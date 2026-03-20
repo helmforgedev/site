@@ -200,36 +200,38 @@ function isActive(href: string): boolean {
   <Footer />
 
   <script is:inline>
-    const toggle = document.getElementById('docs-sidebar-toggle');
-    const sidebar = document.getElementById('docs-sidebar');
-    if (toggle && sidebar) {
-      toggle.addEventListener('click', () => {
-        sidebar.classList.toggle('hidden');
-        sidebar.classList.toggle('block');
-      });
-    }
+    (() => {
+      const toggle = document.getElementById('docs-sidebar-toggle');
+      const sidebar = document.getElementById('docs-sidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', () => {
+          sidebar.classList.toggle('hidden');
+          sidebar.classList.toggle('block');
+        });
+      }
 
-    // Inject copy buttons into all prose code blocks
-    document.querySelectorAll('.prose pre').forEach(pre => {
-      if (pre.querySelector('.prose-copy-btn')) return;
-      const btn = document.createElement('button');
-      btn.className = 'prose-copy-btn';
-      btn.setAttribute('aria-label', 'Copy code');
-      btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy</span>';
-      btn.addEventListener('click', async () => {
-        const code = pre.querySelector('code');
-        if (!code) return;
-        try {
-          await navigator.clipboard.writeText(code.textContent || '');
-          btn.querySelector('span').textContent = 'Copied!';
-          btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
-          setTimeout(() => {
-            btn.querySelector('span').textContent = 'Copy';
-            btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
-          }, 2000);
-        } catch (err) { console.error('Copy failed:', err); }
+      // Inject copy buttons into all prose code blocks
+      document.querySelectorAll('.prose pre').forEach(pre => {
+        if (pre.querySelector('.prose-copy-btn')) return;
+        const btn = document.createElement('button');
+        btn.className = 'prose-copy-btn';
+        btn.setAttribute('aria-label', 'Copy code');
+        btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy</span>';
+        btn.addEventListener('click', async () => {
+          const code = pre.querySelector('code');
+          if (!code) return;
+          try {
+            await navigator.clipboard.writeText(code.textContent || '');
+            btn.querySelector('span').textContent = 'Copied!';
+            btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
+            setTimeout(() => {
+              btn.querySelector('span').textContent = 'Copy';
+              btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+            }, 2000);
+          } catch (err) { console.error('Copy failed:', err); }
+        });
+        pre.appendChild(btn);
       });
-      pre.appendChild(btn);
-    });
+    })();
   </script>
 </BaseLayout>
