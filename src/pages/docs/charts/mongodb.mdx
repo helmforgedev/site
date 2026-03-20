@@ -1,0 +1,92 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: MongoDB Chart
+description: HelmForge MongoDB chart — MongoDB with standalone and replica set configurations for Kubernetes.
+---
+
+# MongoDB
+
+Production-ready MongoDB deployment with support for standalone and replica set configurations.
+
+## Key Features
+
+- **Standalone and replica set** — Single instance or multi-member replica set
+- **Automatic initialization** — Init scripts and custom configuration
+- **Metrics** — Prometheus exporter with ServiceMonitor
+- **Security** — Authentication, non-root containers, network policies
+- **Persistent storage** — Configurable PVCs with storage class selection
+- **Arbiter support** — Optional arbiter for replica set elections
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install my-mongo helmforge/mongodb
+```
+
+**OCI registry:**
+
+```bash
+helm install my-mongo oci://ghcr.io/helmforgedev/helm/mongodb
+```
+
+## Standalone Example
+
+```yaml
+# values.yaml
+architecture: standalone
+
+auth:
+  rootPassword: "my-secret-password"
+  database: myapp
+  username: myuser
+  password: "user-password"
+
+persistence:
+  size: 20Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+## Replica Set Example
+
+```yaml
+architecture: replicaset
+
+auth:
+  rootPassword: "my-secret-password"
+  database: myapp
+  username: myuser
+  password: "user-password"
+
+replicaCount: 3
+
+persistence:
+  size: 20Gi
+
+arbiter:
+  enabled: true
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `architecture` | `standalone` | `standalone` or `replicaset` |
+| `auth.rootPassword` | `""` | MongoDB root password |
+| `auth.database` | `""` | Default database to create |
+| `auth.username` | `""` | Default user to create |
+| `replicaCount` | `1` | Number of replica set members |
+| `persistence.size` | `8Gi` | PVC size |
+| `arbiter.enabled` | `false` | Enable arbiter node |
+| `metrics.enabled` | `false` | Enable Prometheus exporter |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mongodb) on GitHub.

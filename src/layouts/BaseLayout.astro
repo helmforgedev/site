@@ -1,0 +1,89 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  url?: string;
+}
+
+const {
+  title,
+  description,
+  image = '/og-default.png',
+  url = Astro.url.href,
+} = Astro.props;
+
+const siteName = 'HelmForge';
+const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Primary Meta -->
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={url} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(image, Astro.site).href} />
+    <meta property="og:site_name" content={siteName} />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(image, Astro.site).href} />
+
+    <!-- GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5PD0B83HRE"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5PD0B83HRE');
+    </script>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "HelmForge",
+      "url": "https://helmforge.dev",
+      "logo": "https://helmforge.dev/favicon.svg",
+      "description": "Production-ready Helm charts, forged for Kubernetes",
+      "sameAs": ["https://github.com/helmforgedev/charts"]
+    })} />
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "HelmForge Charts",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Kubernetes",
+      "url": "https://helmforge.dev",
+      "description": "Open-source Helm charts built with security, observability, and operational excellence in mind.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    })} />
+
+    <!-- Global CSS -->
+    <style>
+      @import '../styles/global.css';
+    </style>
+  </head>
+  <body class="min-h-screen bg-white text-dark antialiased">
+    <slot />
+  </body>
+</html>

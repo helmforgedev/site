@@ -1,0 +1,94 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: RabbitMQ Chart
+description: HelmForge RabbitMQ chart — RabbitMQ with management UI and clustering for Kubernetes.
+---
+
+# RabbitMQ
+
+Production-ready RabbitMQ deployment with management UI and clustering support.
+
+## Key Features
+
+- **Standalone and clustering** — Single instance or multi-node cluster
+- **Management UI** — Built-in web management console with ingress support
+- **Plugin support** — Configurable RabbitMQ plugins
+- **Metrics** — Prometheus exporter with ServiceMonitor
+- **Security** — Authentication, non-root containers, network policies, TLS
+- **Persistent storage** — Message persistence across restarts
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install my-rabbit helmforge/rabbitmq
+```
+
+**OCI registry:**
+
+```bash
+helm install my-rabbit oci://ghcr.io/helmforgedev/helm/rabbitmq
+```
+
+## Standalone Example
+
+```yaml
+# values.yaml
+auth:
+  username: admin
+  password: "my-secret-password"
+
+persistence:
+  size: 10Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+## Clustering Example
+
+```yaml
+replicaCount: 3
+
+auth:
+  username: admin
+  password: "my-secret-password"
+  erlangCookie: "my-erlang-cookie"
+
+persistence:
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: rabbitmq.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: rabbitmq-tls
+      hosts:
+        - rabbitmq.example.com
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `replicaCount` | `1` | Number of RabbitMQ nodes |
+| `auth.username` | `admin` | Default admin username |
+| `auth.password` | `""` | Admin password |
+| `auth.erlangCookie` | `""` | Erlang cookie for clustering |
+| `persistence.size` | `8Gi` | PVC size |
+| `ingress.enabled` | `false` | Enable ingress for management UI |
+| `metrics.enabled` | `false` | Enable Prometheus exporter |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/rabbitmq) on GitHub.

@@ -1,0 +1,89 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Redis Chart
+description: HelmForge Redis chart — Redis with standalone and Sentinel high-availability for Kubernetes.
+---
+
+# Redis
+
+Production-ready Redis deployment with support for standalone and Sentinel high-availability architectures.
+
+## Key Features
+
+- **Standalone and Sentinel** — Single instance or HA with automatic failover
+- **Persistence** — RDB and AOF persistence options
+- **Metrics** — Prometheus exporter with ServiceMonitor
+- **Security** — Password authentication, non-root containers, network policies
+- **Configurable** — Custom Redis configuration parameters
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install my-redis helmforge/redis
+```
+
+**OCI registry:**
+
+```bash
+helm install my-redis oci://ghcr.io/helmforgedev/helm/redis
+```
+
+## Standalone Example
+
+```yaml
+# values.yaml
+architecture: standalone
+
+auth:
+  password: "my-secret-password"
+
+master:
+  persistence:
+    size: 8Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+## Sentinel Example
+
+```yaml
+architecture: sentinel
+
+auth:
+  password: "my-secret-password"
+
+master:
+  persistence:
+    size: 8Gi
+
+replica:
+  replicaCount: 3
+  persistence:
+    size: 8Gi
+
+sentinel:
+  enabled: true
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `architecture` | `standalone` | `standalone` or `sentinel` |
+| `auth.enabled` | `true` | Enable password authentication |
+| `auth.password` | `""` | Redis password |
+| `master.persistence.size` | `8Gi` | Master PVC size |
+| `replica.replicaCount` | `3` | Number of replicas (Sentinel mode) |
+| `sentinel.enabled` | `false` | Enable Sentinel |
+| `metrics.enabled` | `false` | Enable Prometheus exporter |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/redis) on GitHub.

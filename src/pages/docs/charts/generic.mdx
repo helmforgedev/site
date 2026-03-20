@@ -1,0 +1,99 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Generic Chart
+description: HelmForge Generic chart — a multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, and CronJobs.
+---
+
+# Generic
+
+A multi-purpose Helm chart that can deploy virtually any container workload on Kubernetes. Instead of writing boilerplate templates for each application, the Generic chart lets you configure everything through `values.yaml`.
+
+## Key Features
+
+- **Multiple workload types** — Deployment, StatefulSet, DaemonSet, Job, CronJob
+- **Flexible container configuration** — Ports, environment variables, volumes, probes
+- **Ingress support** — Configurable with `ingressClassName` and TLS
+- **Service accounts** — Create or reference existing service accounts
+- **Init containers and sidecars** — Full support for multi-container pods
+- **HPA and PDB** — Autoscaling and disruption budgets
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install my-app helmforge/generic -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install my-app oci://ghcr.io/helmforgedev/helm/generic -f values.yaml
+```
+
+## Basic Example
+
+Deploy a simple web application:
+
+```yaml
+# values.yaml
+image:
+  repository: nginx
+  tag: "1.27"
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+```
+
+## StatefulSet Example
+
+```yaml
+workloadType: StatefulSet
+
+image:
+  repository: my-stateful-app
+  tag: "2.0"
+
+replicaCount: 3
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: standard
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `workloadType` | `Deployment` | Workload type: Deployment, StatefulSet, DaemonSet, Job, CronJob |
+| `replicaCount` | `1` | Number of replicas |
+| `image.repository` | `""` | Container image repository |
+| `image.tag` | `""` | Container image tag |
+| `service.type` | `ClusterIP` | Kubernetes service type |
+| `service.port` | `80` | Service port |
+| `ingress.enabled` | `false` | Enable ingress resource |
+| `resources` | `{}` | CPU/memory requests and limits |
+| `persistence.enabled` | `false` | Enable persistent storage |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/generic) on GitHub.

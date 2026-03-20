@@ -1,0 +1,99 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: Getting Started
+description: Learn how to add the HelmForge repository and install your first Helm chart on Kubernetes.
+---
+
+# Getting Started
+
+This guide walks you through adding the HelmForge repository and installing your first chart.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **Helm 3.x** installed ([installation guide](https://helm.sh/docs/intro/install/))
+- **kubectl** configured with access to a Kubernetes cluster
+- A running **Kubernetes cluster** (v1.24 or later recommended)
+
+## Add the Repository
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+```
+
+Verify the repository was added:
+
+```bash
+helm search repo helmforge
+```
+
+### OCI Registry
+
+No repository setup is needed for OCI. You can install charts directly:
+
+```bash
+helm install my-release oci://ghcr.io/helmforgedev/helm/<chart-name>
+```
+
+## Install Your First Chart
+
+Let's install Redis as an example:
+
+### Using the HTTPS repository
+
+```bash
+helm install my-redis helmforge/redis
+```
+
+### Using the OCI registry
+
+```bash
+helm install my-redis oci://ghcr.io/helmforgedev/helm/redis
+```
+
+### Verify the installation
+
+```bash
+kubectl get pods -l app.kubernetes.io/instance=my-redis
+```
+
+## Customizing Values
+
+Every chart ships with sensible defaults, but you can override any value:
+
+```bash
+# See all available values
+helm show values helmforge/redis
+
+# Install with custom values
+helm install my-redis helmforge/redis \
+  --set architecture=sentinel \
+  --set replicaCount=3
+```
+
+Or use a values file:
+
+```yaml
+# my-values.yaml
+architecture: sentinel
+replicaCount: 3
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+```bash
+helm install my-redis helmforge/redis -f my-values.yaml
+```
+
+## Next Steps
+
+- Browse the [Charts Overview](/docs/charts) to see all available charts
+- Read individual chart documentation for detailed configuration options
+- Visit the [GitHub repository](https://github.com/helmforgedev/charts) for source code and issues
