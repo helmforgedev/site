@@ -10,7 +10,15 @@ export default defineConfig({
   site: 'https://helmforge.dev',
 
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    build: {
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
+          defaultHandler(warning);
+        },
+      },
+    },
   },
 
   integrations: [mdx(), sitemap()],
