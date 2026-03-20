@@ -34,18 +34,75 @@ public/
 └── robots.txt             # Search engine directives
 ```
 
+## Git Rules
+
+Use Conventional Commits for commit messages and PR titles.
+
+Scoped:
+
+- `feat(site): ...`
+- `fix(site): ...`
+- `docs(site): ...`
+- `refactor(site): ...`
+- `ci(site): ...`
+- `feat(site)!: ...` (breaking change)
+
+Rules:
+
+- always write commit subjects in lowercase
+- keep PR titles in the same Conventional Commit format
+- always open PRs from the working branch to `main`
+- never create branch-to-branch PRs
+- never commit directly to `main` — always use a branch and PR
+- all commits must be authored solely by the repository owner
+- never add Co-Authored-By lines to commits
+
+## Branches
+
+Use:
+
+- `feat/site-<description>`
+- `fix/site-<description>`
+- `refactor/site-<description>`
+- `docs/site-<description>`
+- `ci/site-<description>`
+
+Mandatory flow:
+
+1. run `git checkout main` and `git pull --ff-only origin main`
+2. create a new branch from the updated local `main`
+3. implement the change
+4. commit all intended files
+5. push the branch
+6. create a PR to `main`
+7. wait for CI to pass before merging
+
+Conflict prevention:
+
+- never start new work from an older feature branch after its PR was merged
+- always restart from current `main`
+- before starting the next task, verify that the previous PR was merged and refresh local `main`
+- do not assume local `main` is current after a merge; the deploy workflow runs immediately after merge
+
+## Validation
+
+Run before pushing:
+
+```bash
+npm run build   # Must succeed with zero errors
+```
+
+CI runs automatically on every PR and checks:
+
+1. **Build** — `npm run build` must succeed
+2. **Sitemap** — `sitemap-index.xml` must be generated
+3. **Page count** — minimum expected pages must be built
+4. **HTML validity** — no undefined titles, no broken asset references
+5. **Internal links** — all internal `href` links must resolve
+
 ## Development Rules
 
-### Mandatory Checklist
-
-Before every push, verify:
-
-1. `npm run build` must complete without errors
-2. All new pages are registered in the sidebar navigation
-3. All new chart docs are registered in both sidebar and landing page grid
-4. No hardcoded URLs — always use `Astro.site` or `Astro.url` for absolute URLs
-
-### Page Creation Rules
+### Page Creation Checklist
 
 Every new page or document MUST follow these steps:
 
@@ -61,90 +118,69 @@ Every new page or document MUST follow these steps:
    - Chart docs go in the `chartNav` array
    - Other docs go in the `sidebarNav` array
    - The `allPages` array controls prev/next navigation order
-3. **Register in landing page** (charts only) — add the chart to `ChartGrid.astro` with name, slug, color, letter, and description
-4. **Sitemap is automatic** — `@astrojs/sitemap` generates `sitemap-index.xml` and `sitemap-0.xml` from all pages at build time. No manual sitemap editing is needed. Just create the page and it will be included.
-5. **Canonical URL is automatic** — `BaseLayout.astro` generates `<link rel="canonical">` from `Astro.url`
-6. **Build to verify** — run `npm run build` and confirm the new page appears in the output
+3. **Register in landing page** (charts only) — add to `ChartGrid.astro`
+4. **Sitemap is automatic** — `@astrojs/sitemap` generates it at build time
+5. **Canonical URL is automatic** — `BaseLayout.astro` generates it from `Astro.url`
+6. **Build to verify** — run `npm run build` and confirm the new page appears
 
 ### Chart Documentation Standard
 
-Every chart doc page (`src/pages/docs/charts/<name>.mdx`) must include:
+Every chart doc (`src/pages/docs/charts/<name>.mdx`) must include:
 
 1. Title heading (`# Chart Name`)
 2. Brief description paragraph
 3. **Key Features** section with bullet list
-4. **Installation** section with two subsections:
+4. **Installation** section with:
    - **HTTPS repository** — `helm repo add` + `helm repo update` + `helm install`
    - **OCI registry** — `helm install oci://ghcr.io/helmforgedev/helm/<name>`
 5. **Basic Example** with a `values.yaml` code block
-6. **Key Values** table with columns: Key, Default, Description
+6. **Key Values** table (Key, Default, Description)
 7. **More Information** link to the chart's GitHub source
 
 ### SEO Rules
 
-- Every page must have a unique `title` and `description` in frontmatter
-- `description` should be 50-160 characters for optimal search results
-- `title` is rendered as `{title} | HelmForge` in the browser tab
-- The Open Graph image (`public/og-default.png`) is shared across all pages — if a page needs a custom OG image, add the `image` prop to the layout
+- every page must have a unique `title` and `description` in frontmatter
+- `description` should be 50-160 characters
+- `title` renders as `{title} | HelmForge` — keep under 60 chars
+- OG image at `public/og-default.png` is shared across all pages
 - `robots.txt` allows all crawlers and points to the sitemap
-- JSON-LD structured data is in `BaseLayout.astro` — update when adding new schema types
+- JSON-LD structured data lives in `BaseLayout.astro`
 
 ### Styling Rules
 
-- **Global CSS must use `<style is:global>`** in `BaseLayout.astro` — without it, Astro scopes selectors with `data-astro-cid-*`, breaking MDX-rendered and dynamically injected elements
-- Use `global.css` for prose styles and shared CSS — do not add inline `<style>` blocks in MDX files
-- Use Tailwind utility classes in Astro components
-- Custom theme values go in the `@theme` block in `global.css`
-- Do not import Google Fonts via `<link>` tags — Astro 6 Fonts API handles font loading
+- global CSS in `BaseLayout.astro` MUST use `<style is:global>` — without it, Astro scopes selectors breaking MDX and dynamic content
+- use `global.css` for prose styles — do not add `<style>` blocks in MDX
+- do not import Google Fonts via `<link>` — Astro 6 Fonts API handles it
+- all `<script is:inline>` blocks must be wrapped in IIFE `(() => { ... })()` to prevent variable collisions between components
 
 ### Component Rules
 
-- Keep components in `src/components/`
-- Components that need client-side JS should use `<script is:inline>` for small scripts or Astro's client directives for framework components
-- Copy buttons on code blocks are injected via JS in `DocsLayout.astro` — do not add copy buttons manually in MDX files
+- keep components in `src/components/`
+- copy buttons on code blocks are injected via JS in `DocsLayout.astro` — do not add manually in MDX
 
 ## Key Conventions
 
 ### Astro 6 Fonts API
 
-Fonts are configured at the top level of `astro.config.mjs` (NOT under `experimental`):
+Fonts are top-level in `astro.config.mjs` (NOT under `experimental`):
 
 ```javascript
-import { defineConfig, fontProviders } from 'astro/config';
-export default defineConfig({
-  fonts: [
-    { provider: fontProviders.google(), name: 'Inter', cssVariable: '--font-inter' },
-  ],
-});
-```
-
-### Tailwind CSS 4
-
-Uses `@theme` directive in `global.css` for custom properties:
-
-```css
-@theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-}
+fonts: [
+  { provider: fontProviders.google(), name: 'Inter', cssVariable: '--font-inter' },
+],
 ```
 
 ### MDX Layouts
 
-MDX files use frontmatter `layout` property. Frontmatter is accessed via `Astro.props.frontmatter` in layouts (not `Astro.props` directly).
-
-## Git Rules
-
-- Use Conventional Commits: `feat(site):`, `fix(site):`, `docs(site):`, `ci(site):`
-- Commit subjects must be lowercase
-- All commits must be authored solely by the repository owner
-- Never add Co-Authored-By lines
-- Keep commits focused — separate content changes from infrastructure changes
+Frontmatter accessed via `Astro.props.frontmatter` in layouts (not `Astro.props` directly).
 
 ## Deployment
 
-Automated via GitHub Actions on push to `main`:
+Deploy is automated via GitHub Actions on push to `main`:
 1. `npm ci` + `npm run build`
 2. `wrangler pages deploy dist --project-name=helmforge --branch=main`
+
+CI runs on every PR to `main` and must pass before merging.
 
 ### Secrets
 
@@ -153,11 +189,15 @@ Automated via GitHub Actions on push to `main`:
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Pages + DNS permissions |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account identifier |
 
-## Validation
+## Repository Learning Rule
 
-```bash
-npm run build   # Must succeed before pushing
-```
+When real work reveals a stable reusable improvement:
+
+1. fix the concrete issue
+2. convert it into a short rule if it is likely to recur
+3. update the smallest relevant document in the same branch
+
+Preferred targets: `CLAUDE.md`, `AGENTS.md`, `README.md`
 
 ## Related Repositories
 

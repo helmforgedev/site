@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      - name: Verify sitemap
+        run: |
+          if [ ! -f dist/sitemap-index.xml ]; then
+            echo "ERROR: sitemap-index.xml not generated"
+            exit 1
+          fi
+          echo "Sitemap URLs:"
+          grep -o '<loc>[^<]*</loc>' dist/sitemap-0.xml | sed 's/<[^>]*>//g'
+
+      - name: Verify pages
+        run: |
+          EXPECTED_PAGES=13
+          ACTUAL_PAGES=$(find dist -name '*.html' | wc -l)
+          echo "Pages built: $ACTUAL_PAGES (expected: $EXPECTED_PAGES)"
+          if [ "$ACTUAL_PAGES" -lt "$EXPECTED_PAGES" ]; then
+            echo "ERROR: Expected at least $EXPECTED_PAGES pages, got $ACTUAL_PAGES"
+            exit 1
+          fi
+
+      - name: Check HTML validity
+        run: |
+          ERRORS=0
+          for f in dist/**/*.html dist/*.html; do
+            # Check for undefined titles (broken frontmatter)
+            if grep -q '<title>undefined' "$f"; then
+              echo "ERROR: undefined title in $f"
+              ERRORS=$((ERRORS + 1))
+            fi
+            # Check for empty meta descriptions
+            if grep -q 'name="description" content=""' "$f"; then
+              echo "WARNING: empty description in $f"
+            fi
+            # Check for broken asset references
+            if grep -qE 'src="[^"]*undefined|href="[^"]*undefined' "$f"; then
+              echo "ERROR: undefined asset reference in $f"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Found $ERRORS error(s)"
+            exit 1
+          fi
+          echo "HTML checks passed"
+
+  links:
+    name: Check links
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Check internal links
+        run: |
+          ERRORS=0
+          # Extract internal href links from all HTML files
+          for f in $(find dist -name '*.html'); do
+            grep -oE 'href="(/[^"#]*)"' "$f" | sed 's/href="//;s/"//' | while read -r link; do
+              # Normalize: /docs/ -> dist/docs/index.html
+              TARGET="dist${link}"
+              if [ "${link}" != "/" ] && [ "${link: -1}" = "/" ]; then
+                TARGET="${TARGET}index.html"
+              elif [ "${link}" = "/" ]; then
+                TARGET="dist/index.html"
+              elif [[ ! "$link" =~ \. ]]; then
+                TARGET="${TARGET}/index.html"
+              fi
+              if [ ! -f "$TARGET" ]; then
+                echo "BROKEN LINK in $f: $link -> $TARGET"
+                echo "BROKEN" >> /tmp/broken-links.txt
+              fi
+            done
+          done
+          if [ -f /tmp/broken-links.txt ]; then
+            COUNT=$(wc -l < /tmp/broken-links.txt)
+            echo "Found $COUNT broken internal link(s)"
+            exit 1
+          fi
+          echo "All internal links valid"
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [build, links]
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.build.result }}" = "failure" ] || \
+             [ "${{ needs.links.result }}" = "failure" ]; then
+            echo "CI failed"
+            exit 1
+          fi
+          echo "CI passed"
