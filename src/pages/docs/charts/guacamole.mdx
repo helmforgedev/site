@@ -1,0 +1,112 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Apache Guacamole Chart
+description: HelmForge Apache Guacamole chart — remote desktop gateway with guacd, PostgreSQL or MySQL, OIDC/SAML SSO, and S3 backup.
+---
+
+# Apache Guacamole
+
+Deploy Apache Guacamole on Kubernetes using the official [guacamole/guacamole](https://hub.docker.com/r/guacamole/guacamole) and [guacamole/guacd](https://hub.docker.com/r/guacamole/guacd) Docker images. A clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.
+
+## Key Features
+
+- **guacd Sidecar** — protocol daemon runs alongside the web app
+- **PostgreSQL Subchart** — bundled via HelmForge dependency (default)
+- **MySQL Subchart** — bundled via HelmForge dependency
+- **External Database** — connect to existing PostgreSQL or MySQL
+- **Database Init Job** — automatic schema initialization on install
+- **OpenID Connect** — SSO with Keycloak, Okta, Azure AD, and others
+- **SAML** — SSO with any SAML 2.0 identity provider
+- **TOTP** — two-factor authentication
+- **Scheduled Backups** — pg_dump or mysqldump with S3 upload
+- **Ingress Support** — TLS with cert-manager
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install guacamole helmforge/guacamole -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install guacamole oci://ghcr.io/helmforgedev/helm/guacamole -f values.yaml
+```
+
+## Basic Example (PostgreSQL)
+
+```yaml
+# values.yaml
+postgresql:
+  auth:
+    password: "change-me"
+```
+
+Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.
+
+## OIDC with Keycloak
+
+```yaml
+oidc:
+  enabled: true
+  authorizationEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/auth
+  jwksEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/certs
+  issuer: https://keycloak.example.com/realms/master
+  clientId: guacamole
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: guacamole.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: guacamole-tls
+      hosts:
+        - guacamole.example.com
+```
+
+The `redirectUri` is auto-detected from the ingress configuration.
+
+## External Database
+
+```yaml
+postgresql:
+  enabled: false
+
+database:
+  type: postgresql
+  external:
+    host: db.example.com
+    name: guacamole_db
+    username: guacamole_user
+    existingSecret: guacamole-db-credentials
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `guacamole.contextPath` | `ROOT` | Web context path (`ROOT` = `/`) |
+| `guacd.port` | `4822` | guacd daemon port |
+| `guacd.logLevel` | `info` | guacd log level |
+| `database.type` | `postgresql` | Database type (postgresql, mysql) |
+| `postgresql.enabled` | `true` | Deploy PostgreSQL subchart |
+| `mysql.enabled` | `false` | Deploy MySQL subchart |
+| `initDb.enabled` | `true` | Auto-initialize database schema |
+| `oidc.enabled` | `false` | Enable OpenID Connect SSO |
+| `oidc.clientId` | `""` | OIDC client ID |
+| `saml.enabled` | `false` | Enable SAML SSO |
+| `totp.enabled` | `false` | Enable TOTP 2FA |
+| `ingress.enabled` | `false` | Enable ingress |
+| `backup.enabled` | `false` | Enable S3 backups |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/guacamole) on GitHub.
