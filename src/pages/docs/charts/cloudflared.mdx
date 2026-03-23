@@ -1,0 +1,94 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Cloudflare Tunnel Chart
+description: HelmForge Cloudflare Tunnel chart — secure outbound-only connections with HA, PDB, and Prometheus metrics.
+---
+
+# Cloudflare Tunnel (cloudflared)
+
+Deploy Cloudflare Tunnel on Kubernetes using the official [cloudflare/cloudflared](https://hub.docker.com/r/cloudflare/cloudflared) Docker image. Secure, outbound-only connections between your cluster and Cloudflare's network — no open ports, no public IP required.
+
+## Key Features
+
+- **Zero-trust networking** — no inbound firewall rules needed
+- **Remotely-managed** — configure routes in the Cloudflare dashboard
+- **High availability** — 2 replicas with PodDisruptionBudget by default
+- **Prometheus metrics** — `/ready` and `/metrics` on port 2000
+- **ServiceMonitor** — optional Prometheus Operator integration
+- **Existing secrets** — bring your own Secret for the tunnel token
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install cloudflared helmforge/cloudflared -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install cloudflared oci://ghcr.io/helmforgedev/helm/cloudflared -f values.yaml
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+tunnel:
+  token: "eyJhIjoiY2Y..."  # From Cloudflare dashboard
+```
+
+Create a tunnel in the [Cloudflare dashboard](https://one.dash.cloudflare.com) under **Networks → Tunnels**, copy the token, and configure public hostnames to route traffic to your Kubernetes services.
+
+## Production Example
+
+```yaml
+tunnel:
+  existingSecret: cloudflare-tunnel
+
+replicaCount: 2
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `tunnel.token` | `""` | Tunnel token from Cloudflare dashboard |
+| `tunnel.existingSecret` | `""` | Existing secret with tunnel token |
+| `replicaCount` | `2` | Number of replicas |
+| `cloudflared.logLevel` | `info` | Log level |
+| `cloudflared.noAutoupdate` | `true` | Disable auto-update |
+| `cloudflared.metricsPort` | `2000` | Metrics listen port |
+| `pdb.enabled` | `true` | Create PodDisruptionBudget |
+| `pdb.minAvailable` | `1` | Min available during disruption |
+| `metrics.enabled` | `true` | Expose metrics service |
+| `serviceMonitor.enabled` | `false` | Create Prometheus ServiceMonitor |
+
+## Important Notes
+
+- **Do not use HPA** — downscaling terminates active tunnel connections
+- **No ingress template** — cloudflared replaces traditional ingress controllers
+- **Routing is dashboard-managed** — use the Cloudflare dashboard to map hostnames to services
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/cloudflared) on GitHub.
