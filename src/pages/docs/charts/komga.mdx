@@ -1,0 +1,104 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Komga Chart
+description: HelmForge Komga chart — media server for comics and manga with OPDS, SQLite persistence, and S3 backup.
+---
+
+# Komga
+
+Deploy Komga on Kubernetes using the official [gotson/komga](https://hub.docker.com/r/gotson/komga) Docker image. A media server for comics, mangas, BDs, magazines, and eBooks with OPDS support and a modern web reader.
+
+## Key Features
+
+- **SQLite Database** — zero database configuration, persistent via PVC
+- **Dual Persistent Volumes** — separate PVCs for config and library data
+- **Java Memory Tuning** — configurable JVM heap via `JAVA_TOOL_OPTIONS`
+- **Timezone Support** — configurable via `TZ` environment variable
+- **Scheduled Backups** — config/database tar archive with S3 upload
+- **Ingress Support** — TLS with cert-manager
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install komga helmforge/komga
+```
+
+**OCI registry:**
+
+```bash
+helm install komga oci://ghcr.io/helmforgedev/helm/komga
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+persistence:
+  config:
+    enabled: true
+    size: 2Gi
+  data:
+    enabled: true
+    size: 100Gi
+```
+
+## Production Example
+
+```yaml
+komga:
+  timezone: "America/Sao_Paulo"
+  javaMemory: "-Xmx2g"
+  sessionTimeout: "7d"
+
+persistence:
+  config:
+    size: 5Gi
+  data:
+    size: 500Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: komga.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: komga-tls
+      hosts:
+        - komga.example.com
+
+backup:
+  enabled: true
+  schedule: "0 3 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: komga
+    existingSecret: komga-s3-credentials
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `komga.port` | `25600` | Container port |
+| `komga.contextPath` | `/` | Base URL path for reverse proxy |
+| `komga.sessionTimeout` | `30m` | Session timeout |
+| `komga.timezone` | `UTC` | Timezone |
+| `komga.javaMemory` | `""` | JVM options (e.g. `-Xmx2g`) |
+| `persistence.config.enabled` | `true` | Persist /config (database) |
+| `persistence.config.size` | `2Gi` | Config PVC size |
+| `persistence.data.enabled` | `true` | Persist /data (libraries) |
+| `persistence.data.size` | `50Gi` | Data PVC size |
+| `ingress.enabled` | `false` | Enable ingress |
+| `backup.enabled` | `false` | Enable S3 backups |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/komga) on GitHub.
