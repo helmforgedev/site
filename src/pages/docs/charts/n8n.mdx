@@ -1,0 +1,121 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: n8n Chart
+description: HelmForge n8n chart — workflow automation with SQLite, PostgreSQL, or MySQL, Redis queue mode, and S3 backup.
+---
+
+# n8n
+
+Deploy n8n on Kubernetes using the official [n8nio/n8n](https://hub.docker.com/r/n8nio/n8n) Docker image. Supports SQLite (default), PostgreSQL, MySQL, Redis-backed queue mode with dedicated workers, and scheduled backups.
+
+## Key Features
+
+- **SQLite by Default** — zero database configuration needed
+- **PostgreSQL Subchart** — bundled via HelmForge dependency
+- **MySQL Subchart** — bundled via HelmForge dependency
+- **External Database** — connect to existing PostgreSQL or MySQL
+- **Queue Mode** — Redis-backed horizontal scaling with worker Deployments
+- **Encryption Key** — auto-generated and preserved across upgrades
+- **Scheduled Backups** — database-aware CronJob with S3 upload
+- **Ingress Support** — TLS with cert-manager
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install n8n helmforge/n8n
+```
+
+**OCI registry:**
+
+```bash
+helm install n8n oci://ghcr.io/helmforgedev/helm/n8n
+```
+
+## Basic Example (SQLite)
+
+```yaml
+# values.yaml
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: n8n.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - n8n.example.com
+```
+
+## PostgreSQL Example
+
+```yaml
+postgresql:
+  enabled: true
+  auth:
+    database: n8n
+    username: n8n
+    password: "strong-password"
+
+n8n:
+  webhookUrl: "https://n8n.example.com"
+```
+
+## Queue Mode Example
+
+```yaml
+queue:
+  enabled: true
+  workers: 3
+  concurrency: 10
+
+redis:
+  enabled: true
+  auth:
+    password: "redis-secret"
+```
+
+## External Database Example
+
+```yaml
+database:
+  external:
+    vendor: postgres
+    host: db.example.com
+    name: n8n
+    username: n8n
+    existingSecret: n8n-db-credentials
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `n8n.encryptionKey` | `""` | Encryption key (auto-generated if empty) |
+| `n8n.webhookUrl` | `""` | External webhook URL (auto-detected from ingress) |
+| `n8n.logLevel` | `info` | Log level (silent, error, warn, info, debug, verbose) |
+| `queue.enabled` | `false` | Enable Redis-backed queue mode |
+| `queue.workers` | `2` | Number of worker replicas |
+| `queue.concurrency` | `10` | Jobs per worker |
+| `database.mode` | `auto` | Database mode (auto, sqlite, external, postgresql, mysql) |
+| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart |
+| `mysql.enabled` | `false` | Deploy MySQL subchart |
+| `redis.enabled` | `false` | Deploy Redis subchart |
+| `persistence.enabled` | `true` | Enable persistent storage |
+| `persistence.size` | `5Gi` | PVC size |
+| `ingress.enabled` | `false` | Enable ingress |
+| `backup.enabled` | `false` | Enable S3 backups |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/n8n) on GitHub.
