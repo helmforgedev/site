@@ -1,0 +1,102 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: WordPress Chart
+description: HelmForge WordPress chart — CMS with MySQL subchart or external database, S3 backup, and Prometheus metrics.
+---
+
+# WordPress
+
+Deploy WordPress on Kubernetes using the official [wordpress](https://hub.docker.com/_/wordpress) Docker image (Apache variant). Supports MySQL subchart or external database, scheduled backups, and monitoring.
+
+## Key Features
+
+- **Official WordPress Image** — Apache variant with PHP
+- **MySQL Subchart** — Bundled MySQL via HelmForge dependency
+- **External Database** — Connect to existing MySQL/MariaDB
+- **Scheduled Backups** — mysqldump + wp-content archive to S3
+- **Ingress Support** — TLS with cert-manager
+- **PHP Configuration** — Custom php.ini via ConfigMap
+- **Prometheus Metrics** — Apache exporter sidecar
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install wordpress helmforge/wordpress
+```
+
+**OCI registry:**
+
+```bash
+helm install wordpress oci://ghcr.io/helmforgedev/helm/wordpress
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+wordpress:
+  siteTitle: "My Blog"
+  adminUser: admin
+  adminPassword: "change-me"
+
+mysql:
+  enabled: true
+  auth:
+    password: "db-password"
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: blog.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: wordpress-tls
+      hosts:
+        - blog.example.com
+```
+
+## External Database Example
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  external:
+    host: db.example.com
+    name: wordpress
+    username: wordpress
+    existingSecret: wordpress-db
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `wordpress.adminUser` | `admin` | Admin username |
+| `wordpress.adminPassword` | `""` | Admin password (auto-generated) |
+| `wordpress.debug` | `false` | Enable WP_DEBUG |
+| `database.mode` | `auto` | Database mode (auto, external, mysql) |
+| `mysql.enabled` | `true` | Deploy MySQL subchart |
+| `mysql.auth.database` | `wordpress` | Database name |
+| `php.ini` | `""` | Custom PHP settings |
+| `ingress.enabled` | `false` | Enable ingress |
+| `metrics.enabled` | `false` | Enable Prometheus metrics |
+| `backup.enabled` | `false` | Enable S3 backups |
+| `persistence.enabled` | `true` | Enable persistent storage |
+| `persistence.size` | `5Gi` | PVC size |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/wordpress) on GitHub.
