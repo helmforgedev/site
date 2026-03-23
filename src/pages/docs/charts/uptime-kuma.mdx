@@ -1,0 +1,89 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Uptime Kuma Chart
+description: HelmForge Uptime Kuma chart — self-hosted monitoring with SQLite or MariaDB, status pages, and S3 backup.
+---
+
+# Uptime Kuma
+
+Deploy [Uptime Kuma](https://uptime.kuma.pet) on Kubernetes using the official [louislam/uptime-kuma](https://hub.docker.com/r/louislam/uptime-kuma) Docker image. Self-hosted monitoring with HTTP/TCP/DNS/Ping checks, 90+ notification services, and customizable status pages.
+
+## Key Features
+
+- **20+ monitor types** — HTTP(s), TCP, Ping, DNS, Docker, WebSocket, and more
+- **90+ notification services** — Telegram, Discord, Slack, Email, Pushover, and more
+- **Status pages** — public status pages with custom domains
+- **SQLite or MariaDB** — embedded SQLite (default) or MySQL subchart
+- **External database** — connect to existing MariaDB instances
+- **Scheduled backups** — SQLite tar or mysqldump with S3 upload
+- **Ingress support** — TLS with cert-manager
+- **2FA** — built-in two-factor authentication
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install uptime-kuma helmforge/uptime-kuma -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install uptime-kuma oci://ghcr.io/helmforgedev/helm/uptime-kuma -f values.yaml
+```
+
+## Basic Example (SQLite)
+
+```yaml
+# values.yaml — default values are sufficient
+# SQLite is used by default, no database configuration needed
+```
+
+After deploying, access the setup wizard via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.
+
+## MariaDB Mode
+
+```yaml
+database:
+  type: mariadb
+
+mysql:
+  enabled: true
+  auth:
+    password: "change-me"
+```
+
+## External Database
+
+```yaml
+database:
+  type: mariadb
+  external:
+    host: mariadb.example.com
+    name: uptime_kuma
+    username: uptime_kuma
+    existingSecret: uptime-kuma-db-credentials
+
+mysql:
+  enabled: false
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `uptimeKuma.port` | `3001` | Application port |
+| `database.type` | `sqlite` | Database type (sqlite, mariadb) |
+| `mysql.enabled` | `false` | Deploy MySQL subchart |
+| `persistence.enabled` | `true` | Enable persistence for /app/data |
+| `persistence.size` | `2Gi` | PVC size |
+| `ingress.enabled` | `false` | Enable ingress |
+| `backup.enabled` | `false` | Enable S3 backups |
+| `service.port` | `80` | Service port |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/uptime-kuma) on GitHub.
