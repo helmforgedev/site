@@ -1,0 +1,123 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Authelia Chart
+description: HelmForge Authelia chart — SSO, MFA, OpenID Connect, forward auth for Traefik/nginx, with SQLite/PostgreSQL/MySQL and Redis.
+---
+
+# Authelia
+
+Deploy [Authelia](https://www.authelia.com) on Kubernetes using the official [authelia/authelia](https://hub.docker.com/r/authelia/authelia) Docker image. Authentication and authorization server with single sign-on, multi-factor authentication, and OpenID Connect identity provider.
+
+## Key Features
+
+- **Forward auth middleware** — Traefik, nginx, Caddy, Envoy
+- **Multi-factor authentication** — TOTP, WebAuthn/FIDO2, Duo
+- **OpenID Connect** — certified identity provider for SSO
+- **File or LDAP** authentication backends
+- **SQLite, PostgreSQL, or MySQL** storage backends
+- **Redis** session storage for stateless HA deployments
+- **Access control rules** — domain, user, group, and network policies
+- **Brute force protection** — configurable regulation
+- **Prometheus metrics** with optional ServiceMonitor
+- **S3 backup** — SQLite tar, pg_dump, or mysqldump with S3 upload
+- **Ingress support** — TLS with cert-manager
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install authelia helmforge/authelia -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install authelia oci://ghcr.io/helmforgedev/helm/authelia -f values.yaml
+```
+
+## Basic Example (SQLite)
+
+```yaml
+secrets:
+  jwtSecret: "your-64-char-random-string"
+  sessionSecret: "your-64-char-random-string"
+  storageEncryptionKey: "your-20-plus-char-string"
+
+config:
+  session:
+    cookies:
+      - domain: example.com
+        authelia_url: "https://auth.example.com"
+  access_control:
+    default_policy: one_factor
+
+usersDatabase:
+  users:
+    admin:
+      displayname: "Admin"
+      email: "admin@example.com"
+      password: "$argon2id$v=19$m=65536,t=3,p=4$..."
+      groups:
+        - admins
+```
+
+After deploying, access via `kubectl port-forward svc/<release>-authelia 9091:80`.
+
+## PostgreSQL + Redis Mode
+
+```yaml
+database:
+  type: postgres
+
+postgresql:
+  enabled: true
+  auth:
+    password: "change-me"
+
+redis:
+  enabled: true
+  auth:
+    password: "change-me"
+```
+
+## External Database
+
+```yaml
+database:
+  type: postgres
+  external:
+    host: postgres.example.com
+    name: authelia
+    username: authelia
+    existingSecret: authelia-db-credentials
+
+postgresql:
+  enabled: false
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `config` | (see values.yaml) | Full Authelia configuration YAML |
+| `secrets.jwtSecret` | `""` | JWT secret (64+ chars) |
+| `secrets.sessionSecret` | `""` | Session secret (64+ chars) |
+| `secrets.storageEncryptionKey` | `""` | Storage encryption key (20+ chars) |
+| `database.type` | `sqlite` | Storage: sqlite, postgres, mysql |
+| `usersDatabase.enabled` | `true` | Enable file-based user database |
+| `persistence.enabled` | `true` | Enable persistence for /data |
+| `persistence.size` | `1Gi` | PVC size |
+| `ingress.enabled` | `false` | Enable ingress |
+| `metrics.enabled` | `false` | Enable metrics service |
+| `backup.enabled` | `false` | Enable S3 backups |
+| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart |
+| `mysql.enabled` | `false` | Deploy MySQL subchart |
+| `redis.enabled` | `false` | Deploy Redis subchart |
+| `service.port` | `80` | Service port |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/authelia) on GitHub.
