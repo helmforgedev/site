@@ -122,6 +122,7 @@ Every new page or document MUST follow these steps:
 4. **Sitemap is automatic** — `@astrojs/sitemap` generates it at build time
 5. **Canonical URL is automatic** — `BaseLayout.astro` generates it from `Astro.url`
 6. **Build to verify** — run `npm run build` and confirm the new page appears
+7. **Keep chart docs in sync with `helm/`** — when a chart is added or its public metadata changes in the charts repository, update the corresponding page, sidebar, and landing-page card here in the same workstream
 
 ### Chart Documentation Standard
 

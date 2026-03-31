@@ -83,6 +83,7 @@ When creating a new chart doc:
 - [ ] Include Installation section with HTTPS repository and OCI registry
 - [ ] Include Key Values table
 - [ ] Link to GitHub source
+- [ ] Keep chart maturity and other public metadata aligned with the `helm/` repository when chart pages or cards expose that information
 
 ### Page Removal Checklist
 
@@ -105,6 +106,8 @@ MDX page (frontmatter: layout, title, description)
 | When you change... | Also update... |
 |---------------------|----------------|
 | Add/remove a chart doc | `DocsLayout.astro` (chartNav) + `ChartGrid.astro` |
+| A chart is added in `helm/` | Create `src/pages/docs/charts/<name>.mdx` + update `DocsLayout.astro` + update `ChartGrid.astro` |
+| Public chart metadata changes in `helm/` (for example maturity) | Update the related chart page and any listing/card content that exposes that metadata |
 | Add/remove a docs page | `DocsLayout.astro` (sidebarNav) |
 | Add a new font | `astro.config.mjs` (fonts) + `global.css` (@theme) |
 | Change site domain | `astro.config.mjs` (site) + `robots.txt` (Sitemap URL) |
