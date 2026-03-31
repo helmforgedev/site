@@ -1,0 +1,92 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Velero Chart
+description: HelmForge Velero chart for Kubernetes backup, restore, migration, schedules, and S3-compatible object storage.
+---
+
+# Velero
+
+Deploy [Velero](https://velero.io/) on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional filesystem backup workflows.
+
+## Key Features
+
+- **Latest stable Velero** — chart pinned to the latest stable upstream release
+- **Official CRDs included** — Velero CRDs shipped through the chart `crds/` directory
+- **S3-compatible storage** — validated with the AWS plugin against MinIO and similar providers
+- **Recurring schedules** — optional `Schedule` resources rendered from chart values
+- **Filesystem backup** — optional node-agent DaemonSet for pod volume backups
+- **Metrics support** — metrics Service and optional ServiceMonitor
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install velero helmforge/velero -n velero --create-namespace -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install velero oci://ghcr.io/helmforgedev/helm/velero -n velero --create-namespace -f values.yaml
+```
+
+## S3-Compatible Example
+
+```yaml
+credentials:
+  secretContents: |
+    [default]
+    aws_access_key_id=minioadmin
+    aws_secret_access_key=minioadmin123
+
+configuration:
+  backupStorageLocations:
+    - name: default
+      provider: aws
+      bucket: velero
+      default: true
+      config:
+        region: minio
+        s3Url: http://minio.minio.svc.cluster.local:9000
+        s3ForcePathStyle: true
+        insecureSkipTLSVerify: true
+```
+
+## Scheduled Backup Example
+
+```yaml
+schedules:
+  - name: daily
+    schedule: "0 3 * * *"
+    template:
+      ttl: 168h
+      includedNamespaces:
+        - apps
+      snapshotVolumes: false
+      defaultVolumesToFsBackup: true
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `image.repository` | `docker.io/velero/velero` | Velero server image |
+| `plugins.aws.tag` | `v1.14.0` | Default AWS/S3 plugin image tag |
+| `configuration.backupStorageLocations` | one default entry | Backup storage definitions |
+| `configuration.volumeSnapshotLocations` | `[]` | Snapshot storage definitions |
+| `schedules` | `[]` | Schedule resources created by the chart |
+| `nodeAgent.enabled` | `false` | Deploy the filesystem backup DaemonSet |
+| `metrics.serviceMonitor.enabled` | `false` | Create a Prometheus Operator ServiceMonitor |
+
+## Validation Guidance
+
+- always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall
+- for S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`
+- create at least one real test backup before enabling recurring schedules in shared environments
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/velero) on GitHub.
