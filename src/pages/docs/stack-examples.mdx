@@ -1,0 +1,448 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: Stack Examples
+description: Real-world Kubernetes stack examples combining multiple HelmForge charts for blogs, SaaS platforms, and self-hosted infrastructure.
+---
+
+# Stack Examples
+
+These examples show how to combine multiple HelmForge charts into production-ready stacks. Each stack uses shared S3 credentials for backup and production-grade defaults.
+
+All examples assume:
+
+- A running Kubernetes cluster (v1.26+)
+- Helm 3.x installed
+- The HelmForge repository added:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+```
+
+---
+
+## Blog Stack
+
+**WordPress + MySQL + S3 Backup**
+
+A complete blog platform with a bundled database and daily backups to S3-compatible storage.
+
+### Install
+
+```bash
+helm install blog helmforge/wordpress -f blog-values.yaml
+```
+
+### blog-values.yaml
+
+```yaml
+# WordPress application
+wordpress:
+  siteTitle: "My Blog"
+  adminUser: admin
+  adminEmail: admin@example.com
+
+# Bundled MySQL database
+mysql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: wordpress
+    username: wordpress
+    existingSecret: blog-mysql-credentials
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# WordPress file persistence
+persistence:
+  enabled: true
+  size: 10Gi
+
+# Daily S3 backup (database dump + uploads archive)
+backup:
+  enabled: true
+  schedule: "0 3 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: blog
+    existingSecret: blog-s3-credentials
+
+# Public ingress with TLS
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: blog.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: blog-tls
+      hosts:
+        - blog.example.com
+
+# Production defaults
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+```
+
+### Secrets
+
+Create the required secrets before installing:
+
+```bash
+# MySQL credentials
+kubectl create secret generic blog-mysql-credentials \
+  --from-literal=password='<db-password>' \
+  --from-literal=root-password='<root-password>'
+
+# S3 backup credentials
+kubectl create secret generic blog-s3-credentials \
+  --from-literal=access-key='<aws-access-key>' \
+  --from-literal=secret-key='<aws-secret-key>'
+```
+
+### What you get
+
+- WordPress accessible at `https://blog.example.com`
+- MySQL database with 10Gi persistent storage
+- Daily database dump uploaded to S3 at 03:00 UTC
+- TLS certificate via cert-manager
+
+---
+
+## SaaS Automation Stack
+
+**n8n + PostgreSQL + Redis (Queue Mode) + S3 Backup**
+
+A horizontally scalable workflow automation platform with PostgreSQL for persistence, Redis for job queues, and automated backups.
+
+### Install
+
+```bash
+helm install automation helmforge/n8n -f automation-values.yaml
+```
+
+### automation-values.yaml
+
+```yaml
+# n8n application
+n8n:
+  logLevel: info
+
+# Queue mode with Redis for horizontal scaling
+queue:
+  enabled: true
+  workers: 2
+  concurrency: 10
+
+# Bundled PostgreSQL database
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: n8n
+    username: n8n
+    existingSecret: automation-pg-credentials
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+# Bundled Redis for queue
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    existingSecret: automation-redis-credentials
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Daily S3 backup (PostgreSQL dump)
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: automation
+    existingSecret: automation-s3-credentials
+
+# Internal ingress (not public-facing)
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: n8n.internal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: automation-tls
+      hosts:
+        - n8n.internal.example.com
+
+# Production resources
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+```
+
+### Secrets
+
+```bash
+# PostgreSQL credentials
+kubectl create secret generic automation-pg-credentials \
+  --from-literal=password='<pg-password>' \
+  --from-literal=root-password='<pg-root-password>'
+
+# Redis credentials
+kubectl create secret generic automation-redis-credentials \
+  --from-literal=password='<redis-password>'
+
+# S3 backup credentials
+kubectl create secret generic automation-s3-credentials \
+  --from-literal=access-key='<aws-access-key>' \
+  --from-literal=secret-key='<aws-secret-key>'
+```
+
+### What you get
+
+- n8n editor at `https://n8n.internal.example.com`
+- 2 queue workers processing workflows in parallel
+- PostgreSQL with 20Gi persistent storage
+- Redis for reliable job queue distribution
+- Daily PostgreSQL dump uploaded to S3 at 02:00 UTC
+
+---
+
+## Self-Hosted Security Stack
+
+**Vaultwarden + Keycloak + PostgreSQL + S3 Backup**
+
+A self-hosted password manager with centralized SSO authentication and per-service database backups. Each application gets its own PostgreSQL instance for isolation.
+
+### Install
+
+This stack uses three separate releases. Install in order:
+
+```bash
+# 1. PostgreSQL for Keycloak
+helm install keycloak-db helmforge/postgresql -f keycloak-db-values.yaml
+
+# 2. Keycloak (SSO provider)
+helm install keycloak helmforge/keycloak -f keycloak-values.yaml
+
+# 3. Vaultwarden (password manager)
+helm install vaultwarden helmforge/vaultwarden -f vaultwarden-values.yaml
+```
+
+### keycloak-db-values.yaml
+
+```yaml
+architecture: standalone
+
+auth:
+  database: keycloak
+  username: keycloak
+  existingSecret: keycloak-db-credentials
+
+primary:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+backup:
+  enabled: true
+  schedule: "0 4 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: keycloak-db
+    existingSecret: infra-s3-credentials
+```
+
+### keycloak-values.yaml
+
+```yaml
+# External PostgreSQL (deployed above)
+postgresql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: keycloak-db-postgresql
+    port: 5432
+    name: keycloak
+    username: keycloak
+    existingSecret: keycloak-db-credentials
+    existingSecretPasswordKey: password
+
+# Keycloak production settings
+keycloak:
+  adminUser: admin
+  adminPassword: ""
+  existingSecret: keycloak-admin-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: sso.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: keycloak-tls
+      hosts:
+        - sso.example.com
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+```
+
+### vaultwarden-values.yaml
+
+```yaml
+# Vaultwarden core settings
+domain: "https://vault.example.com"
+
+vaultwarden:
+  signupsAllowed: false
+  invitationsAllowed: true
+
+admin:
+  existingSecret: vaultwarden-admin-credentials
+  existingSecretTokenKey: admin-token
+
+# Bundled PostgreSQL for Vaultwarden
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: vaultwarden
+    username: vaultwarden
+    existingSecret: vaultwarden-pg-credentials
+
+# Data persistence
+data:
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# Daily S3 backup (PostgreSQL dump + data directory)
+backup:
+  enabled: true
+  schedule: "0 5 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: vaultwarden
+    existingSecret: infra-s3-credentials
+
+# SMTP for email notifications
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 587
+  from: vault@example.com
+  fromName: Vaultwarden
+  security: starttls
+  existingSecret: vaultwarden-smtp-credentials
+  existingSecretPasswordKey: smtp-password
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: vault.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: vaultwarden-tls
+      hosts:
+        - vault.example.com
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+```
+
+### Secrets
+
+```bash
+# Shared S3 credentials (reused across stack)
+kubectl create secret generic infra-s3-credentials \
+  --from-literal=access-key='<aws-access-key>' \
+  --from-literal=secret-key='<aws-secret-key>'
+
+# Keycloak database
+kubectl create secret generic keycloak-db-credentials \
+  --from-literal=password='<keycloak-db-password>' \
+  --from-literal=root-password='<pg-root-password>'
+
+# Keycloak admin
+kubectl create secret generic keycloak-admin-credentials \
+  --from-literal=admin-password='<keycloak-admin-password>'
+
+# Vaultwarden database
+kubectl create secret generic vaultwarden-pg-credentials \
+  --from-literal=password='<vaultwarden-db-password>' \
+  --from-literal=root-password='<pg-root-password>'
+
+# Vaultwarden admin token (Argon2 hash recommended)
+kubectl create secret generic vaultwarden-admin-credentials \
+  --from-literal=admin-token='<argon2-phc-string>'
+
+# Vaultwarden SMTP
+kubectl create secret generic vaultwarden-smtp-credentials \
+  --from-literal=smtp-password='<smtp-password>'
+```
+
+### What you get
+
+- Keycloak SSO at `https://sso.example.com`
+- Vaultwarden at `https://vault.example.com`
+- Isolated PostgreSQL instances per service
+- Staggered daily backups to S3 (Keycloak DB at 04:00, Vaultwarden at 05:00)
+- SMTP notifications for Vaultwarden events
+- All secrets managed via Kubernetes Secrets with `existingSecret` references
+
+---
+
+## Tips for Production Stacks
+
+- **Stagger backup schedules** — avoid running all backup CronJobs at the same time to reduce I/O spikes
+- **Use `existingSecret` everywhere** — never put passwords in values files that get committed to git
+- **Share S3 credentials** — use one secret with different `prefix` values per service to keep backups organized in the same bucket
+- **Set resource requests and limits** — prevents noisy-neighbor issues in shared clusters
+- **Use cert-manager** — automates TLS certificate issuance and renewal across all ingresses
