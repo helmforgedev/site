@@ -1,0 +1,79 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: phpMyAdmin
+description: Helm chart for phpMyAdmin web-based MySQL/MariaDB administration on Kubernetes.
+---
+
+# phpMyAdmin
+
+Helm chart for deploying [phpMyAdmin](https://www.phpmyadmin.net/) on Kubernetes using the official [`phpmyadmin/phpmyadmin`](https://hub.docker.com/r/phpmyadmin/phpmyadmin) Docker image.
+
+## Key Features
+
+- **Official phpMyAdmin image** based on `phpmyadmin/phpmyadmin`
+- **Single or multi-server** connect to one MySQL host or multiple servers
+- **Auto-login** optional automatic authentication via credentials or existing secret
+- **Custom configuration** mount `config.user.inc.php` via ConfigMap
+- **Upload limit** configurable max upload size for SQL imports
+- **Stateless** no persistent storage needed, scales horizontally
+- **Ingress support** configurable ingress with TLS
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install phpmyadmin helmforge/phpmyadmin --set phpmyadmin.host=mysql.default.svc
+```
+
+### OCI Registry
+
+```bash
+helm install phpmyadmin oci://ghcr.io/helmforgedev/helm/phpmyadmin --set phpmyadmin.host=mysql.default.svc
+```
+
+## Basic Example
+
+```yaml
+phpmyadmin:
+  host: mysql.default.svc.cluster.local
+  port: 3306
+  uploadLimit: "128M"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: pma.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: phpmyadmin-tls
+      hosts:
+        - pma.example.com
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `phpmyadmin.host` | `""` | MySQL/MariaDB host to connect to |
+| `phpmyadmin.hosts` | `""` | Comma-separated hosts for multi-server mode |
+| `phpmyadmin.port` | `3306` | MySQL port |
+| `phpmyadmin.uploadLimit` | `"64M"` | Max upload size for SQL imports |
+| `phpmyadmin.absoluteUri` | `""` | Absolute URI when behind a reverse proxy |
+| `auth.username` | `""` | MySQL username for auto-login |
+| `auth.existingSecret` | `""` | Existing secret with auto-login credentials |
+| `config.customConfig` | `""` | Raw content for config.user.inc.php |
+| `replicaCount` | `1` | Number of replicas |
+| `service.type` | `ClusterIP` | Service type |
+| `service.port` | `80` | Service port |
+| `ingress.enabled` | `false` | Enable ingress |
+| `ingress.ingressClassName` | `""` | Ingress class (`traefik`, `nginx`, etc.) |
+
+## More Information
+
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/phpmyadmin)
