@@ -1,0 +1,87 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Dolibarr
+description: Helm chart for Dolibarr ERP/CRM on Kubernetes with MySQL support.
+---
+
+# Dolibarr
+
+Helm chart for deploying [Dolibarr ERP/CRM](https://www.dolibarr.org/) on Kubernetes using the official [`dolibarr/dolibarr`](https://hub.docker.com/r/dolibarr/dolibarr) Docker image.
+
+## Key Features
+
+- **Official Dolibarr image** based on `dolibarr/dolibarr`
+- **MySQL subchart** bundled HelmForge MySQL dependency
+- **External MySQL/MariaDB** connect to a managed database
+- **Auto installation** unattended setup via `DOLI_*` environment variables
+- **Persistent storage** separate PVCs for documents and custom modules
+- **Ingress support** configurable ingress with TLS
+- **Secret preservation** admin, runtime, and database secrets preserved across upgrades
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install dolibarr helmforge/dolibarr
+```
+
+### OCI Registry
+
+```bash
+helm install dolibarr oci://ghcr.io/helmforgedev/helm/dolibarr
+```
+
+## Basic Example
+
+```yaml
+dolibarr:
+  siteUrl: "https://erp.example.com"
+  companyName: "Example Corp"
+  companyCountryCode: "US"
+  enableModules: "societe,produit,service,propal,commande,facture"
+
+mysql:
+  enabled: true
+  auth:
+    password: "change-me"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: erp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: dolibarr-tls
+      hosts:
+        - erp.example.com
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `dolibarr.siteUrl` | `""` | Full external URL (auto-detected from ingress if empty) |
+| `dolibarr.companyName` | `Dolibarr` | Company name for unattended setup |
+| `dolibarr.companyCountryCode` | `US` | ISO country code |
+| `dolibarr.installAuto` | `true` | Enable unattended installation |
+| `dolibarr.enableModules` | `""` | Comma-separated modules to enable on first boot |
+| `admin.login` | `admin` | Admin login |
+| `admin.password` | `""` | Admin password (auto-generated if empty) |
+| `database.mode` | `auto` | Database mode: `auto`, `external`, `mysql` |
+| `mysql.enabled` | `true` | Deploy MySQL subchart |
+| `persistence.documents.enabled` | `true` | Persist `/var/www/documents` |
+| `persistence.documents.size` | `8Gi` | Documents PVC size |
+| `persistence.custom.enabled` | `true` | Persist `/var/www/html/custom` |
+| `persistence.custom.size` | `2Gi` | Custom modules PVC size |
+| `ingress.enabled` | `false` | Enable ingress |
+| `ingress.ingressClassName` | `""` | Ingress class (`traefik`, `nginx`, etc.) |
+
+## More Information
+
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/dolibarr)
