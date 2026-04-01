@@ -23,15 +23,24 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+    
+    <!-- Theme Detection (Prevents FOUC) -->
+    <script is:inline>
+      const theme = typeof localStorage !== 'undefined' ? localStorage.getItem('helmforge-theme') : null;
+      const sysLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+      if (theme === 'light' || (!theme && sysLight)) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
 
     <!-- Primary Meta -->
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
-    <link rel="shortcut icon" href="/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-256.png" />
+    <meta name="keywords" content={`bitnami alternative, helm chart, kubernetes, open source, production ready, ${title.toLowerCase()}, redis, postgresql, mariadb, mongodb, rabbitmq, keycloak, wordpress, minecraft, flowise, n8n`} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="canonical" href={url} />
 
     <!-- Open Graph -->
@@ -57,16 +66,18 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
       gtag('config', 'G-5PD0B83HRE');
     </script>
 
-    <!-- JSON-LD Structured Data -->
+    <!-- JSON-LD Structured Data for Organization -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "HelmForge",
       "url": "https://helmforge.dev",
-      "logo": "https://helmforge.dev/helmforge-logo-horizontal.png",
-      "description": "Production-ready Helm charts, forged for Kubernetes",
+      "logo": "https://helmforge.dev/helmforge-logo-horizontal.svg",
+      "description": "Production-ready Helm charts, forged for Kubernetes. The modern open-source alternative to Bitnami.",
       "sameAs": ["https://github.com/helmforgedev/charts"]
     })} />
+    
+    <!-- JSON-LD Structured Data for SoftwareApplication Collection -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
@@ -74,7 +85,8 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Kubernetes",
       "url": "https://helmforge.dev",
-      "description": "Open-source Helm charts built with security, observability, and operational excellence in mind.",
+      "description": "Premium, open-source Helm charts built with security, observability, built-in backups, and operational excellence in mind.",
+      "keywords": "helm, kubernetes, bitnami alternative, postgresql, redis, open source",
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -87,7 +99,7 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
       @import '../styles/global.css';
     </style>
   </head>
-  <body class="min-h-screen bg-white text-dark antialiased">
+  <body class="min-h-screen antialiased">
     <slot />
   </body>
 </html>

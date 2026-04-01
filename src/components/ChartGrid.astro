@@ -84,6 +84,7 @@ const charts = [
   {
     name: 'Pi-hole',
     slug: 'pihole',
+    icon: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Pi-hole_vector_logo.svg',
     description: 'Network-wide ad blocking with DNS sinkhole and optional recursive DNS.',
     color: 'bg-rose-100 text-rose-700',
     letter: 'Ph',
@@ -111,6 +112,7 @@ const charts = [
   {
     name: 'Answer',
     slug: 'answer',
+    icon: 'https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/apache-answer.png',
     description: 'Apache Answer Q&A platform with SQL backends and S3 backup.',
     color: 'bg-cyan-100 text-cyan-700',
     letter: 'An',
@@ -147,6 +149,7 @@ const charts = [
   {
     name: 'Cloudflared',
     slug: 'cloudflared',
+    icon: 'https://svgl.app/library/cloudflare.svg',
     description: 'Cloudflare Tunnel with outbound-only networking and HA options.',
     color: 'bg-orange-100 text-orange-700',
     letter: 'Cf',
@@ -201,6 +204,7 @@ const charts = [
   {
     name: 'Velero',
     slug: 'velero',
+    icon: 'https://raw.githubusercontent.com/cncf/landscape/master/hosted_logos/velero.svg',
     description: 'Kubernetes backup, restore, and migration with object storage.',
     color: 'bg-cyan-100 text-cyan-700',
     letter: 'Ve',
@@ -210,6 +214,7 @@ const charts = [
   {
     name: 'Kafka',
     slug: 'kafka',
+    icon: 'https://svgl.app/library/apache_kafka.svg',
     description: 'KRaft single-broker and cluster modes with persistent storage.',
     color: 'bg-orange-100 text-orange-700',
     letter: 'Ka',
@@ -300,9 +305,9 @@ const charts = [
 ];
 
 const maturityStyles = {
-  stable: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  beta: 'bg-amber-50 text-amber-700 border-amber-200',
-  alpha: 'bg-rose-50 text-rose-700 border-rose-200',
+  stable: 'bg-green-500/10 text-green-400 border-green-500/20',
+  beta: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  alpha: 'bg-red-500/10 text-red-400 border-red-500/20',
 } as const;
 
 const chartCount = charts.length;
@@ -310,56 +315,87 @@ const backupCount = charts.filter((chart) => chart.backup).length;
 const stableCount = charts.filter((chart) => chart.maturity === 'stable').length;
 ---
 
-<section class="bg-surface py-16 sm:py-20">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+<section class="py-16 sm:py-20 relative">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
       <div class="max-w-2xl">
-        <p class="text-sm font-medium uppercase tracking-[0.18em] text-primary">Charts</p>
-        <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-dark">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Catalog</p>
+        <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-text-base heading-font">
           A cleaner catalog for common Kubernetes workloads.
         </h2>
-        <p class="mt-4 text-base sm:text-lg leading-relaxed text-muted">
+        <p class="mt-4 text-base sm:text-lg leading-relaxed text-text-muted">
           Browse application charts with consistent structure, documented values, and production-minded defaults.
         </p>
+        
+        <!-- Search Input -->
+        <div class="mt-8 relative max-w-md">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-text-muted transition-colors group-focus-within:text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input 
+            type="search" 
+            id="chart-search" 
+            class="block w-full pl-10 pr-4 py-3 border border-border rounded-xl leading-5 bg-bg-surface text-text-base placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors sm:text-sm" 
+            placeholder="Search by name or description..." 
+          />
+        </div>
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:min-w-[320px]">
-        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-2xl font-semibold tracking-tight text-dark">{chartCount}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-muted">Charts</p>
+        <div class="glass-panel rounded-2xl px-4 py-4 text-center">
+          <p class="text-3xl font-bold tracking-tight text-text-base">{chartCount}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-text-muted">Charts</p>
         </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-2xl font-semibold tracking-tight text-dark">{stableCount}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-muted">Stable</p>
+        <div class="glass-panel rounded-2xl px-4 py-4 text-center">
+          <p class="text-3xl font-bold tracking-tight text-text-base">{stableCount}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-text-muted">Stable</p>
         </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-2xl font-semibold tracking-tight text-dark">{backupCount}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-muted">With S3</p>
+        <div class="glass-panel rounded-2xl px-4 py-4 text-center">
+          <p class="text-3xl font-bold tracking-tight text-text-base">{backupCount}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-text-muted">With S3</p>
         </div>
       </div>
     </div>
 
-    <div class="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <!-- Empty State -->
+    <div id="chart-empty-state" class="hidden mt-12 glass-panel rounded-2xl py-16 text-center border-dashed border-border border-2">
+      <svg class="mx-auto h-12 w-12 text-text-muted/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <h3 class="text-lg font-bold text-text-base">No charts found</h3>
+      <p class="mt-2 text-text-muted">Try adjusting your search terms.</p>
+    </div>
+
+    <div class="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3" id="chart-grid-container">
       {charts.map((chart) => (
         <a
           href={`/docs/charts/${chart.slug}`}
-          class="group rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm"
+          class="chart-card group glass-panel rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:bg-text-base/5"
+          data-name={chart.name.toLowerCase()}
+          data-desc={chart.description.toLowerCase()}
         >
           <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${chart.color}`}>
-                {chart.letter}
+            <div class="flex items-center gap-4 min-w-0">
+              <div class={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold shadow-inner ${chart.color} opacity-90 group-hover:opacity-100 transition-opacity bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden`}>
+                <img 
+                  src={chart.icon || `https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/${chart.slug !== 'generic' ? chart.slug : 'kubernetes'}.png`} 
+                  alt={`${chart.name} icon`}
+                  class="w-7 h-7 object-contain drop-shadow-md"
+                  onerror="this.onerror=null; this.src='/chart-placeholder.svg';"
+                />
               </div>
               <div class="min-w-0">
-                <h3 class="truncate text-base font-semibold text-dark transition-colors group-hover:text-primary">
+                <h3 class="truncate text-lg font-bold text-text-base transition-colors group-hover:text-primary-light">
                   {chart.name}
                 </h3>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
-                  <span class={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${maturityStyles[chart.maturity]}`}>
+                  <span class={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] ${maturityStyles[chart.maturity]}`}>
                     {chart.maturity}
                   </span>
                   {chart.backup && (
-                    <span class="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    <span class="inline-flex rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-sky-400">
                       S3 backup
                     </span>
                   )}
@@ -367,12 +403,12 @@ const stableCount = charts.filter((chart) => chart.maturity === 'stable').length
               </div>
             </div>
 
-            <svg class="mt-1 h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="mt-1 h-5 w-5 shrink-0 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </div>
 
-          <p class="mt-4 text-sm leading-6 text-muted">
+          <p class="mt-5 text-sm leading-relaxed text-text-muted">
             {chart.description}
           </p>
         </a>
@@ -380,3 +416,36 @@ const stableCount = charts.filter((chart) => chart.maturity === 'stable').length
     </div>
   </div>
 </section>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('chart-search');
+    const chartCards = document.querySelectorAll('.chart-card');
+    const emptyState = document.getElementById('chart-empty-state');
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase().trim();
+        let visibleCount = 0;
+        
+        chartCards.forEach((card) => {
+          const name = card.getAttribute('data-name');
+          const desc = card.getAttribute('data-desc');
+          
+          if (name.includes(term) || desc.includes(term)) {
+            card.style.display = '';
+            visibleCount++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+
+        if (visibleCount === 0) {
+          emptyState.classList.remove('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+        }
+      });
+    }
+  });
+</script>

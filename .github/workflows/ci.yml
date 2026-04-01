@@ -115,16 +115,38 @@ jobs:
           fi
           echo "All internal links valid"
 
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E Tests
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
   ci:
     name: CI
     runs-on: ubuntu-latest
     if: always()
-    needs: [build, links]
+    needs: [build, links, e2e]
     steps:
       - name: Check results
         run: |
           if [ "${{ needs.build.result }}" = "failure" ] || \
-             [ "${{ needs.links.result }}" = "failure" ]; then
+             [ "${{ needs.links.result }}" = "failure" ] || \
+             [ "${{ needs.e2e.result }}" = "failure" ]; then
             echo "CI failed"
             exit 1
           fi

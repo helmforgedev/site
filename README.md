@@ -1,84 +1,89 @@
-# HelmForge Site
+<div align="center">
+  <img src="public/github-banner.svg" alt="HelmForge Banner" width="100%" />
 
-Landing page and documentation portal for [HelmForge](https://helmforge.dev) — production-ready Helm charts, forged for Kubernetes.
+  <p><h3>Production-ready Helm charts for Kubernetes</h3></p>
+  
+  <p>
+    The ultimate open-source alternative to Bitnami. We package popular applications with sane defaults for security, built-in backups, and day-two operations. No proprietary layers. No limits.
+  </p>
 
-## Stack
+  <p>
+    <a href="https://helmforge.dev"><b>Website</b></a> •
+    <a href="https://helmforge.dev/docs"><b>Documentation</b></a> •
+    <a href="https://github.com/helmforgedev/charts"><b>Helm Charts Repository</b></a>
+  </p>
 
-- **[Astro 6](https://astro.build)** — static site generator with built-in Fonts API
-- **[Tailwind CSS 4](https://tailwindcss.com)** — utility-first CSS framework
-- **[MDX](https://mdxjs.com)** — Markdown with JSX for documentation pages
-- **[Cloudflare Pages](https://pages.cloudflare.com)** — hosting and CDN
+  <p>
+    <a href="https://github.com/helmforgedev/site/actions/workflows/ci.yml"><img src="https://github.com/helmforgedev/site/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/helmforgedev/site/actions/workflows/deploy.yml"><img src="https://github.com/helmforgedev/site/actions/workflows/deploy.yml/badge.svg" alt="Deploy" /></a>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+    <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome" /></a>
+  </p>
 
-## Project Structure
+  <p>
+    <img src="https://img.shields.io/badge/Astro-6.0-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro 6" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind 4" />
+    <img src="https://img.shields.io/badge/Typescript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
+  </p>
+</div>
 
-```
-src/
-├── components/       # Reusable Astro components
-│   ├── Header.astro
-│   ├── Hero.astro
-│   ├── Features.astro
-│   ├── ChartGrid.astro
-│   ├── InstallSection.astro
-│   ├── CodeBlock.astro
-│   └── Footer.astro
-├── layouts/          # Page layouts
-│   ├── BaseLayout.astro   # HTML shell, meta, GA4, structured data
-│   └── DocsLayout.astro   # Docs sidebar, breadcrumbs, prev/next
-├── pages/            # File-based routing
-│   ├── index.astro        # Landing page
-│   ├── 404.astro          # Custom 404
-│   └── docs/              # Documentation portal (MDX)
-│       ├── index.mdx
-│       ├── getting-started.mdx
-│       └── charts/        # Per-chart documentation
-└── styles/
-    └── global.css         # Tailwind theme, prose styles
-```
+---
 
-## Development
+## 🚀 Overview
+
+This repository contains the source code for the **HelmForge** web portal and documentation engine ([helmforge.dev](https://helmforge.dev)). 
+
+HelmForge is designed to fill the void left by commercialized chart ecosystems. It provides 100% open-source, OCI-compliant, and production-hardened Kubernetes Helm Charts, directly utilizing upstream images without proprietary vendor lock-in.
+
+This frontend is built for extreme performance, rich aesthetics, and massive SEO discoverability.
+
+## 🛠 Tech Stack
+
+Our portal leverages a modern, static-first web architecture:
+
+* **[Astro 6](https://astro.build/)** - Ultra-fast static site generator with zero JS by default.
+* **[Tailwind CSS v4](https://tailwindcss.com/)** - Next-generation utility-first styling with native CSS variables and Design Tokens.
+* **[MDX](https://mdxjs.com/)** - Markdown for components, driving our entire documentation portal.
+* **[Playwright](https://playwright.dev/)** - End-to-End browser automation and visual regression testing.
+* **[Framer Motion / Vanilla Motion]** - Orchestrating smooth `Awwwards`-tier UI animations and typing effects.
+
+## 💻 Local Development
+
+To run the site locally, ensure you have **Node.js >= 22** installed.
 
 ```bash
 # Install dependencies
 npm install
 
-# Start dev server
+# Start the dev server at localhost:4321
 npm run dev
 
-# Build for production
+# Build the production bundle
 npm run build
 
-# Preview production build
+# Preview the built production site
 npm run preview
 ```
 
-**Requirements:** Node.js >= 22
+## 🧪 Testing (E2E)
 
-## Deployment
+We use Playwright to ensure zero regressions on critical paths (Terminal animations, Splash Screens, and SEO JSON-LD injection).
 
-Deployment is automated via GitHub Actions. Every push to `main` triggers:
+```bash
+# Run the E2E test suite
+npx playwright test
 
-1. `npm ci` + `npm run build`
-2. `wrangler pages deploy dist` to Cloudflare Pages
+# View test report
+npx playwright show-report
+```
 
-**Secrets required:**
+## 🌐 Related Repositories
 
-| Secret | Description |
-|--------|-------------|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Pages + DNS permissions |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account identifier |
+If you are looking for the actual Helm Charts and their CI/CD pipelines, please visit our infrastructure repository:
 
-## Domains
+👉 **[github.com/helmforgedev/charts](https://github.com/helmforgedev/charts)**
 
-| URL | Status |
-|-----|--------|
-| [helmforge.dev](https://helmforge.dev) | Production |
-| [www.helmforge.dev](https://www.helmforge.dev) | Production (CNAME) |
-| [helmforge.pages.dev](https://helmforge.pages.dev) | Cloudflare Pages default |
+## 📜 License
 
-## Analytics
-
-- **Google Analytics 4** — Measurement ID: `G-5PD0B83HRE`
-
-## Related Repositories
-
-- [helmforgedev/charts](https://github.com/helmforgedev/charts) — Helm charts source code and CI/CD
+This project is licensed under the [MIT License](LICENSE).
