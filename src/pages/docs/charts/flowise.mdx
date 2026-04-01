@@ -1,0 +1,113 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Flowise
+description: Helm chart for Flowise on Kubernetes with standalone SQLite mode or scalable queue mode using Redis, PostgreSQL, and S3.
+---
+
+# Flowise
+
+Helm chart for deploying [Flowise](https://flowiseai.com/) on Kubernetes using the official [`flowiseai/flowise`](https://hub.docker.com/r/flowiseai/flowise) image, with a simple standalone topology and a scalable queue topology for larger workloads.
+
+## Key Features
+
+- **Official Flowise image** based on `flowiseai/flowise`
+- **Standalone mode** SQLite and local storage for simple installs
+- **Queue mode** separate main and worker deployments for scalable processing
+- **Bundled PostgreSQL and Redis** optional subcharts for queue mode
+- **External SQL support** external PostgreSQL or MySQL
+- **S3-backed shared storage** queue mode uses S3-compatible storage for shared blob data
+- **Ingress support** configurable ingress for the Flowise web UI
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install flowise helmforge/flowise
+```
+
+### OCI Registry
+
+```bash
+helm install flowise oci://ghcr.io/helmforgedev/helm/flowise
+```
+
+## Standalone Example
+
+```yaml
+architecture:
+  mode: standalone
+
+flowise:
+  appUrl: https://flowise.example.com
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: flowise.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Queue Example
+
+```yaml
+architecture:
+  mode: queue
+
+flowise:
+  replicaCount: 2
+
+queue:
+  worker:
+    replicaCount: 2
+
+persistence:
+  enabled: false
+
+postgresql:
+  enabled: true
+
+redis:
+  enabled: true
+
+storage:
+  type: s3
+  s3:
+    bucketName: flowise
+    existingSecret: flowise-s3
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `architecture.mode` | `standalone` | Flowise topology: `standalone` or `queue` |
+| `flowise.replicaCount` | `1` | Number of main Flowise server replicas |
+| `queue.worker.replicaCount` | `1` | Number of worker replicas in queue mode |
+| `database.mode` | `auto` | Database mode: `sqlite`, `external`, or `postgresql` |
+| `postgresql.enabled` | `false` | Deploy bundled PostgreSQL |
+| `redis.enabled` | `false` | Deploy bundled Redis |
+| `storage.type` | `local` | Blob storage type: `local` or `s3` |
+| `persistence.enabled` | `true` | Persist local Flowise data |
+| `flowise.appUrl` | `""` | Public Flowise URL |
+
+## Topology Notes
+
+- `standalone` defaults to SQLite plus a local PVC for the easiest install
+- `queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`
+- queue mode is intended for scale-out deployments with separate main and worker pods
+- local storage is intentionally single-node oriented
+
+## Version Note
+
+- the chart pins `3.1.1`
+- this version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag `3.1.1`
+
+## More Information
+
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/flowise)
