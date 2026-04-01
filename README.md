@@ -20,12 +20,7 @@
     <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome" /></a>
   </p>
 
-  <p>
-    <img src="https://img.shields.io/badge/Astro-6.0-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro 6" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind 4" />
-    <img src="https://img.shields.io/badge/Typescript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
-  </p>
+
 </div>
 
 ---
