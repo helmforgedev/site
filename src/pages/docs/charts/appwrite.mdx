@@ -1,0 +1,108 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Appwrite
+description: Helm chart for Appwrite — self-hosted BaaS platform with MariaDB, Redis, and 20+ microservices.
+---
+
+# Appwrite
+
+Helm chart for deploying [Appwrite](https://appwrite.io/) on Kubernetes — a self-hosted Backend-as-a-Service (BaaS) platform providing authentication, databases, storage, functions, messaging, and a real-time API. Ships with bundled MariaDB and Redis by default.
+
+## Key Features
+
+- **Full Appwrite stack** — API, Console (v7.5.7), Realtime, 12 workers, schedulers, and maintenance
+- **Bundled MariaDB** — default install includes the HelmForge MariaDB chart
+- **Bundled Redis** — default install includes the HelmForge Redis chart
+- **External services support** — connect to managed MariaDB/MySQL and Redis instead of subcharts
+- **Path-based ingress routing** — single host with path prefixes for API (`/v1`), Console, and Realtime (`/v1/realtime`)
+- **Shared PVCs** — persistent volumes for uploads, cache, and function builds shared across components
+- **appVersion 1.8.1** — tracks the latest Appwrite open-source release
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install appwrite helmforge/appwrite
+```
+
+### OCI Registry
+
+```bash
+helm install appwrite oci://ghcr.io/helmforgedev/helm/appwrite
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+appwrite:
+  domain: appwrite.example.com
+  secretKey: "change-me-to-a-random-string"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: appwrite.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+mariadb:
+  enabled: true
+
+redis:
+  enabled: true
+```
+
+## External Database and Cache
+
+```yaml
+mariadb:
+  enabled: false
+
+redis:
+  enabled: false
+
+database:
+  external:
+    host: mariadb.example.internal
+    port: 3306
+    name: appwrite
+    existingSecret: appwrite-db
+
+cache:
+  external:
+    host: redis.example.internal
+    port: 6379
+    existingSecret: appwrite-redis
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `appwrite.domain` | `""` | Public domain for the Appwrite instance |
+| `appwrite.secretKey` | `""` | Encryption key for Appwrite secrets |
+| `mariadb.enabled` | `true` | Deploy bundled MariaDB |
+| `redis.enabled` | `true` | Deploy bundled Redis |
+| `database.external.host` | `""` | External MariaDB/MySQL host |
+| `cache.external.host` | `""` | External Redis host |
+| `ingress.enabled` | `false` | Enable ingress exposure |
+| `persistence.uploads.size` | `10Gi` | Uploads PVC size |
+| `persistence.cache.size` | `5Gi` | Cache PVC size |
+| `workers.deletes.replicaCount` | `1` | Replicas for each worker type |
+
+## Operational Notes
+
+- this alpha chart deploys approximately 20 Kubernetes workloads — use minimal worker replicas for initial testing
+- the Console is served at the root path, the API at `/v1`, and Realtime at `/v1/realtime`
+- default installs use bundled MariaDB and Redis via HelmForge subcharts
+- all worker pods share the same Appwrite image with different entrypoint commands
+
+## More Information
+
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/appwrite)
