@@ -85,12 +85,14 @@ function isActive(href: string): boolean {
 <BaseLayout title={title} description={description}>
   <Header />
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
     <!-- Mobile sidebar toggle -->
     <button
       id="docs-sidebar-toggle"
-      class="lg:hidden mb-4 flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted bg-surface rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
+      class="lg:hidden mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-slate-50"
       aria-label="Toggle sidebar navigation"
+      aria-expanded="false"
+      aria-controls="docs-sidebar"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -98,12 +100,12 @@ function isActive(href: string): boolean {
       Menu
     </button>
 
-    <div class="lg:grid lg:grid-cols-[260px_1fr] lg:gap-10">
+    <div class="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-12">
       <!-- Sidebar -->
       <aside id="docs-sidebar" class="hidden lg:block">
-        <nav class="sticky top-24 space-y-6">
+        <nav class="sticky top-24 space-y-6 rounded-2xl border border-slate-200 bg-white p-4">
           <!-- Breadcrumbs (desktop) -->
-          <div class="hidden lg:flex items-center gap-1.5 text-sm text-muted mb-4">
+          <div class="hidden lg:flex flex-wrap items-center gap-1.5 border-b border-slate-100 pb-4 text-sm text-muted">
             <a href="/" class="hover:text-primary transition-colors">Home</a>
             {breadcrumbs.map(crumb => (
               <>
@@ -118,16 +120,16 @@ function isActive(href: string): boolean {
           </div>
 
           <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-2">Documentation</h3>
+            <h3 class="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Documentation</h3>
             <ul class="space-y-1">
               <li>
                 <a
                   href="/docs"
                   class:list={[
-                    'block px-3 py-1.5 rounded-md text-sm transition-colors',
+                    'block rounded-lg px-3 py-2 text-sm transition-colors',
                     isActive('/docs')
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-dark',
+                      ? 'bg-primary/8 text-primary font-medium'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-dark',
                   ]}
                 >
                   Overview
@@ -138,10 +140,10 @@ function isActive(href: string): boolean {
                   <a
                     href={item.href}
                     class:list={[
-                      'block px-3 py-1.5 rounded-md text-sm transition-colors',
+                      'block rounded-lg px-3 py-2 text-sm transition-colors',
                       isActive(item.href)
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-dark',
+                        ? 'bg-primary/8 text-primary font-medium'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-dark',
                     ]}
                   >
                     {item.label}
@@ -152,17 +154,20 @@ function isActive(href: string): boolean {
           </div>
 
           <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted mb-2">Charts</h3>
-            <ul class="space-y-1">
+            <div class="mb-2 flex items-center justify-between px-2">
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Charts</h3>
+              <a href="/docs/charts" class="text-xs font-medium text-primary hover:text-primary-dark transition-colors">View all</a>
+            </div>
+            <ul class="max-h-[32rem] space-y-1 overflow-y-auto pr-1">
               {chartNav.map(item => (
                 <li>
                   <a
                     href={item.href}
                     class:list={[
-                      'block px-3 py-1.5 rounded-md text-sm transition-colors',
+                      'block rounded-lg px-3 py-2 text-sm transition-colors',
                       isActive(item.href)
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-dark',
+                        ? 'bg-primary/8 text-primary font-medium'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-dark',
                     ]}
                   >
                     {item.label}
@@ -177,7 +182,7 @@ function isActive(href: string): boolean {
       <!-- Main content -->
       <main class="min-w-0">
         <!-- Breadcrumbs (mobile) -->
-        <div class="flex lg:hidden items-center gap-1.5 text-sm text-muted mb-6 flex-wrap">
+        <div class="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-muted lg:hidden">
           <a href="/" class="hover:text-primary transition-colors">Home</a>
           {breadcrumbs.map(crumb => (
             <>
@@ -188,37 +193,45 @@ function isActive(href: string): boolean {
                 <a href={crumb.href} class="hover:text-primary transition-colors">{crumb.label}</a>
               )}
             </>
-          ))}
+            ))}
         </div>
 
-        <article class="prose max-w-none">
-          <slot />
+        <article class="rounded-2xl border border-slate-200 bg-white px-5 py-8 shadow-sm sm:px-8 lg:px-10">
+          <div class="prose prose-docs max-w-3xl">
+            <slot />
+          </div>
         </article>
 
         <!-- Prev / Next navigation -->
-        <nav class="mt-12 pt-6 border-t border-slate-200 flex justify-between items-center gap-4">
+        <nav class="mt-8 grid gap-3 border-t border-slate-200 pt-6 sm:grid-cols-2">
           {prevPage ? (
             <a
               href={prevPage.href}
-              class="group flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors"
+              class="group flex min-h-[84px] flex-col justify-center rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm transition-colors hover:border-slate-300 hover:text-primary"
             >
-              <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-              {prevPage.label}
+              <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Previous
+              </span>
+              <span class="mt-2 text-base font-semibold text-dark">{prevPage.label}</span>
             </a>
-          ) : <span />}
+          ) : <span class="hidden sm:block" />}
           {nextPage ? (
             <a
               href={nextPage.href}
-              class="group flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors ml-auto"
+              class="group flex min-h-[84px] flex-col justify-center rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm transition-colors hover:border-slate-300 hover:text-primary sm:text-right"
             >
-              {nextPage.label}
-              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
+              <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted sm:justify-end">
+                Next
+                <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+              <span class="mt-2 text-base font-semibold text-dark">{nextPage.label}</span>
             </a>
-          ) : <span />}
+          ) : <span class="hidden sm:block" />}
         </nav>
       </main>
     </div>
@@ -234,11 +247,13 @@ function isActive(href: string): boolean {
         toggle.addEventListener('click', () => {
           sidebar.classList.toggle('hidden');
           sidebar.classList.toggle('block');
+          const expanded = toggle.getAttribute('aria-expanded') === 'true';
+          toggle.setAttribute('aria-expanded', String(!expanded));
         });
       }
 
       // Inject copy buttons into all prose code blocks
-      document.querySelectorAll('.prose pre').forEach(pre => {
+      document.querySelectorAll('.prose-docs pre').forEach(pre => {
         if (pre.querySelector('.prose-copy-btn')) return;
         const btn = document.createElement('button');
         btn.className = 'prose-copy-btn';
