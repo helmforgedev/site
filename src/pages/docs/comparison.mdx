@@ -1,49 +1,78 @@
 ---
 layout: ../../layouts/DocsLayout.astro
-title: HelmForge vs Generic Charts
-description: How HelmForge charts compare to generic community Helm charts and what makes them different.
+title: HelmForge vs Other Charts
+description: How HelmForge compares to Bitnami and generic community Helm charts — images, licensing, backup, and more.
 ---
 
-# HelmForge vs Generic Charts
+# HelmForge vs Other Charts
 
-This page explains the design choices behind HelmForge charts and how they compare to typical community Helm charts. This is not a critique of other projects — many are excellent. The goal is to help you evaluate whether HelmForge fits your needs.
+This page compares HelmForge against two common alternatives: **Bitnami** (the largest commercial chart ecosystem) and **generic community charts** (individual maintainers or small projects). This is not a critique — each approach has its place. The goal is to help you choose the right fit.
 
-## At a Glance
+## Comparison Table
 
-| Aspect | Generic community charts | Bitnami Charts | HelmForge |
-|--------|--------------------------|----------------|-----------|
-| **Container images** | Often custom-built or wrapped | Custom-built Bitnami wrappers | Official upstream images only |
-| **Backup** | Usually not included; separate tools | Varies, prone to breakages | Built-in S3-compatible via CronJob |
-| **Pricing** | Usually Free | Free only for deprecated legacy images | **100% Free Forever** |
-| **License** | Varies | Proprietary for production (Contact Sales to unlock) | **MIT — Open Source** |
-| **Database subcharts** | External dependencies | Self-contained (Bitnami) | Self-contained HelmForge subcharts |
-| **Values design** | Kubernetes-centric (`containers[].ports`) | Application-centric but complex | Product-oriented (`database.host`) |
-| **Security defaults** | Varies wildly | Non-root | Non-root, tight security contexts |
-| **Schema validation** | Rare | Yes | `values.schema.json` on every chart |
-| **CI validation** | Lint + template | Extensive internal CI | Lint + unit + kubeconform + E2E |
+| Aspect | **HelmForge** | Bitnami | Generic Community |
+|--------|---------------|---------|-------------------|
+| **Container images** | Official upstream images from the application maintainer | Custom Bitnami-built images with proprietary layers | Varies — some use official, some use custom |
+| **Image tags** | Pinned, immutable version tags | Bitnami-specific tags, rolling revisions | Often `:latest` or unpinned |
+| **License** | MIT — always, forever open source | Apache 2.0 for charts; images under Bitnami EULA with usage limits | Varies — MIT, Apache, unlicensed |
+| **Free images** | Official upstream — always updated, no restrictions | Moved to `bitnamilegacy/*` — no longer updated, may be removed | Varies |
+| **Vendor lock-in** | None — standard images, standard Helm, standard Kubernetes APIs | Charts tightly coupled to Bitnami images; switching images requires rework | Low, but often abandoned or inconsistent |
+| **Database subcharts** | Self-contained HelmForge subcharts (MySQL, PostgreSQL, MongoDB, MariaDB, Redis) | Bitnami subcharts (locked to Bitnami ecosystem) | External dependencies or none |
+| **Backup** | Built-in S3-compatible CronJob on 17+ charts | Not included | Rarely included |
+| **Values design** | Product-oriented (`database.host`, `admin.email`) | Kubernetes-centric with Bitnami abstractions | Varies — often raw env vars |
+| **Schema validation** | `values.schema.json` on every chart (JSON Schema draft-07) | Available on some charts | Rare |
+| **CI pipeline** | Lint + template + unittest + kubeconform on every PR | Extensive internal CI | Minimal or none |
+| **Supply chain signing** | Sigstore Cosign keyless signing on every OCI artifact | Container image signatures via Cosign | Rare |
+| **Maintenance** | Active, consistent standards across all charts | Active, large team | Unpredictable — may be abandoned |
+| **Chart count** | 33 charts (growing) | 100+ charts | One chart per repo typically |
 
 ## Official Upstream Images
 
-HelmForge charts use the official Docker image published by the application maintainer. We do not build, wrap, or patch container images.
+This is the core difference. HelmForge uses the exact Docker image published by the application maintainer — the same image the upstream project tests, documents, and supports.
 
-This means:
+**Why it matters:**
 
-- You get the same image the upstream project tests and supports
-- No supply chain dependency on a third-party image builder
-- Image updates come directly from the source, not through a middleman
-- If the upstream project publishes a CVE fix, you get it immediately
+- **No supply chain middleman** — when the upstream project patches a CVE, you get the fix directly. No waiting for a third party to rebuild.
+- **No proprietary layers** — Bitnami images include custom scripts, init containers, and filesystem layouts that differ from upstream. If you learn how the official image works, that knowledge transfers to HelmForge.
+- **No vendor-specific tags** — Bitnami images use tags like `15.4.0-debian-12-r18` that are specific to their build pipeline. HelmForge uses the same tags you see on Docker Hub or the project's container registry.
+
+```text
+# HelmForge — official upstream image
+image:
+  repository: postgres
+  tag: "17.4"
+
+# Bitnami — proprietary rebuild
+image:
+  repository: bitnami/postgresql
+  tag: "17.4.0-debian-12-r18"
+```
+
+## Licensing and Business Model
+
+HelmForge is MIT licensed — charts, CI, documentation, everything. This will not change.
+
+Bitnami charts are Apache 2.0, but the **container images** are under a separate [Bitnami EULA](https://www.vmware.com/agreements/bitnami) that introduced usage limits. The free tier has restrictions on pulls and commercial use. Enterprise usage requires a paid subscription.
+
+The previously free open-source Bitnami images were moved to `bitnamilegacy/*` repositories on Docker Hub (e.g., `bitnamilegacy/phpmyadmin`). These legacy images are **no longer updated**, receive no security patches, and carry an explicit warning:
+
+> *"This repository may be removed in the future. For production workloads and long-term support, users are encouraged to adopt Bitnami Secure Images."*
+
+In practice, this means Bitnami's open-source image path is a dead end. Users who want maintained images must adopt the commercial Bitnami Secure Images tier.
+
+Generic community charts have no consistent licensing. Some are MIT, some are unlicensed, some change terms without notice.
+
+**For operators:** MIT means no license audits, no usage tracking, no surprise terms changes. You use it, modify it, redistribute it — commercially or otherwise.
 
 ## Built-in S3 Backup
 
-Most Helm charts leave backup as an exercise for the operator. HelmForge takes a different approach: **17 of 24 charts include built-in S3-compatible backup**.
+Most Helm charts leave backup to the operator. HelmForge takes a different approach: **17+ charts include built-in S3-compatible backup**.
 
 Each backup-capable chart creates an optional CronJob that:
 
-1. Runs the appropriate dump tool for the application (e.g., `pg_dump`, `mysqldump`, `mongodump`, `sqlite3 .backup`)
+1. Runs the appropriate dump tool (`pg_dump`, `mysqldump`, `mongodump`, `sqlite3 .backup`)
 2. Compresses the output
 3. Uploads to any S3-compatible endpoint (AWS S3, MinIO, Cloudflare R2, Backblaze B2)
-
-You configure it through values — no extra tools, operators, or scripts needed:
 
 ```yaml
 backup:
@@ -56,32 +85,24 @@ backup:
     existingSecret: backup-s3-credentials
 ```
 
+Bitnami charts do not include backup. Generic community charts rarely do.
+
 ## Self-Contained Dependencies
 
-When a chart needs a database (MySQL, PostgreSQL, MongoDB), HelmForge bundles its own database subcharts. This avoids depending on third-party chart repositories that may change licensing, availability, or compatibility without notice.
-
-For example, installing n8n with a bundled PostgreSQL is a single command:
+When a chart needs a database, HelmForge bundles its own database subcharts. This avoids depending on third-party chart repositories that may change licensing, availability, or compatibility without notice.
 
 ```bash
+# n8n with bundled PostgreSQL — single command
 helm install n8n helmforge/n8n --set postgresql.enabled=true
 ```
 
-You can also use an external database by disabling the subchart:
-
-```yaml
-postgresql:
-  enabled: false
-database:
-  external:
-    host: db.example.com
-    port: 5432
-```
+Bitnami charts also bundle database subcharts, but they are locked to the Bitnami ecosystem and Bitnami images. Switching away from Bitnami requires reworking the entire dependency tree.
 
 ## Product-Oriented Values
 
-Generic charts often expose Kubernetes primitives directly in values. HelmForge values are designed around the application.
+HelmForge values are designed around the application, not Kubernetes primitives.
 
-**Generic approach:**
+**Generic / Bitnami approach:**
 
 ```yaml
 env:
@@ -89,9 +110,9 @@ env:
     value: "postgres://user:pass@host:5432/db"
   - name: ADMIN_EMAIL
     value: "admin@example.com"
-containers:
-  - ports:
-      - containerPort: 3000
+extraEnvVars:
+  - name: CUSTOM_SETTING
+    value: "true"
 ```
 
 **HelmForge approach:**
@@ -105,43 +126,39 @@ database:
     name: db
 admin:
   email: "admin@example.com"
-service:
-  port: 3000
 ```
 
 The result is values files that read like application configuration, not Kubernetes manifests.
 
-## Schema Validation
+## Supply Chain Security
 
-Every HelmForge chart ships with a `values.schema.json` file (JSON Schema draft-07). This means:
+Every HelmForge OCI artifact is signed with [Sigstore Cosign](https://www.sigstore.dev/) keyless signing via GitHub Actions OIDC. You can verify any chart before deploying:
 
-- `helm install` validates your values **before** applying anything to the cluster
-- ArtifactHub renders values with types and descriptions
-- IDE autocompletion works when editing values files
-- CI catches misconfigured values during template rendering
+```bash
+cosign verify ghcr.io/helmforgedev/helm/<chart-name>:<version> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp https://github.com/helmforgedev/charts
+```
 
-## Consistent CI Pipeline
+[ArtifactHub](https://artifacthub.io/packages/search?repo=helmforge) shows the "Signed" badge on all HelmForge charts.
 
-Every chart goes through the same validation pipeline:
+## When to Choose Each
 
-1. **`helm lint --strict`** — catches YAML and template issues
-2. **`helm template`** — renders all templates with default and CI-specific values
-3. **`helm unittest`** — runs unit tests for template logic
-4. **`kubeconform`** — validates rendered manifests against Kubernetes OpenAPI schemas
+**Choose HelmForge when:**
 
-Charts are also validated on a local k3d cluster before release.
+- You want official upstream images without proprietary layers
+- You need built-in backup without extra tooling
+- You prefer MIT licensing with no usage restrictions
+- You value supply chain signing and schema validation
 
-## Licensing
+**Choose Bitnami when:**
 
-HelmForge is MIT licensed. Every chart, every tool, every piece of documentation. This will not change.
+- You need a chart for an application HelmForge does not cover yet
+- Your organization already standardized on Bitnami and switching cost is high
+- You need commercial support with SLA guarantees
 
-We made this choice because operators should not have to worry about license audits when choosing infrastructure tooling. MIT is simple: use it, modify it, redistribute it, commercially or otherwise.
+**Choose generic community charts when:**
 
-## When HelmForge May Not Be the Right Fit
-
-Be honest about tradeoffs:
-
-- **Enterprise support** — HelmForge is community-maintained. If you need SLA-backed support, a commercial chart vendor may be more appropriate.
-- **Niche applications** — The catalog is growing but does not cover every application. If your stack includes something we do not chart yet, you will need to combine HelmForge with other sources.
-- **Custom images** — If your workflow requires patched or customized container images, HelmForge's upstream-only approach may feel limiting. You can still override `image.repository` and `image.tag` in values.
-- **Air-gapped environments** — Charts pull images from public registries by default. You can configure private registries via `imagePullSecrets`, but there is no built-in image mirroring.
+- You need a very specific or niche application
+- You want a minimal starting point to customize heavily
+- The specific community chart is well-maintained and fits your needs
