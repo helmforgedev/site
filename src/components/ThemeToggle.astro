@@ -41,14 +41,26 @@
         });
       };
 
+      // Status element for screen reader announcements
+      let statusEl = document.getElementById('theme-status');
+      if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'theme-status';
+        statusEl.className = 'sr-only';
+        statusEl.setAttribute('role', 'status');
+        statusEl.setAttribute('aria-live', 'polite');
+        document.body.appendChild(statusEl);
+      }
+
       btns.forEach(btn => {
         btn.addEventListener('click', () => {
           const currentTheme = document.documentElement.getAttribute('data-theme');
           const targetTheme = currentTheme === 'light' ? 'dark' : 'light';
-          
+
           document.documentElement.setAttribute('data-theme', targetTheme);
           window.localStorage.setItem('helmforge-theme', targetTheme);
           syncUI();
+          statusEl.textContent = 'Switched to ' + targetTheme + ' mode';
         });
       });
 
