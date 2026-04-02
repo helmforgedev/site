@@ -61,8 +61,7 @@ document.querySelectorAll('.prose-docs pre').forEach((pre) => {
       const svg = btn.querySelector('svg');
       if (span) span.textContent = 'Copied!';
       if (svg)
-        svg.innerHTML =
-          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
+        svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
       btn.classList.add('text-emerald-400', 'border-emerald-500/50');
       setTimeout(() => {
         if (span) span.textContent = 'Copy';

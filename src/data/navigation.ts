@@ -117,10 +117,6 @@ export const chartCategories: ChartCategory[] = [
 ];
 
 /** Flat list for prev/next navigation */
-const allChartNavItems: NavItem[] = chartCategories.flatMap(cat => cat.charts);
+const allChartNavItems: NavItem[] = chartCategories.flatMap((cat) => cat.charts);
 
-export const allPages: NavItem[] = [
-  { label: 'Documentation', href: '/docs' },
-  ...sidebarNav,
-  ...allChartNavItems,
-];
+export const allPages: NavItem[] = [{ label: 'Documentation', href: '/docs' }, ...sidebarNav, ...allChartNavItems];
