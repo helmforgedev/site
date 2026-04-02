@@ -1,0 +1,110 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: CKAN Chart
+description: HelmForge CKAN chart for open data portal with DataPusher, Solr, PostgreSQL, and Redis.
+---
+
+# CKAN
+
+Deploy [CKAN](https://ckan.org/) on Kubernetes — the world's leading open-source data management system for powering data hubs and data portals with full catalog and API capabilities.
+
+## Key Features
+
+- **CKAN application** — uWSGI-based Python application on port 5000
+- **DataPusher** — optional automatic resource loading for CSV, Excel to DataStore
+- **Built-in Solr** — StatefulSet with CKAN-specific schema configuration
+- **PostgreSQL metadata store** — bundled subchart or external connection
+- **Redis task queue** — bundled subchart or external connection
+- **Auto-generated secrets** — sysadmin password, session secret, JWT secret
+- **Persistent storage** — uploaded datasets at /var/lib/ckan
+- **Plugin system** — configurable CKAN plugins list
+- **Ingress support** — TLS via cert-manager with configurable ingress class
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install ckan helmforge/ckan -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install ckan oci://ghcr.io/helmforgedev/helm/ckan -f values.yaml
+```
+
+## Basic Example
+
+```yaml
+ckan:
+  siteUrl: https://data.example.com
+  sysadminName: admin
+  sysadminPassword: "my-secure-password"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: data.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## External Services
+
+```yaml
+database:
+  mode: external
+  external:
+    type: postgresql
+    host: postgres.example.internal
+    port: 5432
+    name: ckan
+    username: ckan
+    existingSecret: ckan-db
+
+redisConfig:
+  mode: external
+  external:
+    host: redis.example.internal
+    port: 6379
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `image.repository` | `ckan/ckan-base` | CKAN container image |
+| `ckan.siteUrl` | `http://localhost:5000` | Public site URL |
+| `ckan.sysadminName` | `admin` | Sysadmin username |
+| `ckan.sysadminPassword` | `""` | Auto-generated if empty |
+| `ckan.plugins` | `envvars image_view text_view datatables_view` | Active plugins |
+| `ckan.replicaCount` | `1` | CKAN replicas |
+| `datapusher.enabled` | `true` | Enable DataPusher |
+| `solr.enabled` | `true` | Enable built-in Solr |
+| `solr.persistence.size` | `5Gi` | Solr data volume size |
+| `database.mode` | `subchart` | Database mode: subchart or external |
+| `persistence.enabled` | `true` | Enable CKAN storage |
+| `persistence.size` | `10Gi` | CKAN storage volume size |
+| `ingress.enabled` | `false` | Enable ingress |
+
+## Operational Notes
+
+- Solr is deployed as a StatefulSet with CKAN-specific schema — do not share with other applications
+- DataPusher is optional but recommended for automatic resource indexing
+- health probes target /api/action/status_show
+- set `ckan.siteUrl` to the actual public URL for correct link generation
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/ckan) on GitHub.
