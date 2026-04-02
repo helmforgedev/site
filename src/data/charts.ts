@@ -4,7 +4,14 @@ export interface Chart {
   description: string;
   maturity: 'stable' | 'beta' | 'alpha';
   backup: boolean;
-  icon?: string;
+}
+
+/** SVG icons use .svg extension, everything else .png */
+const svgIcons = new Set(['generic', 'pihole', 'cloudflared', 'velero', 'kafka', 'countly', 'middleware', 'superset', 'ckan', 'druid']);
+
+export function chartIcon(slug: string): string {
+  const ext = svgIcons.has(slug) ? 'svg' : 'png';
+  return `/icons/charts/${slug}.${ext}`;
 }
 
 export const charts: Chart[] = [
@@ -17,21 +24,21 @@ export const charts: Chart[] = [
   { name: 'Keycloak', slug: 'keycloak', description: 'Identity and access management for SSO and federation.', maturity: 'stable', backup: true },
   { name: 'Vaultwarden', slug: 'vaultwarden', description: 'Bitwarden-compatible password manager with self-hosted simplicity.', maturity: 'stable', backup: true },
   { name: 'Minecraft', slug: 'minecraft', description: 'Minecraft Java Edition server with backup, monitoring, and mod support.', maturity: 'stable', backup: true },
-  { name: 'Pi-hole', slug: 'pihole', description: 'Network-wide ad blocking with DNS sinkhole and optional recursive DNS.', maturity: 'stable', backup: true, icon: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Pi-hole_vector_logo.svg' },
+  { name: 'Pi-hole', slug: 'pihole', description: 'Network-wide ad blocking with DNS sinkhole and optional recursive DNS.', maturity: 'stable', backup: true },
   { name: 'WordPress', slug: 'wordpress', description: 'WordPress CMS with MySQL, S3 backup, and production-friendly defaults.', maturity: 'stable', backup: true },
   { name: 'Strapi', slug: 'strapi', description: 'Headless CMS with SQLite, PostgreSQL, MySQL, and persistent uploads.', maturity: 'stable', backup: true },
-  { name: 'Answer', slug: 'answer', description: 'Apache Answer Q&A platform with SQL backends and S3 backup.', maturity: 'stable', backup: true, icon: 'https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/apache-answer.png' },
+  { name: 'Answer', slug: 'answer', description: 'Apache Answer Q&A platform with SQL backends and S3 backup.', maturity: 'stable', backup: true },
   { name: 'n8n', slug: 'n8n', description: 'Workflow automation with queue mode, SQL backends, and backup support.', maturity: 'stable', backup: true },
   { name: 'Komga', slug: 'komga', description: 'Comics and manga server with OPDS, web reader, and S3 backup.', maturity: 'stable', backup: true },
   { name: 'Guacamole', slug: 'guacamole', description: 'Remote desktop gateway with RDP, VNC, SSH, and SSO integration.', maturity: 'stable', backup: true },
-  { name: 'Cloudflared', slug: 'cloudflared', description: 'Cloudflare Tunnel with outbound-only networking and HA options.', maturity: 'stable', backup: false, icon: 'https://svgl.app/library/cloudflare.svg' },
+  { name: 'Cloudflared', slug: 'cloudflared', description: 'Cloudflare Tunnel with outbound-only networking and HA options.', maturity: 'stable', backup: false },
   { name: 'DDNS Updater', slug: 'ddns-updater', description: 'Dynamic DNS updater with web UI and provider coverage.', maturity: 'stable', backup: false },
   { name: 'Uptime Kuma', slug: 'uptime-kuma', description: 'Self-hosted monitoring with status pages and broad notification support.', maturity: 'stable', backup: true },
   { name: 'Appwrite', slug: 'appwrite', description: 'Self-hosted BaaS platform with MariaDB, Redis, and microservices.', maturity: 'stable', backup: false },
   { name: 'Authelia', slug: 'authelia', description: 'SSO, MFA, and OpenID Connect for reverse proxies and apps.', maturity: 'stable', backup: true },
   { name: 'AdGuard Home', slug: 'adguard-home', description: 'DNS ad and tracker blocking with sync and backup features.', maturity: 'stable', backup: true },
-  { name: 'Velero', slug: 'velero', description: 'Kubernetes backup, restore, and migration with object storage.', maturity: 'stable', backup: true, icon: 'https://raw.githubusercontent.com/cncf/landscape/master/hosted_logos/velero.svg' },
-  { name: 'Kafka', slug: 'kafka', description: 'KRaft single-broker and cluster modes with persistent storage.', maturity: 'stable', backup: false, icon: 'https://svgl.app/library/apache_kafka.svg' },
+  { name: 'Velero', slug: 'velero', description: 'Kubernetes backup, restore, and migration with object storage.', maturity: 'stable', backup: true },
+  { name: 'Kafka', slug: 'kafka', description: 'KRaft single-broker and cluster modes with persistent storage.', maturity: 'stable', backup: false },
   { name: 'Dolibarr', slug: 'dolibarr', description: 'ERP and CRM with MySQL, auto-installation, and persistent documents.', maturity: 'stable', backup: false },
   { name: 'Mosquitto', slug: 'mosquitto', description: 'MQTT broker with standalone or federated topology and WebSocket support.', maturity: 'stable', backup: false },
   { name: 'Docmost', slug: 'docmost', description: 'Collaborative wiki with bundled PostgreSQL, Redis, and local or S3 storage.', maturity: 'stable', backup: false },
