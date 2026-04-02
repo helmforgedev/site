@@ -19,7 +19,7 @@ test.describe('Hero Section and SEO validations', () => {
 
     // Verify terminal eventually prints the success states configured in the component
     // We wait up to 25s for the first interaction to unfold
-    await expect(page.locator('.text-blue-300', { hasText: 'added' }).first()).toBeVisible({ timeout: 25000 });
+    await expect(page.locator('.text-zinc-500', { hasText: 'added' }).first()).toBeVisible({ timeout: 25000 });
   });
 
   test('should inject the aggressive SEO and JSON-LD schemas', async ({ page }) => {
