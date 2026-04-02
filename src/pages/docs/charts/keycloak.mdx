@@ -4,6 +4,9 @@ title: Keycloak Chart
 description: HelmForge Keycloak chart — Keycloak identity and access management for Kubernetes.
 ---
 
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
 # Keycloak
 
 Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.
@@ -34,10 +37,19 @@ helm install my-keycloak helmforge/keycloak
 helm install my-keycloak oci://ghcr.io/helmforgedev/helm/keycloak
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs tabs={[
+  { id: 'basic', label: 'Basic' },
+  { id: 'external-db', label: 'External Database' },
+  { id: 'ha', label: 'High Availability' },
+  { id: 'ingress', label: 'With Ingress + TLS' },
+]}>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Embedded H2 database (dev only)
 auth:
   adminUser: admin
   adminPassword: 'my-secret-password'
@@ -50,15 +62,19 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: keycloak-tls
-      hosts:
-        - auth.example.com
 ```
 
-## External Database Example
+<Callout type="warning" title="H2 is for development only">
+  The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence.
+  Always use an external database for production.
+</Callout>
+
+</div>
+
+<div data-tab-panel="external-db">
 
 ```yaml
+# values.yaml
 auth:
   adminUser: admin
   adminPassword: 'my-secret-password'
@@ -81,18 +97,127 @@ ingress:
           pathType: Prefix
 ```
 
+</div>
+
+<div data-tab-panel="ha">
+
+```yaml
+# values.yaml — Multi-replica with external PostgreSQL
+replicaCount: 3
+
+auth:
+  adminUser: admin
+  adminPassword: 'my-secret-password'
+
+database:
+  vendor: postgres
+  hostname: postgresql.database.svc
+  port: 5432
+  database: keycloak
+  username: keycloak
+  password: 'db-password'
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 500m
+  limits:
+    memory: 1Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="ingress">
+
+```yaml
+# values.yaml — Full ingress with TLS and cert-manager
+auth:
+  adminUser: admin
+  adminPassword: 'my-secret-password'
+
+database:
+  vendor: postgres
+  hostname: postgresql.database.svc
+  port: 5432
+  database: keycloak
+  username: keycloak
+  password: 'db-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: keycloak-tls
+      hosts:
+        - auth.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+```
+
+</div>
+
+</DocsTabs>
+
 ## Key Values
 
-| Key                        | Default   | Description                                |
-| -------------------------- | --------- | ------------------------------------------ |
-| `auth.adminUser`           | `admin`   | Keycloak admin username                    |
-| `auth.adminPassword`       | `""`      | Keycloak admin password                    |
-| `database.vendor`          | `h2`      | Database vendor: `h2`, `postgres`, `mysql` |
-| `database.hostname`        | `""`      | External database hostname                 |
-| `ingress.enabled`          | `false`   | Enable ingress                             |
-| `ingress.ingressClassName` | `traefik` | Ingress class                              |
-| `replicaCount`             | `1`       | Number of Keycloak replicas                |
-| `metrics.enabled`          | `false`   | Enable Prometheus metrics                  |
+| Key                              | Type    | Default    | Description                                |
+| -------------------------------- | ------- | ---------- | ------------------------------------------ |
+| `auth.adminUser`                 | string  | `admin`    | Keycloak admin username                    |
+| `auth.adminPassword`             | string  | `""`       | Keycloak admin password                    |
+| `database.vendor`                | string  | `h2`       | Database vendor: `h2`, `postgres`, `mysql` |
+| `database.hostname`              | string  | `""`       | External database hostname                 |
+| `database.port`                  | integer | `5432`     | External database port                     |
+| `database.database`              | string  | `keycloak` | Database name                              |
+| `database.username`              | string  | `""`       | Database username                          |
+| `database.password`              | string  | `""`       | Database password                          |
+| `replicaCount`                   | integer | `1`        | Number of Keycloak replicas                |
+| `ingress.enabled`                | boolean | `false`    | Enable ingress                             |
+| `ingress.ingressClassName`       | string  | `traefik`  | Ingress class name                         |
+| `ingress.hosts`                  | array   | `[]`       | Ingress host rules                         |
+| `ingress.tls`                    | array   | `[]`       | TLS configuration                          |
+| `resources.requests.memory`      | string  | `256Mi`    | Memory request                             |
+| `resources.requests.cpu`         | string  | `250m`     | CPU request                                |
+| `metrics.enabled`                | boolean | `false`    | Enable Prometheus metrics                  |
+| `metrics.serviceMonitor.enabled` | boolean | `false`    | Create ServiceMonitor resource             |
+| `realmImport`                    | object  | `{}`       | Realm configuration to import on startup   |
+
+## Upgrade Notes
+
+<Callout type="warning" title="Database migrations">
+  Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only one
+  replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas simultaneously
+  can cause conflicts.
+</Callout>
+
+- Admin password changes in values only take effect on fresh installations
+- Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting
+- Ingress annotations changes require a pod restart if the ingress controller caches configuration
+
+## Common Issues
+
+<Callout type="danger" title="Admin console returns 403 or redirect loop">
+  This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards
+  `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.
+</Callout>
+
+<Callout type="tip" title="Slow startup with large realms">
+  Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and
+  `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.
+</Callout>
 
 ## More Information
 
