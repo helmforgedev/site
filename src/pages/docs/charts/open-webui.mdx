@@ -1,0 +1,109 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Open WebUI
+description: HelmForge Open WebUI chart for self-hosted AI chat with Ollama/OpenAI, RAG, PostgreSQL, Redis, and S3 backup.
+---
+
+# Open WebUI
+
+Deploy [Open WebUI](https://docs.openwebui.com/) on Kubernetes — a self-hosted AI chat platform with Ollama and OpenAI-compatible backend support, RAG pipelines, multi-model conversations, and an extensible plugin system.
+
+## Key Features
+
+- **Ollama integration** — connect to local or remote Ollama instances for open-source LLMs
+- **OpenAI-compatible API** — works with OpenAI, Azure, Anthropic proxies, LiteLLM, and more
+- **SQLite or PostgreSQL** — embedded SQLite for simple installs, PostgreSQL subchart for production
+- **Redis WebSocket coordination** — required for multi-instance deployments
+- **RAG pipelines** — retrieval-augmented generation with document uploads
+- **S3 backup** — scheduled PostgreSQL backup to S3-compatible storage
+- **Ingress support** — TLS via cert-manager with configurable ingress class
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install open-webui helmforge/open-webui
+```
+
+**OCI registry:**
+
+```bash
+helm install open-webui oci://ghcr.io/helmforgedev/helm/open-webui
+```
+
+## Basic Example
+
+```yaml
+openWebui:
+  ollamaBaseUrl: http://ollama.default.svc:11434
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: chat.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Production Example
+
+```yaml
+postgresql:
+  enabled: true
+
+redis:
+  enabled: true
+
+openWebui:
+  ollamaBaseUrl: http://ollama.default.svc:11434
+  openaiBaseUrl: https://api.openai.com/v1
+  openaiExistingSecret: openai-credentials
+
+persistence:
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: chat.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - chat.example.com
+      secretName: open-webui-tls
+```
+
+## Key Values
+
+| Key                      | Default                           | Description                                |
+| ------------------------ | --------------------------------- | ------------------------------------------ |
+| `openWebui.port`         | `8080`                            | Application port                           |
+| `openWebui.ollamaBaseUrl`| `""`                              | Ollama backend URL                         |
+| `openWebui.openaiBaseUrl`| `""`                              | OpenAI-compatible API base URL             |
+| `openWebui.doNotTrack`   | `true`                            | Disable telemetry                          |
+| `database.mode`          | `auto`                            | Database mode: auto, sqlite, external      |
+| `postgresql.enabled`     | `false`                           | Deploy PostgreSQL subchart                 |
+| `redis.enabled`          | `false`                           | Deploy Redis subchart                      |
+| `persistence.enabled`    | `true`                            | Persist /app/backend/data                  |
+| `persistence.size`       | `10Gi`                            | PVC size                                   |
+| `ingress.enabled`        | `false`                           | Enable ingress                             |
+| `backup.enabled`         | `false`                           | Enable S3 backup CronJob                   |
+
+## Operational Notes
+
+- SQLite mode is single-instance only — no horizontal scaling
+- PostgreSQL mode supports multiple replicas with Redis for WebSocket coordination
+- the chart auto-generates a session secret key if not provided
+- telemetry is disabled by default (`DO_NOT_TRACK=true`)
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/open-webui) on GitHub.
