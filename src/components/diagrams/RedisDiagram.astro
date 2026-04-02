@@ -1,0 +1,182 @@
+---
+interface Props {
+  mode: 'standalone' | 'sentinel';
+}
+
+const { mode } = Astro.props;
+---
+
+<svg
+  viewBox="0 0 600 240"
+  class="w-full max-w-[600px] h-auto"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label={`Redis ${mode} architecture diagram`}
+>
+  <style>
+    .diagram-text {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+    }
+    .diagram-label {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 10px;
+    }
+  </style>
+
+  {
+    mode === 'standalone' ? (
+      <g>
+        {/* Client */}
+        <rect x="30" y="80" width="120" height="50" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="90" y="102" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Application
+        </text>
+        <text x="90" y="116" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          client
+        </text>
+
+        {/* Arrow */}
+        <line x1="150" y1="105" x2="230" y2="105" stroke="currentColor" stroke-width="1.5" />
+        <polygon points="230,100 240,105 230,110" fill="currentColor" />
+        <text x="190" y="98" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          TCP:6379
+        </text>
+
+        {/* Redis */}
+        <rect
+          x="240"
+          y="70"
+          width="140"
+          height="70"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.05"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="310" y="98" text-anchor="middle" fill="currentColor" class="diagram-text" font-weight="bold">
+          Redis
+        </text>
+        <text x="310" y="112" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          StatefulSet (1 pod)
+        </text>
+        <text x="310" y="126" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          in-memory + AOF
+        </text>
+
+        {/* PVC */}
+        <line x1="310" y1="140" x2="310" y2="175" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="260" y="175" width="100" height="35" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="310" y="197" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC (data)
+        </text>
+      </g>
+    ) : (
+      <g>
+        {/* Client */}
+        <rect x="10" y="10" width="100" height="45" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="60" y="30" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Application
+        </text>
+        <text x="60" y="43" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          client
+        </text>
+
+        {/* Arrow to Sentinel */}
+        <line x1="110" y1="32" x2="165" y2="32" stroke="currentColor" stroke-width="1.5" />
+        <polygon points="165,27 175,32 165,37" fill="currentColor" />
+        <text x="137" y="25" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          query
+        </text>
+
+        {/* Sentinel cluster */}
+        <rect
+          x="175"
+          y="5"
+          width="240"
+          height="55"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.04"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-dasharray="6 3"
+        />
+        <text x="295" y="25" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Sentinel (3 pods)
+        </text>
+        <text x="295" y="40" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          monitors + failover
+        </text>
+
+        {/* Arrow from Sentinel to Master */}
+        <line x1="295" y1="60" x2="200" y2="105" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" />
+        <line x1="295" y1="60" x2="440" y2="105" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" />
+
+        {/* Master */}
+        <rect
+          x="120"
+          y="90"
+          width="160"
+          height="60"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.08"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="200" y="112" text-anchor="middle" fill="currentColor" class="diagram-text" font-weight="bold">
+          Master
+        </text>
+        <text x="200" y="126" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read + write
+        </text>
+        <text x="200" y="140" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          pod-0
+        </text>
+
+        {/* Replication arrow */}
+        <line x1="280" y1="120" x2="355" y2="120" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 3" />
+        <text x="318" y="113" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          repl
+        </text>
+
+        {/* Replica */}
+        <rect
+          x="355"
+          y="90"
+          width="160"
+          height="60"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.04"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="435" y="112" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Replica
+        </text>
+        <text x="435" y="126" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read-only
+        </text>
+        <text x="435" y="140" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          pod-1
+        </text>
+
+        {/* PVCs */}
+        <line x1="200" y1="150" x2="200" y2="180" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="150" y="180" width="100" height="32" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="200" y="200" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC
+        </text>
+
+        <line x1="435" y1="150" x2="435" y2="180" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="385" y="180" width="100" height="32" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="435" y="200" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC
+        </text>
+      </g>
+    )
+  }
+</svg>
