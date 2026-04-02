@@ -2,7 +2,7 @@
 import ThemeToggle from './ThemeToggle.astro';
 import Logo from './Logo.astro';
 import Container from './Container.astro';
-import { Github, Menu, X } from 'lucide-astro';
+import { Github, Menu, X, Search } from 'lucide-astro';
 
 const currentPath = Astro.url.pathname;
 
@@ -47,6 +47,16 @@ function isActive(href: string): boolean {
           </a>
         ))}
         <div class="h-5 w-px bg-border mx-2"></div>
+        <button
+          id="search-trigger"
+          class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base"
+          aria-label="Search documentation (Ctrl+K)"
+        >
+          <Search class="w-4 h-4" />
+          <span class="text-xs text-text-muted/60 hidden lg:inline-flex items-center gap-0.5 border border-border rounded-md px-1.5 py-0.5 font-mono">
+            <span class="text-[10px]" id="search-mod-key">Ctrl</span>K
+          </span>
+        </button>
         <a
           href="https://github.com/helmforgedev/charts"
           target="_blank"
@@ -63,6 +73,13 @@ function isActive(href: string): boolean {
 
       <!-- Mobile controls -->
       <div class="flex items-center gap-3 md:hidden">
+        <button
+          id="search-trigger-mobile"
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-bg-surface text-text-muted transition-colors hover:bg-text-base/5 hover:text-text-base"
+          aria-label="Search documentation"
+        >
+          <Search class="w-4 h-4" />
+        </button>
         <ThemeToggle />
         
         <button
@@ -115,6 +132,25 @@ function isActive(href: string): boolean {
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    // Search triggers
+    const searchBtn = document.getElementById('search-trigger');
+    const searchBtnMobile = document.getElementById('search-trigger-mobile');
+    const modKey = document.getElementById('search-mod-key');
+
+    // Show Cmd on macOS, Ctrl elsewhere
+    if (modKey && navigator.platform?.includes('Mac')) {
+      modKey.textContent = '\u2318';
+    }
+
+    function openSearch() {
+      if (typeof (window as any).__openSearch === 'function') {
+        (window as any).__openSearch();
+      }
+    }
+
+    searchBtn?.addEventListener('click', openSearch);
+    searchBtnMobile?.addEventListener('click', openSearch);
+
     const toggle = document.getElementById('mobile-menu-toggle');
     const menu = document.getElementById('mobile-menu');
     const iconOpen = document.getElementById('menu-icon-open');
