@@ -71,6 +71,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'n8n', href: '/docs/charts/n8n', maturity: 'stable' },
       { label: 'Flowise', href: '/docs/charts/flowise', maturity: 'stable' },
+      { label: 'Open WebUI', href: '/docs/charts/open-webui', maturity: 'alpha' },
     ],
   },
   {
@@ -106,14 +107,24 @@ export const chartCategories: ChartCategory[] = [
     ],
   },
   {
-    label: 'Alpha',
+    label: 'Analytics',
     charts: [
-      { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'alpha' },
+      { label: 'Umami', href: '/docs/charts/umami', maturity: 'alpha' },
+      { label: 'Metabase', href: '/docs/charts/metabase', maturity: 'alpha' },
+      { label: 'Liwan', href: '/docs/charts/liwan', maturity: 'alpha' },
       { label: 'Countly', href: '/docs/charts/countly', maturity: 'alpha' },
-      { label: 'Middleware', href: '/docs/charts/middleware', maturity: 'alpha' },
       { label: 'Apache Superset', href: '/docs/charts/superset', maturity: 'alpha' },
       { label: 'CKAN', href: '/docs/charts/ckan', maturity: 'alpha' },
       { label: 'Apache Druid', href: '/docs/charts/druid', maturity: 'alpha' },
+    ],
+  },
+  {
+    label: 'Alpha',
+    charts: [
+      { label: 'Wallabag', href: '/docs/charts/wallabag', maturity: 'alpha' },
+      { label: 'Strava Statistics', href: '/docs/charts/strava-statistics', maturity: 'alpha' },
+      { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'alpha' },
+      { label: 'Middleware', href: '/docs/charts/middleware', maturity: 'alpha' },
     ],
   },
 ];

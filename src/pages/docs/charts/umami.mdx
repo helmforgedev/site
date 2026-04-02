@@ -1,0 +1,52 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Umami
+description: HelmForge Umami chart for privacy-focused web analytics with PostgreSQL.
+---
+
+# Umami
+
+Deploy [Umami](https://umami.is/) on Kubernetes — a privacy-focused, open-source web analytics platform that respects visitor privacy and does not use cookies.
+
+## Key Features
+
+- **Privacy-first analytics** — no cookies, GDPR-compliant by design
+- **PostgreSQL backend** — bundled subchart or external database
+- **Auto-generated app secret** — managed via Kubernetes Secret
+- **S3 backup** — scheduled PostgreSQL backup to S3-compatible storage
+- **Ingress support** — TLS via cert-manager with configurable ingress class
+
+## Installation
+
+```bash
+helm install umami oci://ghcr.io/helmforgedev/helm/umami
+```
+
+## Basic Example
+
+```yaml
+postgresql:
+  enabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: analytics.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                   | Default | Description                |
+| --------------------- | ------- | -------------------------- |
+| `postgresql.enabled`  | `true`  | Deploy PostgreSQL subchart |
+| `persistence.enabled` | `true`  | Enable data persistence    |
+| `ingress.enabled`     | `false` | Enable ingress             |
+| `backup.enabled`      | `false` | Enable S3 backup CronJob   |
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/umami) on GitHub.
