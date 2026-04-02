@@ -1,0 +1,101 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Middleware Chart
+description: HelmForge Middleware chart for DORA metrics platform with PostgreSQL, Redis, and engineering performance tracking.
+---
+
+# Middleware
+
+Deploy [Middleware](https://www.middlewarehq.com/) on Kubernetes — an open-source DORA metrics platform that measures Deployment Frequency, Lead Time, MTTR, and Change Failure Rate for engineering teams.
+
+## Key Features
+
+- **All four DORA metrics** — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate
+- **All-in-one container** — frontend, analytics, and sync server in a single image
+- **PostgreSQL + Redis** — bundled subcharts or external connections
+- **CI/CD integrations** — tracks metrics from your existing pipelines
+- **Persistent storage** — API keys and configuration stored in PVC
+- **Ingress support** — TLS via cert-manager with configurable ingress class
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install middleware helmforge/middleware -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install middleware oci://ghcr.io/helmforgedev/helm/middleware -f values.yaml
+```
+
+## Basic Example
+
+```yaml
+postgresql:
+  enabled: true
+
+redis:
+  enabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: middleware.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## External Database and Cache
+
+```yaml
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  host: postgres.example.internal
+  port: 5432
+  name: middleware
+  username: middleware
+  existingSecret: middleware-db
+
+externalRedis:
+  enabled: true
+  host: redis.example.internal
+  port: 6379
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `middleware.frontendPort` | `3333` | Frontend port |
+| `middleware.analyticsPort` | `9696` | Analytics API port |
+| `middleware.syncPort` | `9697` | Sync server port |
+| `middleware.environment` | `prod` | Environment |
+| `postgresql.enabled` | `true` | Enable bundled PostgreSQL |
+| `redis.enabled` | `true` | Enable bundled Redis |
+| `externalDatabase.enabled` | `false` | Use external database |
+| `externalRedis.enabled` | `false` | Use external Redis |
+| `persistence.enabled` | `true` | Enable /app/keys persistence |
+| `persistence.size` | `1Gi` | PVC size |
+
+## Operational Notes
+
+- single instance only — no horizontal scaling
+- resource-heavy — 16GB RAM recommended for production workloads
+- all three ports (frontend, analytics, sync) are exposed via the same pod
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/middleware) on GitHub.

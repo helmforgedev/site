@@ -1,0 +1,124 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Apache Superset Chart
+description: HelmForge Superset chart for data exploration and visualization with Celery workers, PostgreSQL, and Redis.
+---
+
+# Apache Superset
+
+Deploy [Apache Superset](https://superset.apache.org/) on Kubernetes — a modern, enterprise-ready business intelligence platform for data exploration and visualization with 60+ database connectors.
+
+## Key Features
+
+- **Three-component architecture** — Gunicorn web, Celery workers, Celery beat scheduler for independent scaling
+- **Init Job** — automatic database migration and admin user creation
+- **PostgreSQL metadata store** — bundled subchart or external connection
+- **Redis broker** — bundled subchart for Celery task queue or external
+- **Configurable** — superset_config.py delivered via ConfigMap
+- **Auto-generated secrets** — admin password, Flask SECRET_KEY, database and Redis passwords
+- **Health probes** — startup, liveness, and readiness on /health
+- **Ingress support** — configurable class (traefik, nginx, etc.)
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install superset helmforge/superset -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install superset oci://ghcr.io/helmforgedev/helm/superset -f values.yaml
+```
+
+## Basic Example
+
+```yaml
+superset:
+  adminUsername: admin
+  adminPassword: "my-secure-password"
+  secretKey: "my-flask-secret-key"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: superset.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Scaled Workers
+
+```yaml
+web:
+  replicaCount: 2
+  workers: 4
+
+worker:
+  replicaCount: 3
+  concurrency: 4
+
+beat:
+  enabled: true
+```
+
+## External Database and Redis
+
+```yaml
+database:
+  mode: external
+  external:
+    type: postgresql
+    host: postgres.example.internal
+    port: 5432
+    name: superset
+    username: superset
+    existingSecret: superset-db
+
+redisConfig:
+  mode: external
+  external:
+    host: redis.example.internal
+    port: 6379
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `image.repository` | `apache/superset` | Container image |
+| `superset.adminUsername` | `admin` | Admin username |
+| `superset.adminPassword` | `""` | Auto-generated if empty |
+| `superset.secretKey` | `""` | Flask SECRET_KEY (auto-generated) |
+| `superset.loadExamples` | `false` | Load example dashboards |
+| `web.replicaCount` | `1` | Web server replicas |
+| `web.workers` | `2` | Gunicorn workers |
+| `worker.replicaCount` | `1` | Celery worker replicas |
+| `worker.concurrency` | `2` | Celery concurrency |
+| `beat.enabled` | `true` | Enable Celery beat scheduler |
+| `database.mode` | `subchart` | Database mode: subchart or external |
+| `redisConfig.mode` | `subchart` | Redis mode: subchart or external |
+| `ingress.enabled` | `false` | Enable ingress |
+
+## Operational Notes
+
+- the init job runs database migrations and creates the admin user on every install/upgrade
+- web, worker, and beat components scale independently
+- configure `superset.extraConfig` for custom superset_config.py settings
+- use `superset.loadExamples: true` for demonstration environments
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/superset) on GitHub.

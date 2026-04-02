@@ -1,0 +1,134 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Apache Druid Chart
+description: HelmForge Druid chart for distributed analytics database with coordinator, broker, historical, and router.
+---
+
+# Apache Druid
+
+Deploy [Apache Druid](https://druid.apache.org/) on Kubernetes — a high-performance, real-time analytics database designed for fast slice-and-dice analytics on large datasets, commonly used for BI dashboards and real-time data exploration.
+
+## Key Features
+
+- **6-component architecture** — coordinator, overlord, broker, router, historical, middlemanager
+- **Router web console** — built-in Druid console accessible via ingress
+- **PostgreSQL metadata store** — bundled subchart or external PostgreSQL/MySQL
+- **ZooKeeper coordination** — bundled subchart or external ZooKeeper
+- **Deep storage** — local or S3-compatible (MinIO, AWS S3)
+- **Persistent volumes** — segment cache (historical) and task storage (middlemanager)
+- **Per-component scaling** — independent replica counts and JVM tuning
+- **Health probes** — liveness on /status/health, readiness on /status/selfDiscovered
+- **Ingress support** — configurable class (traefik, nginx, etc.)
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install druid helmforge/druid -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install druid oci://ghcr.io/helmforgedev/helm/druid -f values.yaml
+```
+
+## Basic Example
+
+```yaml
+coordinator:
+  enabled: true
+
+broker:
+  enabled: true
+
+router:
+  enabled: true
+
+historical:
+  enabled: true
+  persistence:
+    size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: druid.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## S3 Deep Storage
+
+```yaml
+deepStorage:
+  type: s3
+  s3:
+    bucket: my-druid-bucket
+    baseKey: druid/segments
+    region: us-east-1
+    accessKey: "AKIAIOSFODNN7EXAMPLE"
+    secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+```
+
+## External Services
+
+```yaml
+metadata:
+  mode: external
+  external:
+    type: postgresql
+    host: postgres.example.internal
+    port: 5432
+    name: druid
+    username: druid
+    existingSecret: druid-db
+
+zookeeperConfig:
+  mode: external
+  external:
+    hosts: "zk1.example.internal:2181,zk2.example.internal:2181"
+
+postgresql:
+  enabled: false
+
+zookeeper:
+  enabled: false
+```
+
+## Key Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `image.repository` | `apache/druid` | Druid container image |
+| `coordinator.enabled` | `true` | Enable coordinator |
+| `coordinator.javaOpts` | `-Xms256m -Xmx512m` | Coordinator JVM options |
+| `overlord.enabled` | `true` | Enable overlord |
+| `broker.enabled` | `true` | Enable broker |
+| `broker.javaOpts` | `-Xms512m -Xmx1g` | Broker JVM options |
+| `router.enabled` | `true` | Enable router (web console) |
+| `historical.enabled` | `true` | Enable historical node |
+| `historical.persistence.size` | `10Gi` | Segment cache volume size |
+| `middleManager.enabled` | `true` | Enable middle manager |
+| `middleManager.workerCapacity` | `2` | Tasks per middle manager |
+| `metadata.mode` | `subchart` | Metadata mode: subchart or external |
+| `zookeeperConfig.mode` | `subchart` | ZooKeeper mode: subchart or external |
+| `deepStorage.type` | `local` | Deep storage: local or s3 |
+| `ingress.enabled` | `false` | Enable ingress |
+
+## Operational Notes
+
+- Druid is memory-intensive — all 6 components together require 2GB+ RAM minimum
+- tune JVM heap per component via `javaOpts` for production sizing
+- the router component serves the web console and is the default ingress target
+- use S3 deep storage for production; local deep storage is only suitable for development
+- historical nodes cache segments on disk — size the PVC based on data volume
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/druid) on GitHub.
