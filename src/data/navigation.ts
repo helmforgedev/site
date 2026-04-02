@@ -12,6 +12,8 @@ export const sidebarNav: NavItem[] = [
   { label: 'Charts Overview', href: '/docs/charts' },
   { label: 'Stack Examples', href: '/docs/stack-examples' },
   { label: 'HelmForge vs Other Charts', href: '/docs/comparison' },
+  { label: 'FAQ', href: '/docs/faq' },
+  { label: 'Troubleshooting', href: '/docs/troubleshooting' },
 ];
 
 export interface ChartCategory {

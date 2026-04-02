@@ -1,0 +1,341 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: FAQ
+description: Frequently asked questions about HelmForge charts — installation, configuration, backup, networking, and compatibility.
+---
+
+import Callout from '../../components/Callout.astro';
+
+# Frequently Asked Questions
+
+Common questions about installing, configuring, and operating HelmForge charts.
+
+---
+
+## Installation
+
+<details>
+<summary>How do I add the HelmForge Helm repository?</summary>
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+```
+
+You can also install charts directly from the OCI registry without adding a repo:
+
+```bash
+helm install my-release oci://ghcr.io/helmforgedev/helm/redis
+```
+
+</details>
+
+<details>
+<summary>Can I install charts using OCI instead of the Helm repo?</summary>
+
+Yes. All HelmForge charts are published as OCI artifacts on GitHub Container Registry:
+
+```bash
+helm install my-release oci://ghcr.io/helmforgedev/helm/<chart-name>
+```
+
+OCI artifacts are signed with Cosign keyless signing. You can verify them with:
+
+```bash
+cosign verify ghcr.io/helmforgedev/helm/<chart-name>:<version> \
+  --certificate-identity-regexp="github.com/helmforgedev" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+</details>
+
+<details>
+<summary>How do I upgrade a chart without downtime?</summary>
+
+For most charts, `helm upgrade` performs a rolling update by default:
+
+```bash
+helm upgrade my-release helmforge/<chart-name> -f values.yaml
+```
+
+For database charts, check the architecture-specific docs:
+
+- **Standalone**: brief downtime during pod restart is expected
+- **Replication**: the upgrade rolls replicas first, then the primary, minimizing downtime
+
+Always back up data before upgrading database charts.
+
+</details>
+
+<details>
+<summary>How do I install a specific chart version?</summary>
+
+```bash
+helm install my-release helmforge/<chart-name> --version 1.2.3
+```
+
+To list all available versions:
+
+```bash
+helm search repo helmforge/<chart-name> --versions
+```
+
+</details>
+
+---
+
+## Configuration
+
+<details>
+<summary>How do I use a different ingress controller?</summary>
+
+Set `ingress.className` in your values:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx # or traefik, haproxy, etc.
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+HelmForge charts default to `traefik` as the ingress class, but any controller that supports the `IngressClass` resource will work.
+
+</details>
+
+<details>
+<summary>How do I enable TLS with cert-manager?</summary>
+
+Add the cert-manager annotation and a TLS section:
+
+```yaml
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: app-tls
+      hosts:
+        - app.example.com
+```
+
+</details>
+
+<details>
+<summary>How do I set resource requests and limits?</summary>
+
+Most charts support a `resources` block:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+```
+
+Check the chart's `values.yaml` for the exact path — some charts have per-component resources (e.g., `primary.resources`, `secondary.resources`).
+
+</details>
+
+<details>
+<summary>How do I use an existing Secret instead of chart-generated credentials?</summary>
+
+Most charts support `existingSecret`:
+
+```yaml
+auth:
+  existingSecret: my-precreated-secret
+```
+
+The secret must contain the expected keys. Check the chart's README for the required key names.
+
+</details>
+
+---
+
+## Backup
+
+<details>
+<summary>How do I configure S3 backup with MinIO?</summary>
+
+Database charts that support backup accept S3-compatible endpoints:
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: http://minio.minio.svc.cluster.local:9000
+    bucket: backups
+    accessKey: minioadmin
+    secretKey: minioadmin
+    region: us-east-1
+```
+
+For production, store credentials in a Kubernetes Secret and reference it via `backup.existingSecret`.
+
+</details>
+
+<details>
+<summary>Which charts support automated backups?</summary>
+
+Charts with built-in S3 backup CronJobs:
+
+- **PostgreSQL** — `pg_dump` to S3
+- **MySQL** — `mysqldump` to S3
+- **MongoDB** — `mongodump` to S3
+- **MariaDB** — `mariadb-dump` to S3
+
+All backup jobs support S3-compatible endpoints (AWS S3, MinIO, DigitalOcean Spaces, etc.).
+
+</details>
+
+<details>
+<summary>How do I restore from a backup?</summary>
+
+Backup restoration is application-specific. General steps:
+
+1. Download the backup from S3
+2. Create a new release or scale down the existing one
+3. Restore using the application's native tool (`psql`, `mysql`, `mongorestore`)
+4. Verify data integrity
+5. Scale back up
+
+Check the chart's docs for detailed restore procedures.
+
+</details>
+
+---
+
+## Networking
+
+<details>
+<summary>How do I expose a service without an ingress controller?</summary>
+
+Use a `NodePort` or `LoadBalancer` service type:
+
+```yaml
+service:
+  type: LoadBalancer
+  port: 80
+```
+
+Or use port-forwarding for development:
+
+```bash
+kubectl port-forward svc/my-release-<chart> 8080:80
+```
+
+</details>
+
+<details>
+<summary>How do I use Pi-hole with Cloudflared for DNS-over-HTTPS?</summary>
+
+Deploy both charts and point Pi-hole's upstream DNS to Cloudflared:
+
+```yaml
+# Pi-hole values
+pihole:
+  dns:
+    upstream:
+      - 'cloudflared.default.svc.cluster.local#5053'
+```
+
+See the [Network Stack](/stack) preset in the Stack Builder for a one-click setup.
+
+</details>
+
+---
+
+## Compatibility
+
+<details>
+<summary>What Kubernetes versions are supported?</summary>
+
+HelmForge charts are tested on Kubernetes 1.28+. Most charts work on 1.26+ but we recommend staying on a supported Kubernetes version.
+
+</details>
+
+<details>
+<summary>Can I use HelmForge charts with ArgoCD or Flux?</summary>
+
+Yes. For **ArgoCD**, create an Application resource:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-redis
+  namespace: argocd
+spec:
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://repo.helmforge.dev
+    chart: redis
+    targetRevision: '*'
+    helm:
+      values: |
+        architecture: standalone
+  project: default
+```
+
+For **Flux**, create a HelmRelease:
+
+```yaml
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: my-redis
+  namespace: default
+spec:
+  chart:
+    spec:
+      chart: redis
+      sourceRef:
+        kind: HelmRepository
+        name: helmforge
+      version: '*'
+  values:
+    architecture: standalone
+```
+
+The [Stack Builder](/stack) can generate both ArgoCD and Helmfile manifests.
+
+</details>
+
+<details>
+<summary>Do HelmForge charts use official images?</summary>
+
+Yes. HelmForge charts use official upstream images whenever available. When an official image does not exist, the chart documents this clearly and specifies a trusted community image.
+
+All image tags are pinned to specific versions — never `latest` or floating tags.
+
+</details>
+
+<details>
+<summary>Are charts signed?</summary>
+
+Yes. All OCI artifacts are signed with [Sigstore Cosign](https://www.sigstore.dev/) keyless signing in the CI/CD pipeline. You can verify signatures using the `cosign verify` command shown in the installation section above.
+
+</details>
+
+<details>
+<summary>What license are the charts under?</summary>
+
+All HelmForge charts are released under the **MIT License**. You can use them freely in personal and commercial projects.
+
+</details>
