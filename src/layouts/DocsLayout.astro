@@ -2,6 +2,8 @@
 import BaseLayout from './BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Container from '../components/Container.astro';
+import { sidebarNav, chartNav, allPages } from '../data/navigation';
 
 interface Props {
   title: string;
@@ -11,55 +13,6 @@ interface Props {
 const { title, description } = Astro.props.frontmatter || Astro.props;
 
 const currentPath = Astro.url.pathname;
-
-const sidebarNav = [
-  { label: 'Getting Started', href: '/docs/getting-started' },
-  { label: 'Charts Overview', href: '/docs/charts' },
-  { label: 'Stack Examples', href: '/docs/stack-examples' },
-  { label: 'HelmForge vs Other Charts', href: '/docs/comparison' },
-];
-
-const chartNav = [
-  { label: 'Generic', href: '/docs/charts/generic' },
-  { label: 'MySQL', href: '/docs/charts/mysql' },
-  { label: 'PostgreSQL', href: '/docs/charts/postgresql' },
-  { label: 'Redis', href: '/docs/charts/redis' },
-  { label: 'MongoDB', href: '/docs/charts/mongodb' },
-  { label: 'RabbitMQ', href: '/docs/charts/rabbitmq' },
-  { label: 'Keycloak', href: '/docs/charts/keycloak' },
-  { label: 'Vaultwarden', href: '/docs/charts/vaultwarden' },
-  { label: 'Minecraft', href: '/docs/charts/minecraft' },
-  { label: 'Pi-hole', href: '/docs/charts/pihole' },
-  { label: 'WordPress', href: '/docs/charts/wordpress' },
-  { label: 'Strapi', href: '/docs/charts/strapi' },
-  { label: 'Answer', href: '/docs/charts/answer' },
-  { label: 'n8n', href: '/docs/charts/n8n' },
-  { label: 'Komga', href: '/docs/charts/komga' },
-  { label: 'Guacamole', href: '/docs/charts/guacamole' },
-  { label: 'Cloudflared', href: '/docs/charts/cloudflared' },
-  { label: 'DDNS Updater', href: '/docs/charts/ddns-updater' },
-  { label: 'Uptime Kuma', href: '/docs/charts/uptime-kuma' },
-  { label: 'Appwrite', href: '/docs/charts/appwrite' },
-  { label: 'Authelia', href: '/docs/charts/authelia' },
-  { label: 'AdGuard Home', href: '/docs/charts/adguard-home' },
-  { label: 'Velero', href: '/docs/charts/velero' },
-  { label: 'Kafka', href: '/docs/charts/kafka' },
-  { label: 'Dolibarr', href: '/docs/charts/dolibarr' },
-  { label: 'Mosquitto', href: '/docs/charts/mosquitto' },
-  { label: 'Docmost', href: '/docs/charts/docmost' },
-  { label: 'Flowise', href: '/docs/charts/flowise' },
-  { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin' },
-  { label: 'Heimdall', href: '/docs/charts/heimdall' },
-  { label: 'Gitea', href: '/docs/charts/gitea' },
-  { label: 'Homarr', href: '/docs/charts/homarr' },
-  { label: 'MariaDB', href: '/docs/charts/mariadb' },
-];
-
-const allPages = [
-  { label: 'Documentation', href: '/docs' },
-  ...sidebarNav,
-  ...chartNav,
-];
 
 const currentIndex = allPages.findIndex(p =>
   currentPath.replace(/\/$/, '') === p.href.replace(/\/$/, '')
@@ -85,7 +38,7 @@ function isActive(href: string): boolean {
 <BaseLayout title={title} description={description}>
   <Header />
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+  <Container class="py-6 sm:py-8">
     <!-- Mobile sidebar toggle -->
     <button
       id="docs-sidebar-toggle"
@@ -235,7 +188,7 @@ function isActive(href: string): boolean {
         </nav>
       </main>
     </div>
-  </div>
+  </Container>
 
   <Footer />
 
@@ -253,34 +206,35 @@ function isActive(href: string): boolean {
       }
 
       // Inject copy buttons into all prose code blocks
-      document.querySelectorAll('.prose-docs pre').forEach(pre => {
-        // Ensure parent 'pre' has the necessary positioning and group classes
-        pre.classList.add('group', 'relative');
-        if (pre.querySelector('.prose-copy-btn')) return;
-        
-        const btn = document.createElement('button');
-        // Usar Tailwind classes puras para garantir consistência e evitar problemas de scope de CSS global
-        btn.className = 'prose-copy-btn absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-400 bg-zinc-800/80 backdrop-blur-sm border border-white/10 rounded-md cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:text-white hover:bg-primary hover:border-primary-light z-10';
-        btn.setAttribute('aria-label', 'Copy code');
-        btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy</span>';
-        
-        btn.addEventListener('click', async () => {
-          const code = pre.querySelector('code');
-          if (!code) return;
-          try {
-            await navigator.clipboard.writeText(code.textContent || '');
-            btn.querySelector('span').textContent = 'Copied!';
-            btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
-            btn.classList.add('text-emerald-400', 'border-emerald-500/50');
-            setTimeout(() => {
-              btn.querySelector('span').textContent = 'Copy';
-              btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
-              btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
-            }, 2000);
-          } catch (err) { console.error('Copy failed:', err); }
+      if (!window.__proseCopyInit) {
+        window.__proseCopyInit = true;
+        document.querySelectorAll('.prose-docs pre').forEach(pre => {
+          pre.classList.add('group', 'relative');
+          if (pre.querySelector('.prose-copy-btn')) return;
+
+          const btn = document.createElement('button');
+          btn.className = 'prose-copy-btn absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-400 bg-zinc-800/80 backdrop-blur-sm border border-white/10 rounded-md cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:text-white hover:bg-primary hover:border-primary-light z-10';
+          btn.setAttribute('aria-label', 'Copy code');
+          btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy</span>';
+
+          btn.addEventListener('click', async () => {
+            const code = pre.querySelector('code');
+            if (!code) return;
+            try {
+              await navigator.clipboard.writeText(code.textContent || '');
+              btn.querySelector('span').textContent = 'Copied!';
+              btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
+              btn.classList.add('text-emerald-400', 'border-emerald-500/50');
+              setTimeout(() => {
+                btn.querySelector('span').textContent = 'Copy';
+                btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+                btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+              }, 2000);
+            } catch (err) { console.error('Copy failed:', err); }
+          });
+          pre.appendChild(btn);
         });
-        pre.appendChild(btn);
-      });
+      }
     })();
   </script>
 </BaseLayout>
