@@ -1,0 +1,282 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Container from '../components/Container.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+
+interface Milestone {
+  title: string;
+  description: string;
+  html_url: string;
+  state: 'open' | 'closed';
+  open_issues: number;
+  closed_issues: number;
+  due_on: string | null;
+  created_at: string;
+}
+
+let milestones: Milestone[] = [];
+try {
+  const res = await fetch(
+    'https://api.github.com/repos/helmforgedev/charts/milestones?state=all&sort=due_on&direction=asc&per_page=30',
+    { headers: { Accept: 'application/vnd.github+json' } },
+  );
+  if (res.ok) {
+    milestones = await res.json();
+  }
+} catch {
+  // Build continues with empty milestones
+}
+
+const openMilestones = milestones.filter((m) => m.state === 'open');
+const closedMilestones = milestones.filter((m) => m.state === 'closed');
+
+function formatDate(iso: string | null) {
+  if (!iso) return 'No deadline';
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function progress(m: Milestone) {
+  const total = m.open_issues + m.closed_issues;
+  return total === 0 ? 0 : Math.round((m.closed_issues / total) * 100);
+}
+
+// Static roadmap items when no milestones exist
+const staticRoadmap = [
+  {
+    phase: 'Foundation',
+    status: 'done' as const,
+    items: [
+      'Core database charts (PostgreSQL, MySQL, Redis, MongoDB)',
+      'S3-compatible backup CronJobs',
+      'Cosign-signed OCI artifacts',
+      'Automated semantic versioning & release notes',
+      'ArtifactHub integration',
+    ],
+  },
+  {
+    phase: 'Growth',
+    status: 'active' as const,
+    items: [
+      'Application charts (n8n, Keycloak, Gitea, WordPress, etc.)',
+      'Networking charts (Pi-hole, Cloudflared, Uptime Kuma)',
+      'AI/ML charts (Flowise, Open WebUI)',
+      'Chart maturity promotion pipeline',
+      'Website with docs, playground, and stack builder',
+    ],
+  },
+  {
+    phase: 'Enterprise',
+    status: 'planned' as const,
+    items: [
+      'HA and multi-region deployment patterns',
+      'Monitoring and alerting integrations',
+      'Operator-based lifecycle management',
+      'Terraform and Pulumi modules',
+      'Compliance and policy templates (OPA, Kyverno)',
+    ],
+  },
+  {
+    phase: 'Ecosystem',
+    status: 'planned' as const,
+    items: [
+      'GitOps-native install (ArgoCD, Flux catalogs)',
+      'Chart dependency graph and compatibility matrix',
+      'Community chart contribution pipeline',
+      'Cloud marketplace listings (AWS, Azure, GCP)',
+      'Interactive tutorials and learning paths',
+    ],
+  },
+];
+
+const statusColors = {
+  done: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Completed' },
+  active: { bg: 'bg-primary/10', text: 'text-primary-light', border: 'border-primary/30', label: 'In Progress' },
+  planned: { bg: 'bg-zinc-500/10', text: 'text-zinc-400', border: 'border-zinc-500/30', label: 'Planned' },
+};
+---
+
+<BaseLayout
+  title="Roadmap"
+  description="See what's coming next for HelmForge. Track milestones, upcoming charts, and planned features."
+>
+  <Header />
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <SectionHeader
+        label="Roadmap"
+        title="Where HelmForge is heading."
+        description="Our roadmap is public. Track progress, see what's next, and help shape the direction."
+      />
+
+      <!-- GitHub Milestones (if available) -->
+      {
+        milestones.length > 0 && (
+          <div class="mt-12">
+            <h3 class="text-lg font-bold text-text-base heading-font mb-6">GitHub Milestones</h3>
+
+            {openMilestones.length > 0 && (
+              <div class="space-y-4 mb-8">
+                <h4 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted">Active</h4>
+                {openMilestones.map((m) => (
+                  <a
+                    href={m.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="block glass-panel rounded-2xl p-5 transition-all hover:border-primary/40 hover:-translate-y-0.5"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="min-w-0 flex-1">
+                        <div class="text-base font-bold text-text-base">{m.title}</div>
+                        {m.description && <p class="mt-1 text-sm text-text-muted line-clamp-2">{m.description}</p>}
+                      </div>
+                      <span class="shrink-0 text-xs text-text-muted">{formatDate(m.due_on)}</span>
+                    </div>
+                    <div class="mt-3">
+                      <div class="flex items-center justify-between text-xs text-text-muted mb-1.5">
+                        <span>
+                          {m.closed_issues}/{m.open_issues + m.closed_issues} issues
+                        </span>
+                        <span>{progress(m)}%</span>
+                      </div>
+                      <div class="h-1.5 rounded-full bg-border overflow-hidden">
+                        <div class="h-full rounded-full bg-primary transition-all" style={`width: ${progress(m)}%`} />
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {closedMilestones.length > 0 && (
+              <div class="space-y-3">
+                <h4 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted">Completed</h4>
+                {closedMilestones.map((m) => (
+                  <a
+                    href={m.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center gap-3 glass-panel rounded-xl px-5 py-3 transition-all hover:border-primary/40 opacity-70 hover:opacity-100"
+                  >
+                    <svg
+                      class="w-4 h-4 text-emerald-400 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="text-sm font-semibold text-text-base">{m.title}</span>
+                    <span class="text-xs text-text-muted ml-auto">{formatDate(m.due_on)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      <!-- Static Roadmap Timeline -->
+      <div class="mt-12">
+        {milestones.length > 0 && <h3 class="text-lg font-bold text-text-base heading-font mb-6">Long-term Vision</h3>}
+
+        <div class="relative">
+          <!-- Timeline line -->
+          <div class="absolute left-[19px] top-8 bottom-8 w-px bg-border hidden sm:block"></div>
+
+          <div class="space-y-6">
+            {
+              staticRoadmap.map((phase) => {
+                const s = statusColors[phase.status];
+                return (
+                  <div class="relative flex gap-5">
+                    <div class="hidden sm:flex shrink-0 w-10 justify-center pt-5">
+                      <div class={`w-3.5 h-3.5 rounded-full border-2 ${s.border} ${s.bg}`} />
+                    </div>
+                    <div class="flex-1 glass-panel rounded-2xl p-6">
+                      <div class="flex items-center gap-3 mb-3">
+                        <h3 class="text-lg font-bold text-text-base heading-font">{phase.phase}</h3>
+                        <span class={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${s.bg} ${s.text}`}>
+                          {s.label}
+                        </span>
+                      </div>
+                      <ul class="space-y-2">
+                        {phase.items.map((item) => (
+                          <li class="flex items-start gap-2.5 text-sm text-text-muted">
+                            {phase.status === 'done' ? (
+                              <svg
+                                class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                class={`w-4 h-4 shrink-0 mt-0.5 ${phase.status === 'active' ? 'text-primary-light' : 'text-zinc-500'}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="mt-16 glass-panel rounded-2xl p-8 text-center">
+        <h3 class="text-lg font-bold text-text-base heading-font">Have a suggestion?</h3>
+        <p class="mt-2 text-sm text-text-muted max-w-lg mx-auto">
+          The roadmap is shaped by the community. Open an issue to request a chart, suggest a feature, or propose a
+          change.
+        </p>
+        <div class="mt-5 flex flex-wrap justify-center gap-3">
+          <a
+            href="/request"
+            class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/20"
+          >
+            Request a Chart
+          </a>
+          <a
+            href="https://github.com/helmforgedev/charts/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-semibold text-text-base transition-all hover:border-primary/40 hover:bg-bg-surface"
+          >
+            Open an Issue
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>
