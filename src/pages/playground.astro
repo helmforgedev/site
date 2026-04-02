@@ -1,0 +1,218 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Container from '../components/Container.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+import { charts, chartIcon } from '../data/charts';
+
+const stableCharts = charts.filter((c) => c.maturity === 'stable');
+
+// Define common configurable values for chart categories
+const chartConfigs: Record<
+  string,
+  {
+    label: string;
+    key: string;
+    type: 'text' | 'number' | 'select' | 'toggle';
+    default: string;
+    options?: string[];
+    description: string;
+  }[]
+> = {
+  postgresql: [
+    {
+      label: 'Architecture',
+      key: 'architecture',
+      type: 'select',
+      default: 'standalone',
+      options: ['standalone', 'replication'],
+      description: 'Deployment architecture',
+    },
+    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
+    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+    },
+  ],
+  mysql: [
+    {
+      label: 'Architecture',
+      key: 'architecture',
+      type: 'select',
+      default: 'standalone',
+      options: ['standalone', 'replication'],
+      description: 'Deployment architecture',
+    },
+    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
+    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+    },
+  ],
+  redis: [
+    {
+      label: 'Architecture',
+      key: 'architecture',
+      type: 'select',
+      default: 'standalone',
+      options: ['standalone', 'sentinel'],
+      description: 'Deployment architecture',
+    },
+    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '2Gi', description: 'PVC storage size' },
+    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+  ],
+  mongodb: [
+    {
+      label: 'Architecture',
+      key: 'architecture',
+      type: 'select',
+      default: 'standalone',
+      options: ['standalone', 'replicaset'],
+      description: 'Deployment architecture',
+    },
+    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
+    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+    },
+  ],
+  _default: [
+    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
+    {
+      label: 'Ingress',
+      key: 'ingress.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable Ingress resource',
+    },
+  ],
+};
+
+// Serialize configs for the client
+const configsJson = JSON.stringify(chartConfigs);
+---
+
+<BaseLayout
+  title="Values Playground"
+  description="Interactively configure HelmForge chart values and generate ready-to-use Helm install commands."
+>
+  <Header />
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <SectionHeader
+        label="Playground"
+        title="Configure, preview, deploy."
+        description="Pick a chart, tweak the values, and get a ready-to-paste install command with your customizations."
+      />
+
+      <div class="mt-12 grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <!-- Chart Selector -->
+        <div class="lg:col-span-2">
+          <h3 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted mb-4">Select a chart</h3>
+          <div class="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+            {
+              stableCharts.map((chart) => (
+                <button
+                  class="playground-chart-btn w-full flex items-center gap-3 rounded-xl border border-border bg-bg-surface/40 px-4 py-3 text-left transition-all hover:border-primary/40 hover:bg-bg-surface/80"
+                  data-slug={chart.slug}
+                  data-name={chart.name}
+                >
+                  <img
+                    src={chartIcon(chart.slug)}
+                    alt=""
+                    class="w-7 h-7 object-contain"
+                    loading="lazy"
+                    width="28"
+                    height="28"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-semibold text-text-base">{chart.name}</div>
+                    <div class="text-xs text-text-muted truncate">{chart.description}</div>
+                  </div>
+                </button>
+              ))
+            }
+          </div>
+        </div>
+
+        <!-- Config + Output -->
+        <div class="lg:col-span-3">
+          <!-- Config Panel -->
+          <div id="playground-config" class="glass-panel rounded-2xl p-6 mb-6">
+            <div id="playground-empty" class="text-center py-8 text-text-muted">
+              <svg class="mx-auto h-10 w-10 opacity-40 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <p class="text-sm font-medium">Select a chart to configure</p>
+              <p class="text-xs mt-1 opacity-60">Values will appear here with controls to customize them</p>
+            </div>
+            <div id="playground-fields" class="hidden">
+              <div class="flex items-center justify-between mb-5">
+                <h3 id="playground-chart-title" class="text-lg font-bold text-text-base heading-font"></h3>
+                <a id="playground-docs-link" href="#" class="text-xs text-primary-light hover:underline">View docs</a>
+              </div>
+              <div id="playground-controls" class="space-y-4"></div>
+            </div>
+          </div>
+
+          <!-- Command Output -->
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted">Install command</h3>
+            <button
+              id="playground-copy"
+              class="text-xs font-medium text-primary-light hover:text-primary transition-colors disabled:opacity-40"
+              disabled
+            >
+              Copy to clipboard
+            </button>
+          </div>
+          <div class="rounded-2xl border border-border bg-[#1e1e2e] overflow-hidden">
+            <div class="flex items-center px-4 py-2.5 border-b border-white/5 bg-white/5">
+              <div class="flex space-x-1.5">
+                <div class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></div>
+              </div>
+              <span class="mx-auto text-[10px] text-zinc-500 font-mono">terminal</span>
+            </div>
+            <pre
+              id="playground-output"
+              class="p-5 font-mono text-sm text-zinc-300 leading-relaxed overflow-x-auto min-h-[120px]"><code id="playground-code" class="block"><span class="text-zinc-500"># Select a chart and configure values</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>
+
+<script define:vars={{ configsJson }}>
+  window.__playgroundConfigs = JSON.parse(configsJson);
+</script>
+<script>
+  import '../scripts/playground';
+</script>
