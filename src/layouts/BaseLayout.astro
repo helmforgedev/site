@@ -12,6 +12,26 @@ const { title, description, image = '/og-default.png', url = Astro.url.href } = 
 
 const siteName = 'HelmForge';
 const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+
+// Build breadcrumb from URL path
+const pathSegments = Astro.url.pathname.split('/').filter(Boolean);
+const breadcrumbItems = [{ name: 'Home', url: 'https://helmforge.dev/' }];
+let accumulated = '';
+for (const seg of pathSegments) {
+  accumulated += `/${seg}`;
+  const name = seg.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  breadcrumbItems.push({ name, url: `https://helmforge.dev${accumulated}` });
+}
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: breadcrumbItems.map((item, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: item.name,
+    item: item.url,
+  })),
+};
 ---
 
 <!doctype html>
@@ -118,6 +138,9 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
         },
       })}
     />
+
+    <!-- BreadcrumbList JSON-LD -->
+    {pathSegments.length > 0 && <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />}
 
     <!-- Global CSS -->
     <style is:global>

@@ -2,24 +2,66 @@
 import ThemeToggle from './ThemeToggle.astro';
 import Logo from './Logo.astro';
 import Container from './Container.astro';
-import { Github, Menu, X, Search } from 'lucide-astro';
+import { Github, Menu, X, Search, ChevronDown } from 'lucide-astro';
 
 const currentPath = Astro.url.pathname;
 
-const navItems = [
-  { label: 'Home', href: '/' },
+interface NavLink {
+  label: string;
+  href: string;
+}
+
+interface NavDropdown {
+  label: string;
+  items: NavLink[];
+}
+
+type NavEntry = NavLink | NavDropdown;
+
+function isDropdown(entry: NavEntry): entry is NavDropdown {
+  return 'items' in entry;
+}
+
+const navEntries: NavEntry[] = [
+  { label: 'Docs', href: '/docs' },
+  {
+    label: 'Tools',
+    items: [
+      { label: 'Stack Builder', href: '/stack' },
+      { label: 'Playground', href: '/playground' },
+    ],
+  },
+  { label: 'Blog', href: '/blog' },
+  {
+    label: 'Community',
+    items: [
+      { label: 'Roadmap', href: '/roadmap' },
+      { label: 'Community', href: '/community' },
+      { label: 'Request a Chart', href: '/request' },
+      { label: 'Changelog', href: '/changelog' },
+    ],
+  },
+];
+
+// Flatten for mobile
+const mobileItems: NavLink[] = [
   { label: 'Docs', href: '/docs' },
   { label: 'Stack Builder', href: '/stack' },
   { label: 'Playground', href: '/playground' },
   { label: 'Blog', href: '/blog' },
-  { label: 'Request', href: '/request' },
-  { label: 'Changelog', href: '/changelog' },
   { label: 'Roadmap', href: '/roadmap' },
+  { label: 'Community', href: '/community' },
+  { label: 'Request a Chart', href: '/request' },
+  { label: 'Changelog', href: '/changelog' },
 ];
 
 function isActive(href: string): boolean {
   if (href === '/') return currentPath === '/';
   return currentPath.startsWith(href);
+}
+
+function isDropdownActive(items: NavLink[]): boolean {
+  return items.some((item) => isActive(item.href));
 }
 ---
 
@@ -41,22 +83,57 @@ function isActive(href: string): boolean {
       </a>
 
       <!-- Desktop nav -->
-      <nav class="hidden md:flex items-center gap-2">
+      <nav class="hidden md:flex items-center gap-1">
         {
-          navItems.map((item) => (
-            <a
-              href={item.href}
-              class:list={[
-                'relative px-4 py-2 text-sm font-semibold transition-colors rounded-full overflow-hidden group',
-                isActive(item.href) ? 'text-primary-light bg-primary/10' : 'text-text-muted hover:text-text-base',
-              ]}
-            >
-              <span class="relative z-10">{item.label}</span>
-              {!isActive(item.href) && (
-                <span class="absolute inset-0 bg-text-base/5 rounded-full scale-50 opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
-              )}
-            </a>
-          ))
+          navEntries.map((entry) =>
+            isDropdown(entry) ? (
+              <div class="nav-dropdown relative">
+                <button
+                  class:list={[
+                    'nav-dropdown-trigger flex items-center gap-1 px-4 py-2 text-sm font-semibold transition-colors rounded-full',
+                    isDropdownActive(entry.items)
+                      ? 'text-primary-light bg-primary/10'
+                      : 'text-text-muted hover:text-text-base',
+                  ]}
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                >
+                  {entry.label}
+                  <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200" />
+                </button>
+                <div class="nav-dropdown-menu absolute top-full left-0 mt-1 min-w-[180px] rounded-xl border border-border bg-bg-base/95 backdrop-blur-xl shadow-xl opacity-0 invisible translate-y-1 transition-all duration-200 z-50">
+                  <div class="py-1.5">
+                    {entry.items.map((item) => (
+                      <a
+                        href={item.href}
+                        class:list={[
+                          'block px-4 py-2 text-sm font-medium transition-colors',
+                          isActive(item.href)
+                            ? 'text-primary-light bg-primary/5'
+                            : 'text-text-muted hover:text-text-base hover:bg-text-base/5',
+                        ]}
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <a
+                href={entry.href}
+                class:list={[
+                  'relative px-4 py-2 text-sm font-semibold transition-colors rounded-full overflow-hidden group',
+                  isActive(entry.href) ? 'text-primary-light bg-primary/10' : 'text-text-muted hover:text-text-base',
+                ]}
+              >
+                <span class="relative z-10">{entry.label}</span>
+                {!isActive(entry.href) && (
+                  <span class="absolute inset-0 bg-text-base/5 rounded-full scale-50 opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
+                )}
+              </a>
+            ),
+          )
         }
         <div class="h-5 w-px bg-border mx-2"></div>
         <button
@@ -117,7 +194,7 @@ function isActive(href: string): boolean {
       <div class="overflow-hidden">
         <div class="flex flex-col gap-2 pb-4 pt-2">
           {
-            navItems.map((item) => (
+            mobileItems.map((item) => (
               <a
                 href={item.href}
                 class:list={[
@@ -153,7 +230,6 @@ function isActive(href: string): boolean {
     const searchBtnMobile = document.getElementById('search-trigger-mobile');
     const modKey = document.getElementById('search-mod-key');
 
-    // Show Cmd on macOS, Ctrl elsewhere
     if (modKey && navigator.platform?.includes('Mac')) {
       modKey.textContent = '\u2318';
     }
@@ -167,13 +243,64 @@ function isActive(href: string): boolean {
     searchBtn?.addEventListener('click', openSearch);
     searchBtnMobile?.addEventListener('click', openSearch);
 
+    // Dropdown menus
+    const dropdowns = document.querySelectorAll('.nav-dropdown');
+
+    dropdowns.forEach((dropdown) => {
+      const trigger = dropdown.querySelector('.nav-dropdown-trigger') as HTMLButtonElement;
+      const menu = dropdown.querySelector('.nav-dropdown-menu') as HTMLElement;
+      let timeout: ReturnType<typeof setTimeout>;
+
+      function show() {
+        clearTimeout(timeout);
+        trigger.setAttribute('aria-expanded', 'true');
+        menu.classList.remove('opacity-0', 'invisible', 'translate-y-1');
+        menu.classList.add('opacity-100', 'visible', 'translate-y-0');
+        const chevron = trigger.querySelector('svg:last-child');
+        if (chevron) (chevron as HTMLElement).style.transform = 'rotate(180deg)';
+      }
+
+      function hide() {
+        timeout = setTimeout(() => {
+          trigger.setAttribute('aria-expanded', 'false');
+          menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
+          menu.classList.remove('opacity-100', 'visible', 'translate-y-0');
+          const chevron = trigger.querySelector('svg:last-child');
+          if (chevron) (chevron as HTMLElement).style.transform = '';
+        }, 150);
+      }
+
+      dropdown.addEventListener('mouseenter', show);
+      dropdown.addEventListener('mouseleave', hide);
+      trigger.addEventListener('click', () => {
+        const isOpen = trigger.getAttribute('aria-expanded') === 'true';
+        isOpen ? hide() : show();
+      });
+      trigger.addEventListener('focus', show);
+      menu.addEventListener('mouseenter', () => clearTimeout(timeout));
+    });
+
+    // Close dropdowns on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        dropdowns.forEach((dropdown) => {
+          const trigger = dropdown.querySelector('.nav-dropdown-trigger') as HTMLButtonElement;
+          const menu = dropdown.querySelector('.nav-dropdown-menu') as HTMLElement;
+          trigger.setAttribute('aria-expanded', 'false');
+          menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
+          menu.classList.remove('opacity-100', 'visible', 'translate-y-0');
+        });
+      }
+    });
+
+    // Mobile menu
     const toggle = document.getElementById('mobile-menu-toggle');
-    const menu = document.getElementById('mobile-menu');
+    const mobileMenu = document.getElementById('mobile-menu');
     const iconOpen = document.getElementById('menu-icon-open');
     const iconClose = document.getElementById('menu-icon-close');
 
     function closeMenu() {
-      menu.style.gridTemplateRows = '0fr';
+      mobileMenu.style.gridTemplateRows = '0fr';
       iconOpen.style.opacity = '1';
       iconOpen.style.transform = 'scale(1)';
       iconClose.style.opacity = '0';
@@ -182,7 +309,7 @@ function isActive(href: string): boolean {
     }
 
     function openMenu() {
-      menu.style.gridTemplateRows = '1fr';
+      mobileMenu.style.gridTemplateRows = '1fr';
       iconOpen.style.opacity = '0';
       iconOpen.style.transform = 'scale(0.5)';
       iconClose.style.opacity = '1';
@@ -190,7 +317,7 @@ function isActive(href: string): boolean {
       toggle.setAttribute('aria-expanded', 'true');
     }
 
-    if (toggle && menu && iconOpen && iconClose) {
+    if (toggle && mobileMenu && iconOpen && iconClose) {
       toggle.addEventListener('click', () => {
         const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
         isExpanded ? closeMenu() : openMenu();
