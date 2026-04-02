@@ -1,43 +1,87 @@
 ---
 import Container from './Container.astro';
 import SectionHeader from './SectionHeader.astro';
+import { backupCount, stableCount } from '../data/charts';
 
 const features = [
   {
-    icon: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>`,
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>`,
     title: 'Validated for real clusters',
-    description: 'Charts go through linting, template rendering, unit tests, and live validation before release.',
+    stat: `${stableCount} stable charts`,
+    description: 'Linting, template rendering, unit tests, and live k3d validation before every release.',
+    snippet: `# Every chart passes:\nhelm lint --strict\nhelm template test\nhelm unittest\nk3d deploy + verify`,
   },
   {
-    icon: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>`,
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>`,
     title: 'Secure by default',
-    description: 'HelmForge favors sane defaults for networking, non-root containers, and production hardening.',
+    stat: 'Non-root, hardened',
+    description: 'Non-root containers, read-only filesystems, network policies, and Cosign-signed OCI artifacts.',
+    snippet: `securityContext:\n  runAsNonRoot: true\n  readOnlyRootFilesystem: true\n  allowPrivilegeEscalation: false`,
   },
   {
-    icon: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>`,
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>`,
+    title: 'Built-in S3 backups',
+    stat: `${backupCount} charts with backup`,
+    description: 'Automated CronJob-based backups to any S3-compatible storage. Restore with a single command.',
+    snippet: `backup:\n  enabled: true\n  schedule: "0 2 * * *"\n  s3:\n    endpoint: s3.amazonaws.com\n    bucket: my-backups`,
+  },
+  {
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>`,
     title: 'Simple to operate',
-    description: 'Readable values, clear docs, and practical features like backups, ingress, and observability where they matter.',
+    stat: 'Clean values.yaml',
+    description: 'Readable values, clear docs, and practical features like ingress, TLS, and observability.',
+    snippet: `ingress:\n  enabled: true\n  className: traefik\n  hosts:\n    - host: app.example.com`,
+  },
+  {
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`,
+    title: 'Official upstream images',
+    stat: 'No custom builds',
+    description: 'Every chart uses the official Docker image from the upstream project. No forks, no wrappers.',
+    snippet: `image:\n  repository: postgres  # official\n  tag: "17.4"\n  pullPolicy: IfNotPresent`,
+  },
+  {
+    icon: `<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>`,
+    title: 'MIT Licensed',
+    stat: 'Free forever',
+    description: 'Use in production, modify, redistribute. No enterprise tiers, no usage limits, no surprises.',
+    snippet: null,
   },
 ];
 ---
 
-<section class="bg-bg-base py-16 sm:py-20 transition-colors">
-  <Container maxWidth="6xl">
+<section class="bg-bg-base py-20 sm:py-28 transition-colors">
+  <Container>
     <SectionHeader
-      label="Principles"
-      title="Fewer surprises, better defaults."
-      description="Every chart follows the same product direction: predictable installs, clear values, and production-minded behavior."
-      class="mb-10"
+      label="Why HelmForge"
+      title='Built for the day <span class="bg-gradient-to-r from-primary-light to-accent bg-clip-text text-transparent">after</span> deploy.'
+      description="Every chart follows the same direction: predictable installs, clear values, and production-minded behavior from day one."
+      class="mb-14"
     />
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {features.map(feature => (
-        <div class="rounded-2xl border border-border bg-bg-surface/50 p-6 transition-all hover:border-border/80 hover:bg-bg-surface hover:shadow-lg">
-          <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Fragment set:html={feature.icon} />
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {features.map((feature) => (
+        <div class="feature-card group relative rounded-2xl border border-border bg-bg-surface/40 p-6 transition-all duration-300 hover:border-primary/30 hover:bg-bg-surface/80 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+              <Fragment set:html={feature.icon} />
+            </div>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-primary-light bg-primary/5 border border-primary/10 rounded-full px-2.5 py-1 whitespace-nowrap">
+              {feature.stat}
+            </span>
           </div>
-          <h3 class="text-lg font-semibold text-text-base heading-font">{feature.title}</h3>
-          <p class="mt-2 text-sm leading-6 text-text-muted">{feature.description}</p>
+
+          <h3 class="text-lg font-bold text-text-base heading-font mb-2">{feature.title}</h3>
+          <p class="text-sm leading-relaxed text-text-muted mb-4">{feature.description}</p>
+
+          {feature.snippet && (
+            <div class="rounded-lg bg-[#0d1117] border border-white/5 p-3 font-mono text-[11px] leading-relaxed text-zinc-400 overflow-x-auto">
+              {feature.snippet.split('\n').map((line) => (
+                <div class:list={[line.startsWith('#') ? 'text-zinc-600' : '']}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
