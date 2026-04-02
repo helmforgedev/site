@@ -10,23 +10,112 @@ This page compares HelmForge against two common alternatives: **Bitnami** (the l
 
 ## Comparison Table
 
-| Aspect | **HelmForge** | Bitnami | Generic Community |
-|--------|---------------|---------|-------------------|
-| **Container images** | Official upstream images from the application maintainer | Custom Bitnami-built images with proprietary layers | Varies — some use official, some use custom |
-| **Image tags** | Pinned, immutable version tags | Bitnami-specific tags, rolling revisions | Often `:latest` or unpinned |
-| **License** | MIT — always, forever open source | Apache 2.0 for charts; images under Bitnami EULA with usage limits | Varies — MIT, Apache, unlicensed |
-| **Pricing / Tiering** | 100% Free forever | Free only for deprecated legacy images — requires Sales for production usage | Usually Free |
-| **Free images** | Official upstream — always updated, no restrictions | Moved to `bitnamilegacy/*` — no longer updated, may be removed | Varies |
-| **Vendor lock-in** | None — standard images, standard Helm, standard Kubernetes APIs | Charts tightly coupled to Bitnami images; switching images requires rework | Low, but often abandoned or inconsistent |
-| **Database subcharts** | Self-contained HelmForge subcharts (MySQL, PostgreSQL, MongoDB, MariaDB, Redis) | Bitnami subcharts (locked to Bitnami ecosystem) | External dependencies or none |
-| **Backup** | Built-in S3-compatible CronJob on 17+ charts | Not included | Rarely included |
-| **Values design** | Product-oriented (`database.host`, `admin.email`) | Kubernetes-centric with Bitnami abstractions | Varies — often raw env vars |
-| **Security defaults** | Non-root, tight security contexts by default | Non-root | Varies wildly |
-| **Schema validation** | `values.schema.json` on every chart (JSON Schema draft-07) | Available on some charts | Rare |
-| **CI pipeline** | Lint + template + unittest + kubeconform on every PR | Extensive internal CI | Minimal or none |
-| **Supply chain signing** | Sigstore Cosign keyless signing on every OCI artifact | Container image signatures via Cosign | Rare |
-| **Maintenance** | Active, consistent standards across all charts | Active, large team | Unpredictable — may be abandoned |
-| **Chart count** | 33 charts (growing) | 100+ charts | One chart per repo typically |
+<div class="my-8 overflow-hidden rounded-2xl border border-border bg-bg-surface/40 backdrop-blur-sm shadow-xl shadow-black/20">
+  <div class="overflow-x-auto scrollbar-hide">
+    <table class="w-full text-sm text-left border-collapse !my-0 !border-0">
+      <thead>
+        <tr class="border-b border-border/80 bg-bg-surface/80">
+          <th class="px-5 py-4 font-semibold text-text-muted w-[20%] uppercase tracking-wider text-[11px] !border-0">Features</th>
+          <th class="px-5 py-4 w-[30%] bg-primary/5 border-x border-primary/10 !border-y-0 text-primary-light font-bold">HelmForge</th>
+          <th class="px-5 py-4 font-semibold text-text-muted w-[25%] opacity-80 !border-0">Bitnami</th>
+          <th class="px-5 py-4 font-semibold text-text-muted w-[25%] opacity-80 !border-0">Generic Community</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border/50">
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Container images</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Official upstream images</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Custom Bitnami-built images</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Varies</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Image tags</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Pinned, immutable versions</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Bitnami-specific rolling tags</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Often `:latest` or unpinned</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">License</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> MIT — forever open source</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Apache 2.0 charts; images under EULA</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Varies</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Pricing / Tiering</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 100% Free forever</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Free only for legacy images</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Usually Free</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Vendor lock-in</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> None</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Tied to Bitnami images</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Low</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Backup</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Built-in S3 cronjobs</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Not included</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Rarely included</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Security defaults</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Non-root, tight security</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Non-root</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Varies wildly</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Free images</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Official upstream</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Moved to `legacy` repo</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Varies</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Database subcharts</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Self-contained subcharts</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Bitnami ecosystem locked</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">External dependencies</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Values design</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Product-oriented</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Kubernetes-centric</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Raw env vars</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Schema validation</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> `values.schema` on every chart</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Available on some charts</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Rare</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">CI pipeline</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Lint + test + kubeconform</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Extensive internal CI</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Minimal or none</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Supply chain signing</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Sigstore Cosign on every chart</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Container image signatures</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Rare</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Maintenance</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Active, strict standards</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Active, large team</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Unpredictable</td>
+        </tr>
+        <tr class="group transition-colors hover:bg-white/[0.02]">
+          <td class="px-5 py-3.5 font-semibold text-text-base whitespace-nowrap !border-0">Chart count</td>
+          <td class="px-5 py-3.5 text-text-base font-medium bg-primary/[0.02] border-x border-primary/10 !border-y-0 group-hover:bg-primary/[0.04] transition-colors"><span class="flex items-start gap-2"><svg class="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 33 charts (growing)</span></td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">100+ charts</td>
+          <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Usually one per repo</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 ## Official Upstream Images
 

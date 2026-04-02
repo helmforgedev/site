@@ -1,4 +1,6 @@
 ---
+import { Search } from 'lucide-astro';
+
 const charts = [
   {
     name: 'Generic',
@@ -328,22 +330,20 @@ const stableCount = charts.filter((chart) => chart.maturity === 'stable').length
         </p>
         
         <!-- Search Input -->
-        <div class="mt-8 relative max-w-md">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg class="h-5 w-5 text-text-muted transition-colors group-focus-within:text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        <div class="mt-8 relative max-w-md group focus-within:ring-0">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search class="h-5 w-5 text-text-muted transition-colors group-focus-within:text-primary-light" />
           </div>
           <input 
             type="search" 
             id="chart-search" 
-            class="block w-full pl-10 pr-4 py-3 border border-border rounded-xl leading-5 bg-bg-surface text-text-base placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors sm:text-sm" 
-            placeholder="Search by name or description..." 
+            class="block w-full pl-12 pr-4 py-3.5 border border-border rounded-2xl leading-5 bg-bg-surface/80 backdrop-blur-sm text-text-base placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent transition-all sm:text-sm hover:border-border/80 shadow-sm" 
+            placeholder="Search charts (e.g. postgres, redis, backup)..." 
           />
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:min-w-[320px]">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:min-w-[320px] mt-8 lg:mt-0">
         <div class="glass-panel rounded-2xl px-4 py-4 text-center">
           <p class="text-3xl font-bold tracking-tight text-text-base">{chartCount}</p>
           <p class="mt-1 text-xs uppercase tracking-[0.16em] text-text-muted">Charts</p>
@@ -364,38 +364,41 @@ const stableCount = charts.filter((chart) => chart.maturity === 'stable').length
       <svg class="mx-auto h-12 w-12 text-text-muted/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="text-lg font-bold text-text-base">No charts found</h3>
+      <div class="text-lg font-bold text-text-base">No charts found</div>
       <p class="mt-2 text-text-muted">Try adjusting your search terms.</p>
     </div>
 
-    <div class="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3" id="chart-grid-container">
+    <div class="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" id="chart-grid-container">
       {charts.map((chart) => (
         <a
           href={`/docs/charts/${chart.slug}`}
-          class="chart-card group glass-panel rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:bg-text-base/5"
+          class="chart-card group relative rounded-3xl border border-border bg-bg-surface/40 p-5 transition-all duration-400 hover:-translate-y-1 hover:border-primary/40 hover:bg-bg-surface/80 hover:shadow-xl hover:shadow-primary/10 overflow-hidden flex flex-col h-full"
           data-name={chart.name.toLowerCase()}
           data-desc={chart.description.toLowerCase()}
         >
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-4 min-w-0">
-              <div class={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold shadow-inner ${chart.color} opacity-90 group-hover:opacity-100 transition-opacity bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden`}>
+          <!-- Glow background -->
+          <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100 pointer-events-none"></div>
+          
+          <div class="relative flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold shadow-inner ${chart.color} opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 bg-white/5 backdrop-blur-md border border-white/10 overflow-hidden`}>
                 <img 
                   src={chart.icon || `https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/${chart.slug !== 'generic' ? chart.slug : 'kubernetes'}.png`} 
                   alt={`${chart.name} icon`}
-                  class="w-7 h-7 object-contain drop-shadow-md"
+                  class="w-6 h-6 object-contain drop-shadow-md"
                   onerror="this.onerror=null; this.src='/chart-placeholder.svg';"
                 />
               </div>
-              <div class="min-w-0">
-                <h3 class="truncate text-lg font-bold text-text-base transition-colors group-hover:text-primary-light">
+              <div class="min-w-0 flex-1 pr-1">
+                <div class="truncate text-base font-bold text-text-base transition-colors group-hover:text-primary-light" title={chart.name}>
                   {chart.name}
-                </h3>
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                  <span class={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] ${maturityStyles[chart.maturity]}`}>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                  <span class={`inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${maturityStyles[chart.maturity]}`}>
                     {chart.maturity}
                   </span>
                   {chart.backup && (
-                    <span class="inline-flex rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-sky-400">
+                    <span class="inline-flex rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-sky-400">
                       S3 backup
                     </span>
                   )}
@@ -403,12 +406,12 @@ const stableCount = charts.filter((chart) => chart.maturity === 'stable').length
               </div>
             </div>
 
-            <svg class="mt-1 h-5 w-5 shrink-0 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="mt-0.5 h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-primary-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </div>
 
-          <p class="mt-5 text-sm leading-relaxed text-text-muted">
+          <p class="mt-3.5 text-xs leading-relaxed line-clamp-2 text-text-muted flex-grow">
             {chart.description}
           </p>
         </a>
