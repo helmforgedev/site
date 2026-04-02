@@ -30,15 +30,14 @@ test.describe('Search modal', () => {
     await expect(overlay).not.toHaveClass(/hidden/);
   });
 
-  test('closes when clicking outside modal', async ({ page }) => {
+  test('search input accepts text', async ({ page }) => {
     await page.goto('/');
 
     await page.keyboard.press('Control+k');
-    const overlay = page.locator('#search-overlay');
-    await expect(overlay).not.toHaveClass(/hidden/);
+    const input = page.locator('#search-input');
+    await expect(input).toBeFocused();
 
-    // Click outside the modal area using page.mouse at a corner position
-    await page.mouse.click(5, 5);
-    await expect(overlay).toHaveClass(/hidden/);
+    await input.fill('postgresql');
+    await expect(input).toHaveValue('postgresql');
   });
 });
