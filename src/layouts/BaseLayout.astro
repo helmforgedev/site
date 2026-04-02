@@ -67,6 +67,11 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={new URL(image, Astro.site).href} />
 
+    <!-- Preconnect for GA4 -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.google-analytics.com" />
+
     <!-- GA4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-5PD0B83HRE"></script>
     <script is:inline>
@@ -128,5 +133,23 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
     </a>
     <slot />
     <SearchModal />
+    <script>
+      import { onCLS, onLCP, onTTFB, onINP } from 'web-vitals';
+
+      function sendToGA4(metric: { name: string; value: number; id: string }) {
+        if (typeof gtag === 'function') {
+          gtag('event', metric.name, {
+            value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
+            event_label: metric.id,
+            non_interaction: true,
+          });
+        }
+      }
+
+      onCLS(sendToGA4);
+      onLCP(sendToGA4);
+      onTTFB(sendToGA4);
+      onINP(sendToGA4);
+    </script>
   </body>
 </html>
