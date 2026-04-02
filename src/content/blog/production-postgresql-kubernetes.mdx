@@ -1,0 +1,157 @@
+---
+title: "Deploy Production-Ready PostgreSQL on Kubernetes"
+description: "Step-by-step guide to deploying PostgreSQL with replication, automated backups, and monitoring using the HelmForge chart."
+date: 2025-03-05
+author: "HelmForge Team"
+tags: ["tutorial", "postgresql", "database", "kubernetes"]
+---
+
+## What you will build
+
+By the end of this guide, you will have a PostgreSQL deployment with:
+
+- Streaming replication (1 primary + 1 replica)
+- Automated nightly S3 backups
+- Persistent storage with proper resource limits
+- Ingress-ready configuration
+
+## Prerequisites
+
+- A running Kubernetes cluster (k3d, kind, EKS, GKE, etc.)
+- `helm` v3.12+ and `kubectl` installed
+- An S3-compatible endpoint for backups (AWS S3, MinIO, etc.)
+
+## Step 1: Add the HelmForge repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+```
+
+## Step 2: Create the namespace and secrets
+
+```bash
+kubectl create namespace databases
+
+kubectl create secret generic postgresql-credentials \
+  --namespace databases \
+  --from-literal=postgres-password=your-secure-password \
+  --from-literal=replication-password=repl-secure-password
+
+kubectl create secret generic backup-s3-credentials \
+  --namespace databases \
+  --from-literal=access-key=YOUR_ACCESS_KEY \
+  --from-literal=secret-key=YOUR_SECRET_KEY
+```
+
+## Step 3: Create the values file
+
+Create a file called `postgresql-values.yaml`:
+
+```yaml
+architecture: replication
+
+auth:
+  existingSecret: postgresql-credentials
+
+primary:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  persistence:
+    size: 20Gi
+
+readReplicas:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  persistence:
+    size: 20Gi
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-pg-backups
+    existingSecret: backup-s3-credentials
+```
+
+## Step 4: Install
+
+```bash
+helm install postgresql helmforge/postgresql \
+  --namespace databases \
+  --values postgresql-values.yaml \
+  --wait --timeout 5m
+```
+
+## Step 5: Verify the deployment
+
+Check that all pods are running:
+
+```bash
+kubectl get pods -n databases -l app.kubernetes.io/name=postgresql
+```
+
+You should see two pods: one primary and one replica.
+
+Test the connection:
+
+```bash
+kubectl run pg-test --rm -it --restart=Never \
+  --namespace databases \
+  --image=postgres:17 \
+  -- psql -h postgresql-primary -U postgres -c "SELECT version();"
+```
+
+## Step 6: Verify replication
+
+Connect to the replica and confirm it is streaming:
+
+```bash
+kubectl run pg-test --rm -it --restart=Never \
+  --namespace databases \
+  --image=postgres:17 \
+  -- psql -h postgresql-read -U postgres -c "SELECT * FROM pg_stat_wal_receiver;"
+```
+
+## Step 7: Verify backup
+
+Check the backup CronJob:
+
+```bash
+kubectl get cronjob -n databases
+```
+
+Trigger a manual backup run to verify:
+
+```bash
+kubectl create job --from=cronjob/postgresql-backup manual-backup -n databases
+kubectl logs -n databases job/manual-backup -f
+```
+
+## Operational tips
+
+**Monitoring:** Export PostgreSQL metrics by enabling the metrics sidecar and scraping with Prometheus.
+
+**Scaling replicas:** Increase `readReplicas.replicaCount` and run `helm upgrade` — new replicas automatically sync from the primary.
+
+**Disaster recovery:** Restore from S3 backup by downloading the dump and running `pg_restore` against a fresh instance.
+
+**Upgrades:** Always review the [upgrade notes](/docs/charts/postgresql) before changing the chart version. PostgreSQL major version upgrades require `pg_upgrade` — the chart handles minor version bumps automatically.
+
+## Next steps
+
+- Read the full [PostgreSQL chart documentation](/docs/charts/postgresql)
+- Explore other database charts: [MySQL](/docs/charts/mysql), [MongoDB](/docs/charts/mongodb), [MariaDB](/docs/charts/mariadb)
+- Try the [Stack Builder](/stack) to generate install scripts for your full stack

@@ -1,0 +1,54 @@
+---
+title: "Introducing HelmForge: Why We Built It"
+description: "The story behind HelmForge — production-ready Helm charts built with security, backups, and operational excellence as first-class features."
+date: 2025-01-15
+author: "HelmForge Team"
+tags: ["announcement", "open-source", "kubernetes"]
+---
+
+## The problem with Helm charts today
+
+If you have run Kubernetes in production, you have probably experienced the pain of finding a good Helm chart. The ecosystem is fragmented: official charts are abandoned, community charts vary wildly in quality, and the dominant player wraps everything in proprietary images.
+
+We built HelmForge because we believed there should be a better option.
+
+## What makes HelmForge different
+
+Every HelmForge chart is built around three principles:
+
+### 1. Official upstream images only
+
+We never rebuild or wrap upstream Docker images. When you deploy PostgreSQL with HelmForge, you get the official `postgres` image from Docker Hub. No custom entrypoints, no vendor lock-in, no wondering what was added to the image.
+
+### 2. Built-in S3 backup from day one
+
+Backup should not be an afterthought. Charts that manage data include a configurable CronJob for S3-compatible backup out of the box. Point it at MinIO, AWS S3, or any compatible endpoint and your data is protected.
+
+```yaml
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    existingSecret: backup-credentials
+```
+
+### 3. Security as default
+
+Every container runs as non-root with read-only root filesystems where possible. Security contexts, network policies, and pod disruption budgets are not hidden behind flags — they are the default.
+
+## The numbers
+
+Since our first release, HelmForge has grown to over 30 stable charts covering databases, CMS platforms, identity management, monitoring, and more. Every chart goes through:
+
+- Automated CI with `helm lint`, `helm template`, and unit tests
+- Local k3d validation before every release
+- Cosign keyless signing for OCI artifacts
+- Conventional Commits powering automated semantic versioning
+
+## What is next
+
+We are actively building more charts based on community requests. If there is an application you want to see in HelmForge, [request it](/request) and the community votes on priorities.
+
+HelmForge is MIT licensed and always will be. Check out the [getting started guide](/docs/getting-started) or browse the [chart catalog](/) to find what you need.
