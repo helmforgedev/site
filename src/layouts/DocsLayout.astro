@@ -3,7 +3,7 @@ import BaseLayout from './BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
-import { sidebarNav, chartNav, allPages } from '../data/navigation';
+import { sidebarNav, chartCategories, allPages } from '../data/navigation';
 
 interface Props {
   title: string;
@@ -28,6 +28,31 @@ const breadcrumbs = segments.map((seg, i) => ({
   isLast: i === segments.length - 1,
 }));
 
+// Edit on GitHub link
+const pathSlug = currentPath.replace(/\/$/, '').replace(/^\//, '');
+const editUrl = `https://github.com/helmforgedev/site/edit/main/src/pages/${pathSlug || 'index'}.mdx`;
+
+// Breadcrumb JSON-LD
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://helmforge.dev/" },
+    ...breadcrumbs.map((crumb, i) => ({
+      "@type": "ListItem",
+      "position": i + 2,
+      "name": crumb.label,
+      ...(crumb.isLast ? {} : { "item": `https://helmforge.dev${crumb.href}` }),
+    })),
+  ],
+};
+
+const maturityDot: Record<string, string> = {
+  stable: 'bg-green-400',
+  beta: 'bg-amber-400',
+  alpha: 'bg-red-400',
+};
+
 function isActive(href: string): boolean {
   const clean = currentPath.replace(/\/$/, '');
   const target = href.replace(/\/$/, '');
@@ -37,6 +62,8 @@ function isActive(href: string): boolean {
 
 <BaseLayout title={title} description={description}>
   <Header />
+
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
 
   <Container class="py-6 sm:py-8">
     <!-- Mobile sidebar toggle -->
@@ -56,7 +83,7 @@ function isActive(href: string): boolean {
     <div class="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_200px] lg:gap-12">
       <!-- Sidebar -->
       <aside id="docs-sidebar" class="hidden lg:block relative z-10 w-full mb-8">
-        <nav class="sticky top-24 space-y-6 rounded-2xl glass-panel p-4 pb-8">
+        <nav class="sticky top-24 space-y-5 rounded-2xl glass-panel p-4 pb-8 max-h-[calc(100vh-7rem)] overflow-y-auto">
           <!-- Breadcrumbs (desktop) -->
           <nav aria-label="Breadcrumb" class="hidden lg:block border-b border-border pb-4">
             <ol class="flex flex-wrap items-center gap-1.5 text-sm text-text-muted">
@@ -110,29 +137,36 @@ function isActive(href: string): boolean {
             </ul>
           </div>
 
+          <!-- Categorized charts -->
           <div>
             <div class="mb-2 flex items-center justify-between px-2">
               <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">Charts</div>
               <a href="/docs/charts" class="text-[10px] font-medium text-primary hover:text-primary-dark transition-colors uppercase tracking-wider">View all</a>
             </div>
-            <ul class="max-h-[32rem] space-y-1 overflow-y-auto pr-1">
-              {chartNav.map(item => (
-                <li>
-                  <a
-                    href={item.href}
-                    class:list={[
-                      'block rounded-lg px-3 py-2 text-sm transition-colors',
-                      isActive(item.href)
-                        ? 'bg-primary/20 text-primary-light font-bold'
-                        : 'text-text-muted hover:bg-text-base/5 hover:text-text-base',
-                    ]}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
+            {chartCategories.map(cat => (
+              <div class="mb-3">
+                <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted/60">{cat.label}</div>
+                <ul class="space-y-0.5">
+                  {cat.charts.map(item => (
+                    <li>
+                      <a
+                        href={item.href}
+                        class:list={[
+                          'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                          isActive(item.href)
+                            ? 'bg-primary/20 text-primary-light font-bold'
+                            : 'text-text-muted hover:bg-text-base/5 hover:text-text-base',
+                        ]}
+                        aria-current={isActive(item.href) ? 'page' : undefined}
+                      >
+                        <span class={`w-1.5 h-1.5 rounded-full shrink-0 ${maturityDot[item.maturity]}`} title={item.maturity}></span>
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </nav>
       </aside>
@@ -159,6 +193,14 @@ function isActive(href: string): boolean {
         <article class="glass-panel rounded-2xl px-5 py-8 sm:px-8 lg:px-10">
           <div class="prose prose-docs max-w-3xl">
             <slot />
+          </div>
+
+          <!-- Edit on GitHub -->
+          <div class="mt-10 pt-6 border-t border-border flex items-center gap-2 text-sm text-text-muted">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            <a href={editUrl} target="_blank" rel="noopener noreferrer" class="hover:text-primary-light transition-colors">
+              Edit this page on GitHub
+            </a>
           </div>
         </article>
 
@@ -199,7 +241,6 @@ function isActive(href: string): boolean {
       <aside class="hidden xl:block relative">
         <nav id="docs-toc" class="toc-nav sticky top-24" aria-label="Table of contents">
           <div class="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">On this page</div>
-          <!-- Populated by script from page headings -->
         </nav>
       </aside>
     </div>
