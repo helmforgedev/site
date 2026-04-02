@@ -2,7 +2,8 @@ const container = document.getElementById('terminal-lines');
 const cursor = document.getElementById('terminal-cursor');
 if (!container || !cursor) throw new Error('Terminal elements not found');
 
-const PROMPT = '<span class="text-emerald-400">user@k8s</span><span class="text-zinc-500">:</span><span class="text-blue-400">~/charts</span><span class="text-zinc-500"> $</span> ';
+const PROMPT =
+  '<span class="text-emerald-400">user@k8s</span><span class="text-zinc-500">:</span><span class="text-blue-400">~/charts</span><span class="text-zinc-500"> $</span> ';
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 interface Step {

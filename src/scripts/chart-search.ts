@@ -25,9 +25,8 @@ if (searchInput) {
     }
 
     if (searchStatus && term) {
-      searchStatus.textContent = visibleCount === 0
-        ? 'No charts found'
-        : `${visibleCount} chart${visibleCount !== 1 ? 's' : ''} found`;
+      searchStatus.textContent =
+        visibleCount === 0 ? 'No charts found' : `${visibleCount} chart${visibleCount !== 1 ? 's' : ''} found`;
     } else if (searchStatus) {
       searchStatus.textContent = '';
     }

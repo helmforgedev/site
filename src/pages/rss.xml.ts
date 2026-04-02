@@ -5,8 +5,7 @@ import { charts } from '../data/charts';
 export function GET(context: APIContext) {
   return rss({
     title: 'HelmForge Charts',
-    description:
-      'Production-ready Helm charts for Kubernetes. The open-source alternative to Bitnami.',
+    description: 'Production-ready Helm charts for Kubernetes. The open-source alternative to Bitnami.',
     site: context.site!.toString(),
     items: charts.map((chart) => ({
       title: `${chart.name} — ${chart.maturity}`,

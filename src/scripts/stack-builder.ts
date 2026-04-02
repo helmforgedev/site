@@ -34,20 +34,22 @@ function generateScript(charts: { name: string; slug: string }[]): string {
   lines.push('<span class="text-emerald-400">helm</span> repo update');
   lines.push('');
   lines.push('<span class="text-zinc-500"># Create namespace</span>');
-  lines.push('<span class="text-emerald-400">kubectl</span> create namespace helmforge --dry-run=client -o yaml | <span class="text-emerald-400">kubectl</span> apply -f -');
+  lines.push(
+    '<span class="text-emerald-400">kubectl</span> create namespace helmforge --dry-run=client -o yaml | <span class="text-emerald-400">kubectl</span> apply -f -',
+  );
   lines.push('');
   lines.push('<span class="text-zinc-500"># Install charts</span>');
 
   charts.forEach((chart) => {
-    lines.push(
-      `<span class="text-emerald-400">helm</span> install ${chart.slug} helmforge/${chart.slug} \\`,
-    );
+    lines.push(`<span class="text-emerald-400">helm</span> install ${chart.slug} helmforge/${chart.slug} \\`);
     lines.push(`  --namespace helmforge \\`);
     lines.push(`  --wait --timeout 5m`);
     lines.push('');
   });
 
-  lines.push('<span class="text-emerald-400">echo</span> <span class="text-amber-300">"Stack deployed successfully!"</span>');
+  lines.push(
+    '<span class="text-emerald-400">echo</span> <span class="text-amber-300">"Stack deployed successfully!"</span>',
+  );
 
   return lines.join('\n');
 }
