@@ -257,7 +257,18 @@ formatBtns.forEach((btn) => {
   });
 });
 
-checkboxes.forEach((cb) => cb.addEventListener('change', update));
+checkboxes.forEach((cb) => {
+  cb.addEventListener('change', update);
+  // Prevent sr-only checkbox focus from scrolling the page
+  cb.addEventListener('focus', () => {
+    const scrollY = window.scrollY;
+    requestAnimationFrame(() => {
+      if (window.scrollY !== scrollY) {
+        window.scrollTo({ top: scrollY });
+      }
+    });
+  });
+});
 
 // Copy
 if (copyBtn) {

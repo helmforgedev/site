@@ -8,7 +8,7 @@ import { charts, chartIcon } from '../data/charts';
 
 const stableCharts = charts.filter((c) => c.maturity === 'stable');
 
-// Define common configurable values for chart categories
+// Chart-specific configurations with ingress, resources, backup, and auth settings
 const chartConfigs: Record<
   string,
   {
@@ -18,6 +18,7 @@ const chartConfigs: Record<
     default: string;
     options?: string[];
     description: string;
+    group?: string;
   }[]
 > = {
   postgresql: [
@@ -28,15 +29,87 @@ const chartConfigs: Record<
       default: 'standalone',
       options: ['standalone', 'replication'],
       description: 'Deployment architecture',
+      group: 'General',
     },
-    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
-    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '8Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '250m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '256Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'CPU Limit',
+      key: 'resources.limits.cpu',
+      type: 'text',
+      default: '1000m',
+      description: 'CPU resource limit',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Limit',
+      key: 'resources.limits.memory',
+      type: 'text',
+      default: '512Mi',
+      description: 'Memory resource limit',
+      group: 'Resources',
+    },
     {
       label: 'S3 Backup',
       key: 'backup.enabled',
       type: 'toggle',
       default: 'false',
       description: 'Enable S3 backup CronJob',
+      group: 'Backup',
+    },
+    {
+      label: 'Backup Schedule',
+      key: 'backup.schedule',
+      type: 'text',
+      default: '0 2 * * *',
+      description: 'Cron schedule for backups',
+      group: 'Backup',
+    },
+    {
+      label: 'S3 Endpoint',
+      key: 'backup.s3.endpoint',
+      type: 'text',
+      default: 's3.amazonaws.com',
+      description: 'S3-compatible endpoint',
+      group: 'Backup',
+    },
+    {
+      label: 'S3 Bucket',
+      key: 'backup.s3.bucket',
+      type: 'text',
+      default: 'my-backups',
+      description: 'S3 bucket name',
+      group: 'Backup',
     },
   ],
   mysql: [
@@ -47,15 +120,55 @@ const chartConfigs: Record<
       default: 'standalone',
       options: ['standalone', 'replication'],
       description: 'Deployment architecture',
+      group: 'General',
     },
-    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
-    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '8Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '250m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '256Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
+    },
     {
       label: 'S3 Backup',
       key: 'backup.enabled',
       type: 'toggle',
       default: 'false',
       description: 'Enable S3 backup CronJob',
+      group: 'Backup',
+    },
+    {
+      label: 'Backup Schedule',
+      key: 'backup.schedule',
+      type: 'text',
+      default: '0 2 * * *',
+      description: 'Cron schedule for backups',
+      group: 'Backup',
     },
   ],
   redis: [
@@ -66,9 +179,40 @@ const chartConfigs: Record<
       default: 'standalone',
       options: ['standalone', 'sentinel'],
       description: 'Deployment architecture',
+      group: 'General',
     },
-    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '2Gi', description: 'PVC storage size' },
-    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '2Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '100m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '128Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
+    },
   ],
   mongodb: [
     {
@@ -78,32 +222,451 @@ const chartConfigs: Record<
       default: 'standalone',
       options: ['standalone', 'replicaset'],
       description: 'Deployment architecture',
+      group: 'General',
     },
-    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
-    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '8Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '250m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '256Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
+    },
     {
       label: 'S3 Backup',
       key: 'backup.enabled',
       type: 'toggle',
       default: 'false',
       description: 'Enable S3 backup CronJob',
+      group: 'Backup',
     },
   ],
-  _default: [
-    { label: 'Replica Count', key: 'replicaCount', type: 'number', default: '1', description: 'Number of replicas' },
-    { label: 'Storage Size', key: 'persistence.size', type: 'text', default: '8Gi', description: 'PVC storage size' },
+  keycloak: [
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
     {
       label: 'Ingress',
       key: 'ingress.enabled',
       type: 'toggle',
       default: 'false',
       description: 'Enable Ingress resource',
+      group: 'Ingress',
+    },
+    {
+      label: 'Hostname',
+      key: 'ingress.hostname',
+      type: 'text',
+      default: 'keycloak.example.com',
+      description: 'Ingress hostname',
+      group: 'Ingress',
+    },
+    {
+      label: 'Ingress Class',
+      key: 'ingress.ingressClassName',
+      type: 'select',
+      default: 'traefik',
+      options: ['traefik', 'nginx'],
+      description: 'Ingress controller class',
+      group: 'Ingress',
+    },
+    {
+      label: 'TLS',
+      key: 'ingress.tls',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable TLS on Ingress',
+      group: 'Ingress',
+    },
+    {
+      label: 'Admin Password',
+      key: 'auth.adminPassword',
+      type: 'text',
+      default: '',
+      description: 'Initial admin password (auto-generated if empty)',
+      group: 'Auth',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '500m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '512Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
+    },
+  ],
+  n8n: [
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Ingress',
+      key: 'ingress.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable Ingress resource',
+      group: 'Ingress',
+    },
+    {
+      label: 'Hostname',
+      key: 'ingress.hostname',
+      type: 'text',
+      default: 'n8n.example.com',
+      description: 'Ingress hostname',
+      group: 'Ingress',
+    },
+    {
+      label: 'Ingress Class',
+      key: 'ingress.ingressClassName',
+      type: 'select',
+      default: 'traefik',
+      options: ['traefik', 'nginx'],
+      description: 'Ingress controller class',
+      group: 'Ingress',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '5Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+      group: 'Backup',
+    },
+  ],
+  wordpress: [
+    {
+      label: 'Ingress',
+      key: 'ingress.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable Ingress resource',
+      group: 'Ingress',
+    },
+    {
+      label: 'Hostname',
+      key: 'ingress.hostname',
+      type: 'text',
+      default: 'blog.example.com',
+      description: 'Ingress hostname',
+      group: 'Ingress',
+    },
+    {
+      label: 'Ingress Class',
+      key: 'ingress.ingressClassName',
+      type: 'select',
+      default: 'traefik',
+      options: ['traefik', 'nginx'],
+      description: 'Ingress controller class',
+      group: 'Ingress',
+    },
+    {
+      label: 'TLS',
+      key: 'ingress.tls',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable TLS on Ingress',
+      group: 'Ingress',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '10Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+      group: 'Backup',
+    },
+  ],
+  gitea: [
+    {
+      label: 'Ingress',
+      key: 'ingress.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable Ingress resource',
+      group: 'Ingress',
+    },
+    {
+      label: 'Hostname',
+      key: 'ingress.hostname',
+      type: 'text',
+      default: 'git.example.com',
+      description: 'Ingress hostname',
+      group: 'Ingress',
+    },
+    {
+      label: 'Ingress Class',
+      key: 'ingress.ingressClassName',
+      type: 'select',
+      default: 'traefik',
+      options: ['traefik', 'nginx'],
+      description: 'Ingress controller class',
+      group: 'Ingress',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '10Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'S3 Backup',
+      key: 'backup.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable S3 backup CronJob',
+      group: 'Backup',
+    },
+  ],
+  _default: [
+    {
+      label: 'Replica Count',
+      key: 'replicaCount',
+      type: 'number',
+      default: '1',
+      description: 'Number of replicas',
+      group: 'General',
+    },
+    {
+      label: 'Storage Size',
+      key: 'persistence.size',
+      type: 'text',
+      default: '8Gi',
+      description: 'PVC storage size',
+      group: 'Storage',
+    },
+    {
+      label: 'Ingress',
+      key: 'ingress.enabled',
+      type: 'toggle',
+      default: 'false',
+      description: 'Enable Ingress resource',
+      group: 'Ingress',
+    },
+    {
+      label: 'Hostname',
+      key: 'ingress.hostname',
+      type: 'text',
+      default: 'app.example.com',
+      description: 'Ingress hostname',
+      group: 'Ingress',
+    },
+    {
+      label: 'Ingress Class',
+      key: 'ingress.ingressClassName',
+      type: 'select',
+      default: 'traefik',
+      options: ['traefik', 'nginx'],
+      description: 'Ingress controller class',
+      group: 'Ingress',
+    },
+    {
+      label: 'CPU Request',
+      key: 'resources.requests.cpu',
+      type: 'text',
+      default: '100m',
+      description: 'CPU resource request',
+      group: 'Resources',
+    },
+    {
+      label: 'Memory Request',
+      key: 'resources.requests.memory',
+      type: 'text',
+      default: '128Mi',
+      description: 'Memory resource request',
+      group: 'Resources',
     },
   ],
 };
 
-// Serialize configs for the client
+// Pre-built scenarios per chart
+const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  postgresql: [
+    {
+      label: 'Development',
+      description: 'Minimal resources for local dev',
+      values: {
+        architecture: 'standalone',
+        replicaCount: '1',
+        'persistence.size': '2Gi',
+        'resources.requests.cpu': '100m',
+        'resources.requests.memory': '128Mi',
+        'resources.limits.cpu': '500m',
+        'resources.limits.memory': '256Mi',
+        'backup.enabled': 'false',
+      },
+    },
+    {
+      label: 'Staging',
+      description: 'Production-like with smaller resources',
+      values: {
+        architecture: 'replication',
+        replicaCount: '2',
+        'persistence.size': '10Gi',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '256Mi',
+        'resources.limits.cpu': '1000m',
+        'resources.limits.memory': '512Mi',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 3 * * *',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'HA with replication and backups',
+      values: {
+        architecture: 'replication',
+        replicaCount: '3',
+        'persistence.size': '50Gi',
+        'resources.requests.cpu': '1000m',
+        'resources.requests.memory': '1Gi',
+        'resources.limits.cpu': '2000m',
+        'resources.limits.memory': '2Gi',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 */6 * * *',
+        'backup.s3.endpoint': 's3.amazonaws.com',
+        'backup.s3.bucket': 'prod-pg-backups',
+      },
+    },
+  ],
+  mysql: [
+    {
+      label: 'Development',
+      description: 'Minimal for local dev',
+      values: {
+        architecture: 'standalone',
+        replicaCount: '1',
+        'persistence.size': '2Gi',
+        'resources.requests.cpu': '100m',
+        'resources.requests.memory': '128Mi',
+        'backup.enabled': 'false',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'Replication with backups',
+      values: {
+        architecture: 'replication',
+        replicaCount: '2',
+        'persistence.size': '50Gi',
+        'resources.requests.cpu': '500m',
+        'resources.requests.memory': '512Mi',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 2 * * *',
+      },
+    },
+  ],
+  redis: [
+    {
+      label: 'Development',
+      description: 'Standalone for caching',
+      values: {
+        architecture: 'standalone',
+        replicaCount: '1',
+        'persistence.size': '1Gi',
+        'resources.requests.cpu': '50m',
+        'resources.requests.memory': '64Mi',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'Sentinel HA with replicas',
+      values: {
+        architecture: 'sentinel',
+        replicaCount: '3',
+        'persistence.size': '5Gi',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '256Mi',
+      },
+    },
+  ],
+  keycloak: [
+    {
+      label: 'Development',
+      description: 'Single instance, no ingress',
+      values: {
+        replicaCount: '1',
+        'ingress.enabled': 'false',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '256Mi',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'HA with Ingress and TLS',
+      values: {
+        replicaCount: '2',
+        'ingress.enabled': 'true',
+        'ingress.hostname': 'auth.example.com',
+        'ingress.tls': 'true',
+        'resources.requests.cpu': '1000m',
+        'resources.requests.memory': '1Gi',
+      },
+    },
+  ],
+};
+
 const configsJson = JSON.stringify(chartConfigs);
+const scenariosJson = JSON.stringify(scenarios);
 ---
 
 <BaseLayout
@@ -123,7 +686,15 @@ const configsJson = JSON.stringify(chartConfigs);
         <!-- Chart Selector -->
         <div class="lg:col-span-2">
           <h3 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted mb-4">Select a chart</h3>
-          <div class="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+          <div class="relative mb-4">
+            <input
+              type="search"
+              id="playground-search"
+              class="block w-full pl-4 pr-4 py-2.5 border border-border rounded-xl bg-bg-surface/80 text-text-base placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent text-sm"
+              placeholder="Filter charts..."
+            />
+          </div>
+          <div id="playground-chart-list" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {
               stableCharts.map((chart) => (
                 <button
@@ -171,24 +742,59 @@ const configsJson = JSON.stringify(chartConfigs);
               <p class="text-xs mt-1">Values will appear here with controls to customize them</p>
             </div>
             <div id="playground-fields" class="hidden">
-              <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center justify-between mb-3">
                 <h3 id="playground-chart-title" class="text-lg font-bold text-text-base heading-font"></h3>
                 <a id="playground-docs-link" href="#" class="text-xs text-primary-light hover:underline">View docs</a>
               </div>
-              <div id="playground-controls" class="space-y-4"></div>
+
+              <!-- Scenario buttons -->
+              <div id="playground-scenarios" class="hidden mb-5">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs font-bold uppercase tracking-[0.12em] text-text-muted">Presets</span>
+                </div>
+                <div id="playground-scenario-btns" class="flex flex-wrap gap-2"></div>
+              </div>
+
+              <div id="playground-controls" class="space-y-5"></div>
             </div>
           </div>
 
-          <!-- Command Output -->
+          <!-- Output Format Toggle -->
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted">Install command</h3>
-            <button
-              id="playground-copy"
-              class="text-xs font-medium text-primary-light hover:text-primary transition-colors disabled:opacity-40"
-              disabled
-            >
-              Copy to clipboard
-            </button>
+            <div class="flex items-center gap-3">
+              <h3 class="text-sm font-bold uppercase tracking-[0.16em] text-text-muted">Output</h3>
+              <div class="flex gap-1 p-0.5 rounded-lg bg-bg-surface/80 border border-border">
+                <button
+                  class="playground-output-btn px-2.5 py-1 rounded-md text-xs font-semibold transition-all bg-primary text-white"
+                  data-output="helm"
+                >
+                  Helm
+                </button>
+                <button
+                  class="playground-output-btn px-2.5 py-1 rounded-md text-xs font-semibold transition-all text-text-muted hover:text-text-base"
+                  data-output="values"
+                >
+                  values.yaml
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                id="playground-share"
+                class="text-xs font-medium text-text-muted hover:text-primary-light transition-colors disabled:opacity-40"
+                disabled
+                title="Copy shareable link"
+              >
+                Share
+              </button>
+              <button
+                id="playground-copy"
+                class="text-xs font-medium text-primary-light hover:text-primary transition-colors disabled:opacity-40"
+                disabled
+              >
+                Copy to clipboard
+              </button>
+            </div>
           </div>
           <div class="rounded-2xl border border-border bg-[#1e1e2e] overflow-hidden">
             <div class="flex items-center px-4 py-2.5 border-b border-white/5 bg-white/5">
@@ -197,11 +803,62 @@ const configsJson = JSON.stringify(chartConfigs);
                 <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
                 <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></div>
               </div>
-              <span class="mx-auto text-[10px] text-zinc-400 font-mono">terminal</span>
+              <span id="playground-filename" class="mx-auto text-[10px] text-zinc-400 font-mono">terminal</span>
             </div>
             <pre
               id="playground-output"
               class="p-5 font-mono text-sm text-zinc-300 leading-relaxed overflow-x-auto min-h-[120px]"><code id="playground-code" class="block"><span class="text-zinc-400"># Select a chart and configure values</span></code></pre>
+          </div>
+
+          <!-- Deploy documentation popup -->
+          <div id="playground-deploy-hint" class="hidden mt-4 glass-panel rounded-xl p-4">
+            <div class="flex items-start gap-3">
+              <svg
+                class="w-5 h-5 text-primary-light shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div class="text-xs text-text-muted leading-relaxed">
+                <p class="font-semibold text-text-base mb-1">Deploy to your cluster</p>
+                <ol class="list-decimal list-inside space-y-1">
+                  <li>
+                    Add the HelmForge repo: <code class="text-primary-light"
+                      >helm repo add helmforge https://repo.helmforge.dev</code
+                    >
+                  </li>
+                  <li>Copy the command above and run it in your terminal</li>
+                  <li>
+                    Verify:
+                    <code class="text-primary-light">kubectl get pods -n helmforge</code>
+                  </li>
+                </ol>
+                <p class="mt-2">
+                  For production use, save the <strong>values.yaml</strong> output to a file and install with
+                  <code class="text-primary-light">helm install -f values.yaml</code>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Changed values summary -->
+          <div id="playground-diff" class="hidden mt-4">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-xs font-bold uppercase tracking-[0.12em] text-text-muted">Changes from defaults</span>
+              <span
+                id="playground-diff-count"
+                class="text-[10px] font-bold bg-primary/10 text-primary-light rounded-full px-2 py-0.5"
+              >
+                0
+              </span>
+            </div>
+            <div id="playground-diff-list" class="flex flex-wrap gap-2"></div>
           </div>
         </div>
       </div>
@@ -210,8 +867,9 @@ const configsJson = JSON.stringify(chartConfigs);
   <Footer />
 </BaseLayout>
 
-<script define:vars={{ configsJson }}>
+<script define:vars={{ configsJson, scenariosJson }}>
   window.__playgroundConfigs = JSON.parse(configsJson);
+  window.__playgroundScenarios = JSON.parse(scenariosJson);
 </script>
 <script>
   import '../scripts/playground';
