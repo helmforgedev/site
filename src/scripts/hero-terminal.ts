@@ -1,5 +1,6 @@
 const container = document.getElementById('terminal-lines');
 const cursor = document.getElementById('terminal-cursor');
+const terminalBody = document.getElementById('terminal-body');
 if (!container || !cursor) throw new Error('Terminal elements not found');
 
 const PROMPT =
@@ -55,10 +56,17 @@ const SCENARIO: Step[] = [
   { type: 'pause', duration: 4000 },
 ];
 
+function scrollToBottom() {
+  if (terminalBody) {
+    terminalBody.scrollTop = terminalBody.scrollHeight;
+  }
+}
+
 function createLine(): HTMLDivElement {
   const line = document.createElement('div');
   line.className = 'whitespace-pre-wrap break-words';
   container.appendChild(line);
+  scrollToBottom();
   return line;
 }
 
@@ -86,6 +94,7 @@ async function typeText(line: HTMLDivElement, prefix: string, text: string): Pro
     // Insert character before cursor
     const span = document.createTextNode(text[i]);
     line.insertBefore(span, cursor);
+    scrollToBottom();
   }
   hideCursor();
 }
