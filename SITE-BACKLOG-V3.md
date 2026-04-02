@@ -6,16 +6,17 @@
 
 | Phase | Title | Status | PR |
 |-------|-------|--------|-----|
-| 1 | Blog & News Section | `pending` | — |
-| 2 | Chart Documentation Enrichment | `pending` | — |
-| 3 | Accessibility & a11y Tests | `pending` | — |
+| 1 | Blog & News Section | `done` | #70 |
+| 2 | Chart Documentation Enrichment | `done` | #78 |
+| 3 | Accessibility & a11y Tests | `done` | #79 |
 | 4 | Roadmap & Community Pages | `pending` | — |
 | 5 | FAQ & Troubleshooting | `pending` | — |
 | 6 | Architecture Diagrams | `pending` | — |
 | 7 | Performance & Web Vitals | `pending` | — |
 | 8 | SEO & Social Enhancements | `pending` | — |
 | 9 | Advanced Playground Features | `pending` | — |
-| 10 | i18n PT-BR | `pending` | — |
+| 10 | ~~i18n PT-BR~~ | `skipped` | — |
+| 11 | Test Coverage & Quality | `pending` | — |
 
 ---
 
@@ -206,22 +207,31 @@
 
 ---
 
-## Phase 10 — i18n PT-BR
+## Phase 10 — ~~i18n PT-BR~~ (SKIPPED)
 
-**Goal:** Add Portuguese (Brazil) translation as first non-English language.
+Skipped per maintainer decision.
+
+---
+
+## Phase 11 — Test Coverage & Quality
+
+**Goal:** Expand E2E and unit test coverage to catch regressions on all new features, code style, broken assets, and interactive components.
 
 **Tasks:**
-- Configure Astro i18n with `defaultLocale: 'en'` and `locales: ['en', 'pt-br']`
-- Create translation JSON files for UI strings (header, footer, buttons, labels)
-- Translate main pages: home, docs index, getting-started, comparison, FAQ
-- Translate top 10 chart docs (postgresql, mysql, redis, mongodb, keycloak, etc.)
-- Add language switcher to header (globe icon dropdown)
-- Add `hreflang` alternate links in `<head>`
-- Update sitemap to include localized URLs
-- Keep English as canonical, PT-BR as alternate
-- Add PT-BR to Pagefind search index
+- Add E2E tests for blog pages (index, individual post, reading time, share links)
+- Add E2E tests for broken images/icons across all pages (assert no 404 on `<img>` src)
+- Add E2E tests for Stack Builder (chart selection, preset stacks, output generation, format toggle)
+- Add E2E tests for Playground (chart selector, config panel, command output, copy button)
+- Add E2E tests for DocsTabs component (tab switching, content visibility, aria states)
+- Add E2E tests for Callout component rendering on doc pages
+- Add E2E tests for install section (tab switching, chart selector, copy button)
+- Add code style/lint validation test (ensure Prettier and ESLint pass on all files)
+- Add visual regression baseline snapshots for key pages (homepage, docs, blog)
+- Verify all chart icons load correctly (no corrupted SVGs, no 404s)
+- Verify search (Pagefind) indexes blog and doc pages correctly
+- Add dark/light theme toggle test (ensure no broken styles on switch)
 
-**Priority:** Low — the user (maintainer) is PT-BR native; adds accessibility for LATAM community.
+**Priority:** High — ensures all new V3 features are regression-proof.
 
 ---
 
@@ -231,11 +241,12 @@
 |----------|--------|-----------|
 | **High** | 1, 2, 3 | SEO, user experience, compliance |
 | **Medium** | 4, 5, 6, 7, 8 | Trust, discoverability, comprehension |
-| **Low** | 9, 10 | Engagement, internationalization |
+| **Low** | 9 | Engagement |
+| **High** | 11 | Regression-proof all V3 features |
 
 ## Notes
 
-- Execute phases sequentially (1 → 10)
+- Execute phases sequentially (1 → 11, phase 10 skipped)
 - Each phase = 1 branch + 1 PR to `main`
 - Branch naming: `feat/<description>` or `docs/<description>`
 - All phases must pass CI (lint, format, build, bundle budget, links, E2E)
