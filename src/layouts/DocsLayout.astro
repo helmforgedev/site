@@ -53,7 +53,7 @@ function isActive(href: string): boolean {
       Menu
     </button>
 
-    <div class="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-12">
+    <div class="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_200px] lg:gap-12">
       <!-- Sidebar -->
       <aside id="docs-sidebar" class="hidden lg:block relative z-10 w-full mb-8">
         <nav class="sticky top-24 space-y-6 rounded-2xl glass-panel p-4 pb-8">
@@ -194,6 +194,14 @@ function isActive(href: string): boolean {
           ) : <span class="hidden sm:block" />}
         </nav>
       </main>
+
+      <!-- Table of Contents (xl screens) -->
+      <aside class="hidden xl:block relative">
+        <nav id="docs-toc" class="toc-nav sticky top-24" aria-label="Table of contents">
+          <div class="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">On this page</div>
+          <!-- Populated by script from page headings -->
+        </nav>
+      </aside>
     </div>
   </Container>
 
@@ -259,6 +267,40 @@ function isActive(href: string): boolean {
           pre.appendChild(btn);
         });
       }
+    })();
+
+    // Table of Contents generation + scroll spy
+    (() => {
+      const toc = document.getElementById('docs-toc');
+      if (!toc) return;
+      const article = document.querySelector('.prose-docs');
+      if (!article) return;
+
+      const headings = article.querySelectorAll('h2, h3');
+      if (headings.length < 2) { toc.parentElement.style.display = 'none'; return; }
+
+      const links = [];
+      headings.forEach(h => {
+        if (!h.id) h.id = h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = h.textContent;
+        a.setAttribute('data-depth', h.tagName === 'H3' ? '3' : '2');
+        toc.appendChild(a);
+        links.push({ el: h, a: a });
+      });
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            links.forEach(l => l.a.classList.remove('toc-active'));
+            const match = links.find(l => l.el === entry.target);
+            if (match) match.a.classList.add('toc-active');
+          }
+        });
+      }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+
+      links.forEach(l => observer.observe(l.el));
     })();
   </script>
 </BaseLayout>
