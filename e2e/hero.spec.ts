@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Hero Section and SEO validations', () => {
-
   test('should render the terminal animation without errors', async ({ page }) => {
     await page.goto('/');
 
@@ -15,9 +14,7 @@ test.describe('Hero Section and SEO validations', () => {
     await expect(terminal).toBeVisible();
 
     // Verify terminal eventually renders the helm repo add output
-    await expect(
-      page.locator('#terminal-lines >> text=helmforge').first()
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#terminal-lines >> text=helmforge').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('should inject the aggressive SEO and JSON-LD schemas', async ({ page }) => {
