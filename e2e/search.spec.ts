@@ -37,8 +37,8 @@ test.describe('Search modal', () => {
     const overlay = page.locator('#search-overlay');
     await expect(overlay).not.toHaveClass(/hidden/);
 
-    // Click the backdrop
-    await page.locator('#search-backdrop').click();
+    // Click the backdrop (top-left corner, outside the centered modal)
+    await page.locator('#search-backdrop').click({ position: { x: 10, y: 10 } });
     await expect(overlay).toHaveClass(/hidden/);
   });
 });
