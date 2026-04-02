@@ -2,25 +2,40 @@
 import Container from './Container.astro';
 import SectionHeader from './SectionHeader.astro';
 import CopyButton from './CopyButton.astro';
+import { charts } from '../data/charts';
 
-const httpsCode = `helm repo add helmforge https://repo.helmforge.dev
-helm repo update
-helm install my-release helmforge/redis`;
-
-const ociCode = `helm install my-release oci://ghcr.io/helmforgedev/helm/redis`;
+const stableCharts = charts.filter((c) => c.maturity === 'stable').map((c) => c.slug);
 ---
 
 <section class="bg-bg-surface/30 border-y border-border py-16 sm:py-20">
   <Container maxWidth="6xl">
     <SectionHeader
       label="Install"
-      title="Two ways to start, both simple."
-      description="Use the Helm repository for a familiar workflow or install directly from OCI."
-      class="mb-10"
+      title='From zero to production in <span class="bg-gradient-to-r from-primary-light to-accent bg-clip-text text-transparent">three commands.</span>'
+      description="Add the repo, pick a chart, install. That's it."
+      class="mb-12"
     />
 
-    <div class="max-w-3xl">
-      <!-- Tab buttons -->
+    <div class="max-w-3xl mx-auto">
+      <!-- Step Indicator -->
+      <div class="flex items-center gap-0 mb-8">
+        <div class="flex items-center gap-2.5">
+          <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white text-xs font-bold">1</span>
+          <span class="text-sm font-medium text-text-base">Add repo</span>
+        </div>
+        <div class="flex-1 h-px bg-border mx-3"></div>
+        <div class="flex items-center gap-2.5">
+          <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white text-xs font-bold">2</span>
+          <span class="text-sm font-medium text-text-base">Update</span>
+        </div>
+        <div class="flex-1 h-px bg-border mx-3"></div>
+        <div class="flex items-center gap-2.5">
+          <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white text-xs font-bold">3</span>
+          <span class="text-sm font-medium text-text-base">Install</span>
+        </div>
+      </div>
+
+      <!-- Tab Buttons -->
       <div class="mb-0 flex overflow-x-auto border-b border-border" role="tablist" aria-label="Installation methods">
         <button
           id="tab-https"
@@ -44,49 +59,91 @@ const ociCode = `helm install my-release oci://ghcr.io/helmforgedev/helm/redis`;
         </button>
       </div>
 
-      <!-- HTTPS panel -->
+      <!-- HTTPS Panel -->
       <div id="panel-https" class="install-panel" role="tabpanel" aria-labelledby="tab-https">
-        <div class="bg-slate-900 rounded-b-xl border border-t-0 border-slate-700/50 overflow-hidden relative group">
-          <CopyButton code={httpsCode} class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 focus:opacity-100" />
-          <div class="px-5 py-5 space-y-1 font-mono text-sm text-slate-300 leading-relaxed overflow-x-auto">
-            <div>
-              <span class="text-accent select-none">$</span>
-              <span class="ml-2">helm repo add helmforge https://repo.helmforge.dev</span>
+        <div class="rounded-b-2xl overflow-hidden border border-t-0 border-white/10 bg-[#0d1117] shadow-xl">
+          <!-- Terminal header -->
+          <div class="flex items-center px-4 py-2.5 border-b border-white/5 bg-[#161b22]">
+            <div class="flex space-x-2">
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></div>
             </div>
-            <div>
-              <span class="text-accent select-none">$</span>
-              <span class="ml-2">helm repo update</span>
-            </div>
-            <div class="pt-2">
-              <span class="text-accent select-none">$</span>
-              <span class="ml-2">helm install my-release helmforge/redis</span>
+            <span class="mx-auto text-[10px] text-zinc-500 font-mono">zsh</span>
+          </div>
+          <div class="relative group">
+            <CopyButton code={`helm repo add helmforge https://repo.helmforge.dev\nhelm repo update\nhelm install my-release helmforge/${stableCharts[3]}`} class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 focus:opacity-100 z-10" />
+            <div class="px-5 py-5 space-y-1.5 font-mono text-[13px] text-zinc-300 leading-relaxed overflow-x-auto">
+              <div class="install-line transition-colors hover:bg-white/[0.02] -mx-5 px-5 py-0.5 rounded">
+                <span class="text-emerald-400 select-none">user@k8s</span><span class="text-zinc-500 select-none">:</span><span class="text-blue-400 select-none">~</span><span class="text-zinc-500 select-none"> $</span>
+                <span class="ml-2">helm repo add helmforge https://repo.helmforge.dev</span>
+              </div>
+              <div class="text-zinc-500 text-xs pl-0">"helmforge" has been added to your repositories</div>
+              <div class="install-line transition-colors hover:bg-white/[0.02] -mx-5 px-5 py-0.5 rounded">
+                <span class="text-emerald-400 select-none">user@k8s</span><span class="text-zinc-500 select-none">:</span><span class="text-blue-400 select-none">~</span><span class="text-zinc-500 select-none"> $</span>
+                <span class="ml-2">helm repo update</span>
+              </div>
+              <div class="text-zinc-500 text-xs pl-0">...Successfully got an update from the "helmforge" chart repository</div>
+              <div class="install-line transition-colors hover:bg-white/[0.02] -mx-5 px-5 py-0.5 rounded pt-2">
+                <span class="text-emerald-400 select-none">user@k8s</span><span class="text-zinc-500 select-none">:</span><span class="text-blue-400 select-none">~</span><span class="text-zinc-500 select-none"> $</span>
+                <span class="ml-2">helm install my-release helmforge/<span id="install-chart-name" class="text-amber-300">redis</span></span>
+              </div>
+              <div class="text-emerald-400 text-xs pl-0">STATUS: deployed ✓</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- OCI panel -->
+      <!-- OCI Panel -->
       <div id="panel-oci" class="install-panel hidden" role="tabpanel" aria-labelledby="tab-oci">
-        <div class="bg-slate-900 rounded-b-xl border border-t-0 border-slate-700/50 overflow-hidden relative group">
-          <CopyButton code={ociCode} class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 focus:opacity-100" />
-          <div class="px-5 py-5 font-mono text-sm text-slate-300 leading-relaxed overflow-x-auto">
-            <div>
-              <span class="text-accent select-none">$</span>
-              <span class="ml-2">helm install my-release oci://ghcr.io/helmforgedev/helm/redis</span>
+        <div class="rounded-b-2xl overflow-hidden border border-t-0 border-white/10 bg-[#0d1117] shadow-xl">
+          <div class="flex items-center px-4 py-2.5 border-b border-white/5 bg-[#161b22]">
+            <div class="flex space-x-2">
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></div>
+            </div>
+            <span class="mx-auto text-[10px] text-zinc-500 font-mono">zsh</span>
+          </div>
+          <div class="relative group">
+            <CopyButton code={`helm install my-release oci://ghcr.io/helmforgedev/helm/redis`} class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 focus:opacity-100 z-10" />
+            <div class="px-5 py-5 font-mono text-[13px] text-zinc-300 leading-relaxed overflow-x-auto">
+              <div class="install-line transition-colors hover:bg-white/[0.02] -mx-5 px-5 py-0.5 rounded">
+                <span class="text-emerald-400 select-none">user@k8s</span><span class="text-zinc-500 select-none">:</span><span class="text-blue-400 select-none">~</span><span class="text-zinc-500 select-none"> $</span>
+                <span class="ml-2">helm install my-release oci://ghcr.io/helmforgedev/helm/<span id="install-chart-name-oci" class="text-amber-300">redis</span></span>
+              </div>
+              <div class="text-emerald-400 text-xs pl-0 mt-1.5">STATUS: deployed ✓</div>
             </div>
           </div>
         </div>
       </div>
 
-      <p class="mt-6 text-sm text-text-muted">
-        Using <code class="bg-bg-surface border border-border px-1.5 py-0.5 rounded text-xs font-mono text-primary-light">redis</code> here as an example.
-        You can install <span class="font-medium text-text-base">komga</span>, <span class="font-medium text-text-base">mosquitto</span>,
-        <span class="font-medium text-text-base">vaultwarden</span>, or any other chart available in the repository.
-      </p>
+      <!-- Chart Selector + CTA -->
+      <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div class="flex items-center gap-2 flex-1">
+          <label for="chart-selector" class="text-sm text-text-muted whitespace-nowrap">Chart:</label>
+          <select
+            id="chart-selector"
+            class="bg-bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-text-base font-mono focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
+          >
+            {stableCharts.map((slug) => (
+              <option value={slug} selected={slug === 'redis'}>{slug}</option>
+            ))}
+          </select>
+        </div>
+        <a
+          href="/docs/getting-started"
+          class="inline-flex items-center gap-2 text-sm font-semibold text-primary-light transition-colors hover:text-primary"
+        >
+          Full getting-started guide
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+        </a>
+      </div>
     </div>
   </Container>
 </section>
 
 <script>
   import '../scripts/install-tabs';
+  import '../scripts/install-chart-selector';
 </script>
