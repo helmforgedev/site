@@ -1,3 +1,15 @@
+// Docs search trigger
+const docsSearchBtn = document.getElementById('docs-search-trigger');
+const docsSearchMod = document.getElementById('docs-search-mod');
+if (docsSearchMod && navigator.platform?.includes('Mac')) {
+  docsSearchMod.textContent = '\u2318';
+}
+docsSearchBtn?.addEventListener('click', () => {
+  if (typeof (window as any).__openSearch === 'function') {
+    (window as any).__openSearch();
+  }
+});
+
 // Sidebar toggle
 const toggle = document.getElementById('docs-sidebar-toggle');
 const sidebar = document.getElementById('docs-sidebar');

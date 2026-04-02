@@ -14,6 +14,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
     build: {
       rollupOptions: {
+        external: ['/pagefind/pagefind.js'],
         onwarn(warning, defaultHandler) {
           if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
           defaultHandler(warning);
