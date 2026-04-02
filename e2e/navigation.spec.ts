@@ -7,9 +7,9 @@ test.describe('Navigation and page rendering', () => {
     // Direct nav links
     await expect(nav.getByText('Docs')).toBeVisible();
     await expect(nav.getByText('Blog')).toBeVisible();
-    // Dropdown triggers
-    await expect(nav.getByText('Tools')).toBeVisible();
-    await expect(nav.getByText('Community')).toBeVisible();
+    // Dropdown trigger buttons
+    await expect(nav.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Community' })).toBeVisible();
     await expect(nav.getByText('GitHub')).toBeVisible();
   });
 
@@ -17,11 +17,11 @@ test.describe('Navigation and page rendering', () => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
     // Hover Tools dropdown to reveal items
-    await nav.getByText('Tools').hover();
+    await nav.getByRole('button', { name: 'Tools' }).hover();
     await expect(nav.getByText('Stack Builder')).toBeVisible();
     await expect(nav.getByText('Playground')).toBeVisible();
     // Hover Community dropdown to reveal items
-    await nav.getByText('Community').hover();
+    await nav.getByRole('button', { name: 'Community' }).hover();
     await expect(nav.getByText('Changelog')).toBeVisible();
     await expect(nav.getByText('Request a Chart')).toBeVisible();
   });
