@@ -30,15 +30,15 @@ test.describe('Search modal', () => {
     await expect(overlay).not.toHaveClass(/hidden/);
   });
 
-  test('closes when clicking backdrop', async ({ page }) => {
+  test('closes when clicking outside modal', async ({ page }) => {
     await page.goto('/');
 
     await page.keyboard.press('Control+k');
     const overlay = page.locator('#search-overlay');
     await expect(overlay).not.toHaveClass(/hidden/);
 
-    // Click the backdrop (top-left corner, outside the centered modal)
-    await page.locator('#search-backdrop').click({ position: { x: 10, y: 10 } });
+    // Click outside the modal area using page.mouse at a corner position
+    await page.mouse.click(5, 5);
     await expect(overlay).toHaveClass(/hidden/);
   });
 });
