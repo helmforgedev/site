@@ -2,24 +2,22 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Hero Section and SEO validations', () => {
 
-  test('should render the dynamic typing terminal without errors', async ({ page }) => {
+  test('should render the terminal animation without errors', async ({ page }) => {
     await page.goto('/');
 
     await expect(page).toHaveTitle(/HelmForge/);
-    
-    // Wait for the splash screen to disappear
-    await page.locator('#splash-screen').waitFor({ state: 'hidden', timeout: 5000 });
 
-    // Verify the glassmorphism grid chart count rendered properly
-    await expect(page.locator('p:has-text("Charts")').first()).toBeVisible();
+    // Verify the chart count badge rendered properly
+    await expect(page.locator('text=Charts').first()).toBeVisible();
 
-    // The typed.js element should exist inside the terminal window
-    const typedElement = page.locator('#typed-element');
-    await expect(typedElement).toBeVisible();
+    // The terminal container should exist
+    const terminal = page.locator('.hero-terminal');
+    await expect(terminal).toBeVisible();
 
-    // Verify terminal eventually prints the success states configured in the component
-    // We wait up to 25s for the first interaction to unfold
-    await expect(page.locator('.text-zinc-500', { hasText: 'added' }).first()).toBeVisible({ timeout: 25000 });
+    // Verify terminal eventually renders the helm repo add output
+    await expect(
+      page.locator('#terminal-lines >> text=helmforge').first()
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('should inject the aggressive SEO and JSON-LD schemas', async ({ page }) => {
@@ -38,7 +36,7 @@ test.describe('Hero Section and SEO validations', () => {
     for (const tag of jsonLDTags) {
       const content = await tag.textContent();
       if (!content) continue;
-      
+
       const parsed = JSON.parse(content);
       if (parsed['@type'] === 'Organization') {
         hasOrganization = true;
