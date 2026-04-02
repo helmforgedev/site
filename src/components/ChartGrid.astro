@@ -18,6 +18,7 @@ import { charts, chartCount, backupCount, stableCount, slugColor } from '../data
 
         <!-- Search Input -->
         <div class="mt-8 relative max-w-md group focus-within:ring-0">
+          <label for="chart-search" class="sr-only">Search charts</label>
           <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <Search class="h-5 w-5 text-text-muted transition-colors group-focus-within:text-primary-light" />
           </div>
@@ -27,6 +28,7 @@ import { charts, chartCount, backupCount, stableCount, slugColor } from '../data
             class="block w-full pl-12 pr-4 py-3.5 border border-border rounded-2xl leading-5 bg-bg-surface/80 backdrop-blur-sm text-text-base placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent transition-all sm:text-sm hover:border-border/80 shadow-sm"
             placeholder="Search charts (e.g. postgres, redis, backup)..."
           />
+          <div id="chart-search-status" class="sr-only" aria-live="polite" role="status"></div>
         </div>
       </div>
 
@@ -106,6 +108,7 @@ import { charts, chartCount, backupCount, stableCount, slugColor } from '../data
     const searchInput = document.getElementById('chart-search');
     const chartCards = document.querySelectorAll('.chart-card');
     const emptyState = document.getElementById('chart-empty-state');
+    const searchStatus = document.getElementById('chart-search-status');
 
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
@@ -128,6 +131,14 @@ import { charts, chartCount, backupCount, stableCount, slugColor } from '../data
           emptyState.classList.remove('hidden');
         } else {
           emptyState.classList.add('hidden');
+        }
+
+        if (searchStatus && term) {
+          searchStatus.textContent = visibleCount === 0
+            ? 'No charts found'
+            : visibleCount + ' chart' + (visibleCount !== 1 ? 's' : '') + ' found';
+        } else if (searchStatus) {
+          searchStatus.textContent = '';
         }
       });
     }

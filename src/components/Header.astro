@@ -117,24 +117,34 @@ function isActive(href: string): boolean {
     const iconOpen = document.getElementById('menu-icon-open');
     const iconClose = document.getElementById('menu-icon-close');
 
+    function closeMenu() {
+      menu.style.gridTemplateRows = '0fr';
+      iconOpen.style.opacity = '1';
+      iconOpen.style.transform = 'scale(1)';
+      iconClose.style.opacity = '0';
+      iconClose.style.transform = 'scale(0.5)';
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu() {
+      menu.style.gridTemplateRows = '1fr';
+      iconOpen.style.opacity = '0';
+      iconOpen.style.transform = 'scale(0.5)';
+      iconClose.style.opacity = '1';
+      iconClose.style.transform = 'scale(1)';
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+
     if (toggle && menu && iconOpen && iconClose) {
       toggle.addEventListener('click', () => {
         const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
-        
-        toggle.setAttribute('aria-expanded', (!isExpanded).toString());
-        
-        if (!isExpanded) {
-          menu.style.gridTemplateRows = '1fr';
-          iconOpen.style.opacity = '0';
-          iconOpen.style.transform = 'scale(0.5)';
-          iconClose.style.opacity = '1';
-          iconClose.style.transform = 'scale(1)';
-        } else {
-          menu.style.gridTemplateRows = '0fr';
-          iconOpen.style.opacity = '1';
-          iconOpen.style.transform = 'scale(1)';
-          iconClose.style.opacity = '0';
-          iconClose.style.transform = 'scale(0.5)';
+        isExpanded ? closeMenu() : openMenu();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+          closeMenu();
+          toggle.focus();
         }
       });
     }
