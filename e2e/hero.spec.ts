@@ -28,7 +28,7 @@ test.describe('Hero Section and SEO validations', () => {
     // Check meta keywords
     const metaKeywords = await page.locator('meta[name="keywords"]').getAttribute('content');
     expect(metaKeywords).toContain('bitnami alternative');
-    expect(metaKeywords).toContain('postgresql');
+    expect(metaKeywords).toContain('helm chart');
 
     // Check JSON-LD
     const jsonLDTags = await page.locator('script[type="application/ld+json"]').all();
