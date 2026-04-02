@@ -1,0 +1,71 @@
+---
+title: 'HelmForge vs Bitnami: A Practical Comparison'
+description: 'An honest look at how HelmForge charts compare to Bitnami — images, licensing, backup, and operational trade-offs.'
+date: 2025-02-10
+author: 'HelmForge Team'
+tags: ['comparison', 'bitnami', 'kubernetes']
+---
+
+## Two approaches to Helm charts
+
+Bitnami has been the default choice for Helm charts for years. They offer hundreds of charts with consistent tooling and regular updates. So why would you consider an alternative?
+
+The answer comes down to three things: **images**, **licensing**, and **operational philosophy**.
+
+## Official images vs rebuilt images
+
+The biggest difference between HelmForge and Bitnami is what runs inside your pods.
+
+**Bitnami** rebuilds every upstream image with their own base layer, entrypoint scripts, and configuration system. This means the PostgreSQL you deploy is not the official `postgres` image — it is `bitnami/postgresql` with custom scripts layered on top.
+
+**HelmForge** uses the official upstream image directly. Our charts configure the application through environment variables, config maps, and init containers — without modifying the image itself.
+
+| Aspect       | HelmForge                      | Bitnami                |
+| ------------ | ------------------------------ | ---------------------- |
+| Base image   | Official upstream              | Bitnami-rebuilt        |
+| Image source | Docker Hub / upstream registry | Bitnami registry       |
+| Entrypoint   | Upstream default               | Custom Bitnami scripts |
+| Update lag   | Same day as upstream           | Days to weeks          |
+
+## Licensing
+
+HelmForge charts are MIT licensed. The chart code, templates, documentation — everything is MIT with no exceptions.
+
+Bitnami charts are Apache 2.0 licensed, which is also permissive. However, some Bitnami images include components with different licensing terms, and the dependency on Bitnami's image infrastructure creates a soft vendor lock-in.
+
+## Built-in backup
+
+This is where HelmForge takes a strong stance. Every data-bearing chart includes an optional S3-compatible backup CronJob. Enable it with a few lines of YAML:
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://minio.internal:9000
+    bucket: db-backups
+    existingSecret: s3-credentials
+```
+
+Bitnami charts do not include backup functionality. You need to build your own backup solution or use a separate tool like Velero.
+
+## When to choose each
+
+**Choose HelmForge when:**
+
+- You want official upstream images with no modifications
+- You need built-in backup for databases and stateful apps
+- You prefer MIT licensing with no vendor dependency
+- You value security defaults (non-root, read-only FS)
+
+**Choose Bitnami when:**
+
+- You need a chart that HelmForge does not offer yet
+- Your organization already standardizes on Bitnami images
+- You need the broader ecosystem of 100+ charts
+
+## The bottom line
+
+Both projects serve the Kubernetes community well. HelmForge is not trying to replace Bitnami — it is offering an alternative for teams that want official images, built-in backup, and a more opinionated approach to production readiness.
+
+Explore the [full comparison table](/docs/comparison) for a detailed feature-by-feature breakdown.
