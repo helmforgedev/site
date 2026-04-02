@@ -4,6 +4,9 @@ title: MySQL Chart
 description: HelmForge MySQL chart — MySQL with standalone and source-replica replication architectures for Kubernetes.
 ---
 
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
 # MySQL
 
 Production-ready MySQL deployment with support for standalone and source-replica replication architectures.
@@ -12,7 +15,7 @@ Production-ready MySQL deployment with support for standalone and source-replica
 
 - **Standalone and replication** — Single instance or source-replica topology
 - **Automatic initialization** — Init scripts and custom configuration
-- **Backup support** — Configurable backup CronJobs
+- **Backup support** — Configurable backup CronJobs to S3-compatible storage
 - **Metrics** — Prometheus exporter with ServiceMonitor
 - **Security** — Non-root containers, network policies, TLS support
 - **Persistent storage** — Configurable PVCs with storage class selection
@@ -33,7 +36,16 @@ helm install my-mysql helmforge/mysql
 helm install my-mysql oci://ghcr.io/helmforgedev/helm/mysql
 ```
 
-## Standalone Example
+## Deployment Examples
+
+<DocsTabs tabs={[
+  { id: 'standalone', label: 'Standalone' },
+  { id: 'replication', label: 'Replication' },
+  { id: 'backup', label: 'With Backup' },
+  { id: 'ingress', label: 'With Ingress' },
+]}>
+
+<div data-tab-panel="standalone">
 
 ```yaml
 # values.yaml
@@ -55,9 +67,12 @@ metrics:
     enabled: true
 ```
 
-## Replication Example
+</div>
+
+<div data-tab-panel="replication">
 
 ```yaml
+# values.yaml
 architecture: replication
 
 auth:
@@ -77,18 +92,115 @@ secondary:
     size: 20Gi
 ```
 
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml
+architecture: standalone
+
+auth:
+  rootPassword: 'my-secret-password'
+  database: myapp
+
+primary:
+  persistence:
+    size: 20Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-mysql-backups
+    accessKey: AKIAIOSFODNN7EXAMPLE
+    secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  retention:
+    days: 30
+```
+
+</div>
+
+<div data-tab-panel="ingress">
+
+```yaml
+# values.yaml — Use with phpMyAdmin or a web-based management tool
+architecture: standalone
+
+auth:
+  rootPassword: 'my-secret-password'
+  database: myapp
+
+primary:
+  persistence:
+    size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: phpmyadmin.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: phpmyadmin-tls
+      hosts:
+        - phpmyadmin.example.com
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+```
+
+</div>
+
+</DocsTabs>
+
 ## Key Values
 
-| Key                        | Default      | Description                   |
-| -------------------------- | ------------ | ----------------------------- |
-| `architecture`             | `standalone` | `standalone` or `replication` |
-| `auth.rootPassword`        | `""`         | MySQL root password           |
-| `auth.database`            | `""`         | Default database to create    |
-| `auth.username`            | `""`         | Default user to create        |
-| `auth.password`            | `""`         | Password for default user     |
-| `primary.persistence.size` | `8Gi`        | Primary PVC size              |
-| `secondary.replicaCount`   | `1`          | Number of read replicas       |
-| `metrics.enabled`          | `false`      | Enable Prometheus exporter    |
+| Key                                 | Type    | Default      | Description                                            |
+| ----------------------------------- | ------- | ------------ | ------------------------------------------------------ |
+| `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication` |
+| `auth.rootPassword`                 | string  | `""`         | MySQL root password                                    |
+| `auth.database`                     | string  | `""`         | Default database to create                             |
+| `auth.username`                     | string  | `""`         | Default user to create                                 |
+| `auth.password`                     | string  | `""`         | Password for default user                              |
+| `auth.replicationPassword`          | string  | `""`         | Password for replication user                          |
+| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                       |
+| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                          |
+| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                             |
+| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                |
+| `secondary.replicaCount`            | integer | `1`          | Number of read replicas                                |
+| `secondary.persistence.size`        | string  | `8Gi`        | Secondary PVC size                                     |
+| `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                               |
+| `backup.schedule`                   | string  | `0 3 * * *`  | Cron schedule for backups                              |
+| `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                             |
+| `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                         |
+| `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                |
+| `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                  |
+
+## Upgrade Notes
+
+<Callout type="warning" title="Password persistence">
+  MySQL stores the root password during initial setup. On upgrade, ensure `auth.rootPassword` matches the original value
+  or the pod will fail to start with an authentication error.
+</Callout>
+
+- When enabling replication on an existing standalone instance, a full re-initialization is required
+- Backup CronJob changes take effect on the next scheduled run
+- Secondary replicas are read-only; write attempts return an error
+
+## Common Issues
+
+<Callout type="danger" title="Pod stuck in CrashLoopBackOff after upgrade">
+  If the root password in values doesn't match the existing data directory, MySQL refuses to start.
+  Check logs with `kubectl logs <pod>` and verify the password matches.
+</Callout>
+
+<Callout type="tip" title="Replication lag monitoring">
+  Enable metrics and monitor `mysql_slave_status_seconds_behind_master`. Values consistently above 0 indicate the
+  replica cannot keep up — consider increasing replica resources or reducing write load.
+</Callout>
 
 ## More Information
 

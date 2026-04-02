@@ -4,6 +4,9 @@ title: PostgreSQL Chart
 description: HelmForge PostgreSQL chart — PostgreSQL with standalone and streaming replication for Kubernetes.
 ---
 
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
 # PostgreSQL
 
 Production-ready PostgreSQL deployment with support for standalone and streaming replication architectures.
@@ -12,7 +15,7 @@ Production-ready PostgreSQL deployment with support for standalone and streaming
 
 - **Standalone and replication** — Single instance or primary with streaming replicas
 - **Automatic initialization** — Init scripts, extensions, and custom configuration
-- **Backup support** — Configurable backup strategies
+- **S3 backup** — Scheduled backups to S3-compatible storage via CronJob
 - **Metrics** — Prometheus exporter with ServiceMonitor
 - **Security** — Non-root containers, network policies, TLS support
 - **Persistent storage** — Configurable PVCs with storage class selection
@@ -33,7 +36,16 @@ helm install my-pg helmforge/postgresql
 helm install my-pg oci://ghcr.io/helmforgedev/helm/postgresql
 ```
 
-## Standalone Example
+## Deployment Examples
+
+<DocsTabs tabs={[
+  { id: 'standalone', label: 'Standalone' },
+  { id: 'replication', label: 'Replication' },
+  { id: 'backup', label: 'With Backup' },
+  { id: 'ingress', label: 'With Ingress' },
+]}>
+
+<div data-tab-panel="standalone">
 
 ```yaml
 # values.yaml
@@ -55,9 +67,12 @@ metrics:
     enabled: true
 ```
 
-## Replication Example
+</div>
+
+<div data-tab-panel="replication">
 
 ```yaml
+# values.yaml
 architecture: replication
 
 auth:
@@ -77,17 +92,131 @@ readReplicas:
     size: 20Gi
 ```
 
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml
+architecture: standalone
+
+auth:
+  postgresPassword: 'my-secret-password'
+  database: myapp
+
+primary:
+  persistence:
+    size: 20Gi
+
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-pg-backups
+    accessKey: AKIAIOSFODNN7EXAMPLE
+    secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  retention:
+    days: 30
+```
+
+</div>
+
+<div data-tab-panel="ingress">
+
+```yaml
+# values.yaml — Use with pgAdmin or a TCP ingress controller
+architecture: standalone
+
+auth:
+  postgresPassword: 'my-secret-password'
+  database: myapp
+
+primary:
+  persistence:
+    size: 20Gi
+
+# For pgAdmin or web-based management tools
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: pgadmin.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: pgadmin-tls
+      hosts:
+        - pgadmin.example.com
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+```
+
+</div>
+
+</DocsTabs>
+
 ## Key Values
 
-| Key                         | Default      | Description                   |
-| --------------------------- | ------------ | ----------------------------- |
-| `architecture`              | `standalone` | `standalone` or `replication` |
-| `auth.postgresPassword`     | `""`         | PostgreSQL superuser password |
-| `auth.database`             | `""`         | Default database to create    |
-| `auth.username`             | `""`         | Default user to create        |
-| `primary.persistence.size`  | `8Gi`        | Primary PVC size              |
-| `readReplicas.replicaCount` | `1`          | Number of read replicas       |
-| `metrics.enabled`           | `false`      | Enable Prometheus exporter    |
+| Key                                 | Type    | Default      | Description                                            |
+| ----------------------------------- | ------- | ------------ | ------------------------------------------------------ |
+| `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication` |
+| `auth.postgresPassword`             | string  | `""`         | PostgreSQL superuser password                          |
+| `auth.database`                     | string  | `""`         | Default database to create                             |
+| `auth.username`                     | string  | `""`         | Default user to create                                 |
+| `auth.password`                     | string  | `""`         | Password for default user                              |
+| `auth.replicationPassword`          | string  | `""`         | Password for replication user (replication mode)       |
+| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                       |
+| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                          |
+| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                             |
+| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                |
+| `readReplicas.replicaCount`         | integer | `1`          | Number of read replicas                                |
+| `readReplicas.persistence.size`     | string  | `8Gi`        | Read replica PVC size                                  |
+| `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                               |
+| `backup.schedule`                   | string  | `0 2 * * *`  | Cron schedule for backups                              |
+| `backup.s3.endpoint`                | string  | `""`         | S3-compatible endpoint URL                             |
+| `backup.s3.bucket`                  | string  | `""`         | S3 bucket name                                         |
+| `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                             |
+| `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                         |
+| `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                |
+| `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                  |
+
+## Upgrade Notes
+
+<Callout type="warning" title="Upgrading from 0.x to 1.x">
+  If upgrading across major versions, check the
+  <a
+    href="https://github.com/helmforgedev/charts/tree/main/charts/postgresql"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    changelog
+  </a>
+  for breaking changes in values structure. Always back up your data before upgrading.
+</Callout>
+
+- When switching from `standalone` to `replication`, set `auth.replicationPassword` before upgrading
+- PVC resize requires the storage class to support volume expansion (`allowVolumeExpansion: true`)
+- Metrics sidecar changes may cause a pod restart during upgrade
+
+## Common Issues
+
+<Callout type="danger" title="Pod stuck in CrashLoopBackOff">
+  Usually caused by incorrect `auth.postgresPassword` on upgrade. PostgreSQL does not re-initialize
+  auth when the data directory already exists. Check logs with `kubectl logs <pod>` and verify the
+  password matches the existing data.
+</Callout>
+
+<Callout type="tip" title="Slow replication sync">
+  For large databases, initial replica sync can take time. Increase `readReplicas.resources` and ensure the storage
+  class provides adequate IOPS. Monitor replication lag with the Prometheus exporter (`pg_replication_lag` metric).
+</Callout>
+
+<Callout type="info" title="Using with connection poolers">
+  For high-connection workloads, deploy PgBouncer alongside PostgreSQL. Point your application to PgBouncer and
+  configure it to connect to the PostgreSQL service.
+</Callout>
 
 ## More Information
 
