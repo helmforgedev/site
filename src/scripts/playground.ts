@@ -31,6 +31,7 @@ const fieldsEl = document.getElementById('playground-fields');
 const controlsEl = document.getElementById('playground-controls');
 const titleEl = document.getElementById('playground-chart-title');
 const docsLink = document.getElementById('playground-docs-link') as HTMLAnchorElement | null;
+const valuesLink = document.getElementById('playground-values-link') as HTMLAnchorElement | null;
 const codeEl = document.getElementById('playground-code');
 const copyBtn = document.getElementById('playground-copy') as HTMLButtonElement | null;
 const shareBtn = document.getElementById('playground-share') as HTMLButtonElement | null;
@@ -95,6 +96,7 @@ function selectChart(slug: string, name: string) {
   if (fieldsEl) fieldsEl.classList.remove('hidden');
   if (titleEl) titleEl.textContent = name;
   if (docsLink) docsLink.href = `/docs/charts/${slug}`;
+  if (valuesLink) valuesLink.href = `https://github.com/helmforgedev/charts/blob/main/charts/${slug}/values.yaml`;
   if (deployHint) deployHint.classList.remove('hidden');
 
   // Build scenario buttons
@@ -434,7 +436,12 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 
     for (const field of group.fields) {
       const val = currentValues[field.key];
-      if (val !== undefined && val !== field.default && val !== '') {
+      if (group.collapsible && expandedSections.has(group.name)) {
+        // Expanded collapsible sections emit all fields (enabling means user wants these values)
+        if (val !== undefined && val !== '') {
+          changes.push({ key: field.key, value: val, defaultValue: field.default });
+        }
+      } else if (val !== undefined && val !== field.default && val !== '') {
         changes.push({ key: field.key, value: val, defaultValue: field.default });
       }
     }
