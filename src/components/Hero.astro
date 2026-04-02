@@ -76,58 +76,43 @@ import { chartCount, stableCount } from '../data/charts';
       <div class="absolute -inset-2 rounded-[2rem] bg-gradient-to-br from-primary-light/30 via-accent/20 to-transparent opacity-60 blur-2xl"></div>
 
       <div
-        class="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black/80 backdrop-blur-2xl transition-all duration-700 ease-out hover:rotate-0 hover:scale-[1.02]"
+        class="hero-terminal relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#0d1117] backdrop-blur-2xl transition-all duration-700 ease-out hover:rotate-0 hover:scale-[1.02]"
         style="transform: rotateY(-8deg) rotateX(4deg);"
       >
-        <!-- macOS Style Header -->
-        <div class="flex items-center px-4 py-3 border-b border-white/5 bg-white/5">
+        <!-- macOS Style Header with tabs -->
+        <div class="flex items-center px-4 py-3 border-b border-white/5 bg-[#161b22]">
           <div class="flex space-x-2">
             <div class="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]"></div>
             <div class="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]"></div>
             <div class="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]"></div>
           </div>
-          <div class="mx-auto text-xs text-text-muted/70 font-mono tracking-wider flex border border-white/5 rounded-md px-2 py-0.5 bg-black/30">
-            <Terminal class="w-3 h-3 mr-2 opacity-50" />
-            helmforge — bash
+          <div class="flex items-center mx-auto gap-1">
+            <div class="flex items-center gap-1.5 text-xs text-zinc-400 font-mono bg-[#0d1117] rounded-md px-3 py-1 border border-white/5">
+              <Terminal class="w-3 h-3 opacity-50" />
+              helmforge — zsh
+            </div>
           </div>
         </div>
 
         <!-- Terminal Body -->
-        <div class="p-6 font-mono text-sm leading-relaxed h-[320px] overflow-y-auto scrollbar-hide text-zinc-300">
-          <div class="flex items-center text-primary-light mb-2 font-bold cursor-default">
-            <span class="mr-2">❯</span>
-            <span class="text-white/60 font-normal">kubernetes cluster ready</span>
-          </div>
-          <div class="flex items-start font-bold cursor-default">
-            <span class="text-primary-light mr-2 mt-0.5">❯</span>
-            <span id="typed-element" class="text-white font-normal break-words whitespace-pre-wrap"></span>
-          </div>
+        <div class="relative p-5 font-mono text-[13px] leading-[1.7] h-[340px] overflow-hidden text-zinc-300">
+          <!-- Scan-line overlay -->
+          <div class="absolute inset-0 pointer-events-none opacity-[0.03] bg-[repeating-linear-gradient(0deg,transparent,transparent_1px,rgba(255,255,255,0.1)_1px,rgba(255,255,255,0.1)_2px)]"></div>
+          <div id="terminal-lines" class="relative space-y-0.5"></div>
+          <div id="terminal-cursor" class="inline-block w-[8px] h-[17px] bg-emerald-400 animate-[blink_1s_step-end_infinite] align-middle ml-0.5 hidden"></div>
         </div>
       </div>
     </div>
   </Container>
 </section>
 
+<style>
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+</style>
+
 <script>
-  import Typed from 'typed.js';
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const options = {
-      strings: [
-        'helm repo add helmforge https://repo.helmforge.dev^500\n<br><span class="text-zinc-500">"helmforge" has been added to your repositories</span>^1000',
-        'helm install db helmforge/postgresql^500\n<br><br><span class="text-emerald-400 font-bold">SUCCESS!</span>\n<span class="text-zinc-400">✓ PostgreSQL deployed with secure boundaries</span>\n<span class="text-zinc-400">✓ Built-in S3 Backup cronjob configured</span>\n<span class="text-zinc-400">✓ Automatic TLS certificates attached</span><br><br><span class="text-white font-semibold flex items-center gap-2">🚀 Happy forging!</span>^5000'
-      ],
-      typeSpeed: 30,
-      backSpeed: 15,
-      backDelay: 1500,
-      loop: true,
-      showCursor: true,
-      cursorChar: '<span class="animate-pulse text-primary-light">|</span>',
-      contentType: 'html'
-    };
-
-    if (document.getElementById('typed-element')) {
-      new Typed('#typed-element', options);
-    }
-  });
+  import '../scripts/hero-terminal';
 </script>
