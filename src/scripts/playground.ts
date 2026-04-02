@@ -5,7 +5,13 @@ interface FieldConfig {
   default: string;
   options?: string[];
   description: string;
-  group?: string;
+}
+
+interface GroupConfig {
+  name: string;
+  collapsible?: boolean;
+  gateField?: string;
+  fields: FieldConfig[];
 }
 
 interface Scenario {
@@ -14,7 +20,7 @@ interface Scenario {
   values: Record<string, string>;
 }
 
-const configs: Record<string, FieldConfig[]> = (window as any).__playgroundConfigs ?? {};
+const configs: Record<string, GroupConfig[]> = (window as any).__playgroundConfigs ?? {};
 const scenarios: Record<string, Scenario[]> = (window as any).__playgroundScenarios ?? {};
 
 const chartBtns = document.querySelectorAll<HTMLButtonElement>('.playground-chart-btn');
@@ -42,8 +48,10 @@ let outputMode: OutputMode = 'helm';
 let selectedSlug = '';
 let selectedName = '';
 let currentValues: Record<string, string> = {};
+// Track which collapsible sections are expanded
+let expandedSections: Set<string> = new Set();
 
-function getFields(slug: string): FieldConfig[] {
+function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
 }
 
@@ -51,21 +59,27 @@ function getScenarios(slug: string): Scenario[] {
   return scenarios[slug] ?? [];
 }
 
-// Group fields by their group property
-function groupFields(fields: FieldConfig[]): Map<string, FieldConfig[]> {
-  const groups = new Map<string, FieldConfig[]>();
-  for (const field of fields) {
-    const group = field.group ?? 'General';
-    if (!groups.has(group)) groups.set(group, []);
-    groups.get(group)!.push(field);
+function createToggleButton(isOn: boolean): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-border'}`;
+  btn.innerHTML = `<span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}"></span>`;
+  return btn;
+}
+
+function updateToggleVisual(btn: HTMLButtonElement, isOn: boolean) {
+  btn.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-border'}`;
+  const dot = btn.querySelector('span');
+  if (dot) {
+    dot.className = `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}`;
   }
-  return groups;
 }
 
 function selectChart(slug: string, name: string) {
   selectedSlug = slug;
   selectedName = name;
   currentValues = {};
+  expandedSections = new Set();
 
   // Update button states
   chartBtns.forEach((btn) => {
@@ -103,146 +117,293 @@ function selectChart(slug: string, name: string) {
     }
   }
 
-  // Build controls grouped
-  const fields = getFields(slug);
-  if (!controlsEl) return;
-  controlsEl.innerHTML = '';
-
-  const groups = groupFields(fields);
-
-  for (const [groupName, groupFields] of groups) {
-    // Group header
-    const groupHeader = document.createElement('div');
-    groupHeader.className = 'text-xs font-bold uppercase tracking-[0.12em] text-text-muted mb-2';
-    if (controlsEl.children.length > 0) {
-      groupHeader.classList.add('mt-3', 'pt-3', 'border-t', 'border-border');
+  // Initialize all field defaults
+  const groups = getGroups(slug);
+  for (const group of groups) {
+    if (group.gateField) {
+      currentValues[group.gateField] = 'false';
     }
-    groupHeader.textContent = groupName;
-    controlsEl.appendChild(groupHeader);
-
-    // Fields
-    for (const field of groupFields) {
+    for (const field of group.fields) {
       currentValues[field.key] = field.default;
-      const div = document.createElement('div');
-      div.className = 'flex items-center justify-between gap-4';
-      div.dataset.fieldKey = field.key;
-
-      const labelDiv = document.createElement('div');
-      labelDiv.className = 'min-w-0';
-      labelDiv.innerHTML = `
-        <div class="text-sm font-semibold text-text-base">${field.label}</div>
-        <div class="text-xs text-text-muted">${field.description}</div>
-      `;
-
-      const controlDiv = document.createElement('div');
-      controlDiv.className = 'shrink-0';
-
-      if (field.type === 'select') {
-        const select = document.createElement('select');
-        select.className =
-          'rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
-        select.dataset.fieldKey = field.key;
-        (field.options ?? []).forEach((opt) => {
-          const option = document.createElement('option');
-          option.value = opt;
-          option.textContent = opt;
-          if (opt === field.default) option.selected = true;
-          select.appendChild(option);
-        });
-        select.addEventListener('change', () => {
-          currentValues[field.key] = select.value;
-          updateOutput();
-        });
-        controlDiv.appendChild(select);
-      } else if (field.type === 'toggle') {
-        const btn = document.createElement('button');
-        const isOn = field.default === 'true';
-        btn.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-border'}`;
-        btn.innerHTML = `<span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}"></span>`;
-        btn.dataset.fieldKey = field.key;
-        btn.addEventListener('click', () => {
-          const wasOn = currentValues[field.key] === 'true';
-          currentValues[field.key] = wasOn ? 'false' : 'true';
-          btn.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!wasOn ? 'bg-primary' : 'bg-border'}`;
-          const dot = btn.querySelector('span')!;
-          dot.className = `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!wasOn ? 'translate-x-6' : 'translate-x-1'}`;
-          updateOutput();
-        });
-        controlDiv.appendChild(btn);
-      } else if (field.type === 'number') {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '1';
-        input.max = '10';
-        input.value = field.default;
-        input.dataset.fieldKey = field.key;
-        input.className =
-          'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
-        input.addEventListener('input', () => {
-          currentValues[field.key] = input.value;
-          updateOutput();
-        });
-        controlDiv.appendChild(input);
-      } else {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = field.default;
-        input.dataset.fieldKey = field.key;
-        input.className =
-          'w-32 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
-        input.addEventListener('input', () => {
-          currentValues[field.key] = input.value;
-          updateOutput();
-        });
-        controlDiv.appendChild(input);
-      }
-
-      div.appendChild(labelDiv);
-      div.appendChild(controlDiv);
-      controlsEl.appendChild(div);
     }
   }
 
+  buildControls();
   updateOutput();
   updateUrlState();
 }
 
-function applyScenario(scenario: Scenario) {
-  const fields = getFields(selectedSlug);
+function buildControls() {
+  if (!controlsEl) return;
+  controlsEl.innerHTML = '';
 
-  // Reset all to defaults first
-  fields.forEach((f) => {
-    currentValues[f.key] = f.default;
-  });
+  const groups = getGroups(selectedSlug);
+
+  for (const group of groups) {
+    const isCollapsible = group.collapsible === true;
+    const isExpanded = expandedSections.has(group.name);
+
+    // Group container
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'playground-group';
+    groupContainer.dataset.groupName = group.name;
+
+    // Group header
+    const groupHeader = document.createElement('div');
+
+    if (isCollapsible) {
+      // Collapsible header with toggle
+      groupHeader.className =
+        'flex items-center justify-between py-2.5 px-3 rounded-xl cursor-pointer select-none transition-all hover:bg-bg-surface/60 border border-transparent' +
+        (isExpanded ? ' border-primary/20 bg-bg-surface/40' : '');
+
+      const headerLeft = document.createElement('div');
+      headerLeft.className = 'flex items-center gap-2';
+
+      const chevron = document.createElement('svg');
+      chevron.className = `w-3.5 h-3.5 text-text-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`;
+      chevron.setAttribute('fill', 'none');
+      chevron.setAttribute('stroke', 'currentColor');
+      chevron.setAttribute('viewBox', '0 0 24 24');
+      chevron.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>';
+
+      const headerLabel = document.createElement('span');
+      headerLabel.className = 'text-xs font-bold uppercase tracking-[0.12em] text-text-muted';
+      headerLabel.textContent = group.name;
+
+      headerLeft.appendChild(chevron);
+      headerLeft.appendChild(headerLabel);
+
+      const toggleBtn = createToggleButton(isExpanded);
+      toggleBtn.dataset.sectionToggle = group.name;
+
+      // Click on toggle
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSection(group);
+      });
+
+      // Click on header row
+      groupHeader.addEventListener('click', () => {
+        toggleSection(group);
+      });
+
+      groupHeader.appendChild(headerLeft);
+      groupHeader.appendChild(toggleBtn);
+    } else {
+      // Non-collapsible group header
+      groupHeader.className = 'text-xs font-bold uppercase tracking-[0.12em] text-text-muted mb-2 px-1';
+      if (controlsEl.children.length > 0) {
+        groupHeader.classList.add('mt-3', 'pt-3', 'border-t', 'border-border');
+      }
+      groupHeader.textContent = group.name;
+    }
+
+    groupContainer.appendChild(groupHeader);
+
+    // Fields container
+    const fieldsContainer = document.createElement('div');
+    fieldsContainer.className = 'playground-group-fields overflow-hidden transition-all duration-200';
+    fieldsContainer.dataset.groupFields = group.name;
+
+    if (isCollapsible && !isExpanded) {
+      fieldsContainer.style.maxHeight = '0';
+      fieldsContainer.style.opacity = '0';
+    } else {
+      fieldsContainer.style.maxHeight = 'none';
+      fieldsContainer.style.opacity = '1';
+    }
+
+    const fieldsInner = document.createElement('div');
+    fieldsInner.className = isCollapsible
+      ? 'space-y-2 pt-2 pb-1 pl-3 border-l-2 border-primary/20 ml-2 mt-1'
+      : 'space-y-2';
+
+    for (const field of group.fields) {
+      const fieldEl = buildFieldControl(field);
+      fieldsInner.appendChild(fieldEl);
+    }
+
+    fieldsContainer.appendChild(fieldsInner);
+    groupContainer.appendChild(fieldsContainer);
+    controlsEl.appendChild(groupContainer);
+  }
+}
+
+function toggleSection(group: GroupConfig) {
+  const isExpanded = expandedSections.has(group.name);
+
+  if (isExpanded) {
+    // Collapse: reset child fields to defaults and set gate to false
+    expandedSections.delete(group.name);
+    if (group.gateField) {
+      currentValues[group.gateField] = 'false';
+    }
+    for (const field of group.fields) {
+      currentValues[field.key] = field.default;
+    }
+  } else {
+    // Expand: set gate to true
+    expandedSections.add(group.name);
+    if (group.gateField) {
+      currentValues[group.gateField] = 'true';
+    }
+  }
+
+  // Update the group visuals
+  const groupEl = controlsEl?.querySelector(`[data-group-name="${group.name}"]`);
+  if (!groupEl) return;
+
+  const fieldsContainer = groupEl.querySelector(`[data-group-fields="${group.name}"]`) as HTMLElement;
+  const toggleBtn = groupEl.querySelector(`[data-section-toggle="${group.name}"]`) as HTMLButtonElement;
+  const chevron = groupEl.querySelector('svg');
+  const header = groupEl.querySelector(':scope > div:first-child') as HTMLElement;
+  const nowExpanded = expandedSections.has(group.name);
+
+  if (fieldsContainer) {
+    if (nowExpanded) {
+      fieldsContainer.style.maxHeight = fieldsContainer.scrollHeight + 'px';
+      fieldsContainer.style.opacity = '1';
+      // After transition, set to none so new content isn't clipped
+      setTimeout(() => {
+        fieldsContainer.style.maxHeight = 'none';
+      }, 200);
+    } else {
+      // First set a concrete height, then collapse
+      fieldsContainer.style.maxHeight = fieldsContainer.scrollHeight + 'px';
+      requestAnimationFrame(() => {
+        fieldsContainer.style.maxHeight = '0';
+        fieldsContainer.style.opacity = '0';
+      });
+    }
+  }
+
+  if (toggleBtn) updateToggleVisual(toggleBtn, nowExpanded);
+  if (chevron) {
+    chevron.classList.toggle('rotate-90', nowExpanded);
+  }
+  if (header) {
+    if (nowExpanded) {
+      header.classList.add('border-primary/20', 'bg-bg-surface/40');
+      header.classList.remove('border-transparent');
+    } else {
+      header.classList.remove('border-primary/20', 'bg-bg-surface/40');
+      header.classList.add('border-transparent');
+    }
+  }
+
+  updateOutput();
+}
+
+function buildFieldControl(field: FieldConfig): HTMLElement {
+  const div = document.createElement('div');
+  div.className = 'flex items-center justify-between gap-4';
+  div.dataset.fieldKey = field.key;
+
+  const labelDiv = document.createElement('div');
+  labelDiv.className = 'min-w-0';
+  labelDiv.innerHTML = `
+    <div class="text-sm font-semibold text-text-base">${field.label}</div>
+    <div class="text-xs text-text-muted">${field.description}</div>
+  `;
+
+  const controlDiv = document.createElement('div');
+  controlDiv.className = 'shrink-0';
+
+  if (field.type === 'select') {
+    const select = document.createElement('select');
+    select.className =
+      'rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
+    select.dataset.fieldKey = field.key;
+    (field.options ?? []).forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === (currentValues[field.key] ?? field.default)) option.selected = true;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', () => {
+      currentValues[field.key] = select.value;
+      updateOutput();
+    });
+    controlDiv.appendChild(select);
+  } else if (field.type === 'toggle') {
+    const isOn = (currentValues[field.key] ?? field.default) === 'true';
+    const btn = createToggleButton(isOn);
+    btn.dataset.fieldKey = field.key;
+    btn.addEventListener('click', () => {
+      const wasOn = currentValues[field.key] === 'true';
+      currentValues[field.key] = wasOn ? 'false' : 'true';
+      updateToggleVisual(btn, !wasOn);
+      updateOutput();
+    });
+    controlDiv.appendChild(btn);
+  } else if (field.type === 'number') {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '10';
+    input.value = currentValues[field.key] ?? field.default;
+    input.dataset.fieldKey = field.key;
+    input.className =
+      'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
+    input.addEventListener('input', () => {
+      currentValues[field.key] = input.value;
+      updateOutput();
+    });
+    controlDiv.appendChild(input);
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentValues[field.key] ?? field.default;
+    input.dataset.fieldKey = field.key;
+    input.className =
+      'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
+    input.addEventListener('input', () => {
+      currentValues[field.key] = input.value;
+      updateOutput();
+    });
+    controlDiv.appendChild(input);
+  }
+
+  div.appendChild(labelDiv);
+  div.appendChild(controlDiv);
+  return div;
+}
+
+function applyScenario(scenario: Scenario) {
+  const groups = getGroups(selectedSlug);
+
+  // Reset all to defaults
+  for (const group of groups) {
+    if (group.gateField) {
+      currentValues[group.gateField] = 'false';
+    }
+    for (const field of group.fields) {
+      currentValues[field.key] = field.default;
+    }
+  }
+  expandedSections.clear();
 
   // Apply scenario values
   for (const [key, val] of Object.entries(scenario.values)) {
     currentValues[key] = val;
   }
 
-  // Update all UI controls to match
-  if (controlsEl) {
-    const controls = controlsEl.querySelectorAll<HTMLElement>('[data-field-key]');
-    controls.forEach((el) => {
-      const key = el.dataset.fieldKey ?? '';
-      const val = currentValues[key];
-      if (val === undefined) return;
-
-      if (el instanceof HTMLSelectElement) {
-        el.value = val;
-      } else if (el instanceof HTMLInputElement) {
-        el.value = val;
-      } else if (el.tagName === 'BUTTON' && el.classList.contains('inline-flex')) {
-        // Toggle button
-        const isOn = val === 'true';
-        el.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-border'}`;
-        const dot = el.querySelector('span');
-        if (dot) {
-          dot.className = `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}`;
-        }
-      }
-    });
+  // Determine which collapsible sections should be expanded
+  for (const group of groups) {
+    if (!group.collapsible) continue;
+    if (group.gateField && currentValues[group.gateField] === 'true') {
+      expandedSections.add(group.name);
+    } else if (!group.gateField) {
+      // Resources-type: expand if any field changed from default
+      const hasChange = group.fields.some((f) => currentValues[f.key] !== f.default);
+      if (hasChange) expandedSections.add(group.name);
+    }
   }
+
+  // Rebuild controls to reflect new state
+  buildControls();
 
   // Highlight active scenario
   document.querySelectorAll('.playground-scenario-btn').forEach((btn) => {
@@ -259,20 +420,31 @@ function applyScenario(scenario: Scenario) {
 }
 
 function getChangedValues(): { key: string; value: string; defaultValue: string }[] {
-  const fields = getFields(selectedSlug);
+  const groups = getGroups(selectedSlug);
   const changes: { key: string; value: string; defaultValue: string }[] = [];
-  fields.forEach((field) => {
-    const val = currentValues[field.key];
-    if (val !== undefined && val !== field.default && val !== '') {
-      changes.push({ key: field.key, value: val, defaultValue: field.default });
+
+  for (const group of groups) {
+    // For collapsible sections with a gate field, include the gate if enabled
+    if (group.gateField && currentValues[group.gateField] === 'true') {
+      changes.push({ key: group.gateField, value: 'true', defaultValue: 'false' });
     }
-  });
+
+    // Only include child fields if section is expanded (or not collapsible)
+    if (group.collapsible && !expandedSections.has(group.name)) continue;
+
+    for (const field of group.fields) {
+      const val = currentValues[field.key];
+      if (val !== undefined && val !== field.default && val !== '') {
+        changes.push({ key: field.key, value: val, defaultValue: field.default });
+      }
+    }
+  }
+
   return changes;
 }
 
 function buildSetFlags(): string[] {
-  const changes = getChangedValues();
-  return changes.map((c) => `--set ${c.key}=${c.value}`);
+  return getChangedValues().map((c) => `--set ${c.key}=${c.value}`);
 }
 
 function generateHelmOutput(): string {
@@ -303,7 +475,6 @@ function generateValuesYaml(): string {
   lines.push(`<span class="text-zinc-500"># Generated at helmforge.dev/playground</span>`);
   lines.push('');
 
-  // Build nested YAML from dotted keys
   const tree: Record<string, any> = {};
   changes.forEach(({ key, value }) => {
     const parts = key.split('.');
@@ -312,7 +483,6 @@ function generateValuesYaml(): string {
       if (!node[parts[i]]) node[parts[i]] = {};
       node = node[parts[i]];
     }
-    // Convert booleans and numbers
     if (value === 'true' || value === 'false') {
       node[parts[parts.length - 1]] = value === 'true';
     } else if (/^\d+$/.test(value)) {
@@ -397,7 +567,6 @@ function updateOutput() {
   if (copyBtn) copyBtn.disabled = false;
   if (shareBtn) shareBtn.disabled = false;
 
-  // Update output
   if (outputMode === 'helm') {
     codeEl.innerHTML = generateHelmOutput();
     if (filenameEl) filenameEl.textContent = 'terminal';
@@ -428,7 +597,6 @@ function updateOutput() {
   updateUrlState();
 }
 
-// URL state management for shareable links
 function updateUrlState() {
   if (!selectedSlug) return;
   const params = new URLSearchParams();
@@ -446,46 +614,42 @@ function loadFromUrl() {
   const chart = params.get('chart');
   if (!chart) return;
 
-  // Find and click the chart button
   const btn = Array.from(chartBtns).find((b) => b.dataset.slug === chart);
   if (!btn) return;
 
   selectChart(chart, btn.dataset.name ?? chart);
 
-  // Apply URL params
-  const fields = getFields(chart);
+  // Apply URL params to values
+  const groups = getGroups(chart);
   let hasChanges = false;
-  fields.forEach((field) => {
-    const val = params.get(field.key);
-    if (val !== null) {
-      currentValues[field.key] = val;
-      hasChanges = true;
+
+  for (const group of groups) {
+    // Check gate field
+    if (group.gateField) {
+      const gateVal = params.get(group.gateField);
+      if (gateVal === 'true') {
+        currentValues[group.gateField] = 'true';
+        expandedSections.add(group.name);
+        hasChanges = true;
+      }
     }
-  });
+
+    for (const field of group.fields) {
+      const val = params.get(field.key);
+      if (val !== null) {
+        currentValues[field.key] = val;
+        hasChanges = true;
+        // Auto-expand collapsible section if a child value is set
+        if (group.collapsible) {
+          expandedSections.add(group.name);
+          if (group.gateField) currentValues[group.gateField] = 'true';
+        }
+      }
+    }
+  }
 
   if (hasChanges) {
-    // Update UI controls
-    if (controlsEl) {
-      const controls = controlsEl.querySelectorAll<HTMLElement>('[data-field-key]');
-      controls.forEach((el) => {
-        const key = el.dataset.fieldKey ?? '';
-        const val = currentValues[key];
-        if (val === undefined) return;
-
-        if (el instanceof HTMLSelectElement) {
-          el.value = val;
-        } else if (el instanceof HTMLInputElement) {
-          el.value = val;
-        } else if (el.tagName === 'BUTTON' && el.classList.contains('inline-flex')) {
-          const isOn = val === 'true';
-          el.className = `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isOn ? 'bg-primary' : 'bg-border'}`;
-          const dot = el.querySelector('span');
-          if (dot) {
-            dot.className = `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}`;
-          }
-        }
-      });
-    }
+    buildControls();
     updateOutput();
   }
 }

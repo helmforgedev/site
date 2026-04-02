@@ -113,4 +113,62 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-diff')).toBeVisible();
     await expect(page.locator('#playground-diff-count')).toContainText('1');
   });
+
+  test('collapsible sections expand on toggle click', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+
+    // Backup section should be collapsed — child fields hidden
+    const backupFields = page.locator('[data-group-fields="S3 Backup"]');
+    await expect(backupFields).toHaveCSS('max-height', '0px');
+
+    // Click the section toggle to expand
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+    await page.waitForTimeout(300);
+
+    // Child fields should now be visible
+    await expect(page.locator('input[data-field-key="backup.schedule"]')).toBeVisible();
+    await expect(page.locator('input[data-field-key="backup.s3.bucket"]')).toBeVisible();
+
+    // Output should include backup.enabled=true
+    await expect(page.locator('#playground-code')).toContainText('backup.enabled=true');
+  });
+
+  test('collapsible sections collapse and reset values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+
+    // Expand resources
+    await page.locator('[data-section-toggle="Resources"]').click();
+    await page.waitForTimeout(300);
+
+    // Change CPU request
+    const cpuInput = page.locator('input[data-field-key="resources.requests.cpu"]');
+    await cpuInput.clear();
+    await cpuInput.fill('500m');
+    await expect(page.locator('#playground-code')).toContainText('resources.requests.cpu=500m');
+
+    // Collapse resources — values should reset
+    await page.locator('[data-section-toggle="Resources"]').click();
+    await page.waitForTimeout(300);
+
+    // Output should no longer contain resources
+    await expect(page.locator('#playground-code')).not.toContainText('resources.requests.cpu');
+  });
+
+  test('scenario auto-expands collapsible sections', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+
+    // Click Production scenario
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    await page.waitForTimeout(300);
+
+    // Backup and Resources sections should auto-expand
+    await expect(page.locator('input[data-field-key="backup.schedule"]')).toBeVisible();
+    await expect(page.locator('input[data-field-key="resources.requests.cpu"]')).toBeVisible();
+
+    // Output should contain backup and resources values
+    await expect(page.locator('#playground-code')).toContainText('backup.enabled=true');
+  });
 });
