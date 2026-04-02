@@ -1,0 +1,266 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Container from '../components/Container.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+
+interface Contributor {
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  contributions: number;
+}
+
+let contributors: Contributor[] = [];
+try {
+  const res = await fetch('https://api.github.com/repos/helmforgedev/charts/contributors?per_page=30', {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (res.ok) {
+    contributors = (await res.json()).filter((c: Contributor) => !c.login.includes('[bot]'));
+  }
+} catch {
+  // Build continues with empty contributors
+}
+
+const ways = [
+  {
+    icon: 'chart',
+    title: 'Submit a Chart',
+    description: 'Build and contribute a new Helm chart for an application you use in production.',
+    link: 'https://github.com/helmforgedev/charts/blob/main/CONTRIBUTING.md',
+    linkText: 'Read CONTRIBUTING.md',
+  },
+  {
+    icon: 'bug',
+    title: 'Report Issues',
+    description: 'Found a bug or unexpected behavior? Open an issue with reproduction steps.',
+    link: 'https://github.com/helmforgedev/charts/issues/new',
+    linkText: 'Open an issue',
+  },
+  {
+    icon: 'request',
+    title: 'Request a Chart',
+    description: 'Need a chart for an application? Submit a request and the community will evaluate it.',
+    link: '/request',
+    linkText: 'Request form',
+  },
+  {
+    icon: 'docs',
+    title: 'Improve Docs',
+    description: 'Fix typos, add examples, improve explanations. Documentation PRs are always welcome.',
+    link: 'https://github.com/helmforgedev/site',
+    linkText: 'Site repository',
+  },
+  {
+    icon: 'test',
+    title: 'Test & Review',
+    description: 'Try charts on your cluster and report results. Review open pull requests.',
+    link: 'https://github.com/helmforgedev/charts/pulls',
+    linkText: 'Open PRs',
+  },
+  {
+    icon: 'star',
+    title: 'Spread the Word',
+    description: 'Star the repo, share on social media, or write about your experience with HelmForge.',
+    link: 'https://github.com/helmforgedev/charts',
+    linkText: 'Star on GitHub',
+  },
+];
+
+const iconPaths: Record<string, string> = {
+  chart:
+    'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z',
+  bug: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  request: 'M12 4v16m8-8H4',
+  docs: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  test: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  star: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+};
+
+const governance = [
+  { label: 'License', value: 'MIT', description: 'All charts are open-source under the MIT license.' },
+  {
+    label: 'Versioning',
+    value: 'SemVer',
+    description: 'Automated semantic versioning from Conventional Commits.',
+  },
+  {
+    label: 'Signing',
+    value: 'Cosign',
+    description: 'All OCI artifacts are signed with Sigstore keyless signing.',
+  },
+  {
+    label: 'Maturity',
+    value: 'alpha → beta → stable',
+    description: 'Charts progress through maturity levels with clear criteria.',
+  },
+];
+---
+
+<BaseLayout
+  title="Community"
+  description="Join the HelmForge community. Contribute charts, report issues, and help shape the future of Kubernetes deployments."
+>
+  <Header />
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <SectionHeader
+        label="Community"
+        title="Built in the open, shaped by the community."
+        description="HelmForge is open-source and community-driven. Every contribution makes the project better for everyone."
+      />
+
+      <!-- How to Contribute -->
+      <div class="mt-12">
+        <h3 class="text-lg font-bold text-text-base heading-font mb-6">How to contribute</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {
+            ways.map((way) => (
+              <div class="glass-panel rounded-2xl p-5 flex flex-col">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={iconPaths[way.icon]} />
+                    </svg>
+                  </div>
+                  <h4 class="text-sm font-bold text-text-base">{way.title}</h4>
+                </div>
+                <p class="text-xs text-text-muted leading-relaxed flex-1">{way.description}</p>
+                <a
+                  href={way.link}
+                  target={way.link.startsWith('/') ? undefined : '_blank'}
+                  rel={way.link.startsWith('/') ? undefined : 'noopener noreferrer'}
+                  class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-light hover:underline"
+                >
+                  {way.linkText}
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </a>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+
+      <!-- Contributors -->
+      {
+        contributors.length > 0 && (
+          <div class="mt-16">
+            <h3 class="text-lg font-bold text-text-base heading-font mb-6">Contributors</h3>
+            <div class="glass-panel rounded-2xl p-6">
+              <div class="flex flex-wrap gap-3">
+                {contributors.map((c) => (
+                  <a
+                    href={c.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="group flex items-center gap-2.5 rounded-xl border border-border bg-bg-surface/40 px-3 py-2 transition-all hover:border-primary/40 hover:bg-bg-surface/80"
+                    title={`${c.login} — ${c.contributions} contributions`}
+                  >
+                    <img
+                      src={c.avatar_url}
+                      alt={c.login}
+                      class="w-7 h-7 rounded-full"
+                      loading="lazy"
+                      width="28"
+                      height="28"
+                    />
+                    <span class="text-sm font-medium text-text-base group-hover:text-primary-light">{c.login}</span>
+                    <span class="text-xs text-text-muted font-mono">{c.contributions}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      <!-- Governance -->
+      <div class="mt-16">
+        <h3 class="text-lg font-bold text-text-base heading-font mb-6">Project governance</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {
+            governance.map((g) => (
+              <div class="glass-panel rounded-2xl p-5">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{g.label}</span>
+                  <span class="text-xs font-mono text-primary-light bg-primary/10 px-2 py-0.5 rounded-full">
+                    {g.value}
+                  </span>
+                </div>
+                <p class="text-sm text-text-muted leading-relaxed">{g.description}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+
+      <!-- Chart Request Process -->
+      <div class="mt-16">
+        <h3 class="text-lg font-bold text-text-base heading-font mb-6">Chart request process</h3>
+        <div class="glass-panel rounded-2xl p-6">
+          <div class="flex flex-col sm:flex-row gap-4">
+            {
+              [
+                {
+                  step: '1',
+                  title: 'Submit',
+                  description: 'Open a chart request via the request form or GitHub issue.',
+                },
+                {
+                  step: '2',
+                  title: 'Evaluate',
+                  description: 'Maintainers assess demand, complexity, and upstream support.',
+                },
+                {
+                  step: '3',
+                  title: 'Build',
+                  description: 'Chart is scaffolded, tested on k3d, and reviewed.',
+                },
+                {
+                  step: '4',
+                  title: 'Release',
+                  description: 'Chart is published to OCI and Helm repo with signed artifacts.',
+                },
+              ].map((s) => (
+                <div class="flex-1 text-center">
+                  <div class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-sm font-bold mb-2">
+                    {s.step}
+                  </div>
+                  <div class="text-sm font-bold text-text-base">{s.title}</div>
+                  <p class="mt-1 text-xs text-text-muted">{s.description}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="mt-16 text-center">
+        <a
+          href="https://github.com/helmforgedev/charts"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/20"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+            ></path>
+          </svg>
+          Star on GitHub
+        </a>
+      </div>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>
