@@ -4,11 +4,26 @@ test.describe('Navigation and page rendering', () => {
   test('header renders all nav items', async ({ page }) => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
-    await expect(nav.getByText('Home')).toBeVisible();
+    // Direct nav links
     await expect(nav.getByText('Docs')).toBeVisible();
+    await expect(nav.getByText('Blog')).toBeVisible();
+    // Dropdown trigger buttons
+    await expect(nav.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Community' })).toBeVisible();
+    await expect(nav.getByText('GitHub')).toBeVisible();
+  });
+
+  test('dropdown menus reveal items on hover', async ({ page }) => {
+    await page.goto('/');
+    const nav = page.locator('header nav').first();
+    // Hover Tools dropdown to reveal items
+    await nav.getByRole('button', { name: 'Tools' }).hover();
     await expect(nav.getByText('Stack Builder')).toBeVisible();
-    await expect(nav.getByText('Request')).toBeVisible();
+    await expect(nav.getByText('Playground')).toBeVisible();
+    // Hover Community dropdown to reveal items
+    await nav.getByRole('button', { name: 'Community' }).hover();
     await expect(nav.getByText('Changelog')).toBeVisible();
+    await expect(nav.getByText('Request a Chart')).toBeVisible();
   });
 
   test('docs page loads with sidebar', async ({ page }) => {
