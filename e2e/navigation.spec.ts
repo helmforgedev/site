@@ -10,7 +10,7 @@ test.describe('Navigation and page rendering', () => {
     // Dropdown trigger buttons
     await expect(nav.getByRole('button', { name: 'Tools' })).toBeVisible();
     await expect(nav.getByRole('button', { name: 'Community' })).toBeVisible();
-    await expect(nav.getByText('GitHub')).toBeVisible();
+    await expect(nav.locator('a[href*="github.com"]')).toBeVisible();
   });
 
   test('dropdown menus reveal items on hover', async ({ page }) => {

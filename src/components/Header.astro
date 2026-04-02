@@ -9,6 +9,7 @@ const currentPath = Astro.url.pathname;
 interface NavLink {
   label: string;
   href: string;
+  description?: string;
 }
 
 interface NavDropdown {
@@ -24,21 +25,21 @@ function isDropdown(entry: NavEntry): entry is NavDropdown {
 
 const navEntries: NavEntry[] = [
   { label: 'Docs', href: '/docs' },
+  { label: 'Blog', href: '/blog' },
   {
     label: 'Tools',
     items: [
-      { label: 'Stack Builder', href: '/stack' },
-      { label: 'Playground', href: '/playground' },
+      { label: 'Stack Builder', href: '/stack', description: 'Compose chart stacks visually' },
+      { label: 'Playground', href: '/playground', description: 'Configure and preview values' },
     ],
   },
-  { label: 'Blog', href: '/blog' },
   {
     label: 'Community',
     items: [
-      { label: 'Roadmap', href: '/roadmap' },
-      { label: 'Community', href: '/community' },
-      { label: 'Request a Chart', href: '/request' },
-      { label: 'Changelog', href: '/changelog' },
+      { label: 'Roadmap', href: '/roadmap', description: 'Track what\u2019s coming next' },
+      { label: 'Changelog', href: '/changelog', description: 'Release notes from GitHub' },
+      { label: 'Request a Chart', href: '/request', description: 'Suggest a new chart' },
+      { label: 'Community', href: '/community', description: 'Contributors and links' },
     ],
   },
 ];
@@ -46,13 +47,13 @@ const navEntries: NavEntry[] = [
 // Flatten for mobile
 const mobileItems: NavLink[] = [
   { label: 'Docs', href: '/docs' },
+  { label: 'Blog', href: '/blog' },
   { label: 'Stack Builder', href: '/stack' },
   { label: 'Playground', href: '/playground' },
-  { label: 'Blog', href: '/blog' },
   { label: 'Roadmap', href: '/roadmap' },
-  { label: 'Community', href: '/community' },
-  { label: 'Request a Chart', href: '/request' },
   { label: 'Changelog', href: '/changelog' },
+  { label: 'Request a Chart', href: '/request' },
+  { label: 'Community', href: '/community' },
 ];
 
 function isActive(href: string): boolean {
@@ -69,7 +70,7 @@ function isDropdownActive(items: NavLink[]): boolean {
   class="header-glass sticky top-0 z-50 border-b border-border shadow-[0_4px_30px_rgba(0,0,0,0.05)] transition-all"
 >
   <Container>
-    <div class="flex h-[72px] items-center justify-between">
+    <div class="flex h-16 items-center justify-between">
       <!-- Logo -->
       <a
         href="/"
@@ -78,22 +79,23 @@ function isDropdownActive(items: NavLink[]): boolean {
       >
         <Logo
           variant="horizontal"
-          class="h-9 sm:h-10 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
+          class="h-8 sm:h-9 w-auto transition-transform duration-300 group-hover:scale-[1.02]"
         />
       </a>
 
       <!-- Desktop nav -->
-      <nav class="hidden md:flex items-center gap-1">
+      <nav class="hidden md:flex items-center gap-0.5" aria-label="Main navigation">
         {
           navEntries.map((entry) =>
             isDropdown(entry) ? (
               <div class="nav-dropdown relative">
                 <button
+                  type="button"
                   class:list={[
-                    'nav-dropdown-trigger flex items-center gap-1 px-4 py-2 text-sm font-semibold transition-colors rounded-full',
+                    'nav-dropdown-trigger flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors rounded-lg min-h-[36px]',
                     isDropdownActive(entry.items)
                       ? 'text-primary-light bg-primary/10'
-                      : 'text-text-muted hover:text-text-base',
+                      : 'text-text-muted hover:text-text-base hover:bg-text-base/5',
                   ]}
                   aria-expanded="false"
                   aria-haspopup="true"
@@ -101,19 +103,27 @@ function isDropdownActive(items: NavLink[]): boolean {
                   {entry.label}
                   <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200" />
                 </button>
-                <div class="nav-dropdown-menu absolute top-full left-0 mt-1 min-w-[180px] rounded-xl border border-border bg-bg-base/95 backdrop-blur-xl shadow-xl opacity-0 invisible translate-y-1 transition-all duration-200 z-50">
+                <div
+                  class="nav-dropdown-menu absolute top-full left-0 mt-1.5 min-w-[220px] rounded-xl border border-border bg-bg-base/95 backdrop-blur-xl shadow-xl opacity-0 invisible translate-y-1 transition-all duration-200 z-50"
+                  role="menu"
+                >
                   <div class="py-1.5">
                     {entry.items.map((item) => (
                       <a
                         href={item.href}
+                        role="menuitem"
+                        tabindex="-1"
                         class:list={[
-                          'block px-4 py-2 text-sm font-medium transition-colors',
+                          'block px-4 py-2.5 transition-colors',
                           isActive(item.href)
                             ? 'text-primary-light bg-primary/5'
                             : 'text-text-muted hover:text-text-base hover:bg-text-base/5',
                         ]}
                       >
-                        {item.label}
+                        <span class="block text-sm font-medium">{item.label}</span>
+                        {item.description && (
+                          <span class="block text-xs text-text-muted mt-0.5">{item.description}</span>
+                        )}
                       </a>
                     ))}
                   </div>
@@ -123,22 +133,24 @@ function isDropdownActive(items: NavLink[]): boolean {
               <a
                 href={entry.href}
                 class:list={[
-                  'relative px-4 py-2 text-sm font-semibold transition-colors rounded-full overflow-hidden group',
-                  isActive(entry.href) ? 'text-primary-light bg-primary/10' : 'text-text-muted hover:text-text-base',
+                  'relative px-3 py-2 text-sm font-medium transition-colors rounded-lg min-h-[36px] inline-flex items-center',
+                  isActive(entry.href)
+                    ? 'text-primary-light bg-primary/10'
+                    : 'text-text-muted hover:text-text-base hover:bg-text-base/5',
                 ]}
               >
-                <span class="relative z-10">{entry.label}</span>
-                {!isActive(entry.href) && (
-                  <span class="absolute inset-0 bg-text-base/5 rounded-full scale-50 opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
-                )}
+                {entry.label}
               </a>
             ),
           )
         }
-        <div class="h-5 w-px bg-border mx-2"></div>
+
+        <div class="h-5 w-px bg-border mx-1.5"></div>
+
         <button
+          type="button"
           id="search-trigger"
-          class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base"
+          class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base min-h-[36px]"
           aria-label="Search documentation (Ctrl+K)"
         >
           <Search class="w-4 h-4" />
@@ -148,25 +160,28 @@ function isDropdownActive(items: NavLink[]): boolean {
             <span class="text-[10px]" id="search-mod-key">Ctrl</span>K
           </span>
         </button>
+
         <a
           href="https://github.com/helmforgedev/charts"
           target="_blank"
           rel="noopener noreferrer"
-          class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base"
+          class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base min-h-[36px]"
         >
           <Github class="w-4 h-4" />
-          <span>GitHub</span>
+          <span class="hidden lg:inline">GitHub</span>
         </a>
-        <div class="pl-2 ml-1">
+
+        <div class="pl-1">
           <ThemeToggle />
         </div>
       </nav>
 
       <!-- Mobile controls -->
-      <div class="flex items-center gap-3 md:hidden">
+      <div class="flex items-center gap-2 md:hidden">
         <button
+          type="button"
           id="search-trigger-mobile"
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-bg-surface text-text-muted transition-colors hover:bg-text-base/5 hover:text-text-base"
+          class="flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-bg-surface text-text-muted transition-colors hover:bg-text-base/5 hover:text-text-base"
           aria-label="Search documentation"
         >
           <Search class="w-4 h-4" />
@@ -174,8 +189,9 @@ function isDropdownActive(items: NavLink[]): boolean {
         <ThemeToggle />
 
         <button
+          type="button"
           id="mobile-menu-toggle"
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-border bg-bg-surface text-text-muted transition-colors hover:bg-text-base/5 hover:text-text-base focus-visible:outline-2 focus-visible:outline-primary-light"
+          class="flex items-center justify-center w-10 h-10 rounded-lg border border-border bg-bg-surface text-text-muted transition-colors hover:bg-text-base/5 hover:text-text-base"
           aria-label="Toggle navigation menu"
           aria-expanded="false"
           aria-controls="mobile-menu"
@@ -190,15 +206,16 @@ function isDropdownActive(items: NavLink[]): boolean {
     <nav
       id="mobile-menu"
       class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:hidden"
+      aria-label="Mobile navigation"
     >
       <div class="overflow-hidden">
-        <div class="flex flex-col gap-2 pb-4 pt-2">
+        <div class="flex flex-col gap-1 pb-4 pt-2">
           {
             mobileItems.map((item) => (
               <a
                 href={item.href}
                 class:list={[
-                  'rounded-xl px-4 py-3 text-base font-semibold transition-all',
+                  'rounded-xl px-4 py-3 text-base font-medium transition-all min-h-[44px] flex items-center',
                   isActive(item.href)
                     ? 'bg-primary/10 text-primary-light border-l-4 border-primary'
                     : 'text-text-muted hover:bg-text-base/5 hover:text-text-base border-l-4 border-transparent',
@@ -212,7 +229,7 @@ function isDropdownActive(items: NavLink[]): boolean {
             href="https://github.com/helmforgedev/charts"
             target="_blank"
             rel="noopener noreferrer"
-            class="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-semibold text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base border-l-4 border-transparent"
+            class="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-text-muted transition-all hover:bg-text-base/5 hover:text-text-base border-l-4 border-transparent min-h-[44px]"
           >
             <Github class="w-5 h-5" />
             GitHub
@@ -249,6 +266,7 @@ function isDropdownActive(items: NavLink[]): boolean {
     dropdowns.forEach((dropdown) => {
       const trigger = dropdown.querySelector('.nav-dropdown-trigger') as HTMLButtonElement;
       const menu = dropdown.querySelector('.nav-dropdown-menu') as HTMLElement;
+      const menuItems = menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
       let timeout: ReturnType<typeof setTimeout>;
 
       function show() {
@@ -278,6 +296,47 @@ function isDropdownActive(items: NavLink[]): boolean {
       });
       trigger.addEventListener('focus', show);
       menu.addEventListener('mouseenter', () => clearTimeout(timeout));
+
+      // Keyboard navigation within dropdown
+      trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          show();
+          setTimeout(() => {
+            const items = menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
+            if (items[0]) {
+              items[0].focus();
+              // WebKit sometimes needs a second attempt
+              if (document.activeElement !== items[0]) {
+                items[0].focus();
+              }
+            }
+          }, 150);
+        }
+      });
+
+      menuItems.forEach((item, i) => {
+        item.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            menuItems[Math.min(i + 1, menuItems.length - 1)]?.focus();
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (i === 0) {
+              trigger.focus();
+              hide();
+            } else {
+              menuItems[i - 1]?.focus();
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hide();
+            trigger.focus();
+          } else if (e.key === 'Tab') {
+            hide();
+          }
+        });
+      });
     });
 
     // Close dropdowns on Escape
