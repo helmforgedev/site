@@ -1,0 +1,210 @@
+---
+interface Props {
+  mode: 'standalone' | 'replication';
+}
+
+const { mode } = Astro.props;
+---
+
+<svg
+  viewBox="0 0 600 260"
+  class="w-full max-w-[600px] h-auto"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label={`PostgreSQL ${mode} architecture diagram`}
+>
+  <style>
+    .diagram-text {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+    }
+    .diagram-label {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 10px;
+    }
+  </style>
+
+  {
+    mode === 'standalone' ? (
+      <g>
+        {/* Client */}
+        <rect x="30" y="90" width="120" height="50" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="90" y="112" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Application
+        </text>
+        <text x="90" y="126" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          client
+        </text>
+
+        {/* Arrow */}
+        <line x1="150" y1="115" x2="230" y2="115" stroke="currentColor" stroke-width="1.5" />
+        <polygon points="230,110 240,115 230,120" fill="currentColor" />
+        <text x="190" y="108" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          TCP:5432
+        </text>
+
+        {/* Service */}
+        <rect
+          x="240"
+          y="80"
+          width="140"
+          height="70"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.05"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="310" y="105" text-anchor="middle" fill="currentColor" class="diagram-text" font-weight="bold">
+          PostgreSQL
+        </text>
+        <text x="310" y="120" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          StatefulSet (1 pod)
+        </text>
+        <text x="310" y="135" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          primary
+        </text>
+
+        {/* PVC */}
+        <line x1="310" y1="150" x2="310" y2="185" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="260" y="185" width="100" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="310" y="208" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC (data)
+        </text>
+
+        {/* Backup CronJob */}
+        <line x1="380" y1="115" x2="430" y2="115" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="430" y="90" width="130" height="50" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="495" y="112" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Backup CronJob
+        </text>
+        <text x="495" y="126" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          pg_dump → S3
+        </text>
+      </g>
+    ) : (
+      <g>
+        {/* Client */}
+        <rect x="10" y="30" width="100" height="45" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="60" y="50" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Application
+        </text>
+        <text x="60" y="63" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read/write
+        </text>
+
+        {/* Arrow to Primary */}
+        <line x1="110" y1="52" x2="175" y2="52" stroke="currentColor" stroke-width="1.5" />
+        <polygon points="175,47 185,52 175,57" fill="currentColor" />
+
+        {/* Primary */}
+        <rect
+          x="185"
+          y="20"
+          width="150"
+          height="65"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.08"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="260" y="42" text-anchor="middle" fill="currentColor" class="diagram-text" font-weight="bold">
+          Primary
+        </text>
+        <text x="260" y="56" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read + write
+        </text>
+        <text x="260" y="70" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          StatefulSet pod-0
+        </text>
+
+        {/* Primary PVC */}
+        <line x1="260" y1="85" x2="260" y2="110" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="210" y="110" width="100" height="32" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="260" y="130" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC (data)
+        </text>
+
+        {/* Streaming arrows */}
+        <line x1="335" y1="52" x2="395" y2="52" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 3" />
+        <text x="365" y="45" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          WAL
+        </text>
+
+        {/* Replica 1 */}
+        <rect
+          x="395"
+          y="20"
+          width="150"
+          height="65"
+          rx="10"
+          fill="currentColor"
+          fill-opacity="0.04"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <text x="470" y="42" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Replica
+        </text>
+        <text x="470" y="56" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read-only
+        </text>
+        <text x="470" y="70" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          StatefulSet pod-1
+        </text>
+
+        {/* Replica PVC */}
+        <line x1="470" y1="85" x2="470" y2="110" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+        <rect x="420" y="110" width="100" height="32" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="470" y="130" text-anchor="middle" fill="currentColor" class="diagram-label">
+          PVC (data)
+        </text>
+
+        {/* Read-only client */}
+        <rect x="10" y="160" width="100" height="45" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="60" y="180" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Read Client
+        </text>
+        <text x="60" y="193" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          read-only
+        </text>
+
+        {/* Arrow to read svc */}
+        <line x1="110" y1="182" x2="175" y2="182" stroke="currentColor" stroke-width="1.5" />
+        <polygon points="175,177 185,182 175,187" fill="currentColor" />
+
+        {/* Read Service */}
+        <rect
+          x="185"
+          y="160"
+          width="150"
+          height="45"
+          rx="10"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-dasharray="4 3"
+        />
+        <text x="260" y="180" text-anchor="middle" fill="currentColor" class="diagram-text">
+          svc-read
+        </text>
+        <text x="260" y="193" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          load-balanced
+        </text>
+
+        {/* Arrow from read svc to replica */}
+        <line x1="335" y1="182" x2="460" y2="85" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" />
+
+        {/* Backup */}
+        <rect x="395" y="160" width="150" height="45" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <text x="470" y="180" text-anchor="middle" fill="currentColor" class="diagram-text">
+          Backup CronJob
+        </text>
+        <text x="470" y="193" text-anchor="middle" fill="currentColor" class="diagram-label" opacity="0.5">
+          pg_dump → S3
+        </text>
+      </g>
+    )
+  }
+</svg>
