@@ -3,6 +3,10 @@ export interface NavItem {
   href: string;
 }
 
+export interface ChartNavItem extends NavItem {
+  maturity: 'stable' | 'beta' | 'alpha';
+}
+
 export const sidebarNav: NavItem[] = [
   { label: 'Getting Started', href: '/docs/getting-started' },
   { label: 'Charts Overview', href: '/docs/charts' },
@@ -10,44 +14,113 @@ export const sidebarNav: NavItem[] = [
   { label: 'HelmForge vs Other Charts', href: '/docs/comparison' },
 ];
 
-export const chartNav: NavItem[] = [
-  { label: 'Generic', href: '/docs/charts/generic' },
-  { label: 'MySQL', href: '/docs/charts/mysql' },
-  { label: 'PostgreSQL', href: '/docs/charts/postgresql' },
-  { label: 'Redis', href: '/docs/charts/redis' },
-  { label: 'MongoDB', href: '/docs/charts/mongodb' },
-  { label: 'RabbitMQ', href: '/docs/charts/rabbitmq' },
-  { label: 'Keycloak', href: '/docs/charts/keycloak' },
-  { label: 'Vaultwarden', href: '/docs/charts/vaultwarden' },
-  { label: 'Minecraft', href: '/docs/charts/minecraft' },
-  { label: 'Pi-hole', href: '/docs/charts/pihole' },
-  { label: 'WordPress', href: '/docs/charts/wordpress' },
-  { label: 'Strapi', href: '/docs/charts/strapi' },
-  { label: 'Answer', href: '/docs/charts/answer' },
-  { label: 'n8n', href: '/docs/charts/n8n' },
-  { label: 'Komga', href: '/docs/charts/komga' },
-  { label: 'Guacamole', href: '/docs/charts/guacamole' },
-  { label: 'Cloudflared', href: '/docs/charts/cloudflared' },
-  { label: 'DDNS Updater', href: '/docs/charts/ddns-updater' },
-  { label: 'Uptime Kuma', href: '/docs/charts/uptime-kuma' },
-  { label: 'Appwrite', href: '/docs/charts/appwrite' },
-  { label: 'Authelia', href: '/docs/charts/authelia' },
-  { label: 'AdGuard Home', href: '/docs/charts/adguard-home' },
-  { label: 'Velero', href: '/docs/charts/velero' },
-  { label: 'Kafka', href: '/docs/charts/kafka' },
-  { label: 'Dolibarr', href: '/docs/charts/dolibarr' },
-  { label: 'Mosquitto', href: '/docs/charts/mosquitto' },
-  { label: 'Docmost', href: '/docs/charts/docmost' },
-  { label: 'Flowise', href: '/docs/charts/flowise' },
-  { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin' },
-  { label: 'Heimdall', href: '/docs/charts/heimdall' },
-  { label: 'Gitea', href: '/docs/charts/gitea' },
-  { label: 'Homarr', href: '/docs/charts/homarr' },
-  { label: 'MariaDB', href: '/docs/charts/mariadb' },
+export interface ChartCategory {
+  label: string;
+  charts: ChartNavItem[];
+}
+
+export const chartCategories: ChartCategory[] = [
+  {
+    label: 'Databases',
+    charts: [
+      { label: 'MySQL', href: '/docs/charts/mysql', maturity: 'stable' },
+      { label: 'PostgreSQL', href: '/docs/charts/postgresql', maturity: 'stable' },
+      { label: 'MongoDB', href: '/docs/charts/mongodb', maturity: 'stable' },
+      { label: 'MariaDB', href: '/docs/charts/mariadb', maturity: 'stable' },
+      { label: 'Redis', href: '/docs/charts/redis', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Messaging & Streaming',
+    charts: [
+      { label: 'RabbitMQ', href: '/docs/charts/rabbitmq', maturity: 'stable' },
+      { label: 'Kafka', href: '/docs/charts/kafka', maturity: 'stable' },
+      { label: 'Mosquitto', href: '/docs/charts/mosquitto', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'CMS & Content',
+    charts: [
+      { label: 'WordPress', href: '/docs/charts/wordpress', maturity: 'stable' },
+      { label: 'Strapi', href: '/docs/charts/strapi', maturity: 'stable' },
+      { label: 'Docmost', href: '/docs/charts/docmost', maturity: 'stable' },
+      { label: 'Komga', href: '/docs/charts/komga', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Identity & Security',
+    charts: [
+      { label: 'Keycloak', href: '/docs/charts/keycloak', maturity: 'stable' },
+      { label: 'Vaultwarden', href: '/docs/charts/vaultwarden', maturity: 'stable' },
+      { label: 'Authelia', href: '/docs/charts/authelia', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Networking & DNS',
+    charts: [
+      { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
+      { label: 'DDNS Updater', href: '/docs/charts/ddns-updater', maturity: 'stable' },
+      { label: 'Pi-hole', href: '/docs/charts/pihole', maturity: 'stable' },
+      { label: 'AdGuard Home', href: '/docs/charts/adguard-home', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Automation & AI',
+    charts: [
+      { label: 'n8n', href: '/docs/charts/n8n', maturity: 'stable' },
+      { label: 'Flowise', href: '/docs/charts/flowise', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Monitoring & Ops',
+    charts: [
+      { label: 'Uptime Kuma', href: '/docs/charts/uptime-kuma', maturity: 'stable' },
+      { label: 'Velero', href: '/docs/charts/velero', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Dashboards & Admin',
+    charts: [
+      { label: 'Heimdall', href: '/docs/charts/heimdall', maturity: 'stable' },
+      { label: 'Homarr', href: '/docs/charts/homarr', maturity: 'stable' },
+      { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Dev Tools',
+    charts: [
+      { label: 'Gitea', href: '/docs/charts/gitea', maturity: 'stable' },
+      { label: 'Guacamole', href: '/docs/charts/guacamole', maturity: 'stable' },
+      { label: 'Answer', href: '/docs/charts/answer', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Platform & ERP',
+    charts: [
+      { label: 'Appwrite', href: '/docs/charts/appwrite', maturity: 'stable' },
+      { label: 'Dolibarr', href: '/docs/charts/dolibarr', maturity: 'stable' },
+      { label: 'Minecraft', href: '/docs/charts/minecraft', maturity: 'stable' },
+      { label: 'Generic', href: '/docs/charts/generic', maturity: 'stable' },
+    ],
+  },
+  {
+    label: 'Alpha',
+    charts: [
+      { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'alpha' },
+      { label: 'Countly', href: '/docs/charts/countly', maturity: 'alpha' },
+      { label: 'Middleware', href: '/docs/charts/middleware', maturity: 'alpha' },
+      { label: 'Apache Superset', href: '/docs/charts/superset', maturity: 'alpha' },
+      { label: 'CKAN', href: '/docs/charts/ckan', maturity: 'alpha' },
+      { label: 'Apache Druid', href: '/docs/charts/druid', maturity: 'alpha' },
+    ],
+  },
 ];
+
+/** Flat list for prev/next navigation */
+const allChartNavItems: NavItem[] = chartCategories.flatMap(cat => cat.charts);
 
 export const allPages: NavItem[] = [
   { label: 'Documentation', href: '/docs' },
   ...sidebarNav,
-  ...chartNav,
+  ...allChartNavItems,
 ];
