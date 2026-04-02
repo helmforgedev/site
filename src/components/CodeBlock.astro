@@ -1,4 +1,6 @@
 ---
+import CopyButton from './CopyButton.astro';
+
 interface Props {
   code: string;
   lang?: string;
@@ -12,50 +14,9 @@ const id = `code-${Math.random().toString(36).slice(2, 9)}`;
   <!-- Language badge -->
   <div class="flex items-center justify-between px-4 py-2 border-b border-slate-700/50">
     <span class="text-xs font-mono text-slate-500 uppercase tracking-wider">{lang}</span>
-    <button
-      data-copy-target={id}
-      class="copy-btn flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors"
-      aria-label="Copy code to clipboard"
-    >
-      <svg class="w-3.5 h-3.5 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-      <svg class="w-3.5 h-3.5 check-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-      </svg>
-      <span class="copy-text">Copy</span>
-    </button>
+    <CopyButton targetId={id} />
   </div>
 
   <!-- Code content -->
   <pre class="px-5 py-4 overflow-x-auto text-sm leading-relaxed"><code id={id} class="text-slate-300 font-mono">{code}</code></pre>
 </div>
-
-<script is:inline>
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const targetId = btn.getAttribute('data-copy-target');
-      const codeEl = document.getElementById(targetId);
-      if (!codeEl) return;
-
-      try {
-        await navigator.clipboard.writeText(codeEl.textContent || '');
-        const copyIcon = btn.querySelector('.copy-icon');
-        const checkIcon = btn.querySelector('.check-icon');
-        const copyText = btn.querySelector('.copy-text');
-
-        if (copyIcon) copyIcon.classList.add('hidden');
-        if (checkIcon) checkIcon.classList.remove('hidden');
-        if (copyText) copyText.textContent = 'Copied!';
-
-        setTimeout(() => {
-          if (copyIcon) copyIcon.classList.remove('hidden');
-          if (checkIcon) checkIcon.classList.add('hidden');
-          if (copyText) copyText.textContent = 'Copy';
-        }, 2000);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
-    });
-  });
-</script>
