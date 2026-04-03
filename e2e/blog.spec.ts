@@ -48,4 +48,39 @@ test.describe('Blog', () => {
     );
     expect(await shareLinks.count()).toBeGreaterThan(0);
   });
+
+  test('blog post with cover image renders hero media', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const hero = page.locator('figure img[src*="/blog/"][src$=".webp"]').first();
+    await expect(hero).toBeVisible();
+    await expect(hero).toHaveAttribute('alt', /Kubernetes 1\.34/i);
+  });
+
+  test('blog post renders author card with social links', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const authorCard = page.locator('aside section').filter({ hasText: 'Written by' }).first();
+    await expect(authorCard).toBeVisible();
+    await expect(authorCard.getByText('Maicon Berlofa')).toBeVisible();
+    await expect(authorCard.locator('a[aria-label*="GitHub"]')).toBeVisible();
+    await expect(authorCard.locator('a[aria-label*="LinkedIn"]')).toBeVisible();
+  });
+
+  test('blog post renders right rail ad placeholder', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    await expect(page.locator('text=Ad slot placeholder for future sponsorship placements.')).toBeVisible();
+  });
+
+  test('blog post exposes Person author in structured data', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const scripts = page.locator('script[type="application/ld+json"]');
+    const combined = (await scripts.allTextContents()).join('\n');
+
+    expect(combined).toContain('"@type":"Article"');
+    expect(combined).toContain('"@type":"Person"');
+    expect(combined).toContain('Maicon Berlofa');
+  });
 });
