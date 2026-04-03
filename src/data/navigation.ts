@@ -38,6 +38,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'RabbitMQ', href: '/docs/charts/rabbitmq', maturity: 'stable' },
       { label: 'Kafka', href: '/docs/charts/kafka', maturity: 'stable' },
       { label: 'Mosquitto', href: '/docs/charts/mosquitto', maturity: 'stable' },
+      { label: 'ntfy', href: '/docs/charts/ntfy', maturity: 'alpha' },
     ],
   },
   {
@@ -46,7 +47,9 @@ export const chartCategories: ChartCategory[] = [
       { label: 'WordPress', href: '/docs/charts/wordpress', maturity: 'stable' },
       { label: 'Strapi', href: '/docs/charts/strapi', maturity: 'stable' },
       { label: 'Docmost', href: '/docs/charts/docmost', maturity: 'stable' },
+      { label: 'Ghost', href: '/docs/charts/ghost', maturity: 'alpha' },
       { label: 'Komga', href: '/docs/charts/komga', maturity: 'stable' },
+      { label: 'Castopod', href: '/docs/charts/castopod', maturity: 'alpha' },
     ],
   },
   {
@@ -72,6 +75,9 @@ export const chartCategories: ChartCategory[] = [
       { label: 'n8n', href: '/docs/charts/n8n', maturity: 'stable' },
       { label: 'Flowise', href: '/docs/charts/flowise', maturity: 'stable' },
       { label: 'Open WebUI', href: '/docs/charts/open-webui', maturity: 'stable' },
+      { label: 'OliveTin', href: '/docs/charts/olivetin', maturity: 'alpha' },
+      { label: 'Cronicle', href: '/docs/charts/cronicle', maturity: 'alpha' },
+      { label: 'Automatisch', href: '/docs/charts/automatisch', maturity: 'alpha' },
     ],
   },
   {
@@ -79,6 +85,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Uptime Kuma', href: '/docs/charts/uptime-kuma', maturity: 'stable' },
       { label: 'Velero', href: '/docs/charts/velero', maturity: 'stable' },
+      { label: 'changedetection.io', href: '/docs/charts/changedetection', maturity: 'alpha' },
     ],
   },
   {
@@ -87,6 +94,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Heimdall', href: '/docs/charts/heimdall', maturity: 'stable' },
       { label: 'Homarr', href: '/docs/charts/homarr', maturity: 'stable' },
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
+      { label: 'Discount Bandit', href: '/docs/charts/discount-bandit', maturity: 'alpha' },
     ],
   },
   {
@@ -102,6 +110,8 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Appwrite', href: '/docs/charts/appwrite', maturity: 'stable' },
       { label: 'Dolibarr', href: '/docs/charts/dolibarr', maturity: 'stable' },
+      { label: 'ChiefOnboarding', href: '/docs/charts/chiefonboarding', maturity: 'alpha' },
+      { label: 'alf.io', href: '/docs/charts/alfio', maturity: 'alpha' },
       { label: 'Minecraft', href: '/docs/charts/minecraft', maturity: 'stable' },
       { label: 'Generic', href: '/docs/charts/generic', maturity: 'stable' },
     ],
@@ -124,6 +134,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Wallabag', href: '/docs/charts/wallabag', maturity: 'stable' },
       { label: 'Strava Statistics', href: '/docs/charts/strava-statistics', maturity: 'stable' },
       { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'stable' },
+      { label: 'Karakeep', href: '/docs/charts/karakeep', maturity: 'alpha' },
       { label: 'Middleware', href: '/docs/charts/middleware', maturity: 'stable' },
     ],
   },

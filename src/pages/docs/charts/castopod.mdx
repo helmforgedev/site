@@ -1,0 +1,78 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Castopod Chart
+description: HelmForge Castopod chart — open-source podcast hosting with MariaDB and optional Redis cache.
+---
+
+# Castopod
+
+Deploy Castopod on Kubernetes using the official [castopod/castopod](https://hub.docker.com/r/castopod/castopod) container image. Castopod is an open-source podcast hosting platform with built-in analytics, Fediverse integration, and RSS feed generation.
+
+## Key Features
+
+- **MariaDB Backend** — bundled MariaDB subchart or external database support
+- **Redis Cache** — optional Redis subchart for improved performance
+- **RSS Feed** — automatic podcast RSS feed generation
+- **Analytics** — built-in podcast analytics with hashed listener tracking
+- **Fediverse Integration** — ActivityPub support for social interactions
+- **Persistence** — persistent storage for uploads, cache, and session data
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install castopod helmforge/castopod
+```
+
+**OCI registry:**
+
+```bash
+helm install castopod oci://ghcr.io/helmforgedev/helm/castopod
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+castopod:
+  baseURL: 'https://podcast.example.com'
+
+mariadb:
+  enabled: true
+
+redis:
+  enabled: true
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: podcast.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                   | Default | Description                     |
+| --------------------- | ------- | ------------------------------- |
+| `castopod.baseURL`    | `""`    | Public base URL (required)      |
+| `castopod.port`       | `8080`  | Application port (FrankenPHP)   |
+| `mariadb.enabled`     | `true`  | Enable bundled MariaDB subchart |
+| `redis.enabled`       | `false` | Enable bundled Redis subchart   |
+| `persistence.enabled` | `true`  | Enable persistent storage       |
+| `persistence.size`    | `10Gi`  | PVC size                        |
+| `ingress.enabled`     | `false` | Enable ingress                  |
+
+## More Information
+
+- [Castopod documentation](https://docs.castopod.org)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/castopod)

@@ -1,0 +1,75 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Ghost Chart
+description: HelmForge Ghost chart — modern publishing platform with MySQL backend and S3 content backup.
+---
+
+# Ghost
+
+Deploy Ghost on Kubernetes using the official [ghost](https://hub.docker.com/_/ghost) container image. Ghost is a powerful open-source publishing platform for blogs, newsletters, and memberships with a modern editor and headless CMS API.
+
+## Key Features
+
+- **MySQL Backend** — bundled MySQL subchart or external database support
+- **Content Persistence** — persistent volume for images, media, and uploaded files
+- **S3 Backup** — scheduled content backups to S3-compatible object storage
+- **Headless CMS API** — Content API and Admin API for headless usage
+- **Memberships & Newsletters** — built-in subscription and email newsletter support
+- **Ingress Support** — configurable ingress with TLS for the publishing frontend
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install ghost helmforge/ghost
+```
+
+**OCI registry:**
+
+```bash
+helm install ghost oci://ghcr.io/helmforgedev/helm/ghost
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+ghost:
+  url: 'https://blog.example.com'
+
+mysql:
+  enabled: true
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: blog.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                   | Default     | Description                         |
+| --------------------- | ----------- | ----------------------------------- |
+| `ghost.url`           | `""`        | Public URL of the Ghost instance    |
+| `mysql.enabled`       | `true`      | Enable bundled MySQL subchart       |
+| `persistence.enabled` | `true`      | Enable content persistence          |
+| `persistence.size`    | `10Gi`      | PVC size for content                |
+| `backup.enabled`      | `false`     | Enable scheduled S3 content backups |
+| `backup.schedule`     | `0 3 * * *` | Cron schedule for backups           |
+| `ingress.enabled`     | `false`     | Enable ingress                      |
+
+## More Information
+
+- [Ghost documentation](https://ghost.org/docs)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/ghost)

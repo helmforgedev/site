@@ -1,0 +1,70 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Discount Bandit Chart
+description: HelmForge Discount Bandit chart — self-hosted price tracker and deal aggregator with SQLite persistence.
+---
+
+# Discount Bandit
+
+Deploy Discount Bandit on Kubernetes using the official [cybrarist/discount-bandit](https://hub.docker.com/r/cybrarist/discount-bandit) container image. Discount Bandit is a self-hosted price tracker and deal aggregator that monitors prices across Amazon, eBay, AliExpress, and other stores.
+
+## Key Features
+
+- **Multi-Store Tracking** — monitor prices on Amazon, eBay, AliExpress, and more
+- **SQLite Persistence** — lightweight database with no external dependencies
+- **Auto-Generated App Key** — Laravel application key generated automatically
+- **Price History** — track price changes over time with historical data
+- **Deal Alerts** — get notified when prices drop below your target
+- **Web Interface** — manage tracked products through a clean dashboard
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install discount-bandit helmforge/discount-bandit
+```
+
+**OCI registry:**
+
+```bash
+helm install discount-bandit oci://ghcr.io/helmforgedev/helm/discount-bandit
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+discountBandit:
+  appUrl: 'https://deals.example.com'
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: deals.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                     | Default | Description                |
+| ----------------------- | ------- | -------------------------- |
+| `discountBandit.appUrl` | `""`    | Public URL of the instance |
+| `persistence.enabled`   | `true`  | Enable SQLite persistence  |
+| `persistence.size`      | `5Gi`   | PVC size                   |
+| `service.port`          | `80`    | HTTP service port          |
+| `ingress.enabled`       | `false` | Enable ingress             |
+
+## More Information
+
+- [Discount Bandit documentation](https://discount-bandit.cybrarist.com)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/discount-bandit)

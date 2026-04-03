@@ -1,0 +1,72 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Automatisch Chart
+description: HelmForge Automatisch chart — open-source workflow automation platform with PostgreSQL and Redis.
+---
+
+# Automatisch
+
+Deploy Automatisch on Kubernetes using the official [automatischio/automatisch](https://hub.docker.com/r/automatischio/automatisch) container image. Automatisch is an open-source business automation tool (self-hosted Zapier alternative) with pre-built integrations, visual workflow builder, and enterprise-grade security.
+
+## Key Features
+
+- **PostgreSQL + Redis** — bundled subcharts for database and queue backend
+- **Pre-Built Integrations** — connect with popular services out of the box
+- **Auto-Generated Keys** — encryption and session keys generated automatically
+- **Visual Workflow Builder** — drag-and-drop interface for creating automations
+- **Webhook Triggers** — start workflows from external events
+- **Ingress Support** — configurable ingress with TLS
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install automatisch helmforge/automatisch
+```
+
+**OCI registry:**
+
+```bash
+helm install automatisch oci://ghcr.io/helmforgedev/helm/automatisch
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+automatisch:
+  webAppUrl: 'https://automate.example.com'
+
+postgresql:
+  enabled: true
+
+redis:
+  enabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: automate.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                     | Default                 | Description                        |
+| ----------------------- | ----------------------- | ---------------------------------- |
+| `automatisch.webAppUrl` | `http://localhost:3000` | Public URL of the web application  |
+| `automatisch.appEnv`    | `production`            | Application environment            |
+| `postgresql.enabled`    | `true`                  | Enable bundled PostgreSQL subchart |
+| `redis.enabled`         | `true`                  | Enable bundled Redis subchart      |
+| `ingress.enabled`       | `false`                 | Enable ingress                     |
+
+## More Information
+
+- [Automatisch documentation](https://automatisch.io/docs)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/automatisch)

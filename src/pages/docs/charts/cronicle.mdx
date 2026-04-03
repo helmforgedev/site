@@ -1,0 +1,76 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Cronicle Chart
+description: HelmForge Cronicle chart — multi-server task scheduler with web UI and persistent job storage.
+---
+
+# Cronicle
+
+Deploy Cronicle on Kubernetes using the [soulteary/cronicle](https://hub.docker.com/r/soulteary/cronicle) container image. Cronicle is a multi-server task scheduler and runner with a web-based UI for managing scheduled jobs, cron replacements, and automated workflows.
+
+## Key Features
+
+- **Web UI** — browser-based interface for creating and managing scheduled tasks
+- **Multi-Server** — optional UDP auto-discovery for distributed job execution
+- **Job Storage** — persistent storage for job data, history, and state
+- **Email Notifications** — configurable SMTP for job success/failure alerts
+- **Session Encryption** — auto-generated secret key for secure sessions
+- **Concurrency Control** — configurable maximum concurrent jobs per server
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install cronicle helmforge/cronicle
+```
+
+**OCI registry:**
+
+```bash
+helm install cronicle oci://ghcr.io/helmforgedev/helm/cronicle
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+cronicle:
+  baseUrl: 'https://cronicle.example.com'
+  maxJobs: 5
+  emailFrom: 'cronicle@example.com'
+  smtpHostname: 'smtp.example.com'
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: cronicle.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                     | Default                 | Description                             |
+| ----------------------- | ----------------------- | --------------------------------------- |
+| `cronicle.baseUrl`      | `http://localhost:3012` | Public base URL of the instance         |
+| `cronicle.maxJobs`      | `0`                     | Maximum concurrent jobs (0 = unlimited) |
+| `cronicle.emailFrom`    | `cronicle@localhost`    | Email sender address for notifications  |
+| `cronicle.smtpHostname` | `localhost`             | SMTP server hostname                    |
+| `secret.create`         | `true`                  | Auto-generate session encryption key    |
+| `persistence.enabled`   | `true`                  | Enable persistent job storage           |
+| `persistence.size`      | `5Gi`                   | PVC size                                |
+| `ingress.enabled`       | `false`                 | Enable ingress                          |
+
+## More Information
+
+- [Cronicle documentation](https://github.com/jhuckaby/Cronicle)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/cronicle)
