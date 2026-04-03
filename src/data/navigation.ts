@@ -71,7 +71,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'n8n', href: '/docs/charts/n8n', maturity: 'stable' },
       { label: 'Flowise', href: '/docs/charts/flowise', maturity: 'stable' },
-      { label: 'Open WebUI', href: '/docs/charts/open-webui', maturity: 'alpha' },
+      { label: 'Open WebUI', href: '/docs/charts/open-webui', maturity: 'stable' },
     ],
   },
   {

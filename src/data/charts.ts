@@ -338,7 +338,7 @@ export const charts: Chart[] = [
     name: 'Open WebUI',
     slug: 'open-webui',
     description: 'Self-hosted AI chat platform with Ollama/OpenAI, RAG, PostgreSQL, and Redis.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: true,
   },
 ];
