@@ -10,8 +10,6 @@ export interface Chart {
 const svgIcons = new Set([
   'generic',
   'cloudflared',
-  'countly',
-  'ckan',
 ]);
 
 export const FALLBACK_ICON = '/icons/charts/kubernetes.svg';
