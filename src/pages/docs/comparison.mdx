@@ -254,7 +254,7 @@ This page compares HelmForge against two common alternatives: **Bitnami** (the l
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>{' '}
-              Sigstore Cosign on every chart
+              GPG provenance + Cosign on every chart
             </span>
           </td>
           <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">Container image signatures</td>
@@ -407,12 +407,19 @@ The result is values files that read like application configuration, not Kuberne
 
 ## Supply Chain Security
 
-Every HelmForge OCI artifact is signed with [Sigstore Cosign](https://www.sigstore.dev/) keyless signing via GitHub Actions OIDC. You can verify any chart before deploying:
+HelmForge uses **dual signing** on every release:
+
+1. **GPG provenance** — `helm package --sign` generates `.prov` files verified by `helm verify`. The public key is available at [`repo.helmforge.dev/pgp-public-key.asc`](https://repo.helmforge.dev/pgp-public-key.asc).
+2. **Sigstore Cosign** — OCI artifacts are signed with [Cosign](https://www.sigstore.dev/) keyless signing via GitHub Actions OIDC.
 
 ```bash
+# Verify OCI artifact with Cosign
 cosign verify ghcr.io/helmforgedev/helm/<chart-name>:<version> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp https://github.com/helmforgedev/charts
+
+# Verify Helm chart with GPG provenance
+helm verify <chart-name>-<version>.tgz --keyring pgp-public-key.asc
 ```
 
 [ArtifactHub](https://artifacthub.io/packages/search?repo=helmforge) shows the "Signed" badge on all HelmForge charts.

@@ -39,12 +39,16 @@ Yes. All HelmForge charts are published as OCI artifacts on GitHub Container Reg
 helm install my-release oci://ghcr.io/helmforgedev/helm/<chart-name>
 ```
 
-OCI artifacts are signed with Cosign keyless signing. You can verify them with:
+All releases include GPG provenance files and Cosign keyless signatures. You can verify them with:
 
 ```bash
+# Cosign (OCI artifacts)
 cosign verify ghcr.io/helmforgedev/helm/<chart-name>:<version> \
   --certificate-identity-regexp="github.com/helmforgedev" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+
+# GPG (Helm provenance)
+helm verify <chart-name>-<version>.tgz --keyring pgp-public-key.asc
 ```
 
 </details>
@@ -329,7 +333,7 @@ All image tags are pinned to specific versions — never `latest` or floating ta
 <details>
 <summary>Are charts signed?</summary>
 
-Yes. All OCI artifacts are signed with [Sigstore Cosign](https://www.sigstore.dev/) keyless signing in the CI/CD pipeline. You can verify signatures using the `cosign verify` command shown in the installation section above.
+Yes. HelmForge uses dual signing: GPG provenance files for `helm verify` and [Sigstore Cosign](https://www.sigstore.dev/) keyless signatures on OCI artifacts. Both are generated automatically in the CI/CD pipeline. See the installation section above for verification commands.
 
 </details>
 

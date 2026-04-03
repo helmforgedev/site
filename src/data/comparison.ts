@@ -71,7 +71,7 @@ export const comparisonFull: ComparisonRow[] = [
   { aspect: 'Schema validation', helmforge: 'Every chart', bitnami: 'Some charts', community: 'Rare' },
   {
     aspect: 'Supply chain signing',
-    helmforge: 'Sigstore Cosign on every artifact',
+    helmforge: 'GPG provenance + Cosign on every artifact',
     bitnami: 'Image signatures',
     community: 'Rare',
   },
