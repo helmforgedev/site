@@ -1,0 +1,103 @@
+---
+title: 'Kubernetes 1.34 and Short Image Names: What Broke, Why, and How to Fix It Fast'
+description: 'A practical guide to the short-image-name failures seen with Kubernetes 1.34 + CRI-O, with mitigation playbooks and a pre-upgrade checklist.'
+date: 2026-04-03
+authorId: 'maicon-berlofa'
+tags: ['kubernetes', 'cri-o', 'images', 'operations']
+coverImage: '/blog/2026-04-03-kubernetes-1-34-short-image-names-hero.webp'
+coverAlt: 'Kubernetes 1.34 image short-name enforcement incident overview and mitigation'
+---
+
+If you upgraded to Kubernetes 1.34 and suddenly saw pod failures like `short name mode is enforcing`, you are not alone.
+
+This post explains what changed, who is affected, and how to mitigate quickly without creating long-term security debt.
+
+## What changed in practice
+
+The breaking behavior is linked to CRI-O 1.34 image resolution behavior, not a new Kubernetes API field.
+
+In CRI-O `v1.34.0` (released on September 10, 2025), release notes include a change to enforce short-name resolution ambiguity checks (`#9401`). In plain terms: image references like `nginx:1.27` can fail when the runtime cannot safely decide which registry to use.
+
+That lines up with field incidents:
+
+- Replicated community report for Kubernetes 1.34 clusters.
+- Broadcom KB for Kubernetes 1.34 + CRI-O environments.
+- Grafana chart issue reports from users hitting the same class of error.
+
+## Why this is actually a good change
+
+Kubernetes documentation has long noted that if you omit a registry hostname, pull behavior depends on runtime defaults. That is convenient, but risky.
+
+Short names increase supply-chain ambiguity:
+
+- registry search order can differ by node/runtime config
+- a typo or unexpected registry precedence can pull the wrong image
+- namespace squatting risk increases when unqualified search registries are used
+
+So while this hurts during upgrades, it pushes clusters toward safer and more deterministic image sourcing.
+
+## Who is most likely to break
+
+You are in the risk zone if all of the following are true:
+
+- Kubernetes control plane/nodes are on 1.34.x
+- nodes use CRI-O 1.34.x
+- workloads or Helm values still use short image names (for example, `redis:8`, `myorg/app:1.2.3`, `busybox`)
+
+If you run containerd, behavior may differ, but fully qualified image names are still the safest cross-runtime baseline.
+
+## Fast mitigation playbook
+
+### 1) Permanent fix (recommended)
+
+Use fully qualified image references everywhere:
+
+- include registry host + repository path + explicit tag (or digest)
+- example: `docker.io/library/nginx:1.27.5`
+- example: `ghcr.io/org/service:v2.4.1`
+
+### 2) Pre-upgrade audit (very practical)
+
+Scan Helm values, manifests, and CI templates before upgrading nodes:
+
+```bash
+rg -n "repository:|image:" charts/ -g "*.yaml"
+```
+
+Then fail CI for any non-qualified defaults.
+
+### 3) Runtime-level temporary workaround (use with caution)
+
+If you must keep legacy manifests alive during a transition window:
+
+- tune `short-name-mode` and/or aliases in `registries.conf`
+- reduce ambiguity with explicit short-name aliases
+
+Treat this as temporary. It restores compatibility, but keeps ambiguity risk alive.
+
+### 4) Organization policy guardrail
+
+Add admission or CI policy that rejects non-qualified image references in new changes.
+
+This turns the incident into a one-time cleanup instead of a recurring outage pattern.
+
+## Suggested upgrade checklist
+
+1. Audit all charts/manifests for short image names.
+2. Convert to fully qualified references.
+3. Test on a staging cluster with the same runtime as production.
+4. Roll node pools in waves and monitor pull/image errors.
+5. Keep runtime fallback only as rollback protection, not as final state.
+
+## HelmForge status
+
+All HelmForge charts are already aligned with the corrected pattern: image repositories are published with fully qualified references (explicit registry host), avoiding short-name resolution ambiguity by default.
+
+## References
+
+- [Replicated: breaking change write-up](https://www.replicated.com/blog/breaking-change-kubernetes-1-34-tightens-image-name-resolution-rules----what-it-means-for-you)
+- [Broadcom KB 423187](https://knowledge.broadcom.com/external/article/423187/short-name-mode-is-enforcing-but-image.html)
+- [Grafana Helm issue #3923](https://github.com/grafana/helm-charts/issues/3923)
+- [Kubernetes docs: Images](https://kubernetes.io/docs/concepts/containers/images/)
+- [CRI-O v1.34.0 release notes](https://github.com/cri-o/cri-o/releases/tag/v1.34.0)
+- [CRI-O PR #9401](https://github.com/cri-o/cri-o/pull/9401)
