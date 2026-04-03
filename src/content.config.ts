@@ -7,9 +7,11 @@ const blog = defineCollection({
     title: z.string(),
     description: z.string(),
     date: z.coerce.date(),
-    author: z.string().default('HelmForge Team'),
+    authorId: z.string(),
     tags: z.array(z.string()).default([]),
     image: z.string().optional(),
+    coverImage: z.string().optional(),
+    coverAlt: z.string().optional(),
   }),
 });
 
