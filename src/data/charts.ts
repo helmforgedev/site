@@ -20,6 +20,8 @@ const svgIcons = new Set([
   'druid',
 ]);
 
+export const FALLBACK_ICON = '/icons/charts/kubernetes.svg';
+
 export function chartIcon(slug: string): string {
   const ext = svgIcons.has(slug) ? 'svg' : 'png';
   return `/icons/charts/${slug}.${ext}`;
