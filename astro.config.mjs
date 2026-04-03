@@ -23,7 +23,24 @@ export default defineConfig({
     },
   },
 
-  integrations: [mdx(), sitemap()],
+  integrations: [
+    mdx(),
+    sitemap({
+      serialize(item) {
+        const match = item.url.match(/\/docs\/charts\/([a-z0-9-]+)$/);
+        if (match) {
+          const slug = match[1];
+          /** @type {any} */ (item).img = [
+            {
+              url: `https://helmforge.dev/icons/charts/${slug}.png`,
+              title: `${slug} Helm chart icon`,
+            },
+          ];
+        }
+        return item;
+      },
+    }),
+  ],
 
   fonts: [
     {
