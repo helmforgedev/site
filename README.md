@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/github-banner.svg" alt="HelmForge Banner" width="100%" />
 
-  <p><h3>Production-ready Helm charts for Kubernetes</h3></p>
+  <p><h3>Open-source Helm charts, forged to last.</h3></p>
   
   <p>
     The ultimate open-source alternative to Bitnami. We package popular applications with sane defaults for security, built-in backups, and day-two operations. No proprietary layers. No limits.
@@ -54,7 +54,7 @@ This frontend is built for extreme performance, rich aesthetics, and massive SEO
 
 ## Features
 
-- **33 chart playground configs** — Interactive playground with live YAML preview for every stable chart
+- **55+ chart playground configs** — Interactive playground with live YAML preview for every stable chart
 - **Stack Builder** — Compose multi-chart stacks visually and export install commands
 - **Full documentation** — MDX-powered docs with sidebar navigation, search, and copy-to-clipboard
 - **Public roadmap** — GitHub Milestones integration with static timeline
