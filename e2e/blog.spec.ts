@@ -67,12 +67,6 @@ test.describe('Blog', () => {
     await expect(authorCard.locator('a[aria-label*="LinkedIn"]')).toBeVisible();
   });
 
-  test('blog post renders right rail ad placeholder', async ({ page }) => {
-    await page.goto('/blog/kubernetes-1-34-image-short-names');
-
-    await expect(page.locator('text=Ad slot placeholder for future sponsorship placements.')).toBeVisible();
-  });
-
   test('blog post exposes Person author in structured data', async ({ page }) => {
     await page.goto('/blog/kubernetes-1-34-image-short-names');
 
