@@ -6,17 +6,10 @@ export interface Chart {
   backup: boolean;
 }
 
-/** SVG icons use .svg extension, everything else .png */
-const svgIcons = new Set([
-  'generic',
-  'cloudflared',
-]);
-
-export const FALLBACK_ICON = '/icons/charts/kubernetes.svg';
+export const FALLBACK_ICON = '/icons/charts/kubernetes.png';
 
 export function chartIcon(slug: string): string {
-  const ext = svgIcons.has(slug) ? 'svg' : 'png';
-  return `/icons/charts/${slug}.${ext}`;
+  return `/icons/charts/${slug}.png`;
 }
 
 export const charts: Chart[] = [
