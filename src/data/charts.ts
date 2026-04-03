@@ -9,15 +9,9 @@ export interface Chart {
 /** SVG icons use .svg extension, everything else .png */
 const svgIcons = new Set([
   'generic',
-  'pihole',
   'cloudflared',
-  'velero',
-  'kafka',
   'countly',
-  'middleware',
-  'superset',
   'ckan',
-  'druid',
 ]);
 
 export const FALLBACK_ICON = '/icons/charts/kubernetes.svg';
