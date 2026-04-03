@@ -1,0 +1,74 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: changedetection.io Chart
+description: HelmForge changedetection.io chart — website change monitoring with optional headless browser sidecar.
+---
+
+# changedetection.io
+
+Deploy changedetection.io on Kubernetes using the official [dgtlmoon/changedetection.io](https://github.com/dgtlmoon/changedetection.io) container image. Monitor websites for changes with support for CSS/XPath selectors, visual comparisons, and notifications via email, webhooks, and more.
+
+## Key Features
+
+- **Website Monitoring** — detect changes on any web page with configurable check intervals
+- **CSS/XPath Selectors** — target specific page elements for precise change detection
+- **Browser Sidecar** — optional Playwright/Chromium sidecar for JavaScript-rendered pages
+- **Notifications** — email, webhook, Slack, Telegram, and many more notification channels
+- **REST API** — programmatic access to watches and change history
+- **Persistence** — SQLite database and page snapshots stored on persistent volume
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install changedetection helmforge/changedetection
+```
+
+**OCI registry:**
+
+```bash
+helm install changedetection oci://ghcr.io/helmforgedev/helm/changedetection
+```
+
+## Basic Example
+
+```yaml
+# values.yaml
+changedetection:
+  baseUrl: "https://changes.example.com"
+
+browser:
+  enabled: true
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: changes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Key Values
+
+| Key                              | Default   | Description                                        |
+| -------------------------------- | --------- | -------------------------------------------------- |
+| `changedetection.baseUrl`        | `""`      | Public base URL of the instance                    |
+| `changedetection.fetchWorkers`   | `10`      | Number of concurrent fetch workers                 |
+| `browser.enabled`                | `false`   | Enable Playwright browser sidecar                  |
+| `persistence.enabled`            | `true`    | Enable persistent storage                          |
+| `persistence.size`               | `10Gi`    | PVC size                                           |
+| `ingress.enabled`                | `false`   | Enable ingress                                     |
+
+## More Information
+
+- [changedetection.io documentation](https://changedetection.io)
+- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/changedetection)

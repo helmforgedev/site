@@ -69,6 +69,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Karakeep',
+    slug: 'karakeep',
+    description: 'AI-powered bookmark manager with Meilisearch and Chromium sidecars.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Keycloak',
     slug: 'keycloak',
     description: 'Identity and access management for SSO and federation.',
@@ -167,11 +174,25 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Automatisch',
+    slug: 'automatisch',
+    description: 'Open-source workflow automation platform with PostgreSQL and Redis.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Authelia',
     slug: 'authelia',
     description: 'SSO, MFA, and OpenID Connect for reverse proxies and apps.',
     maturity: 'stable',
     backup: true,
+  },
+  {
+    name: 'alf.io',
+    slug: 'alfio',
+    description: 'Open-source event management and ticketing with PostgreSQL.',
+    maturity: 'alpha',
+    backup: false,
   },
   {
     name: 'AdGuard Home',
@@ -209,6 +230,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Discount Bandit',
+    slug: 'discount-bandit',
+    description: 'Self-hosted price tracker and deal aggregator with SQLite persistence.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Docmost',
     slug: 'docmost',
     description: 'Collaborative wiki with bundled PostgreSQL, Redis, and local or S3 storage.',
@@ -234,6 +262,13 @@ export const charts: Chart[] = [
     slug: 'heimdall',
     description: 'Application dashboard for organizing self-hosted services.',
     maturity: 'stable',
+    backup: true,
+  },
+  {
+    name: 'Ghost',
+    slug: 'ghost',
+    description: 'Modern publishing platform with MySQL backend and S3 content backup.',
+    maturity: 'alpha',
     backup: true,
   },
   {
@@ -300,6 +335,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Cronicle',
+    slug: 'cronicle',
+    description: 'Multi-server task scheduler with web UI and persistent job storage.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Countly',
     slug: 'countly',
     description: 'Product analytics with event tracking, crash reporting, and MongoDB backend.',
@@ -321,6 +363,27 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Castopod',
+    slug: 'castopod',
+    description: 'Open-source podcast hosting with MariaDB and optional Redis cache.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
+    name: 'changedetection.io',
+    slug: 'changedetection',
+    description: 'Website change monitoring with optional headless browser sidecar.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
+    name: 'ChiefOnboarding',
+    slug: 'chiefonboarding',
+    description: 'Employee onboarding platform with PostgreSQL backend.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'CKAN',
     slug: 'ckan',
     description: 'Open data portal with DataPusher, Solr, PostgreSQL, and Redis.',
@@ -332,6 +395,20 @@ export const charts: Chart[] = [
     slug: 'druid',
     description: 'Distributed analytics database with coordinator, broker, historical, and router.',
     maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'ntfy',
+    slug: 'ntfy',
+    description: 'Self-hosted push notification server with Prometheus metrics and REST API.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
+    name: 'OliveTin',
+    slug: 'olivetin',
+    description: 'Browser-based UI for predefined shell commands and system actions.',
+    maturity: 'alpha',
     backup: false,
   },
   {
