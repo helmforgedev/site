@@ -59,7 +59,7 @@ export const charts: Chart[] = [
     name: 'Karakeep',
     slug: 'karakeep',
     description: 'AI-powered bookmark manager with Meilisearch and Chromium sidecars.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -164,7 +164,7 @@ export const charts: Chart[] = [
     name: 'Automatisch',
     slug: 'automatisch',
     description: 'Open-source workflow automation platform with PostgreSQL and Redis.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -178,7 +178,7 @@ export const charts: Chart[] = [
     name: 'alf.io',
     slug: 'alfio',
     description: 'Open-source event management and ticketing with PostgreSQL.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -220,7 +220,7 @@ export const charts: Chart[] = [
     name: 'Discount Bandit',
     slug: 'discount-bandit',
     description: 'Self-hosted price tracker and deal aggregator with SQLite persistence.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -255,7 +255,7 @@ export const charts: Chart[] = [
     name: 'Ghost',
     slug: 'ghost',
     description: 'Modern publishing platform with MySQL backend and S3 content backup.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: true,
   },
   {
@@ -332,7 +332,7 @@ export const charts: Chart[] = [
     name: 'Cronicle',
     slug: 'cronicle',
     description: 'Multi-server task scheduler with web UI and persistent job storage.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -360,21 +360,21 @@ export const charts: Chart[] = [
     name: 'Castopod',
     slug: 'castopod',
     description: 'Open-source podcast hosting with MariaDB and optional Redis cache.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
     name: 'changedetection.io',
     slug: 'changedetection',
     description: 'Website change monitoring with optional headless browser sidecar.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
     name: 'ChiefOnboarding',
     slug: 'chiefonboarding',
     description: 'Employee onboarding platform with PostgreSQL backend.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -395,14 +395,14 @@ export const charts: Chart[] = [
     name: 'ntfy',
     slug: 'ntfy',
     description: 'Self-hosted push notification server with Prometheus metrics and REST API.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
     name: 'OliveTin',
     slug: 'olivetin',
     description: 'Browser-based UI for predefined shell commands and system actions.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
