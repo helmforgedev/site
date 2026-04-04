@@ -8,6 +8,17 @@ test.describe('Blog', () => {
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
   });
 
+  test('blog index has rss subscribe and follow-author cta', async ({ page }) => {
+    await page.goto('/blog');
+
+    const subscribe = page.locator('a[aria-label="Subscribe via RSS"]').first();
+    await expect(subscribe).toBeVisible();
+    await expect(subscribe).toHaveAttribute('href', '/rss.xml');
+
+    await expect(page.locator('a[aria-label="Follow Maicon Berlofa on GitHub"]')).toBeVisible();
+    await expect(page.locator('a[aria-label="Follow Maicon Berlofa on LinkedIn"]')).toBeVisible();
+  });
+
   test('blog cards expose title, description, author, and date', async ({ page }) => {
     await page.goto('/blog');
 
@@ -75,6 +86,14 @@ test.describe('Blog', () => {
     await expect(authorCard.getByText('Maicon Berlofa')).toBeVisible();
     await expect(authorCard.locator('a[aria-label*="GitHub"]')).toBeVisible();
     await expect(authorCard.locator('a[aria-label*="LinkedIn"]')).toBeVisible();
+  });
+
+  test('blog post has rss subscribe cta in sidebar', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const subscribeSection = page.locator('aside section').filter({ hasText: 'Subscribe via RSS' }).first();
+    await expect(subscribeSection).toBeVisible();
+    await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
   });
 
   test('blog post exposes Person author in structured data', async ({ page }) => {
