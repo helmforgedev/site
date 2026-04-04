@@ -294,6 +294,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Listmonk',
+    slug: 'listmonk',
+    description: 'Self-hosted newsletter and mailing list manager with PostgreSQL and S3 backup.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'Liwan',
     slug: 'liwan',
     description: 'Ultra-lightweight privacy-first web analytics with embedded DuckDB.',

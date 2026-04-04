@@ -1,0 +1,104 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Listmonk
+description: Helm chart for Listmonk on Kubernetes with bundled PostgreSQL, persistent uploads, S3 backup, and SMTP configuration.
+---
+
+# Listmonk
+
+Helm chart for deploying [Listmonk](https://listmonk.app/) on Kubernetes — a self-hosted newsletter and mailing list manager with bundled PostgreSQL, persistent uploads storage, and optional S3 backup.
+
+## Key Features
+
+- **Official Listmonk image** based on `listmonk/listmonk`
+- **Bundled PostgreSQL** default install includes the HelmForge PostgreSQL chart
+- **External database support** managed PostgreSQL can be used instead of the subchart
+- **Persistent uploads** configurable PVC for media and attachment storage
+- **S3 backup** optional CronJob for PostgreSQL dumps to S3-compatible storage
+- **Idempotent bootstrap** init container runs `--install --idempotent --yes` and `--upgrade --yes` on every start
+- **pgcrypto extension** automatically provisioned via PostgreSQL init scripts
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install listmonk helmforge/listmonk
+```
+
+### OCI Registry
+
+```bash
+helm install listmonk oci://ghcr.io/helmforgedev/helm/listmonk
+```
+
+## Basic Example
+
+```yaml
+listmonk:
+  adminUser: admin
+  adminPassword: changeme
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: listmonk.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## External Database
+
+```yaml
+database:
+  mode: external
+  external:
+    host: postgres.example.internal
+    name: listmonk
+    username: listmonk
+    existingSecret: listmonk-db
+
+postgresql:
+  enabled: false
+```
+
+## With S3 Backup
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://minio.example.internal
+    bucket: listmonk-backups
+    existingSecret: listmonk-s3
+```
+
+## Key Values
+
+| Key                      | Default     | Description                                     |
+| ------------------------ | ----------- | ----------------------------------------------- |
+| `replicaCount`           | `1`         | Number of Listmonk application pods             |
+| `listmonk.adminUser`     | `""`        | Admin username created on first install         |
+| `listmonk.adminPassword` | `""`        | Admin password (auto-generated if empty)        |
+| `database.mode`          | `auto`      | Database mode: `auto`, `external`, `postgresql` |
+| `postgresql.enabled`     | `true`      | Deploy bundled PostgreSQL                       |
+| `storage.enabled`        | `true`      | Enable persistent uploads storage               |
+| `storage.size`           | `5Gi`       | Uploads PVC size                                |
+| `backup.enabled`         | `false`     | Enable S3 backup CronJob                        |
+| `backup.schedule`        | `0 3 * * *` | Backup cron schedule                            |
+| `ingress.enabled`        | `false`     | Enable ingress exposure                         |
+
+## Operational Notes
+
+- SMTP configuration is done through the Listmonk admin UI after first install
+- The init container ensures the database schema is created and migrated on every pod start
+- PostgreSQL requires the `pgcrypto` extension, which the chart provisions automatically via init scripts
+
+## More Information
+
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/listmonk)

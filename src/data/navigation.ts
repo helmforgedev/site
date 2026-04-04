@@ -50,6 +50,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Ghost', href: '/docs/charts/ghost', maturity: 'alpha' },
       { label: 'Komga', href: '/docs/charts/komga', maturity: 'stable' },
       { label: 'Castopod', href: '/docs/charts/castopod', maturity: 'alpha' },
+      { label: 'Listmonk', href: '/docs/charts/listmonk', maturity: 'stable' },
     ],
   },
   {
