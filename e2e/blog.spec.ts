@@ -20,11 +20,13 @@ test.describe('Blog', () => {
     await expect(subscribe).toHaveAttribute('href', '/rss.xml');
   });
 
-  test('blog index has follow-author cta', async ({ page }) => {
+  test('blog index keeps subscription actions near header', async ({ page }) => {
     await page.goto('/blog');
 
-    await expect(page.locator('a[aria-label="Follow Maicon Berlofa on GitHub"]')).toBeVisible();
-    await expect(page.locator('a[aria-label="Follow Maicon Berlofa on LinkedIn"]')).toBeVisible();
+    const actions = page.locator('[aria-label="Blog subscription actions"]');
+    await expect(actions).toBeVisible();
+    await expect(actions.locator('a[aria-label="Open newsletter page"]')).toBeVisible();
+    await expect(actions.locator('a[aria-label="Subscribe via RSS"]')).toBeVisible();
   });
 
   test('blog cards expose title, description, author, and date', async ({ page }) => {
@@ -101,7 +103,10 @@ test.describe('Blog', () => {
 
     const subscribeSection = page.locator('aside section').filter({ hasText: 'Newsletter and RSS' }).first();
     await expect(subscribeSection).toBeVisible();
-    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
+    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute(
+      'href',
+      '/newsletter',
+    );
     await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
   });
 
@@ -114,14 +119,21 @@ test.describe('Blog', () => {
     await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
   });
 
-  test('newsletter page is reachable and links to listmonk form', async ({ page }) => {
+  test('newsletter page embeds listmonk form', async ({ page }) => {
     await page.goto('/newsletter');
     await expect(page).toHaveTitle(/Newsletter/i);
     await expect(page.locator('h1')).toContainText('Stay ahead');
 
-    const formLink = page.locator('a[aria-label="Open HelmForge newsletter subscription form"]');
-    await expect(formLink).toBeVisible();
-    await expect(formLink).toHaveAttribute('href', 'https://newsletter.helmforge.dev/subscription/form');
+    const form = page.locator('form[aria-label="HelmForge newsletter form"]');
+    await expect(form).toBeVisible();
+    await expect(form).toHaveAttribute('action', 'https://newsletter.helmforge.dev/subscription/form');
+    await expect(form.locator('input[name="email"]')).toBeVisible();
+    await expect(form.locator('input[name="name"]')).toBeVisible();
+    await expect(form.locator('input[name="l"][value="7f91e9db-d5f1-4999-83fd-a908208bd8d5"]')).toBeChecked();
+    await expect(page.locator('altcha-widget')).toHaveAttribute(
+      'challengeurl',
+      'https://newsletter.helmforge.dev/api/public/captcha/altcha',
+    );
   });
 
   test('blog post exposes Person author in structured data', async ({ page }) => {
