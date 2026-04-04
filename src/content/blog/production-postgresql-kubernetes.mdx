@@ -8,7 +8,6 @@ coverImage: '/blog/2026-04-02-production-postgresql-kubernetes-hero.webp'
 coverAlt: 'Production PostgreSQL on Kubernetes with replication, backup, and monitoring'
 ---
 
-import ArchitectureDiagram from '../../components/ArchitectureDiagram.astro';
 import PostgresqlDiagram from '../../components/diagrams/PostgresqlDiagram.astro';
 
 ## What you will build
@@ -20,31 +19,6 @@ By the end of this guide, you will have:
 - Metrics exporter enabled
 - Optional `ServiceMonitor` for Prometheus Operator
 - Resource requests and limits for predictable performance
-
-## Target architecture
-
-This is the effective topology used in this tutorial:
-
-```text
-Application (read/write) ------------------------> PostgreSQL Primary
-Read Client (read-only) -------------------------> PostgreSQL Replica
-
-PostgreSQL Primary  <---------------- WAL ----------------> PostgreSQL Replica
-        |                                                     |
-        +------------- metrics exporter endpoints ------------+
-                              |
-                              v
-                 Prometheus (via ServiceMonitor)
-
-Backup CronJob (pg_dump) -----------------------> S3 bucket
-```
-
-<ArchitectureDiagram
-  title="Replication, backup, and monitoring flow"
-  description="Primary/replica PostgreSQL topology with backup CronJob and observability integration."
->
-  <PostgresqlDiagram mode="replication" />
-</ArchitectureDiagram>
 
 ## Prerequisites
 
@@ -79,6 +53,8 @@ kubectl create secret generic backup-s3-credentials \
 ## Step 3: Create a production values file
 
 Create `postgresql-values.yaml`:
+
+<PostgresqlDiagram mode="replication" />
 
 ```yaml
 architecture: replication
