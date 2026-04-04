@@ -1,4 +1,4 @@
-name: Blog Newsletter Draft
+name: Blog Newsletter Automation
 
 on:
   push:
@@ -15,6 +15,11 @@ on:
         description: 'Prepare payload only (do not create campaign)'
         required: false
         default: true
+        type: boolean
+      auto_send:
+        description: 'Start sending immediately after creating campaign(s)'
+        required: false
+        default: false
         type: boolean
 
 jobs:
@@ -73,6 +78,7 @@ jobs:
         env:
           BLOG_POST_FILES: ${{ steps.detect.outputs.post_files }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          AUTO_SEND: ${{ github.event_name == 'push' && 'true' || inputs.auto_send }}
           SITE_BASE_URL: https://helmforge.dev
           LISTMONK_BASE_URL: ${{ secrets.LISTMONK_BASE_URL }}
           LISTMONK_API_USER: ${{ secrets.LISTMONK_API_USER }}

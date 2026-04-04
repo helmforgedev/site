@@ -228,6 +228,7 @@ async function main() {
   const templateId = templateIdRaw && /^[0-9]+$/.test(templateIdRaw) ? Number(templateIdRaw) : null;
   const siteBaseUrl = (process.env.SITE_BASE_URL || 'https://helmforge.dev').trim();
   const dryRun = parseBoolean(process.env.DRY_RUN, false);
+  const autoSend = parseBoolean(process.env.AUTO_SEND, false);
   const authHeader = `Basic ${Buffer.from(`${apiUser}:${apiToken}`).toString('base64')}`;
 
   const results = [];
@@ -244,8 +245,24 @@ async function main() {
     results.push(result);
   }
 
+  if (!dryRun && autoSend) {
+    for (const result of results) {
+      if (result.status !== 'created' || !result.campaignId) continue;
+      await apiRequest({
+        baseUrl,
+        authHeader,
+        method: 'PUT',
+        endpoint: `/api/campaigns/${result.campaignId}/status`,
+        body: { status: 'running' },
+      });
+      result.status = 'started';
+    }
+  }
+
   for (const result of results) {
-    if (result.status === 'created') {
+    if (result.status === 'started') {
+      console.log(`Created and started campaign #${result.campaignId} for ${result.slug}`);
+    } else if (result.status === 'created') {
       console.log(`Created draft campaign #${result.campaignId} for ${result.slug}`);
     } else if (result.status === 'exists') {
       console.log(`Skipped ${result.slug}: existing campaign #${result.campaignId}`);
@@ -257,10 +274,14 @@ async function main() {
   }
 
   await appendSummary([
-    '## Blog Newsletter Draft Automation',
+    '## Blog Newsletter Automation',
     '',
     `- Dry run: \`${dryRun}\``,
+    `- Auto send: \`${autoSend}\``,
     ...results.map((result) => {
+      if (result.status === 'started') {
+        return `- Started: \`${result.slug}\` -> campaign #${result.campaignId}`;
+      }
       if (result.status === 'created') {
         return `- Created: \`${result.slug}\` -> campaign #${result.campaignId}`;
       }

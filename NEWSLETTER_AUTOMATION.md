@@ -1,6 +1,6 @@
-# Newsletter Automation (Phase A)
+# Newsletter Automation (Phase C)
 
-This repository now includes a Phase A automation for blog-to-newsletter drafts.
+This repository now includes full blog-to-newsletter automation.
 
 Workflow file:
 - `.github/workflows/newsletter-draft.yml`
@@ -8,18 +8,20 @@ Workflow file:
 Script:
 - `scripts/create-blog-newsletter-draft.mjs`
 
-## What Phase A does
+## What it does
 
 1. Triggers on `push` to `main` when files under `src/content/blog/` change.
 2. Reads the changed post(s) frontmatter.
-3. Creates a **draft** campaign in Listmonk (never sends automatically).
-4. Uses idempotency marker `[blog:<slug>]` to avoid duplicate drafts per post.
+3. Creates a campaign in Listmonk with idempotency marker `[blog:<slug>]`.
+4. Starts sending automatically on `push` events (`AUTO_SEND=true`).
+5. Uses marker-based idempotency to avoid duplicate campaigns per post.
 
 ## Manual run
 
 Use `workflow_dispatch` with:
 - `blog_post_file` (optional): path to a specific post file.
 - `dry_run` (optional, default `true`): payload validation without draft creation.
+- `auto_send` (optional, default `false`): start campaign delivery automatically.
 
 ## Required GitHub secrets
 
@@ -32,4 +34,5 @@ Use `workflow_dispatch` with:
 ## Behavior notes
 
 - If frontmatter has `newsletter: false`, the post is skipped.
-- Campaign status remains `draft`; you review and send from Listmonk UI.
+- On `push` to `main`, the workflow creates and starts delivery automatically.
+- On manual dispatch, you control behavior with `dry_run` and `auto_send`.
