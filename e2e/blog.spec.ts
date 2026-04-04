@@ -8,12 +8,20 @@ test.describe('Blog', () => {
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
   });
 
-  test('blog index has rss subscribe and follow-author cta', async ({ page }) => {
+  test('blog index has newsletter and rss subscribe ctas', async ({ page }) => {
     await page.goto('/blog');
+
+    const newsletter = page.locator('a[aria-label="Open newsletter page"]').first();
+    await expect(newsletter).toBeVisible();
+    await expect(newsletter).toHaveAttribute('href', '/newsletter');
 
     const subscribe = page.locator('a[aria-label="Subscribe via RSS"]').first();
     await expect(subscribe).toBeVisible();
     await expect(subscribe).toHaveAttribute('href', '/rss.xml');
+  });
+
+  test('blog index has follow-author cta', async ({ page }) => {
+    await page.goto('/blog');
 
     await expect(page.locator('a[aria-label="Follow Maicon Berlofa on GitHub"]')).toBeVisible();
     await expect(page.locator('a[aria-label="Follow Maicon Berlofa on LinkedIn"]')).toBeVisible();
@@ -88,12 +96,32 @@ test.describe('Blog', () => {
     await expect(authorCard.locator('a[aria-label*="LinkedIn"]')).toBeVisible();
   });
 
-  test('blog post has rss subscribe cta in sidebar', async ({ page }) => {
+  test('blog post has newsletter and rss subscribe cta in sidebar', async ({ page }) => {
     await page.goto('/blog/kubernetes-1-34-image-short-names');
 
-    const subscribeSection = page.locator('aside section').filter({ hasText: 'Subscribe via RSS' }).first();
+    const subscribeSection = page.locator('aside section').filter({ hasText: 'Newsletter and RSS' }).first();
     await expect(subscribeSection).toBeVisible();
+    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
     await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
+  });
+
+  test('blog post has end-of-article newsletter cta', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const ctaSection = page.locator('article section').filter({ hasText: 'Get the next post in your inbox' }).first();
+    await expect(ctaSection).toBeVisible();
+    await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
+    await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
+  });
+
+  test('newsletter page is reachable and links to listmonk form', async ({ page }) => {
+    await page.goto('/newsletter');
+    await expect(page).toHaveTitle(/Newsletter/i);
+    await expect(page.locator('h1')).toContainText('Stay ahead');
+
+    const formLink = page.locator('a[aria-label="Open HelmForge newsletter subscription form"]');
+    await expect(formLink).toBeVisible();
+    await expect(formLink).toHaveAttribute('href', 'https://newsletter.helmforge.dev/subscription/form');
   });
 
   test('blog post exposes Person author in structured data', async ({ page }) => {
