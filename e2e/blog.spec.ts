@@ -19,6 +19,16 @@ test.describe('Blog', () => {
     await expect(page.locator('a[aria-label="Follow Maicon Berlofa on LinkedIn"]')).toBeVisible();
   });
 
+  test('blog cards expose title, description, author, and date', async ({ page }) => {
+    await page.goto('/blog');
+
+    const firstCard = page.locator('a[href^="/blog/"]').first();
+    await expect(firstCard.locator('h2')).toBeVisible();
+    await expect(firstCard.locator('p')).toBeVisible();
+    await expect(firstCard.locator('time')).toBeVisible();
+    await expect(firstCard.locator('time')).toHaveAttribute('datetime', /\d{4}-\d{2}-\d{2}T/);
+  });
+
   test('blog post renders with content', async ({ page }) => {
     await page.goto('/blog');
     const firstPost = page.locator('a[href^="/blog/"]').first();
@@ -95,5 +105,45 @@ test.describe('Blog', () => {
     expect(combined).toContain('"@type":"Article"');
     expect(combined).toContain('"@type":"Person"');
     expect(combined).toContain('Maicon Berlofa');
+  });
+
+  test('blog post includes canonical, rss discovery, and is indexable', async ({ page }) => {
+    await page.goto('/blog/kubernetes-1-34-image-short-names');
+
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveAttribute('href', /\/blog\/kubernetes-1-34-image-short-names\/?$/);
+
+    const rssAlternate = page.locator('link[rel="alternate"][type="application/rss+xml"]');
+    await expect(rssAlternate).toHaveAttribute('href', '/rss.xml');
+
+    await expect(page.locator('meta[name="robots"][content*="noindex" i]')).toHaveCount(0);
+  });
+
+  test('rss endpoint responds with atom self link', async ({ page }) => {
+    const response = await page.request.get('/rss.xml');
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()['content-type']).toContain('xml');
+
+    const body = await response.text();
+    expect(body).toContain('<rss');
+    expect(body).toContain('xmlns:atom="http://www.w3.org/2005/Atom"');
+    expect(body).toContain('<atom:link href="https://helmforge.dev/rss.xml" rel="self" type="application/rss+xml"');
+    expect(body).toContain('<language>en</language>');
+  });
+
+  test('sitemap includes blog urls', async ({ page }) => {
+    const response = await page.request.get('/sitemap-index.xml');
+    expect(response.ok()).toBeTruthy();
+    const indexBody = await response.text();
+
+    const sitemapMatch = indexBody.match(/<loc>([^<]*sitemap-0\.xml)<\/loc>/);
+    expect(sitemapMatch).toBeTruthy();
+
+    const sitemapResponse = await page.request.get(sitemapMatch![1]);
+    expect(sitemapResponse.ok()).toBeTruthy();
+    const sitemapBody = await sitemapResponse.text();
+
+    expect(sitemapBody).toContain('https://helmforge.dev/blog/');
+    expect(sitemapBody).toContain('https://helmforge.dev/blog/kubernetes-1-34-image-short-names');
   });
 });
