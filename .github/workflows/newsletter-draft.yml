@@ -1,0 +1,82 @@
+name: Blog Newsletter Draft
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/content/blog/**'
+  workflow_dispatch:
+    inputs:
+      blog_post_file:
+        description: 'Optional single blog post path (for example: src/content/blog/my-post.mdx)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Prepare payload only (do not create campaign)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Resolve blog post files
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.blog_post_file }}" ]]; then
+            files="${{ inputs.blog_post_file }}"
+          else
+            before="${{ github.event.before }}"
+            after="${{ github.sha }}"
+            if [[ -z "$before" || "$before" == "0000000000000000000000000000000000000000" ]]; then
+              files="$(git show --name-only --pretty='' "$after" -- src/content/blog | grep -E '\.mdx?$' || true)"
+            else
+              files="$(git diff --name-only "$before" "$after" -- src/content/blog | grep -E '\.mdx?$' || true)"
+            fi
+          fi
+
+          files="$(echo "$files" | sed '/^\s*$/d' | sort -u)"
+
+          if [[ -z "$files" ]]; then
+            echo "has_posts=false" >> "$GITHUB_OUTPUT"
+            echo "No changed blog posts found for newsletter draft automation."
+            exit 0
+          fi
+
+          echo "has_posts=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "post_files<<EOF"
+            echo "$files"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Detected blog post files:"
+          echo "$files"
+
+      - name: Create Listmonk draft campaign(s)
+        if: steps.detect.outputs.has_posts == 'true'
+        env:
+          BLOG_POST_FILES: ${{ steps.detect.outputs.post_files }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          SITE_BASE_URL: https://helmforge.dev
+          LISTMONK_BASE_URL: ${{ secrets.LISTMONK_BASE_URL }}
+          LISTMONK_API_USER: ${{ secrets.LISTMONK_API_USER }}
+          LISTMONK_API_TOKEN: ${{ secrets.LISTMONK_API_TOKEN }}
+          LISTMONK_LIST_ID: ${{ secrets.LISTMONK_LIST_ID }}
+          LISTMONK_TEMPLATE_ID: ${{ secrets.LISTMONK_TEMPLATE_ID }}
+        run: node scripts/create-blog-newsletter-draft.mjs
