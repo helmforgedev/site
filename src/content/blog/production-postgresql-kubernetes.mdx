@@ -1,35 +1,47 @@
 ---
 title: 'Deploy Production-Ready PostgreSQL on Kubernetes'
-description: 'Step-by-step guide to deploying PostgreSQL with replication, automated backups, and monitoring using the HelmForge chart.'
+description: 'Run PostgreSQL with replication, backups, and real monitoring using the HelmForge chart.'
 date: 2026-04-02
 authorId: 'maicon-berlofa'
 tags: ['tutorial', 'postgresql', 'database', 'kubernetes']
+coverImage: '/blog/2026-04-02-production-postgresql-kubernetes-hero.jpg'
+coverAlt: 'Production PostgreSQL on Kubernetes with replication, backup, and monitoring'
 ---
-
-import ArchitectureDiagram from '../../components/ArchitectureDiagram.astro';
-import PostgresqlDiagram from '../../components/diagrams/PostgresqlDiagram.astro';
 
 ## What you will build
 
-By the end of this guide, you will have a PostgreSQL deployment with:
+By the end of this guide, you will have:
 
-- Streaming replication (1 primary + 1 replica)
-- Automated nightly S3 backups
-- Persistent storage with proper resource limits
-- Ingress-ready configuration
+- PostgreSQL in replication mode (1 primary + 1 replica)
+- Nightly S3 backups
+- Metrics exporter enabled
+- Optional `ServiceMonitor` for Prometheus Operator
+- Resource requests and limits for predictable performance
 
-<ArchitectureDiagram
-  title="Target architecture (replication + backup)"
-  description="Reference topology used by this tutorial: one primary, one replica, and backup CronJob to S3."
->
-  <PostgresqlDiagram mode="replication" />
-</ArchitectureDiagram>
+## Target architecture
+
+This is the effective topology used in this tutorial:
+
+```text
+Application (read/write) ------------------------> PostgreSQL Primary
+Read Client (read-only) -------------------------> PostgreSQL Replica
+
+PostgreSQL Primary  <---------------- WAL ----------------> PostgreSQL Replica
+        |                                                     |
+        +------------- metrics exporter endpoints ------------+
+                              |
+                              v
+                 Prometheus (via ServiceMonitor)
+
+Backup CronJob (pg_dump) -----------------------> S3 bucket
+```
 
 ## Prerequisites
 
-- A running Kubernetes cluster (k3d, kind, EKS, GKE, etc.)
-- `helm` v3.12+ and `kubectl` installed
-- An S3-compatible endpoint for backups (AWS S3, MinIO, etc.)
+- A Kubernetes cluster (k3d, kind, EKS, GKE, OKE, etc.)
+- `helm` v3.12+ and `kubectl`
+- S3-compatible object storage credentials
+- Prometheus stack (optional, only if you enable `ServiceMonitor`)
 
 ## Step 1: Add the HelmForge repository
 
@@ -38,25 +50,25 @@ helm repo add helmforge https://repo.helmforge.dev
 helm repo update
 ```
 
-## Step 2: Create the namespace and secrets
+## Step 2: Create namespace and secrets
 
 ```bash
 kubectl create namespace databases
 
 kubectl create secret generic postgresql-credentials \
   --namespace databases \
-  --from-literal=postgres-password=your-secure-password \
-  --from-literal=replication-password=repl-secure-password
+  --from-literal=postgres-password='replace-me' \
+  --from-literal=replication-password='replace-me-too'
 
 kubectl create secret generic backup-s3-credentials \
   --namespace databases \
-  --from-literal=access-key=YOUR_ACCESS_KEY \
-  --from-literal=secret-key=YOUR_SECRET_KEY
+  --from-literal=access-key='YOUR_ACCESS_KEY' \
+  --from-literal=secret-key='YOUR_SECRET_KEY'
 ```
 
-## Step 3: Create the values file
+## Step 3: Create a production values file
 
-Create a file called `postgresql-values.yaml`:
+Create `postgresql-values.yaml`:
 
 ```yaml
 architecture: replication
@@ -94,74 +106,83 @@ backup:
     endpoint: https://s3.amazonaws.com
     bucket: my-pg-backups
     existingSecret: backup-s3-credentials
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
 ```
 
-## Step 4: Install
+If you do not run Prometheus Operator, set `metrics.serviceMonitor.enabled: false` and scrape the metrics service directly.
+
+## Step 4: Install PostgreSQL
 
 ```bash
 helm install postgresql helmforge/postgresql \
   --namespace databases \
   --values postgresql-values.yaml \
-  --wait --timeout 5m
+  --wait --timeout 10m
 ```
 
-## Step 5: Verify the deployment
-
-Check that all pods are running:
+## Step 5: Validate core health
 
 ```bash
 kubectl get pods -n databases -l app.kubernetes.io/name=postgresql
-```
-
-You should see two pods: one primary and one replica.
-
-Test the connection:
-
-```bash
-kubectl run pg-test --rm -it --restart=Never \
-  --namespace databases \
-  --image=postgres:17 \
-  -- psql -h postgresql-primary -U postgres -c "SELECT version();"
-```
-
-## Step 6: Verify replication
-
-Connect to the replica and confirm it is streaming:
-
-```bash
-kubectl run pg-test --rm -it --restart=Never \
-  --namespace databases \
-  --image=postgres:17 \
-  -- psql -h postgresql-read -U postgres -c "SELECT * FROM pg_stat_wal_receiver;"
-```
-
-## Step 7: Verify backup
-
-Check the backup CronJob:
-
-```bash
+kubectl get pvc -n databases
 kubectl get cronjob -n databases
 ```
 
-Trigger a manual backup run to verify:
+You should see primary + replica pods, PVCs bound, and backup CronJob present.
+
+## Step 6: Validate replication
 
 ```bash
-kubectl create job --from=cronjob/postgresql-backup manual-backup -n databases
-kubectl logs -n databases job/manual-backup -f
+kubectl run pg-test --rm -it --restart=Never \
+  --namespace databases \
+  --image=postgres:17 \
+  --env="PGPASSWORD=replace-me" \
+  -- psql -h postgresql-read -U postgres -d postgres -c "SELECT status, conninfo FROM pg_stat_wal_receiver;"
 ```
 
-## Operational tips
+`status = streaming` confirms replication is healthy.
 
-**Monitoring:** Export PostgreSQL metrics by enabling the metrics sidecar and scraping with Prometheus.
+## Step 7: Validate monitoring
 
-**Scaling replicas:** Increase `readReplicas.replicaCount` and run `helm upgrade` — new replicas automatically sync from the primary.
+Check metric resources:
 
-**Disaster recovery:** Restore from S3 backup by downloading the dump and running `pg_restore` against a fresh instance.
+```bash
+kubectl get svc -n databases | grep -i metrics
+kubectl get servicemonitor -A | grep -i postgresql
+```
 
-**Upgrades:** Always review the [upgrade notes](/docs/charts/postgresql) before changing the chart version. PostgreSQL major version upgrades require `pg_upgrade` — the chart handles minor version bumps automatically.
+Useful starter alerts/queries:
+
+- `pg_up == 0` (instance down)
+- `rate(pg_stat_database_xact_commit[5m])` (transaction throughput)
+- `pg_replication_lag` (replica lag)
+- `pg_database_size_bytes` (database growth)
+
+## Step 8: Validate backup path
+
+Run an on-demand backup job:
+
+```bash
+kubectl create job --from=cronjob/postgresql-backup postgresql-backup-manual -n databases
+kubectl logs -n databases job/postgresql-backup-manual -f
+```
+
+Confirm the artifact appears in your S3 bucket/prefix.
+
+## Production notes
+
+- Keep replication passwords in external secret managers where possible.
+- Add PodDisruptionBudget and anti-affinity for higher availability.
+- Test restore regularly, not only backup creation.
+- Track replica lag before scaling read traffic.
 
 ## Next steps
 
-- Read the full [PostgreSQL chart documentation](/docs/charts/postgresql)
-- Explore other database charts: [MySQL](/docs/charts/mysql), [MongoDB](/docs/charts/mongodb), [MariaDB](/docs/charts/mariadb)
-- Try the [Stack Builder](/stack) to generate install scripts for your full stack
+- Full chart reference: [/docs/charts/postgresql](/docs/charts/postgresql)
+- Related guides: [/docs/charts/mysql](/docs/charts/mysql), [/docs/charts/mariadb](/docs/charts/mariadb), [/docs/charts/mongodb](/docs/charts/mongodb)
