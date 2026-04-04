@@ -3043,6 +3043,98 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  listmonk: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Uploads Storage',
+          key: 'storage.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'Uploads PVC size',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '100m',
+          description: 'CPU request',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '128Mi',
+          description: 'Memory request',
+        },
+        { label: 'CPU Limit', key: 'resources.limits.cpu', type: 'text', default: '500m', description: 'CPU limit' },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '256Mi',
+          description: 'Memory limit',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hostname',
+          type: 'text',
+          default: 'listmonk.example.com',
+          description: 'Ingress hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Backup',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'Cron schedule for backups',
+        },
+        {
+          label: 'S3 Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: '',
+          description: 'S3-compatible endpoint URL',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Target bucket name',
+        },
+      ],
+    },
+  ],
   metabase: [
     {
       name: 'General',
@@ -3905,6 +3997,33 @@ const scenarios: Record<string, { label: string; description: string; values: Re
         'resources.limits.memory': '1Gi',
         'backup.enabled': 'true',
         'backup.schedule': '0 2 * * *',
+      },
+    },
+  ],
+  listmonk: [
+    {
+      label: 'Development',
+      description: 'Single instance for testing',
+      values: {
+        'storage.size': '2Gi',
+        'ingress.enabled': 'false',
+        'resources.requests.cpu': '100m',
+        'resources.requests.memory': '128Mi',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'With ingress, backups, and more resources',
+      values: {
+        'storage.size': '10Gi',
+        'ingress.enabled': 'true',
+        'ingress.hostname': 'listmonk.example.com',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '256Mi',
+        'resources.limits.cpu': '1000m',
+        'resources.limits.memory': '512Mi',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 3 * * *',
       },
     },
   ],
