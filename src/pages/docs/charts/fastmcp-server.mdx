@@ -27,6 +27,22 @@ Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmc
 - **Diagnostic endpoint** — `GET /debug/info` with full server introspection
 - **Init container pattern** — pre-sync sources before server starts via `initSync.enabled`
 - **Strict loading** — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors
+- **Hot reload** — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`
+- **Periodic sync** — poll S3/Git sources for changes at configurable intervals
+- **Webhook reload** — `POST /reload` endpoint for CI/CD-triggered reloads
+- **OCI artifact source** — pull tool bundles from OCI registries via ORAS
+- **Selective sync** — include/exclude glob patterns for source filtering
+- **Gateway mode** — compose multiple MCP servers via `MCP_MODE=gateway` and `MCP_MOUNT_SERVERS`
+- **Tag visibility** — enable/disable tools by tags with `MCP_ENABLE_TAGS` and `MCP_DISABLE_TAGS`
+- **Multi-auth** — combine bearer + JWT providers via `MCP_AUTH_PROVIDERS`
+- **Tool-level scopes** — `__required_scopes__` module variable for authorization
+- **Context integration** — tools can use `ctx: Context` for progress, logging, sampling, elicitation, and session state
+- **Rate limiting** — `__rate_limit__` module variable or `MCP_RATE_LIMIT_DEFAULT` env var (sliding window)
+- **Caching** — `__cache_ttl__` module variable for idempotent tool result caching
+- **Tool sandboxing** — `__max_memory_mb__` and `__max_output_size_kb__` resource limits per tool
+- **PodDisruptionBudget** — `pdb.enabled` for zero-downtime rolling updates
+- **HorizontalPodAutoscaler** — `autoscaling.enabled` for auto-scaling based on CPU/memory
+- **Security** — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance
 
 ## Installation
 
@@ -152,12 +168,73 @@ server:
 
 `GET /debug/info` returns server version, FastMCP version, uptime, registered components, source status, auth type, and configuration.
 
+## Rate Limiting
+
+```yaml
+rateLimiting:
+  default: "100/min"    # global default
+  perTool:
+    DEPLOY: "5/min"     # per-tool override
+    DELETE_DATA: "2/min"
+```
+
+Or via module-level variable:
+
+```python
+__rate_limit__ = "5/min"
+
+def deploy(service: str, version: str) -> str:
+    """Deploy a service (rate limited)."""
+    return f"Deployed {service}@{version}"
+```
+
+## Caching
+
+```python
+__cache_ttl__ = 300  # cache results for 5 minutes
+
+def get_exchange_rate(currency: str) -> float:
+    """Get current exchange rate (cached 5min)."""
+    ...
+```
+
+```yaml
+caching:
+  enabled: true     # default
+  maxSize: 1000     # max entries per tool
+```
+
+## Tool Sandboxing
+
+```python
+__max_memory_mb__ = 256
+__max_output_size_kb__ = 100
+
+def process_data(data: str) -> str:
+    """Process data with resource limits."""
+    ...
+```
+
+## Autoscaling
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+pdb:
+  enabled: true
+  minAvailable: 1
+```
+
 ## Key Values
 
 | Key                        | Default                              | Description                              |
 | -------------------------- | ------------------------------------ | ---------------------------------------- |
 | `image.repository`         | `docker.io/helmforge/fastmcp-server` | Container image                          |
-| `image.tag`                | `0.4.0`                              | Image tag                                |
+| `image.tag`                | `1.0.0`                              | Image tag                                |
 | `server.name`              | `fastmcp-server`                     | Server name in MCP responses             |
 | `server.port`              | `8000`                               | HTTP port                                |
 | `server.path`              | `/mcp`                               | MCP endpoint path                        |
@@ -166,6 +243,10 @@ server:
 | `ui.enabled`               | `true`                               | Enable Web UI at `/ui`                   |
 | `metrics.enabled`          | `false`                              | Enable Prometheus metrics at `/metrics`  |
 | `auth.type`                | `none`                               | Authentication: `none`, `bearer`, `jwt`  |
+| `rateLimiting.default`     | `""`                                 | Default rate limit (e.g., `100/min`)     |
+| `caching.enabled`          | `true`                               | Enable result caching                    |
+| `sandboxing.maxMemoryMb`   | `0`                                  | Default max memory per tool (MB)         |
+| `sandboxing.maxOutputSizeKb` | `0`                                | Default max output per tool (KB)         |
 | `sources.inline.tools`     | `{}`                                 | Inline Python tool files                 |
 | `sources.inline.knowledge` | `{}`                                 | Inline knowledge base files              |
 | `sources.s3.enabled`       | `false`                              | Enable S3 source                         |
@@ -175,6 +256,8 @@ server:
 | `extraPipPackages`         | `[]`                                 | Extra pip packages to install at startup |
 | `initSync.enabled`         | `false`                              | Run source sync as init container        |
 | `persistence.enabled`      | `false`                              | Enable persistent workspace volume       |
+| `autoscaling.enabled`      | `false`                              | Enable HPA                               |
+| `pdb.enabled`              | `false`                              | Enable PodDisruptionBudget               |
 | `ingress.enabled`          | `false`                              | Enable ingress                           |
 
 ## Operational Notes
