@@ -15,6 +15,11 @@ Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmc
 - **Bearer and JWT authentication** — built-in via FastMCP's `StaticTokenVerifier` and `JWTVerifier`
 - **Knowledge base support** — serve Markdown files as MCP resources for RAG and context injection
 - **Extra pip packages** — install additional Python packages at startup before loading tools
+- **Tool metadata** — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables for tool categorization and behavior hints
+- **Resource templates** — parameterized URIs like `users://{user_id}/profile` for dynamic resources
+- **Multiple resources per file** — `RESOURCES` dict maps multiple URIs to handler functions
+- **Error masking** — hide internal error details from clients via `MCP_MASK_ERROR_DETAILS`
+- **Duplicate handling** — control behavior when tools share names via `MCP_ON_DUPLICATE_TOOLS`
 
 ## Installation
 
@@ -112,7 +117,7 @@ auth:
 | Key                        | Default                              | Description                              |
 | -------------------------- | ------------------------------------ | ---------------------------------------- |
 | `image.repository`         | `docker.io/helmforge/fastmcp-server` | Container image                          |
-| `image.tag`                | `0.2.0`                              | Image tag                                |
+| `image.tag`                | `0.3.0`                              | Image tag                                |
 | `server.name`              | `fastmcp-server`                     | Server name in MCP responses             |
 | `server.port`              | `8000`                               | HTTP port                                |
 | `server.path`              | `/mcp`                               | MCP endpoint path                        |
@@ -132,7 +137,9 @@ auth:
 - Merge precedence is Inline > S3 > Git — if a tool with the same filename exists in multiple sources, the highest-precedence version wins
 - Knowledge base files are served as MCP resources at `knowledge://{filename}` URIs
 - The server health endpoint is at the configured `server.path` (default `/mcp`)
-- Tools are Python files with top-level functions; resources need a `RESOURCE_URI` module-level variable
+- Tools are Python files with top-level functions; resources need a `RESOURCE_URI` or `RESOURCES` module-level variable
+- Tools support optional metadata: `__tags__` (set), `__timeout__` (float), `__annotations_mcp__` (dict)
+- Resource URIs can use `{param}` placeholders for dynamic templates
 - The `extraPipPackages` list installs before tools load — use it when tools import external libraries
 
 ## More Information
