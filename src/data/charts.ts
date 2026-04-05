@@ -412,6 +412,13 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
   },
+  {
+    name: 'FastMCP Server',
+    slug: 'fastmcp-server',
+    description: 'MCP server with multi-source tool, resource, prompt, and knowledge loading.',
+    maturity: 'stable',
+    backup: false,
+  },
 ];
 
 export const chartCount = charts.length;

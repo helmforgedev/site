@@ -1,0 +1,92 @@
+---
+title: 'Deploy MCP Servers Anywhere with FastMCP Server'
+description: 'Introducing FastMCP Server — a standalone Docker image that dynamically loads MCP tools, resources, prompts, and knowledge bases from inline mounts, S3-compatible storage, and Git repositories.'
+date: 2026-04-05
+authorId: 'maicon-berlofa'
+tags: ['mcp', 'ai', 'docker', 'fastmcp', 'knowledge-base']
+---
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) is an open standard for connecting AI assistants to external tools and data sources. Instead of hardcoding integrations, MCP provides a clean interface where servers expose tools, resources, and prompts that any MCP client can discover and use.
+
+## The problem: deploying MCP servers is still manual
+
+Most MCP server implementations are tightly coupled to a specific set of tools. You write Python functions, wire them into a server, build a Docker image, and deploy. When you want to add a new tool, you rebuild and redeploy.
+
+This works for small setups, but it does not scale when:
+
+- Different teams need different tool sets on the same server
+- Knowledge bases change frequently and live in S3 or Git
+- You want to try a new tool without rebuilding the image
+- You need the same server in Docker Compose, Kubernetes, and AWS ECS
+
+## FastMCP Server: dynamic tool loading, zero rebuilds
+
+[FastMCP Server](https://github.com/helmforgedev/fastmcp-server) is a standalone Docker image that separates the MCP runtime from the tools. You deploy the server once and load tools dynamically from three sources:
+
+1. **Inline mounts** — volume-mount Python files directly (highest precedence)
+2. **S3-compatible storage** — AWS S3, MinIO, Cloudflare R2 (medium precedence)
+3. **Git repositories** — clone tools from any Git repo at startup (lowest precedence)
+
+The merge precedence means you can have a shared tool library in S3, override specific tools with inline mounts for testing, and keep everything in Git for version control.
+
+### Quick example: Docker
+
+```bash
+# Mount local tools and start the server
+docker run -d -p 8000:8000 \
+  -v ./my-tools:/app/inline/tools \
+  -v ./my-knowledge:/app/inline/knowledge \
+  docker.io/helmforge/fastmcp-server:0.2.0
+```
+
+### Quick example: Kubernetes (Helm)
+
+```bash
+helm install fastmcp-server oci://ghcr.io/helmforgedev/helm/fastmcp-server \
+  --set sources.s3.enabled=true \
+  --set sources.s3.bucket=mcp-tools \
+  --set auth.type=bearer \
+  --set auth.bearer.token=my-token
+```
+
+## What you can load
+
+| Type          | Format                             | Example                           |
+| ------------- | ---------------------------------- | --------------------------------- |
+| **Tools**     | Python functions                   | `def greet(name: str) -> str`     |
+| **Resources** | Python with `RESOURCE_URI`         | Server status, API endpoints      |
+| **Prompts**   | Python functions returning strings | Summarization templates           |
+| **Knowledge** | Markdown files                     | Architecture docs, runbooks, FAQs |
+
+Knowledge files are automatically served as MCP resources at `knowledge://{filename}` URIs, making them available for RAG and context injection by AI assistants.
+
+## Authentication built-in
+
+FastMCP Server supports two authentication modes without any reverse proxy:
+
+- **Bearer token** — simple static token via `MCP_AUTH_TYPE=bearer`
+- **JWT** — full OIDC/JWT verification with JWKS endpoint via `MCP_AUTH_TYPE=jwt`
+
+## Runs anywhere
+
+The image is not tied to Kubernetes. It works with:
+
+- `docker run` — local development
+- Docker Compose — multi-service setups with MinIO
+- Docker Swarm — production without Kubernetes
+- AWS ECS / Fargate — serverless containers
+- Kubernetes via the HelmForge Helm chart — full production with ingress, PVC, NetworkPolicy
+
+## Try it
+
+```bash
+docker run -d -p 8000:8000 docker.io/helmforge/fastmcp-server:0.2.0
+```
+
+The server starts with no tools (that is fine) and the healthcheck endpoint responds at `http://localhost:8000/mcp`. Mount your tools directory and they appear instantly.
+
+- [Docker image on Docker Hub](https://hub.docker.com/r/helmforge/fastmcp-server)
+- [Source code](https://github.com/helmforgedev/fastmcp-server)
+- [Helm chart documentation](https://helmforge.dev/docs/charts/fastmcp-server)

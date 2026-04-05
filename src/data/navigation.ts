@@ -79,6 +79,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'OliveTin', href: '/docs/charts/olivetin', maturity: 'stable' },
       { label: 'Cronicle', href: '/docs/charts/cronicle', maturity: 'stable' },
       { label: 'Automatisch', href: '/docs/charts/automatisch', maturity: 'stable' },
+      { label: 'FastMCP Server', href: '/docs/charts/fastmcp-server', maturity: 'stable' },
     ],
   },
   {
