@@ -1,0 +1,169 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: FastMCP Server
+description: Helm chart for FastMCP server — deploy MCP tools, resources, prompts, and knowledge bases on Kubernetes with multi-source loading from inline, S3, and Git.
+---
+
+# FastMCP Server
+
+Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmcp-server) on Kubernetes — a standalone MCP (Model Context Protocol) server that dynamically loads tools, resources, prompts, and knowledge bases from multiple sources. The Docker image runs anywhere (Docker, Compose, Swarm, ECS, Kubernetes), and this chart is one installation method.
+
+## Key Features
+
+- **Multi-source loading** — tools, resources, prompts, and knowledge from inline ConfigMaps, S3-compatible storage (AWS S3, MinIO, R2), or Git repositories
+- **Merge precedence** — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching the bucket
+- **Bearer and JWT authentication** — built-in via FastMCP's `StaticTokenVerifier` and `JWTVerifier`
+- **Knowledge base support** — serve Markdown files as MCP resources for RAG and context injection
+- **Extra pip packages** — install additional Python packages at startup before loading tools
+- **Docker image: `docker.io/helmforge/fastmcp-server`** — standalone, multi-arch (amd64/arm64), non-root
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install fastmcp-server helmforge/fastmcp-server
+```
+
+### OCI Registry
+
+```bash
+helm install fastmcp-server oci://ghcr.io/helmforgedev/helm/fastmcp-server
+```
+
+## Basic Example — Inline Tools
+
+```yaml
+# values.yaml
+sources:
+  inline:
+    tools:
+      greet.py: |
+        def greet(name: str) -> str:
+            """Greet someone by name."""
+            return f"Hello, {name}!"
+      math_ops.py: |
+        def add(a: float, b: float) -> float:
+            """Add two numbers."""
+            return a + b
+        def multiply(a: float, b: float) -> float:
+            """Multiply two numbers."""
+            return a * b
+    knowledge:
+      overview.md: |
+        # Product Overview
+        This document provides context for the AI assistant.
+```
+
+## S3 Source (MinIO, AWS S3, Cloudflare R2)
+
+```yaml
+sources:
+  s3:
+    enabled: true
+    endpoint: "https://minio.example.com"
+    bucket: mcp-tools
+    region: us-east-1
+    prefix: production
+    accessKey: minioadmin
+    secretKey: minioadmin
+```
+
+## Git Source
+
+```yaml
+sources:
+  git:
+    enabled: true
+    repository: "https://github.com/your-org/mcp-tools.git"
+    branch: main
+    path: ""          # optional subdirectory
+    token: ghp_xxx    # for private repos
+```
+
+## Authentication
+
+### Bearer Token
+
+```yaml
+auth:
+  type: bearer
+  bearer:
+    token: my-secret-token
+    # or use an existing Kubernetes secret:
+    # existingSecret: my-auth-secret
+    # existingSecretKey: token
+```
+
+### JWT
+
+```yaml
+auth:
+  type: jwt
+  jwt:
+    issuer: "https://auth.example.com"
+    audience: "mcp-server"
+    jwksUri: "https://auth.example.com/.well-known/jwks.json"
+```
+
+## Docker Standalone Usage
+
+The image is not tied to Kubernetes. Use it anywhere:
+
+```bash
+# Inline tools via volume mount
+docker run -d -p 8000:8000 \
+  -v ./my-tools:/app/inline/tools \
+  docker.io/helmforge/fastmcp-server:0.2.0
+
+# With S3 source
+docker run -d -p 8000:8000 \
+  -e SOURCE_S3_ENABLED=true \
+  -e SOURCE_S3_ENDPOINT=https://minio.local \
+  -e SOURCE_S3_BUCKET=mcp-tools \
+  -e SOURCE_S3_ACCESS_KEY=admin \
+  -e SOURCE_S3_SECRET_KEY=secret \
+  docker.io/helmforge/fastmcp-server:0.2.0
+
+# With authentication
+docker run -d -p 8000:8000 \
+  -e MCP_AUTH_TYPE=bearer \
+  -e MCP_AUTH_TOKEN=my-token \
+  -v ./tools:/app/inline/tools \
+  docker.io/helmforge/fastmcp-server:0.2.0
+```
+
+## Key Values
+
+| Key                                | Default                                  | Description                                     |
+| ---------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `image.repository`                 | `docker.io/helmforge/fastmcp-server`     | Container image                                 |
+| `image.tag`                        | `0.2.0`                                  | Image tag                                       |
+| `server.name`                      | `fastmcp-server`                         | Server name in MCP responses                    |
+| `server.port`                      | `8000`                                   | HTTP port                                       |
+| `server.path`                      | `/mcp`                                   | MCP endpoint path                               |
+| `auth.type`                        | `none`                                   | Authentication: `none`, `bearer`, `jwt`          |
+| `sources.inline.tools`             | `{}`                                     | Inline Python tool files                        |
+| `sources.inline.knowledge`         | `{}`                                     | Inline knowledge base files                     |
+| `sources.s3.enabled`               | `false`                                  | Enable S3 source                                |
+| `sources.s3.bucket`                | `""`                                     | S3 bucket name                                  |
+| `sources.git.enabled`              | `false`                                  | Enable Git source                               |
+| `sources.git.repository`           | `""`                                     | Git repository HTTPS URL                        |
+| `extraPipPackages`                 | `[]`                                     | Extra pip packages to install at startup        |
+| `persistence.enabled`              | `false`                                  | Enable persistent workspace volume              |
+| `ingress.enabled`                  | `false`                                  | Enable ingress                                  |
+
+## Operational Notes
+
+- Merge precedence is Inline > S3 > Git — if a tool with the same filename exists in multiple sources, the highest-precedence version wins
+- Knowledge base files are served as MCP resources at `knowledge://{filename}` URIs
+- The server health endpoint is at the configured `server.path` (default `/mcp`)
+- Tools are Python files with top-level functions; resources need a `RESOURCE_URI` module-level variable
+- The `extraPipPackages` list installs before tools load — use it when tools import external libraries
+
+## More Information
+
+- [Docker image source](https://github.com/helmforgedev/fastmcp-server)
+- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/fastmcp-server)

@@ -2461,6 +2461,148 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  'fastmcp-server': [
+    {
+      name: 'Server',
+      fields: [
+        {
+          label: 'Server Name',
+          key: 'server.name',
+          type: 'text',
+          default: 'fastmcp-server',
+          description: 'Server name in MCP responses',
+        },
+        {
+          label: 'MCP Path',
+          key: 'server.path',
+          type: 'text',
+          default: '/mcp',
+          description: 'MCP endpoint URL path',
+        },
+        {
+          label: 'Log Level',
+          key: 'server.logLevel',
+          type: 'select',
+          default: 'INFO',
+          options: ['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+          description: 'Application log level',
+        },
+      ],
+    },
+    {
+      name: 'Authentication',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Auth Type',
+          key: 'auth.type',
+          type: 'select',
+          default: 'none',
+          options: ['none', 'bearer', 'jwt'],
+          description: 'Authentication method',
+        },
+      ],
+    },
+    {
+      name: 'S3 Source',
+      collapsible: true,
+      gateField: 'sources.s3.enabled',
+      fields: [
+        {
+          label: 'Endpoint',
+          key: 'sources.s3.endpoint',
+          type: 'text',
+          default: '',
+          description: 'S3-compatible endpoint URL',
+        },
+        {
+          label: 'Bucket',
+          key: 'sources.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Bucket name',
+        },
+        {
+          label: 'Region',
+          key: 'sources.s3.region',
+          type: 'text',
+          default: 'us-east-1',
+          description: 'AWS region',
+        },
+      ],
+    },
+    {
+      name: 'Git Source',
+      collapsible: true,
+      gateField: 'sources.git.enabled',
+      fields: [
+        {
+          label: 'Repository',
+          key: 'sources.git.repository',
+          type: 'text',
+          default: '',
+          description: 'Git HTTPS URL',
+        },
+        {
+          label: 'Branch',
+          key: 'sources.git.branch',
+          type: 'text',
+          default: 'main',
+          description: 'Branch to clone',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hostname',
+          type: 'text',
+          default: 'mcp.example.com',
+          description: 'Ingress hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '100m',
+          description: 'CPU request',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '128Mi',
+          description: 'Memory request',
+        },
+        { label: 'CPU Limit', key: 'resources.limits.cpu', type: 'text', default: '500m', description: 'CPU limit' },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '512Mi',
+          description: 'Memory limit',
+        },
+      ],
+    },
+  ],
   _default: [
     {
       name: 'General',
@@ -3839,6 +3981,48 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  'fastmcp-server': [
+    {
+      label: 'Inline Tools',
+      description: 'Simple deployment with inline Python tools',
+      values: {
+        'server.name': 'my-mcp',
+        'auth.type': 'none',
+        'server.logLevel': 'INFO',
+      },
+    },
+    {
+      label: 'S3 + Auth',
+      description: 'S3 source with bearer authentication',
+      values: {
+        'auth.type': 'bearer',
+        'sources.s3.enabled': 'true',
+        'sources.s3.endpoint': 'https://minio.example.com',
+        'sources.s3.bucket': 'mcp-tools',
+        'sources.s3.region': 'us-east-1',
+        'server.logLevel': 'INFO',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'Full production setup with ingress and resources',
+      values: {
+        'server.name': 'production-mcp',
+        'auth.type': 'bearer',
+        'sources.s3.enabled': 'true',
+        'sources.s3.bucket': 'mcp-production',
+        'sources.s3.region': 'us-east-1',
+        'ingress.enabled': 'true',
+        'ingress.hostname': 'mcp.example.com',
+        'ingress.ingressClassName': 'nginx',
+        'server.logLevel': 'WARNING',
+        'resources.requests.cpu': '100m',
+        'resources.requests.memory': '128Mi',
+        'resources.limits.cpu': '500m',
+        'resources.limits.memory': '512Mi',
+      },
+    },
+  ],
   postgresql: [
     {
       label: 'Development',
