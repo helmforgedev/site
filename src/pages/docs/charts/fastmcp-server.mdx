@@ -6,7 +6,7 @@ description: Helm chart for FastMCP server — deploy MCP tools, resources, prom
 
 # FastMCP Server
 
-Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmcp-server) on Kubernetes — a standalone MCP (Model Context Protocol) server that dynamically loads tools, resources, prompts, and knowledge bases from multiple sources. The Docker image runs anywhere (Docker, Compose, Swarm, ECS, Kubernetes), and this chart is one installation method.
+Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmcp-server) on Kubernetes — a MCP (Model Context Protocol) server that dynamically loads tools, resources, prompts, and knowledge bases from multiple sources.
 
 ## Key Features
 
@@ -15,7 +15,6 @@ Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmc
 - **Bearer and JWT authentication** — built-in via FastMCP's `StaticTokenVerifier` and `JWTVerifier`
 - **Knowledge base support** — serve Markdown files as MCP resources for RAG and context injection
 - **Extra pip packages** — install additional Python packages at startup before loading tools
-- **Docker image: `docker.io/helmforge/fastmcp-server`** — standalone, multi-arch (amd64/arm64), non-root
 
 ## Installation
 
@@ -106,33 +105,6 @@ auth:
     issuer: 'https://auth.example.com'
     audience: 'mcp-server'
     jwksUri: 'https://auth.example.com/.well-known/jwks.json'
-```
-
-## Docker Standalone Usage
-
-The image is not tied to Kubernetes. Use it anywhere:
-
-```bash
-# Inline tools via volume mount
-docker run -d -p 8000:8000 \
-  -v ./my-tools:/app/inline/tools \
-  docker.io/helmforge/fastmcp-server:0.2.0
-
-# With S3 source
-docker run -d -p 8000:8000 \
-  -e SOURCE_S3_ENABLED=true \
-  -e SOURCE_S3_ENDPOINT=https://minio.local \
-  -e SOURCE_S3_BUCKET=mcp-tools \
-  -e SOURCE_S3_ACCESS_KEY=admin \
-  -e SOURCE_S3_SECRET_KEY=secret \
-  docker.io/helmforge/fastmcp-server:0.2.0
-
-# With authentication
-docker run -d -p 8000:8000 \
-  -e MCP_AUTH_TYPE=bearer \
-  -e MCP_AUTH_TOKEN=my-token \
-  -v ./tools:/app/inline/tools \
-  docker.io/helmforge/fastmcp-server:0.2.0
 ```
 
 ## Key Values
