@@ -11,35 +11,19 @@ import KeycloakDiagram from '../../../components/diagrams/KeycloakDiagram.astro'
 
 # Keycloak
 
-<span data-i18n="docsCharts.keycloak.intro">
-  Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.
-</span>
+Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.keycloak.feature.identity">
-    <strong>Identity management</strong> — SSO, user federation, social login
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.protocols">
-    <strong>Protocol support</strong> — OAuth 2.0, OpenID Connect, SAML 2.0
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.externalDb">
-    <strong>External database</strong> — PostgreSQL or MySQL backend support
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.ingress">
-    <strong>Ingress support</strong> — Configurable with `ingressClassName` and TLS
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.metrics">
-    <strong>Metrics</strong> — Prometheus metrics with ServiceMonitor
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.security">
-    <strong>Security</strong> — Non-root containers, network policies, pod security
-  </span>
-- <span data-i18n="docsCharts.keycloak.feature.realmImport">
-    <strong>Realm import</strong> — Automatic realm configuration on startup
-  </span>
+- **Identity management** — SSO, user federation, social login
+- **Protocol support** — OAuth 2.0, OpenID Connect, SAML 2.0
+- **External database** — PostgreSQL or MySQL backend support
+- **Ingress support** — Configurable with `ingressClassName` and TLS
+- **Metrics** — Prometheus metrics with ServiceMonitor
+- **Security** — Non-root containers, network policies, pod security
+- **Realm import** — Automatic realm configuration on startup
 
-## <span data-i18n="docsCharts.heading.architecture">Architecture</span>
+## Architecture
 
 <ArchitectureDiagram title="Basic" description="Single Keycloak instance behind an ingress with PostgreSQL backend.">
   <KeycloakDiagram mode="basic" />
@@ -52,9 +36,9 @@ import KeycloakDiagram from '../../../components/diagrams/KeycloakDiagram.astro'
   <KeycloakDiagram mode="ha" />
 </ArchitectureDiagram>
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -62,13 +46,13 @@ helm repo update
 helm install my-keycloak helmforge/keycloak
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install my-keycloak oci://ghcr.io/helmforgedev/helm/keycloak
 ```
 
-## <span data-i18n="docsCharts.heading.deploymentExamples">Deployment Examples</span>
+## Deployment Examples
 
 <DocsTabs tabs={[
   { id: 'basic', label: 'Basic' },
@@ -96,10 +80,8 @@ ingress:
 ```
 
 <Callout type="warning" title="H2 is for development only">
-  <span data-i18n="docsCharts.keycloak.h2Warning">
-    The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence.
-    Always use an external database for production.
-  </span>
+  The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence.
+  Always use an external database for production.
 </Callout>
 
 </div>
@@ -205,68 +187,53 @@ ingress:
 
 </DocsTabs>
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | Type    | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>                            |
-| ------------------------------------------------- | ------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `auth.adminUser`                                  | string  | `admin`                                                   | <span data-i18n="docsCharts.keycloak.table.adminUser">Keycloak admin username</span>         |
-| `auth.adminPassword`                              | string  | `""`                                                      | <span data-i18n="docsCharts.keycloak.table.adminPassword">Keycloak admin password</span>     |
-| `database.vendor`                                 | string  | `h2`                                                      | Database vendor: `h2`, `postgres`, `mysql`                                                   |
-| `database.hostname`                               | string  | `""`                                                      | External database hostname                                                                   |
-| `database.port`                                   | integer | `5432`                                                    | External database port                                                                       |
-| `database.database`                               | string  | `keycloak`                                                | Database name                                                                                |
-| `database.username`                               | string  | `""`                                                      | Database username                                                                            |
-| `database.password`                               | string  | `""`                                                      | Database password                                                                            |
-| `replicaCount`                                    | integer | `1`                                                       | Number of Keycloak replicas                                                                  |
-| `ingress.enabled`                                 | boolean | `false`                                                   | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span>                      |
-| `ingress.ingressClassName`                        | string  | `traefik`                                                 | Ingress class name                                                                           |
-| `ingress.hosts`                                   | array   | `[]`                                                      | Ingress host rules                                                                           |
-| `ingress.tls`                                     | array   | `[]`                                                      | TLS configuration                                                                            |
-| `resources.requests.memory`                       | string  | `256Mi`                                                   | Memory request                                                                               |
-| `resources.requests.cpu`                          | string  | `250m`                                                    | CPU request                                                                                  |
-| `metrics.enabled`                                 | boolean | `false`                                                   | <span data-i18n="docsCharts.common.enablePrometheusMetrics">Enable Prometheus metrics</span> |
-| `metrics.serviceMonitor.enabled`                  | boolean | `false`                                                   | Create ServiceMonitor resource                                                               |
-| `realmImport`                                     | object  | `{}`                                                      | Realm configuration to import on startup                                                     |
+| Key                              | Type    | Default    | Description                                |
+| -------------------------------- | ------- | ---------- | ------------------------------------------ |
+| `auth.adminUser`                 | string  | `admin`    | Keycloak admin username                    |
+| `auth.adminPassword`             | string  | `""`       | Keycloak admin password                    |
+| `database.vendor`                | string  | `h2`       | Database vendor: `h2`, `postgres`, `mysql` |
+| `database.hostname`              | string  | `""`       | External database hostname                 |
+| `database.port`                  | integer | `5432`     | External database port                     |
+| `database.database`              | string  | `keycloak` | Database name                              |
+| `database.username`              | string  | `""`       | Database username                          |
+| `database.password`              | string  | `""`       | Database password                          |
+| `replicaCount`                   | integer | `1`        | Number of Keycloak replicas                |
+| `ingress.enabled`                | boolean | `false`    | Enable ingress                             |
+| `ingress.ingressClassName`       | string  | `traefik`  | Ingress class name                         |
+| `ingress.hosts`                  | array   | `[]`       | Ingress host rules                         |
+| `ingress.tls`                    | array   | `[]`       | TLS configuration                          |
+| `resources.requests.memory`      | string  | `256Mi`    | Memory request                             |
+| `resources.requests.cpu`         | string  | `250m`     | CPU request                                |
+| `metrics.enabled`                | boolean | `false`    | Enable Prometheus metrics                  |
+| `metrics.serviceMonitor.enabled` | boolean | `false`    | Create ServiceMonitor resource             |
+| `realmImport`                    | object  | `{}`       | Realm configuration to import on startup   |
 
-## <span data-i18n="docsCharts.heading.upgradeNotes">Upgrade Notes</span>
+## Upgrade Notes
 
 <Callout type="warning" title="Database migrations">
-  <span data-i18n="docsCharts.keycloak.upgrade.callout">
-    Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only
-    one replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas
-    simultaneously can cause conflicts.
-  </span>
+  Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only one
+  replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas simultaneously
+  can cause conflicts.
 </Callout>
 
-- <span data-i18n="docsCharts.keycloak.upgrade.note1">
-    Admin password changes in values only take effect on fresh installations
-  </span>
-- <span data-i18n="docsCharts.keycloak.upgrade.note2">
-    Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting
-  </span>
-- <span data-i18n="docsCharts.keycloak.upgrade.note3">
-    Ingress annotations changes require a pod restart if the ingress controller caches configuration
-  </span>
+- Admin password changes in values only take effect on fresh installations
+- Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting
+- Ingress annotations changes require a pod restart if the ingress controller caches configuration
 
-## <span data-i18n="docsCharts.heading.commonIssues">Common Issues</span>
+## Common Issues
 
 <Callout type="danger" title="Admin console returns 403 or redirect loop">
-  <span data-i18n="docsCharts.keycloak.issue.proxyHeaders">
-    This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards
-    `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.
-  </span>
+  This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards
+  `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.
 </Callout>
 
 <Callout type="tip" title="Slow startup with large realms">
-  <span data-i18n="docsCharts.keycloak.issue.slowStartup">
-    Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and
-    `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.
-  </span>
+  Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and
+  `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.
 </Callout>
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
+## More Information
 
-<span data-i18n="docsCharts.moreInfo.before">See the</span> [
-<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>
-](https://github.com/helmforgedev/charts/tree/main/charts/keycloak)
-<span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/keycloak) on GitHub.

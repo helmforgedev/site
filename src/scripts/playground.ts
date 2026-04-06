@@ -1,12 +1,3 @@
-import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n/config';
-import { ensureLocaleMessages, getMessage } from './i18n-client-store';
-
-declare global {
-  interface Window {
-    __HF_LOCALE__?: Locale;
-  }
-}
-
 interface FieldConfig {
   label: string;
   key: string;
@@ -60,14 +51,6 @@ let selectedName = '';
 let currentValues: Record<string, string> = {};
 // Track which collapsible sections are expanded
 let expandedSections: Set<string> = new Set();
-
-function t(key: string, locale: Locale): string {
-  return getMessage(key, locale);
-}
-
-function getLocale(): Locale {
-  return normalizeLocale(window.__HF_LOCALE__) || DEFAULT_LOCALE;
-}
 
 function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
@@ -491,8 +474,7 @@ function generateValuesYaml(): string {
   if (!selectedSlug) return '';
   const changes = getChangedValues();
   if (changes.length === 0) {
-    const locale = getLocale();
-    return `<span class="text-zinc-500">${t('playground.values.empty.line1', locale)}</span>\n<span class="text-zinc-500">${t('playground.values.empty.line2', locale)}</span>`;
+    return '<span class="text-zinc-500"># No values changed from defaults</span>\n<span class="text-zinc-500"># Modify settings above to generate a custom values.yaml</span>';
   }
 
   const lines: string[] = [];
@@ -547,7 +529,7 @@ function getPlainHelmCommand(): string {
 
 function getPlainValuesYaml(): string {
   const changes = getChangedValues();
-  if (changes.length === 0) return `${t('playground.values.empty.line1', getLocale())}\n`;
+  if (changes.length === 0) return '# No values changed from defaults\n';
 
   const lines: string[] = [];
   lines.push(`# values.yaml for ${selectedName}`);
@@ -722,8 +704,8 @@ if (copyBtn) {
     const text = outputMode === 'helm' ? getPlainHelmCommand() : getPlainValuesYaml();
     try {
       await navigator.clipboard.writeText(text);
-      copyBtn.textContent = t('playground.copied', getLocale());
-      setTimeout(() => (copyBtn.textContent = t('playground.copy', getLocale())), 2000);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy to clipboard'), 2000);
     } catch {
       // Fallback
     }
@@ -736,8 +718,8 @@ if (shareBtn) {
     if (!selectedSlug) return;
     try {
       await navigator.clipboard.writeText(window.location.href);
-      shareBtn.textContent = t('playground.linkCopied', getLocale());
-      setTimeout(() => (shareBtn.textContent = t('playground.share', getLocale())), 2000);
+      shareBtn.textContent = 'Link copied!';
+      setTimeout(() => (shareBtn.textContent = 'Share'), 2000);
     } catch {
       // Fallback
     }
@@ -746,17 +728,3 @@ if (shareBtn) {
 
 // Load state from URL on page load
 loadFromUrl();
-
-document.addEventListener('hf:localechange', () => {
-  const locale = getLocale();
-  if (shareBtn) {
-    shareBtn.title = t('playground.shareTitle', locale);
-    if (shareBtn.disabled) shareBtn.textContent = t('playground.share', locale);
-  }
-  if (copyBtn && copyBtn.disabled) copyBtn.textContent = t('playground.copy', locale);
-  if (selectedSlug) updateOutput();
-});
-
-ensureLocaleMessages(getLocale()).then(() => {
-  if (selectedSlug) updateOutput();
-});

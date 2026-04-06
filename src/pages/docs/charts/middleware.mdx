@@ -8,26 +8,18 @@ description: HelmForge Middleware chart for DORA metrics platform with PostgreSQ
 
 Deploy [Middleware](https://www.middlewarehq.com/) on Kubernetes — an open-source DORA metrics platform that measures Deployment Frequency, Lead Time, MTTR, and Change Failure Rate for engineering teams.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.middleware.b0">
-    All four DORA metrics — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate
-  </span>
-- <span data-i18n="docsCharts.auto.middleware.b1">
-    All-in-one container — frontend, analytics, and sync server in a single image
-  </span>
-- <span data-i18n="docsCharts.auto.middleware.b2">PostgreSQL + Redis — bundled subcharts or external connections</span>
-- <span data-i18n="docsCharts.auto.middleware.b3">
-    CI/CD integrations — tracks metrics from your existing pipelines
-  </span>
-- <span data-i18n="docsCharts.auto.middleware.b4">Persistent storage — API keys and configuration stored in PVC</span>
-- <span data-i18n="docsCharts.common.feature.ingressCertManager">
-    **Ingress support** — TLS via cert-manager with configurable ingress class
-  </span>
+- **All four DORA metrics** — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate
+- **All-in-one container** — frontend, analytics, and sync server in a single image
+- **PostgreSQL + Redis** — bundled subcharts or external connections
+- **CI/CD integrations** — tracks metrics from your existing pipelines
+- **Persistent storage** — API keys and configuration stored in PVC
+- **Ingress support** — TLS via cert-manager with configurable ingress class
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -35,67 +27,75 @@ helm repo update
 helm install middleware helmforge/middleware -f values.yaml
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install middleware oci://ghcr.io/helmforgedev/helm/middleware -f values.yaml
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 ```yaml
 postgresql:
-enabled: true
+  enabled: true
+
 redis:
-enabled: true
+  enabled: true
+
 ingress:
-enabled: true
-ingressClassName: traefik
-hosts:
-  - host: middleware.example.com
-paths:
-  - path: /
-pathType: Prefix
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: middleware.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## <span data-i18n="docsCharts.heading.externalDatabase">External Database</span> and Cache
+## External Database and Cache
 
 ```yaml
 postgresql:
-enabled: false
+  enabled: false
+
 redis:
-enabled:
-  falseexternalDatabase:
-enabled: true
-host: postgres.example.internal
-port: 5432
-name: middleware
-username: middleware
-existingSecret:
-  middleware-dbexternalRedis:
-enabled: true
-host: redis.example.internal
-port: 6379
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  host: postgres.example.internal
+  port: 5432
+  name: middleware
+  username: middleware
+  existingSecret: middleware-db
+
+externalRedis:
+  enabled: true
+  host: redis.example.internal
+  port: 6379
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                        | Default | Description                  |
 | -------------------------- | ------- | ---------------------------- |
-| `middleware.frontendPort` | `3333` | <span data-i18n="docsCharts.auto.middleware.t0">Frontend port</span> |
-| `middleware.analyticsPort` | `9696` | <span data-i18n="docsCharts.auto.middleware.t1">Analytics API port</span> |
-| `middleware.syncPort` | `9697` | <span data-i18n="docsCharts.auto.middleware.t2">Sync server port</span> |
-| `middleware.environment` | `prod` | <span data-i18n="docsCharts.auto.middleware.t3">Environment</span> |
-| `postgresql.enabled` | `true` | <span data-i18n="docsCharts.auto.middleware.t4">Enable bundled PostgreSQL</span> |
-| `redis.enabled` | `true` | <span data-i18n="docsCharts.auto.middleware.t5">Enable bundled Redis</span> |
-| `externalDatabase.enabled` | `false` | <span data-i18n="docsCharts.auto.middleware.t6">Use external database</span> |
-| `externalRedis.enabled` | `false` | <span data-i18n="docsCharts.common.useExternalRedis">Use external Redis</span> |
-| `persistence.enabled` | `true` | <span data-i18n="docsCharts.auto.middleware.t7">Enable /app/keys persistence</span> |
-| `persistence.size` | `1Gi` | <span data-i18n="docsCharts.common.pvcSize">PVC size</span> |
+| `middleware.frontendPort`  | `3333`  | Frontend port                |
+| `middleware.analyticsPort` | `9696`  | Analytics API port           |
+| `middleware.syncPort`      | `9697`  | Sync server port             |
+| `middleware.environment`   | `prod`  | Environment                  |
+| `postgresql.enabled`       | `true`  | Enable bundled PostgreSQL    |
+| `redis.enabled`            | `true`  | Enable bundled Redis         |
+| `externalDatabase.enabled` | `false` | Use external database        |
+| `externalRedis.enabled`    | `false` | Use external Redis           |
+| `persistence.enabled`      | `true`  | Enable /app/keys persistence |
+| `persistence.size`         | `1Gi`   | PVC size                     |
 
-## <span data-i18n="docsCharts.heading.operationalNotes">Operational Notes</span>
+## Operational Notes
 
-- single instance only — no horizontal scaling- resource-heavy — 16GB RAM recommended for production workloads- all three ports (frontend, analytics, sync) are exposed via the same pod
+- single instance only — no horizontal scaling
+- resource-heavy — 16GB RAM recommended for production workloads
+- all three ports (frontend, analytics, sync) are exposed via the same pod
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/middleware) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/middleware) on GitHub.

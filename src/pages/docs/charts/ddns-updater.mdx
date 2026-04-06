@@ -8,22 +8,18 @@ description: HelmForge DDNS Updater chart — dynamic DNS for 50+ providers with
 
 Deploy [ddns-updater](https://github.com/qdm12/ddns-updater) on Kubernetes using the official [qmcgaw/ddns-updater](https://hub.docker.com/r/qmcgaw/ddns-updater) Docker image. Keep DNS A/AAAA records updated across 50+ providers with a responsive web UI.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.ddns_updater.b0">
-    50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more
-  </span>
-- <span data-i18n="docsCharts.auto.ddns_updater.b1">Web UI — responsive dashboard for monitoring update status</span>
-- <span data-i18n="docsCharts.auto.ddns_updater.b2">
-    Multi-provider — manage records across different providers in a single deployment
-  </span>
-- <span data-i18n="docsCharts.auto.ddns_updater.b3">Persistent history — update history stored in a PVC</span>
-- <span data-i18n="docsCharts.auto.ddns_updater.b4">Existing secrets — bring your own Secret for credentials</span>
-- <span data-i18n="docsCharts.auto.ddns_updater.b5">Ingress support — expose the web UI with TLS</span>
+- **50+ DNS providers** — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more
+- **Web UI** — responsive dashboard for monitoring update status
+- **Multi-provider** — manage records across different providers in a single deployment
+- **Persistent history** — update history stored in a PVC
+- **Existing secrets** — bring your own Secret for credentials
+- **Ingress support** — expose the web UI with TLS
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -31,72 +27,73 @@ helm repo update
 helm install ddns-updater helmforge/ddns-updater -f values.yaml
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install ddns-updater oci://ghcr.io/helmforgedev/helm/ddns-updater -f values.yaml
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span> (Cloudflare)
+## Basic Example (Cloudflare)
 
 ```yaml
 # values.yaml
 config:
-settings:
-  - provider: cloudflare
-zone_identifier: 'your-zone-id'
-domain: 'example.com'
-host: '@'
-ttl: 300
-token: 'your-cloudflare-api-token'
-proxied: false
-ip_version: 'ipv4'
+  settings:
+    - provider: cloudflare
+      zone_identifier: 'your-zone-id'
+      domain: 'example.com'
+      host: '@'
+      ttl: 300
+      token: 'your-cloudflare-api-token'
+      proxied: false
+      ip_version: 'ipv4'
 ```
 
 Access the web UI with `kubectl port-forward svc/<release>-ddns-updater 8000:80`.
 
-## <span data-i18n="docsCharts.heading.multiProviderExample">Multi-Provider Example</span>
+## Multi-Provider Example
 
 ```yaml
 config:
-settings:
-  - provider: cloudflare
-zone_identifier: 'cf-zone-id'
-domain: 'example.com'
-host: '@'
-token: 'cf-token'
-proxied: true
-  - provider: duckdns
-domain: 'myhost.duckdns.org'
-token: 'duck-token'
-  - provider: namecheap
-domain: 'example.org'
-host: 'home'
-password: 'ddns-password'
+  settings:
+    - provider: cloudflare
+      zone_identifier: 'cf-zone-id'
+      domain: 'example.com'
+      host: '@'
+      token: 'cf-token'
+      proxied: true
+    - provider: duckdns
+      domain: 'myhost.duckdns.org'
+      token: 'duck-token'
+    - provider: namecheap
+      domain: 'example.org'
+      host: 'home'
+      password: 'ddns-password'
 ```
 
-## <span data-i18n="docsCharts.heading.externalSecret">External Secret</span>
+## External Secret
 
 ```yaml
 config:
-existingSecret: ddns-config
-existingSecretKey: config.json
+  existingSecret: ddns-config
+  existingSecretKey: config.json
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                     | Default | Description                               |
 | ----------------------- | ------- | ----------------------------------------- |
-| `config.settings` | `[]` | <span data-i18n="docsCharts.auto.ddns_updater.t0">DNS records to update (provider-specific)</span> |
-| `config.existingSecret` | `""` | <span data-i18n="docsCharts.auto.ddns_updater.t1">Existing secret with config.json</span> |
-| `ddns.period` | `5m` | <span data-i18n="docsCharts.auto.ddns_updater.t2">Check interval</span> |
-| `ddns.httpTimeout` | `10s` | <span data-i18n="docsCharts.auto.ddns_updater.t3">HTTP timeout</span> |
-| `ddns.publicIpFetchers` | `all` | <span data-i18n="docsCharts.auto.ddns_updater.t4">IP detection method</span> |
-| `ddns.logLevel` | `info` | <span data-i18n="docsCharts.common.logLevel">Log level</span> |
-| `ddns.port` | `8000` | <span data-i18n="docsCharts.auto.ddns_updater.t5">Web UI container port</span> |
-| `persistence.enabled` | `true` | <span data-i18n="docsCharts.auto.ddns_updater.t6">Persist update history</span> |
-| `persistence.size` | `256Mi` | <span data-i18n="docsCharts.common.pvcSize">PVC size</span> |
-| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> for web UI |
+| `config.settings`       | `[]`    | DNS records to update (provider-specific) |
+| `config.existingSecret` | `""`    | Existing secret with config.json          |
+| `ddns.period`           | `5m`    | Check interval                            |
+| `ddns.httpTimeout`      | `10s`   | HTTP timeout                              |
+| `ddns.publicIpFetchers` | `all`   | IP detection method                       |
+| `ddns.logLevel`         | `info`  | Log level                                 |
+| `ddns.port`             | `8000`  | Web UI container port                     |
+| `persistence.enabled`   | `true`  | Persist update history                    |
+| `persistence.size`      | `256Mi` | PVC size                                  |
+| `ingress.enabled`       | `false` | Enable ingress for web UI                 |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/ddns-updater) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/ddns-updater) on GitHub.

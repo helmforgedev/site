@@ -8,26 +8,20 @@ description: HelmForge Minecraft chart — Java Edition server with Vanilla, Pap
 
 Deploy Minecraft Java Edition servers on Kubernetes using the [itzg/minecraft-server](https://docker-minecraft-server.readthedocs.io/) container image. Supports multiple server types, cross-play, modding, monitoring, and scheduled backups.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.minecraft.b0">
-    Multiple Server Types — Vanilla, Paper, Spigot, Forge, Fabric, Quilt
-  </span>
-- <span data-i18n="docsCharts.auto.minecraft.b1">
-    GeyserMC Cross-Play — Allow Bedrock clients (mobile, console) to join Java servers
-  </span>
-- <span data-i18n="docsCharts.auto.minecraft.b2">Authentication — Online/offline mode, whitelist, operators</span>
-- <span data-i18n="docsCharts.auto.minecraft.b3">RCON — Remote console with auto-generated password</span>
-- <span data-i18n="docsCharts.auto.minecraft.b4">
-    Scheduled Backups — CronJob-based backup to S3-compatible storage
-  </span>
-- <span data-i18n="docsCharts.auto.minecraft.b5">Prometheus Monitoring — mc-monitor sidecar with ServiceMonitor</span>
-- <span data-i18n="docsCharts.auto.minecraft.b6">Mod/Plugin Support — Modrinth, CurseForge, Spiget, direct URLs</span>
-- <span data-i18n="docsCharts.auto.minecraft.b7">Optimized JVM — Aikar's GC flags for production workloads</span>
+- **Multiple Server Types** — Vanilla, Paper, Spigot, Forge, Fabric, Quilt
+- **GeyserMC Cross-Play** — Allow Bedrock clients (mobile, console) to join Java servers
+- **Authentication** — Online/offline mode, whitelist, operators
+- **RCON** — Remote console with auto-generated password
+- **Scheduled Backups** — CronJob-based backup to S3-compatible storage
+- **Prometheus Monitoring** — mc-monitor sidecar with ServiceMonitor
+- **Mod/Plugin Support** — Modrinth, CurseForge, Spiget, direct URLs
+- **Optimized JVM** — Aikar's GC flags for production workloads
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -35,62 +29,70 @@ helm repo update
 helm install minecraft helmforge/minecraft --set server.eula=true
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install minecraft oci://ghcr.io/helmforgedev/helm/minecraft --set server.eula=true
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 ```yaml
 # values.yaml
 server:
-eula: true
-type: PAPER
-motd: 'My Minecraft Server'
-maxPlayers: 20jvm:
-memory: 2G
-useAikarFlags: true
+  eula: true
+  type: PAPER
+  motd: 'My Minecraft Server'
+  maxPlayers: 20
+
+jvm:
+  memory: 2G
+  useAikarFlags: true
+
 auth:
-onlineMode: true
-whitelist: 'player1,player2'
-ops: 'player1'
+  onlineMode: true
+  whitelist: 'player1,player2'
+  ops: 'player1'
+
 persistence:
-enabled: true
-size: 20Gi
+  enabled: true
+  size: 20Gi
 ```
 
-## <span data-i18n="docsCharts.heading.crossPlayExample">Cross-Play Example</span>
+## Cross-Play Example
 
 ```yaml
 server:
-eula: true
-type:
-  PAPERgeyser:
-enabled: true
-port: 19132mods:
-modrinthProjects: 'geyser,floodgate'
+  eula: true
+  type: PAPER
+
+geyser:
+  enabled: true
+  port: 19132
+
+mods:
+  modrinthProjects: 'geyser,floodgate'
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                   | Default   | Description                                       |
 | --------------------- | --------- | ------------------------------------------------- |
-| `server.eula` | `true` | <span data-i18n="docsCharts.auto.minecraft.t0">Accept the Minecraft EULA (required)</span> |
-| `server.type` | `VANILLA` | <span data-i18n="docsCharts.auto.minecraft.t1">Server type (VANILLA, PAPER, FORGE, FABRIC, etc.)</span> |
-| `server.version` | `LATEST` | <span data-i18n="docsCharts.auto.minecraft.t2">Minecraft version</span> |
-| `server.maxPlayers` | `20` | <span data-i18n="docsCharts.auto.minecraft.t3">Maximum concurrent players</span> |
-| `jvm.memory` | `1G` | <span data-i18n="docsCharts.auto.minecraft.t4">JVM heap allocation</span> |
-| `jvm.useAikarFlags` | `false` | <span data-i18n="docsCharts.auto.minecraft.t5">Aikar's optimized GC flags</span> |
-| `auth.onlineMode` | `true` | <span data-i18n="docsCharts.auto.minecraft.t6">Mojang online authentication</span> |
-| `auth.whitelist` | `""` | <span data-i18n="docsCharts.auto.minecraft.t7">Whitelisted players</span> |
-| `geyser.enabled` | `false` | <span data-i18n="docsCharts.auto.minecraft.t8">Enable GeyserMC cross-play</span> |
-| `rcon.enabled` | `true` | <span data-i18n="docsCharts.auto.minecraft.t9">Enable RCON remote console</span> |
-| `metrics.enabled` | `false` | <span data-i18n="docsCharts.common.enablePrometheusMetrics">Enable Prometheus metrics</span> |
-| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3Backups">Enable S3 backups</span> |
-| `persistence.enabled` | `true` | <span data-i18n="docsCharts.common.enablePersistentStorage">Enable persistent storage</span> |
-| `persistence.size` | `10Gi` | <span data-i18n="docsCharts.common.pvcSize">PVC size</span> |
+| `server.eula`         | `true`    | Accept the Minecraft EULA (required)              |
+| `server.type`         | `VANILLA` | Server type (VANILLA, PAPER, FORGE, FABRIC, etc.) |
+| `server.version`      | `LATEST`  | Minecraft version                                 |
+| `server.maxPlayers`   | `20`      | Maximum concurrent players                        |
+| `jvm.memory`          | `1G`      | JVM heap allocation                               |
+| `jvm.useAikarFlags`   | `false`   | Aikar's optimized GC flags                        |
+| `auth.onlineMode`     | `true`    | Mojang online authentication                      |
+| `auth.whitelist`      | `""`      | Whitelisted players                               |
+| `geyser.enabled`      | `false`   | Enable GeyserMC cross-play                        |
+| `rcon.enabled`        | `true`    | Enable RCON remote console                        |
+| `metrics.enabled`     | `false`   | Enable Prometheus metrics                         |
+| `backup.enabled`      | `false`   | Enable S3 backups                                 |
+| `persistence.enabled` | `true`    | Enable persistent storage                         |
+| `persistence.size`    | `10Gi`    | PVC size                                          |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/minecraft) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/minecraft) on GitHub.
