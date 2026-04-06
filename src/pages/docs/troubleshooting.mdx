@@ -6,17 +6,19 @@ description: Diagnose and fix common issues with HelmForge charts — CrashLoopB
 
 import Callout from '../../components/Callout.astro';
 
-# Troubleshooting
+# <span data-i18n="docsPage.troubleshooting.title">Troubleshooting</span>
 
-Symptom-based guide to diagnosing and resolving common issues with HelmForge charts.
+<span data-i18n="docsPage.troubleshooting.intro">
+  Symptom-based guide to diagnosing and resolving common issues with HelmForge charts.
+</span>
 
 ---
 
-## Pod stays in CrashLoopBackOff
+## <span data-i18n="docsPage.troubleshooting.crashloop">Pod stays in CrashLoopBackOff</span>
 
-**Symptoms:** Pod restarts repeatedly, `kubectl get pods` shows `CrashLoopBackOff` status.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.crashloopSymptoms">Pod restarts repeatedly, `kubectl get pods` shows `CrashLoopBackOff` status.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 # Check pod logs
@@ -26,15 +28,15 @@ kubectl logs <pod-name> --previous
 kubectl describe pod <pod-name>
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                                 | Fix                                                           |
-| ------------------------------------- | ------------------------------------------------------------- |
-| Missing or wrong database credentials | Check `auth.existingSecret` references and secret key names   |
-| Insufficient memory (OOMKilled)       | Increase `resources.limits.memory`                            |
-| Wrong image tag or missing image      | Verify `image.tag` matches a valid published version          |
-| Config file syntax error              | Check mounted ConfigMaps for YAML/JSON syntax                 |
-| Dependency not ready                  | Ensure dependent services (database, Redis) are running first |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>     |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| Missing or wrong database credentials                         | Check `auth.existingSecret` references and secret key names   |
+| Insufficient memory (OOMKilled)                               | Increase `resources.limits.memory`                            |
+| Wrong image tag or missing image                              | Verify `image.tag` matches a valid published version          |
+| Config file syntax error                                      | Check mounted ConfigMaps for YAML/JSON syntax                 |
+| Dependency not ready                                          | Ensure dependent services (database, Redis) are running first |
 
 <Callout type="tip">
   If the pod log shows `exec format error`, you may be running an AMD64 image on an ARM node (or vice versa). Check the
@@ -43,33 +45,33 @@ kubectl describe pod <pod-name>
 
 ---
 
-## PVC stuck in Pending
+## <span data-i18n="docsPage.troubleshooting.pvc">PVC stuck in Pending</span>
 
-**Symptoms:** `kubectl get pvc` shows `Pending` status, pods cannot start.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.pvcSymptoms">`kubectl get pvc` shows `Pending` status, pods cannot start.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 kubectl describe pvc <pvc-name>
 kubectl get storageclass
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                        | Fix                                                                                                                               |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| No default StorageClass      | Set a default: `kubectl patch sc <name> -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'` |
-| StorageClass doesn't exist   | Create the StorageClass or change `persistence.storageClass` in values                                                            |
-| Insufficient cluster storage | Free disk space or add nodes                                                                                                      |
-| WaitForFirstConsumer binding | The PVC binds when a pod is scheduled — check pod scheduling issues                                                               |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>                                                                         |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| No default StorageClass                                       | Set a default: `kubectl patch sc <name> -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'` |
+| StorageClass doesn't exist                                    | Create the StorageClass or change `persistence.storageClass` in values                                                            |
+| Insufficient cluster storage                                  | Free disk space or add nodes                                                                                                      |
+| WaitForFirstConsumer binding                                  | The PVC binds when a pod is scheduled — check pod scheduling issues                                                               |
 
 ---
 
-## Database connection refused
+## <span data-i18n="docsPage.troubleshooting.db">Database connection refused</span>
 
-**Symptoms:** Application pods log `connection refused` or `could not connect to server` when trying to reach a database.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.dbSymptoms">Application pods log `connection refused` or `could not connect to server` when trying to reach a database.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 # Check if the database pod is running
@@ -83,23 +85,23 @@ kubectl run debug --rm -it --image=busybox -- sh
 # then: nc -zv <service-name> <port>
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                           | Fix                                                                          |
-| ------------------------------- | ---------------------------------------------------------------------------- |
-| Database pod not ready          | Wait for readiness probe to pass, check logs for startup errors              |
-| Wrong service name              | Use the full service name: `<release>-<chart>.<namespace>.svc.cluster.local` |
-| Wrong port                      | Check `service.port` in the chart's values                                   |
-| Network policy blocking traffic | Check NetworkPolicies in the namespace                                       |
-| Auth mismatch                   | Verify the application uses the same credentials as the database chart       |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>                    |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Database pod not ready                                        | Wait for readiness probe to pass, check logs for startup errors              |
+| Wrong service name                                            | Use the full service name: `<release>-<chart>.<namespace>.svc.cluster.local` |
+| Wrong port                                                    | Check `service.port` in the chart's values                                   |
+| Network policy blocking traffic                               | Check NetworkPolicies in the namespace                                       |
+| Auth mismatch                                                 | Verify the application uses the same credentials as the database chart       |
 
 ---
 
-## Ingress returns 404 or 503
+## <span data-i18n="docsPage.troubleshooting.ingress">Ingress returns 404 or 503</span>
 
-**Symptoms:** Ingress resource exists but the application returns 404 or 503 errors.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.ingressSymptoms">Ingress resource exists but the application returns 404 or 503 errors.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 # Check ingress resource
@@ -112,23 +114,23 @@ kubectl logs -n <ingress-namespace> -l app.kubernetes.io/name=<controller>
 kubectl get endpoints <service-name>
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                           | Fix                                                                     |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| Wrong `ingressClassName`        | Match the class to your installed controller (`traefik`, `nginx`, etc.) |
-| No ingress controller installed | Install one: `helm install traefik traefik/traefik`                     |
-| Service has no endpoints        | Check if pods are running and passing readiness probes                  |
-| Path mismatch                   | Verify `pathType` (`Prefix` vs `Exact`) matches your app's routing      |
-| TLS secret missing              | Create the TLS secret or configure cert-manager                         |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>               |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Wrong `ingressClassName`                                      | Match the class to your installed controller (`traefik`, `nginx`, etc.) |
+| No ingress controller installed                               | Install one: `helm install traefik traefik/traefik`                     |
+| Service has no endpoints                                      | Check if pods are running and passing readiness probes                  |
+| Path mismatch                                                 | Verify `pathType` (`Prefix` vs `Exact`) matches your app's routing      |
+| TLS secret missing                                            | Create the TLS secret or configure cert-manager                         |
 
 ---
 
-## Backup CronJob never runs
+## <span data-i18n="docsPage.troubleshooting.backup">Backup CronJob never runs</span>
 
-**Symptoms:** Backup is enabled but no backup jobs appear.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.backupSymptoms">Backup is enabled but no backup jobs appear.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 # Check CronJob exists
@@ -141,15 +143,15 @@ kubectl describe cronjob <cronjob-name>
 kubectl get jobs -l app.kubernetes.io/name=<chart-name>
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                              | Fix                                                           |
-| ---------------------------------- | ------------------------------------------------------------- |
-| `backup.enabled` not set to `true` | Set `backup.enabled: true` in values                          |
-| Invalid cron schedule              | Validate schedule syntax (5 fields, no seconds)               |
-| S3 credentials wrong               | Test S3 connectivity manually with `aws s3 ls --endpoint-url` |
-| Job deadline exceeded              | Increase `backup.activeDeadlineSeconds`                       |
-| Suspended CronJob                  | Check `spec.suspend` field — set to `false`                   |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>     |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `backup.enabled` not set to `true`                            | Set `backup.enabled: true` in values                          |
+| Invalid cron schedule                                         | Validate schedule syntax (5 fields, no seconds)               |
+| S3 credentials wrong                                          | Test S3 connectivity manually with `aws s3 ls --endpoint-url` |
+| Job deadline exceeded                                         | Increase `backup.activeDeadlineSeconds`                       |
+| Suspended CronJob                                             | Check `spec.suspend` field — set to `false`                   |
 
 <Callout type="warning">
   Backup jobs use the same ServiceAccount as the main pod. If you have restrictive PodSecurityPolicies or
@@ -158,13 +160,13 @@ kubectl get jobs -l app.kubernetes.io/name=<chart-name>
 
 ---
 
-## Helm upgrade fails with conflict
+## <span data-i18n="docsPage.troubleshooting.upgrade">Helm upgrade fails with conflict</span>
 
-**Symptoms:** `helm upgrade` fails with `cannot patch` or `field is immutable` errors.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.upgradeSymptoms">`helm upgrade` fails with `cannot patch` or `field is immutable` errors.</span>
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                                                              | Fix                                                               |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span>      | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>         |
 | ------------------------------------------------------------------ | ----------------------------------------------------------------- |
 | Immutable field changed (e.g., StatefulSet `volumeClaimTemplates`) | Delete the StatefulSet with `--cascade=orphan` and re-run upgrade |
 | Resource owned by another release                                  | Check `meta.helm.sh/release-name` annotation                      |
@@ -183,11 +185,11 @@ helm upgrade my-release helmforge/<chart-name> -f values.yaml
 
 ---
 
-## Helm install times out
+## <span data-i18n="docsPage.troubleshooting.timeout">Helm install times out</span>
 
-**Symptoms:** `helm install --wait` times out before pods are ready.
+**<span data-i18n="docsPage.troubleshooting.symptoms">Symptoms:</span>** <span data-i18n="docsPage.troubleshooting.timeoutSymptoms">`helm install --wait` times out before pods are ready.</span>
 
-**Diagnosis:**
+**<span data-i18n="docsPage.troubleshooting.diagnosis">Diagnosis:</span>**
 
 ```bash
 kubectl get pods -l app.kubernetes.io/instance=<release>
@@ -195,18 +197,18 @@ kubectl describe pod <pod-name>
 kubectl get events --sort-by=.metadata.creationTimestamp
 ```
 
-**Common causes:**
+**<span data-i18n="docsPage.troubleshooting.commonCauses">Common causes:</span>**
 
-| Cause                        | Fix                                                            |
-| ---------------------------- | -------------------------------------------------------------- |
-| Image pull error             | Check image name, tag, and pull secrets                        |
-| Resource quota exceeded      | Check namespace ResourceQuotas                                 |
-| Node scheduling issues       | Check node taints, tolerations, and available resources        |
-| Slow startup (large DB init) | Increase `--timeout` flag: `helm install --wait --timeout 10m` |
+| <span data-i18n="docsPage.troubleshooting.cause">Cause</span> | <span data-i18n="docsPage.troubleshooting.fix">Fix</span>      |
+| ------------------------------------------------------------- | -------------------------------------------------------------- |
+| Image pull error                                              | Check image name, tag, and pull secrets                        |
+| Resource quota exceeded                                       | Check namespace ResourceQuotas                                 |
+| Node scheduling issues                                        | Check node taints, tolerations, and available resources        |
+| Slow startup (large DB init)                                  | Increase `--timeout` flag: `helm install --wait --timeout 10m` |
 
 ---
 
-## General debugging commands
+## <span data-i18n="docsPage.troubleshooting.commands">General debugging commands</span>
 
 ```bash
 # Overview of release status

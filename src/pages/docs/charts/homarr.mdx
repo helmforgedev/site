@@ -8,20 +8,32 @@ description: Helm chart for Homarr modern application dashboard on Kubernetes wi
 
 Helm chart for deploying [Homarr](https://homarr.dev/) modern application dashboard on Kubernetes using the official [`ghcr.io/homarr-labs/homarr`](https://github.com/homarr-labs/homarr/pkgs/container/homarr) container image.
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **Official Homarr image** from `ghcr.io/homarr-labs/homarr`
-- **Database backends** SQLite3 (default), PostgreSQL, or MySQL with auto-detection
-- **PostgreSQL and MySQL subcharts** optional bundled database deployments
-- **Encryption key management** auto-generated or existing secret for `SECRET_ENCRYPTION_KEY`
-- **Kubernetes integration** optional workload discovery via `ENABLE_KUBERNETES`
-- **External Redis** optional external Redis for multi-instance setups
-- **S3-compatible backup** database-aware CronJob (SQLite tar, pg_dump, mysqldump)
-- **Ingress support** configurable ingress with TLS
+- <span data-i18n="docsCharts.auto.homarr.b0">Official Homarr image from `ghcr.io/homarr-labs/homarr`</span>
+- <span data-i18n="docsCharts.common.feature.databaseBackendsAutoDetection">
+    **Database backends** SQLite3 (default), PostgreSQL, or MySQL with auto-detection
+  </span>
+- <span data-i18n="docsCharts.common.feature.postgresqlMysqlSubchartsOptional">
+    **PostgreSQL and MySQL subcharts** optional bundled database deployments
+  </span>
+- <span data-i18n="docsCharts.auto.homarr.b1">
+    Encryption key management auto-generated or existing secret for `SECRET_ENCRYPTION_KEY`
+  </span>
+- <span data-i18n="docsCharts.auto.homarr.b2">
+    Kubernetes integration optional workload discovery via `ENABLE_KUBERNETES`
+  </span>
+- <span data-i18n="docsCharts.auto.homarr.b3">External Redis optional external Redis for multi-instance setups</span>
+- <span data-i18n="docsCharts.common.feature.s3CompatibleBackupDatabaseAware">
+    **S3-compatible backup** database-aware CronJob (SQLite tar, pg_dump, mysqldump)
+  </span>
+- <span data-i18n="docsCharts.common.feature.ingressConfigurableTls">
+    **Ingress support** configurable ingress with TLS
+  </span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-### HTTPS Repository
+**HTTPS Repository**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -29,85 +41,79 @@ helm repo update
 helm install homarr helmforge/homarr
 ```
 
-### OCI Registry
+**OCI Registry**
 
 ```bash
 helm install homarr oci://ghcr.io/helmforgedev/helm/homarr
 ```
 
-## Basic Example
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
 
 ```yaml
 homarr:
-  enableKubernetes: true
-
+enableKubernetes: true
 postgresql:
-  enabled: true
-  auth:
-    database: homarr
-    username: homarr
-    password: 'db-password'
-
+enabled: true
+auth:
+  database: homarr
+username: homarr
+password: 'db-password'
 ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: dash.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: homarr-tls
-      hosts:
-        - dash.example.com
-
+enabled: true
+ingressClassName: traefik
+hosts:
+  - host: dash.example.com
+paths:
+  - path: /
+pathType: Prefix
+tls:
+  - secretName: homarr-tls
+hosts:
+  - dash.example.com
 backup:
-  enabled: true
-  schedule: '0 3 * * *'
-  s3:
-    endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: homarr
-    existingSecret: homarr-s3-credentials
+enabled: true
+schedule: '0 3 * * *'
+s3:
+  endpoint:
+https://s3.amazonaws.com
+bucket: my-backups
+prefix: homarr
+existingSecret: homarr-s3-credentials
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                         | Default                 | Description                                              |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
+
 | --------------------------- | ----------------------- | -------------------------------------------------------- |
-| `homarr.logLevel`           | `info`                  | Log level                                                |
-| `homarr.authProviders`      | `credentials`           | Auth providers (credentials, ldap, oidc)                 |
-| `homarr.enableKubernetes`   | `false`                 | Enable K8s workload discovery                            |
-| `encryption.key`            | `""`                    | 32-byte hex encryption key (auto-generated)              |
-| `encryption.existingSecret` | `""`                    | Existing secret with encryption key                      |
-| `database.mode`             | `auto`                  | Database mode: auto, sqlite, external, postgresql, mysql |
-| `database.sqlite.path`      | `/appdata/db/db.sqlite` | SQLite file path                                         |
-| `postgresql.enabled`        | `false`                 | Deploy PostgreSQL subchart                               |
-| `mysql.enabled`             | `false`                 | Deploy MySQL subchart                                    |
-| `redis.external`            | `false`                 | Use external Redis                                       |
-| `redis.host`                | `""`                    | External Redis host                                      |
-| `persistence.enabled`       | `true`                  | Enable persistent storage                                |
-| `persistence.size`          | `1Gi`                   | Volume size                                              |
-| `service.type`              | `ClusterIP`             | Service type                                             |
-| `service.port`              | `7575`                  | Service port                                             |
-| `ingress.enabled`           | `false`                 | Enable ingress                                           |
-| `ingress.ingressClassName`  | `""`                    | Ingress class (`traefik`, `nginx`, etc.)                 |
-| `backup.enabled`            | `false`                 | Enable S3 backup CronJob                                 |
-| `backup.schedule`           | `"0 3 * * *"`           | Backup cron schedule                                     |
-| `backup.s3.endpoint`        | `""`                    | S3-compatible endpoint URL                               |
-| `backup.s3.bucket`          | `""`                    | S3 bucket name                                           |
-| `backup.s3.existingSecret`  | `""`                    | Existing secret with S3 credentials                      |
+| `homarr.logLevel` | `info` | <span data-i18n="docsCharts.common.logLevel">Log level</span> |
+| `homarr.authProviders` | `credentials` | <span data-i18n="docsCharts.auto.homarr.t0">Auth providers (credentials, ldap, oidc)</span> |
+| `homarr.enableKubernetes` | `false` | <span data-i18n="docsCharts.auto.homarr.t1">Enable K8s workload discovery</span> |
+| `encryption.key` | `""` | 32-byte hex encryption key (auto-generated) |
+| `encryption.existingSecret` | `""` | <span data-i18n="docsCharts.auto.homarr.t2">Existing secret with encryption key</span> |
+| `database.mode` | `auto` | <span data-i18n="docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql">Database mode: auto, sqlite, external, postgresql, mysql</span> |
+| `database.sqlite.path` | `/appdata/db/db.sqlite` | <span data-i18n="docsCharts.auto.homarr.t3">SQLite file path</span> |
+| `postgresql.enabled` | `false` | <span data-i18n="docsCharts.common.deployPostgresqlSubchart">Deploy PostgreSQL subchart</span> |
+| `mysql.enabled` | `false` | <span data-i18n="docsCharts.common.deployMysqlSubchart">Deploy MySQL subchart</span> |
+| `redis.external` | `false` | <span data-i18n="docsCharts.common.useExternalRedis">Use external Redis</span> |
+| `redis.host` | `""` | <span data-i18n="docsCharts.auto.homarr.t4">External Redis host</span> |
+| `persistence.enabled` | `true` | <span data-i18n="docsCharts.common.enablePersistentStorage">Enable persistent storage</span> |
+| `persistence.size` | `1Gi` | <span data-i18n="docsCharts.common.volumeSize">Volume size</span> |
+| `service.type` | `ClusterIP` | <span data-i18n="docsCharts.common.serviceType">Service type</span> |
+| `service.port` | `7575` | <span data-i18n="docsCharts.common.servicePort">Service port</span> |
+| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
+| `ingress.ingressClassName` | `""` | <span data-i18n="docsCharts.common.ingressClassTraefikNginx">Ingress class (`traefik`, `nginx`, etc.)</span> |
+| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3BackupCronjob">Enable S3 backup CronJob</span> |
+| `backup.schedule` | `"0 3 * * *"` | <span data-i18n="docsCharts.common.backupCronSchedule">Backup cron schedule</span> |
+| `backup.s3.endpoint` | `""` | <span data-i18n="docsCharts.common.s3CompatibleEndpointUrl">S3-compatible endpoint URL</span> |
+| `backup.s3.bucket` | `""` | <span data-i18n="docsCharts.common.s3BucketName">S3 bucket name</span> |
+| `backup.s3.existingSecret` | `""` | <span data-i18n="docsCharts.common.existingSecretS3Credentials">Existing secret with S3 credentials</span> |
 
-## Database Auto-Detection
+## <span data-i18n="docsCharts.heading.databaseAutoDetection">Database Auto-Detection</span>
 
-When `database.mode` is `auto` (default), the chart detects which database to use:
+When `database.mode` is `auto` (default), the chart detects which database to use:1. If `database.external.host` is set → **external** database2. If `postgresql.enabled` is `true` → **PostgreSQL subchart**3. If `mysql.enabled` is `true` → **MySQL subchart**4. Otherwise → **SQLite3** (zero configuration)
 
-1. If `database.external.host` is set → **external** database
-2. If `postgresql.enabled` is `true` → **PostgreSQL subchart**
-3. If `mysql.enabled` is `true` → **MySQL subchart**
-4. Otherwise → **SQLite3** (zero configuration)
-
-## Encryption Key
+## <span data-i18n="docsCharts.heading.encryptionKey">Encryption Key</span>
 
 Homarr requires a `SECRET_ENCRYPTION_KEY` for encrypting integration secrets. The chart auto-generates a 64-character hex key on first install if not provided. To set your own:
 
@@ -117,6 +123,6 @@ openssl rand -hex 32
 
 Then pass it via `encryption.key` or an existing secret.
 
-## More Information
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
 
 - [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/homarr)

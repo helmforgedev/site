@@ -6,21 +6,35 @@ description: Helm chart for Flowise on Kubernetes with standalone SQLite mode or
 
 # Flowise
 
-Helm chart for deploying [Flowise](https://flowiseai.com/) on Kubernetes using the official [`flowiseai/flowise`](https://hub.docker.com/r/flowiseai/flowise) image, with a simple standalone topology and a scalable queue topology for larger workloads.
+<span data-i18n="docsCharts.flowise.intro.before">Helm chart for deploying</span> [Flowise](https://flowiseai.com/)
+<span data-i18n="docsCharts.flowise.intro.after">
+  on Kubernetes using the official `flowiseai/flowise` image, with a simple standalone topology and a scalable queue
+  topology for larger workloads.
+</span>
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **Official Flowise image** based on `flowiseai/flowise`
-- **Standalone mode** SQLite and local storage for simple installs
-- **Queue mode** separate main and worker deployments for scalable processing
-- **Bundled PostgreSQL and Redis** optional subcharts for queue mode
-- **External SQL support** external PostgreSQL or MySQL
-- **S3-backed shared storage** queue mode uses S3-compatible storage for shared blob data
-- **Ingress support** configurable ingress for the Flowise web UI
+- <span data-i18n="docsCharts.flowise.feature.officialImage">Official Flowise image based on `flowiseai/flowise`</span>
+- <span data-i18n="docsCharts.flowise.feature.standaloneMode">
+    Standalone mode — SQLite and local storage for simple installs
+  </span>
+- <span data-i18n="docsCharts.flowise.feature.queueMode">
+    Queue mode — separate main and worker deployments for scalable processing
+  </span>
+- <span data-i18n="docsCharts.flowise.feature.bundledDeps">
+    Bundled PostgreSQL and Redis — optional subcharts for queue mode
+  </span>
+- <span data-i18n="docsCharts.flowise.feature.externalSql">External SQL support — external PostgreSQL or MySQL</span>
+- <span data-i18n="docsCharts.flowise.feature.s3Storage">
+    S3-backed shared storage — queue mode uses S3-compatible storage for shared blob data
+  </span>
+- <span data-i18n="docsCharts.flowise.feature.ingressSupport">
+    Ingress support — configurable ingress for the Flowise web UI
+  </span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-### HTTPS Repository
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,13 +42,13 @@ helm repo update
 helm install flowise helmforge/flowise
 ```
 
-### OCI Registry
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install flowise oci://ghcr.io/helmforgedev/helm/flowise
 ```
 
-## Standalone Example
+## <span data-i18n="docsCharts.heading.standaloneExample">Standalone Example</span>
 
 ```yaml
 architecture:
@@ -53,7 +67,7 @@ ingress:
           pathType: Prefix
 ```
 
-## Queue Example
+## <span data-i18n="docsCharts.heading.queueModeExample">Queue Mode Example</span>
 
 ```yaml
 architecture:
@@ -82,32 +96,44 @@ storage:
     existingSecret: flowise-s3
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                         | Default      | Description                                          |
-| --------------------------- | ------------ | ---------------------------------------------------- |
-| `architecture.mode`         | `standalone` | Flowise topology: `standalone` or `queue`            |
-| `flowise.replicaCount`      | `1`          | Number of main Flowise server replicas               |
-| `queue.worker.replicaCount` | `1`          | Number of worker replicas in queue mode              |
-| `database.mode`             | `auto`       | Database mode: `sqlite`, `external`, or `postgresql` |
-| `postgresql.enabled`        | `false`      | Deploy bundled PostgreSQL                            |
-| `redis.enabled`             | `false`      | Deploy bundled Redis                                 |
-| `storage.type`              | `local`      | Blob storage type: `local` or `s3`                   |
-| `persistence.enabled`       | `true`       | Persist local Flowise data                           |
-| `flowise.appUrl`            | `""`         | Public Flowise URL                                   |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>                                                   |
+| ------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `architecture.mode`                               | `standalone`                                              | <span data-i18n="docsCharts.flowise.table.architectureMode">Flowise topology: `standalone` or `queue`</span>        |
+| `flowise.replicaCount`                            | `1`                                                       | <span data-i18n="docsCharts.flowise.table.replicaCount">Number of main Flowise server replicas</span>               |
+| `queue.worker.replicaCount`                       | `1`                                                       | <span data-i18n="docsCharts.flowise.table.workerReplicaCount">Number of worker replicas in queue mode</span>        |
+| `database.mode`                                   | `auto`                                                    | <span data-i18n="docsCharts.flowise.table.databaseMode">Database mode: `sqlite`, `external`, or `postgresql`</span> |
+| `postgresql.enabled`                              | `false`                                                   | <span data-i18n="docsCharts.flowise.table.postgresqlEnabled">Deploy bundled PostgreSQL</span>                       |
+| `redis.enabled`                                   | `false`                                                   | <span data-i18n="docsCharts.flowise.table.redisEnabled">Deploy bundled Redis</span>                                 |
+| `storage.type`                                    | `local`                                                   | <span data-i18n="docsCharts.flowise.table.storageType">Blob storage type: `local` or `s3`</span>                    |
+| `persistence.enabled`                             | `true`                                                    | <span data-i18n="docsCharts.flowise.table.persistenceEnabled">Persist local Flowise data</span>                     |
+| `flowise.appUrl`                                  | `""`                                                      | <span data-i18n="docsCharts.flowise.table.appUrl">Public Flowise URL</span>                                         |
 
-## Topology Notes
+## <span data-i18n="docsCharts.heading.topologyNotes">Topology Notes</span>
 
-- `standalone` defaults to SQLite plus a local PVC for the easiest install
-- `queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`
-- queue mode is intended for scale-out deployments with separate main and worker pods
-- local storage is intentionally single-node oriented
+- <span data-i18n="docsCharts.flowise.note.standaloneDefaults">
+    `standalone` defaults to SQLite plus a local PVC for the easiest install
+  </span>
+- <span data-i18n="docsCharts.flowise.note.queueRequirements">
+    `queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`
+  </span>
+- <span data-i18n="docsCharts.flowise.note.queueScaleOut">
+    Queue mode is intended for scale-out deployments with separate main and worker pods
+  </span>
+- <span data-i18n="docsCharts.flowise.note.localSingleNode">Local storage is intentionally single-node oriented</span>
 
-## Version Note
+## <span data-i18n="docsCharts.heading.versionNote">Version Note</span>
 
-- the chart pins `3.1.1`
-- this version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag `3.1.1`
+- <span data-i18n="docsCharts.flowise.note.versionPinned">The chart pins `3.1.1`</span>
+- <span data-i18n="docsCharts.flowise.note.versionValidated">
+    This version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag
+    `3.1.1`
+  </span>
 
-## More Information
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/flowise)
+<span data-i18n="docsCharts.moreInfo.before">See the</span> [
+<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>
+](https://github.com/helmforgedev/charts/tree/main/charts/flowise)
+<span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>

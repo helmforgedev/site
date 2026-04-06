@@ -8,23 +8,23 @@ description: HelmForge Authelia chart — SSO, MFA, OpenID Connect, forward auth
 
 Deploy [Authelia](https://www.authelia.com) on Kubernetes using the official [authelia/authelia](https://hub.docker.com/r/authelia/authelia) Docker image. Authentication and authorization server with single sign-on, multi-factor authentication, and OpenID Connect identity provider.
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **Forward auth middleware** — Traefik, nginx, Caddy, Envoy
-- **Multi-factor authentication** — TOTP, WebAuthn/FIDO2, Duo
-- **OpenID Connect** — certified identity provider for SSO
-- **File or LDAP** authentication backends
-- **SQLite, PostgreSQL, or MySQL** storage backends
-- **Redis** session storage for stateless HA deployments
-- **Access control rules** — domain, user, group, and network policies
-- **Brute force protection** — configurable regulation
-- **Prometheus metrics** with optional ServiceMonitor
-- **S3 backup** — SQLite tar, pg_dump, or mysqldump with S3 upload
-- **Ingress support** — TLS with cert-manager
+- <span data-i18n="docsCharts.auto.authelia.b0">Forward auth middleware — Traefik, nginx, Caddy, Envoy</span>
+- <span data-i18n="docsCharts.auto.authelia.b1">Multi-factor authentication — TOTP, WebAuthn/FIDO2, Duo</span>
+- <span data-i18n="docsCharts.auto.authelia.b2">OpenID Connect — certified identity provider for SSO</span>
+- <span data-i18n="docsCharts.auto.authelia.b3">File or LDAP authentication backends</span>
+- <span data-i18n="docsCharts.auto.authelia.b4">SQLite, PostgreSQL, or MySQL storage backends</span>
+- <span data-i18n="docsCharts.auto.authelia.b5">Redis session storage for stateless HA deployments</span>
+- <span data-i18n="docsCharts.auto.authelia.b6">Access control rules — domain, user, group, and network policies</span>
+- <span data-i18n="docsCharts.auto.authelia.b7">Brute force protection — configurable regulation</span>
+- <span data-i18n="docsCharts.auto.authelia.b8">Prometheus metrics with optional ServiceMonitor</span>
+- <span data-i18n="docsCharts.auto.authelia.b9">S3 backup — SQLite tar, pg_dump, or mysqldump with S3 upload</span>
+- <span data-i18n="docsCharts.auto.authelia.b10">Ingress support — TLS with cert-manager</span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-**HTTPS repository:**
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -32,92 +32,86 @@ helm repo update
 helm install authelia helmforge/authelia -f values.yaml
 ```
 
-**OCI registry:**
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install authelia oci://ghcr.io/helmforgedev/helm/authelia -f values.yaml
 ```
 
-## Basic Example (SQLite)
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span> (SQLite)
 
 ```yaml
 secrets:
-  jwtSecret: 'your-64-char-random-string'
-  sessionSecret: 'your-64-char-random-string'
-  storageEncryptionKey: 'your-20-plus-char-string'
-
+jwtSecret: 'your-64-char-random-string'
+sessionSecret: 'your-64-char-random-string'
+storageEncryptionKey: 'your-20-plus-char-string'
 config:
-  session:
-    cookies:
-      - domain: example.com
-        authelia_url: 'https://auth.example.com'
-  access_control:
-    default_policy: one_factor
-
-usersDatabase:
+session:
+  cookies:
+    - domain: example.com
+authelia_url: 'https://auth.example.com'
+access_control:
+  default_policy:
+one_factorusersDatabase:
   users:
-    admin:
-      displayname: 'Admin'
-      email: 'admin@example.com'
-      password: '$argon2id$v=19$m=65536,t=3,p=4$...'
-      groups:
-        - admins
+admin:
+  displayname: 'Admin'
+email: 'admin@example.com'
+password: '$argon2id$v=19$m=65536,t=3,p=4$...'
+groups:
+  - admins
 ```
 
 After deploying, access via `kubectl port-forward svc/<release>-authelia 9091:80`.
 
-## PostgreSQL + Redis Mode
+## <span data-i18n="docsCharts.heading.postgresqlRedisMode">PostgreSQL + Redis Mode</span>
 
 ```yaml
 database:
-  type: postgres
-
+type: postgres
 postgresql:
-  enabled: true
-  auth:
-    password: 'change-me'
-
+enabled: true
+auth:
+  password: 'change-me'
 redis:
-  enabled: true
-  auth:
-    password: 'change-me'
+enabled: true
+auth:
+  password: 'change-me'
 ```
 
-## External Database
+## <span data-i18n="docsCharts.heading.externalDatabase">External Database</span>
 
 ```yaml
 database:
-  type: postgres
-  external:
-    host: postgres.example.com
-    name: authelia
-    username: authelia
-    existingSecret: authelia-db-credentials
-
+type: postgres
+external:
+  host: postgres.example.com
+name: authelia
+username: authelia
+existingSecret: authelia-db-credentials
 postgresql:
-  enabled: false
+enabled: false
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                            | Default           | Description                        |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
+
 | ------------------------------ | ----------------- | ---------------------------------- |
-| `config`                       | (see values.yaml) | Full Authelia configuration YAML   |
-| `secrets.jwtSecret`            | `""`              | JWT secret (64+ chars)             |
-| `secrets.sessionSecret`        | `""`              | Session secret (64+ chars)         |
-| `secrets.storageEncryptionKey` | `""`              | Storage encryption key (20+ chars) |
-| `database.type`                | `sqlite`          | Storage: sqlite, postgres, mysql   |
-| `usersDatabase.enabled`        | `true`            | Enable file-based user database    |
-| `persistence.enabled`          | `true`            | Enable persistence for /data       |
-| `persistence.size`             | `1Gi`             | PVC size                           |
-| `ingress.enabled`              | `false`           | Enable ingress                     |
-| `metrics.enabled`              | `false`           | Enable metrics service             |
-| `backup.enabled`               | `false`           | Enable S3 backups                  |
-| `postgresql.enabled`           | `false`           | Deploy PostgreSQL subchart         |
-| `mysql.enabled`                | `false`           | Deploy MySQL subchart              |
-| `redis.enabled`                | `false`           | Deploy Redis subchart              |
-| `service.port`                 | `80`              | Service port                       |
+| `config` | (see values.yaml) | Full Authelia configuration YAML |
+| `secrets.jwtSecret` | `""` | <span data-i18n="docsCharts.auto.authelia.t0">JWT secret (64+ chars)</span> |
+| `secrets.sessionSecret` | `""` | <span data-i18n="docsCharts.auto.authelia.t1">Session secret (64+ chars)</span> |
+| `secrets.storageEncryptionKey` | `""` | <span data-i18n="docsCharts.auto.authelia.t2">Storage encryption key (20+ chars)</span> |
+| `database.type` | `sqlite` | <span data-i18n="docsCharts.auto.authelia.t3">Storage: sqlite, postgres, mysql</span> |
+| `usersDatabase.enabled` | `true` | <span data-i18n="docsCharts.auto.authelia.t4">Enable file-based user database</span> |
+| `persistence.enabled` | `true` | <span data-i18n="docsCharts.auto.authelia.t5">Enable persistence for /data</span> |
+| `persistence.size` | `1Gi` | <span data-i18n="docsCharts.common.pvcSize">PVC size</span> |
+| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
+| `metrics.enabled` | `false` | <span data-i18n="docsCharts.auto.authelia.t6">Enable metrics service</span> |
+| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3Backups">Enable S3 backups</span> |
+| `postgresql.enabled` | `false` | <span data-i18n="docsCharts.common.deployPostgresqlSubchart">Deploy PostgreSQL subchart</span> |
+| `mysql.enabled` | `false` | <span data-i18n="docsCharts.common.deployMysqlSubchart">Deploy MySQL subchart</span> |
+| `redis.enabled` | `false` | <span data-i18n="docsCharts.common.deployRedisSubchart">Deploy Redis subchart</span> |
+| `service.port` | `80` | <span data-i18n="docsCharts.common.servicePort">Service port</span> |
 
-## More Information
-
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/authelia) on GitHub.
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/authelia) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>

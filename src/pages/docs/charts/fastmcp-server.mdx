@@ -8,45 +8,111 @@ description: Helm chart for FastMCP server — deploy MCP tools, resources, prom
 
 Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmcp-server) on Kubernetes — a MCP (Model Context Protocol) server that dynamically loads tools, resources, prompts, and knowledge bases from multiple sources.
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **Multi-source loading** — tools, resources, prompts, and knowledge from inline ConfigMaps, S3-compatible storage (AWS S3, MinIO, R2), or Git repositories
-- **Merge precedence** — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching the bucket
-- **Bearer and JWT authentication** — built-in via FastMCP's `StaticTokenVerifier` and `JWTVerifier`
-- **Knowledge base support** — serve Markdown files as MCP resources for RAG and context injection
-- **Extra pip packages** — install additional Python packages at startup before loading tools
-- **Tool metadata** — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables for tool categorization and behavior hints
-- **Resource templates** — parameterized URIs like `users://{user_id}/profile` for dynamic resources
-- **Multiple resources per file** — `RESOURCES` dict maps multiple URIs to handler functions
-- **Error masking** — hide internal error details from clients via `MCP_MASK_ERROR_DETAILS`
-- **Duplicate handling** — control behavior when tools share names via `MCP_ON_DUPLICATE_TOOLS`
-- **Built-in Web UI** — dashboard at `/ui` with tools/resources/prompts explorer (Alpine.js + Tailwind CDN)
-- **Prometheus metrics** — tool call counts, durations, errors, source sync status at `/metrics`
-- **Structured JSON logging** — `LOG_FORMAT=json` for Loki, ELK, CloudWatch, Datadog
-- **Dedicated health endpoints** — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)
-- **Diagnostic endpoint** — `GET /debug/info` with full server introspection
-- **Init container pattern** — pre-sync sources before server starts via `initSync.enabled`
-- **Strict loading** — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors
-- **Hot reload** — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`
-- **Periodic sync** — poll S3/Git sources for changes at configurable intervals
-- **Webhook reload** — `POST /reload` endpoint for CI/CD-triggered reloads
-- **OCI artifact source** — pull tool bundles from OCI registries via ORAS
-- **Selective sync** — include/exclude glob patterns for source filtering
-- **Gateway mode** — compose multiple MCP servers via `MCP_MODE=gateway` and `MCP_MOUNT_SERVERS`
-- **Tag visibility** — enable/disable tools by tags with `MCP_ENABLE_TAGS` and `MCP_DISABLE_TAGS`
-- **Multi-auth** — combine bearer + JWT providers via `MCP_AUTH_PROVIDERS`
-- **Tool-level scopes** — `__required_scopes__` module variable for authorization
-- **Context integration** — tools can use `ctx: Context` for progress, logging, sampling, elicitation, and session state
-- **Rate limiting** — `__rate_limit__` module variable or `MCP_RATE_LIMIT_DEFAULT` env var (sliding window)
-- **Caching** — `__cache_ttl__` module variable for idempotent tool result caching
-- **Tool sandboxing** — `__max_memory_mb__` and `__max_output_size_kb__` resource limits per tool
-- **PodDisruptionBudget** — `pdb.enabled` for zero-downtime rolling updates
-- **HorizontalPodAutoscaler** — `autoscaling.enabled` for auto-scaling based on CPU/memory
-- **Security** — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance
+- <span data-i18n="docsCharts.auto.fastmcp_server.b0">
+    Multi-source loading — tools, resources, prompts, and knowledge from inline ConfigMaps, S3-compatible storage (AWS
+    S3, MinIO, R2), or Git repositories
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b1">Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching the bucket</span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b2">
+    Bearer and JWT authentication — built-in via FastMCP's `StaticTokenVerifier` and `JWTVerifier`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b3">
+    Knowledge base support — serve Markdown files as MCP resources for RAG and context injection
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b4">
+    Extra pip packages — install additional Python packages at startup before loading tools
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b5">
+    Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables for tool categorization
+    and behavior hints
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b6">
+    Resource templates — parameterized URIs like `users://{user_id}/profile` for dynamic resources
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b7">
+    Multiple resources per file — `RESOURCES` dict maps multiple URIs to handler functions
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b8">
+    Error masking — hide internal error details from clients via `MCP_MASK_ERROR_DETAILS`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b9">
+    Duplicate handling — control behavior when tools share names via `MCP_ON_DUPLICATE_TOOLS`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b10">
+    Built-in Web UI — dashboard at `/ui` with tools/resources/prompts explorer (Alpine.js + Tailwind CDN)
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b11">
+    Prometheus metrics — tool call counts, durations, errors, source sync status at `/metrics`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b12">
+    Structured JSON logging — `LOG_FORMAT=json` for Loki, ELK, CloudWatch, Datadog
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b13">
+    Dedicated health endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b14">
+    Diagnostic endpoint — `GET /debug/info` with full server introspection
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b15">
+    Init container pattern — pre-sync sources before server starts via `initSync.enabled`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b16">
+    Strict loading — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b17">
+    Hot reload — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b18">
+    Periodic sync — poll S3/Git sources for changes at configurable intervals
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b19">
+    Webhook reload — `POST /reload` endpoint for CI/CD-triggered reloads
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b20">
+    OCI artifact source — pull tool bundles from OCI registries via ORAS
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b21">
+    Selective sync — include/exclude glob patterns for source filtering
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b22">
+    Gateway mode — compose multiple MCP servers via `MCP_MODE=gateway` and `MCP_MOUNT_SERVERS`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b23">
+    Tag visibility — enable/disable tools by tags with `MCP_ENABLE_TAGS` and `MCP_DISABLE_TAGS`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b24">
+    Multi-auth — combine bearer + JWT providers via `MCP_AUTH_PROVIDERS`
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b25">
+    Tool-level scopes — `__required_scopes__` module variable for authorization
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b26">
+    Context integration — tools can use `ctx: Context` for progress, logging, sampling, elicitation, and session state
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b27">
+    Rate limiting — `__rate_limit__` module variable or `MCP_RATE_LIMIT_DEFAULT` env var (sliding window)
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b28">
+    Caching — `__cache_ttl__` module variable for idempotent tool result caching
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b29">
+    Tool sandboxing — `__max_memory_mb__` and `__max_output_size_kb__` resource limits per tool
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b30">
+    PodDisruptionBudget — `pdb.enabled` for zero-downtime rolling updates
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b31">
+    HorizontalPodAutoscaler — `autoscaling.enabled` for auto-scaling based on CPU/memory
+  </span>
+- <span data-i18n="docsCharts.auto.fastmcp_server.b32">
+    Security — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance
+  </span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-### HTTPS Repository
+**HTTPS Repository**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -54,13 +120,13 @@ helm repo update
 helm install fastmcp-server helmforge/fastmcp-server
 ```
 
-### OCI Registry
+**OCI Registry**
 
 ```bash
 helm install fastmcp-server oci://ghcr.io/helmforgedev/helm/fastmcp-server
 ```
 
-## Basic Example — Inline Tools
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span> — Inline Tools
 
 ```yaml
 # values.yaml
@@ -73,18 +139,14 @@ sources:
             return f"Hello, {name}!"
       math_ops.py: |
         def add(a: float, b: float) -> float:
-            """Add two numbers."""
             return a + b
-        def multiply(a: float, b: float) -> float:
-            """Multiply two numbers."""
-            return a * b
     knowledge:
       overview.md: |
         # Product Overview
         This document provides context for the AI assistant.
 ```
 
-## S3 Source (MinIO, AWS S3, Cloudflare R2)
+## <span data-i18n="docsCharts.heading.s3Source">S3 Source (MinIO, AWS S3, Cloudflare R2)</span>
 
 ```yaml
 sources:
@@ -98,7 +160,7 @@ sources:
     secretKey: minioadmin
 ```
 
-## Git Source
+## <span data-i18n="docsCharts.heading.gitSource">Git Source</span>
 
 ```yaml
 sources:
@@ -110,21 +172,20 @@ sources:
     token: ghp_xxx # for private repos
 ```
 
-## Authentication
+## <span data-i18n="docsCharts.heading.authentication">Authentication</span>
 
-### Bearer Token
+**Bearer Token**
 
 ```yaml
 auth:
   type: bearer
   bearer:
-    token: my-secret-token
-    # or use an existing Kubernetes secret:
-    # existingSecret: my-auth-secret
-    # existingSecretKey: token
+    token: my-secret-token # or use an existing Kubernetes secret
+  existingSecret: my-auth-secret
+  existingSecretKey: token
 ```
 
-### JWT
+**JWT**
 
 ```yaml
 auth:
@@ -135,9 +196,9 @@ auth:
     jwksUri: 'https://auth.example.com/.well-known/jwks.json'
 ```
 
-## Observability
+## <span data-i18n="docsCharts.heading.observability">Observability</span>
 
-### Prometheus Metrics
+**Prometheus Metrics**
 
 ```yaml
 metrics:
@@ -147,16 +208,16 @@ metrics:
     interval: 30s
 ```
 
-Metrics exposed at `/metrics`: tool call counts, durations, errors, source sync status, auth attempts.
+Metrics exposed at `/metrics`: tool call counts, durations, errors, source sync status, and auth attempts.
 
-### Structured Logging
+**Structured Logging**
 
 ```yaml
 server:
   logFormat: json # JSON output for log aggregation
 ```
 
-### Health Endpoints
+**Health Endpoints**
 
 | Endpoint    | Type      | When 200                           |
 | ----------- | --------- | ---------------------------------- |
@@ -164,11 +225,11 @@ server:
 | `/readyz`   | Readiness | Sources synced + components loaded |
 | `/startupz` | Startup   | Full initialization complete       |
 
-### Diagnostics
+## Diagnostics
 
 `GET /debug/info` returns server version, FastMCP version, uptime, registered components, source status, auth type, and configuration.
 
-## Rate Limiting
+## <span data-i18n="docsCharts.heading.rateLimiting">Rate Limiting</span>
 
 ```yaml
 rateLimiting:
@@ -182,17 +243,15 @@ Or via module-level variable:
 
 ```python
 __rate_limit__ = "5/min"
-
 def deploy(service: str, version: str) -> str:
     """Deploy a service (rate limited)."""
     return f"Deployed {service}@{version}"
 ```
 
-## Caching
+## <span data-i18n="docsCharts.heading.caching">Caching</span>
 
 ```python
 __cache_ttl__ = 300  # cache results for 5 minutes
-
 def get_exchange_rate(currency: str) -> float:
     """Get current exchange rate (cached 5min)."""
     ...
@@ -204,18 +263,17 @@ caching:
   maxSize: 1000 # max entries per tool
 ```
 
-## Tool Sandboxing
+## <span data-i18n="docsCharts.heading.toolSandboxing">Tool Sandboxing</span>
 
 ```python
 __max_memory_mb__ = 256
 __max_output_size_kb__ = 100
-
 def process_data(data: str) -> str:
     """Process data with resource limits."""
     ...
 ```
 
-## Autoscaling
+## <span data-i18n="docsCharts.heading.autoscaling">Autoscaling</span>
 
 ```yaml
 autoscaling:
@@ -223,55 +281,46 @@ autoscaling:
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
-
 pdb:
   enabled: true
   minAvailable: 1
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                          | Default                              | Description                              |
-| ---------------------------- | ------------------------------------ | ---------------------------------------- |
-| `image.repository`           | `docker.io/helmforge/fastmcp-server` | Container image                          |
-| `image.tag`                  | `1.0.0`                              | Image tag                                |
-| `server.name`                | `fastmcp-server`                     | Server name in MCP responses             |
-| `server.port`                | `8000`                               | HTTP port                                |
-| `server.path`                | `/mcp`                               | MCP endpoint path                        |
-| `server.logFormat`           | `text`                               | Log format: `text` or `json`             |
-| `server.strictLoading`       | `false`                              | Fail on boot if component errors         |
-| `ui.enabled`                 | `true`                               | Enable Web UI at `/ui`                   |
-| `metrics.enabled`            | `false`                              | Enable Prometheus metrics at `/metrics`  |
-| `auth.type`                  | `none`                               | Authentication: `none`, `bearer`, `jwt`  |
-| `rateLimiting.default`       | `""`                                 | Default rate limit (e.g., `100/min`)     |
-| `caching.enabled`            | `true`                               | Enable result caching                    |
-| `sandboxing.maxMemoryMb`     | `0`                                  | Default max memory per tool (MB)         |
-| `sandboxing.maxOutputSizeKb` | `0`                                  | Default max output per tool (KB)         |
-| `sources.inline.tools`       | `{}`                                 | Inline Python tool files                 |
-| `sources.inline.knowledge`   | `{}`                                 | Inline knowledge base files              |
-| `sources.s3.enabled`         | `false`                              | Enable S3 source                         |
-| `sources.s3.bucket`          | `""`                                 | S3 bucket name                           |
-| `sources.git.enabled`        | `false`                              | Enable Git source                        |
-| `sources.git.repository`     | `""`                                 | Git repository HTTPS URL                 |
-| `extraPipPackages`           | `[]`                                 | Extra pip packages to install at startup |
-| `initSync.enabled`           | `false`                              | Run source sync as init container        |
-| `persistence.enabled`        | `false`                              | Enable persistent workspace volume       |
-| `autoscaling.enabled`        | `false`                              | Enable HPA                               |
-| `pdb.enabled`                | `false`                              | Enable PodDisruptionBudget               |
-| `ingress.enabled`            | `false`                              | Enable ingress                           |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>                                          |
+| ------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `image.repository`                                | `docker.io/helmforge/fastmcp-server`                      | <span data-i18n="docsCharts.auto.fastmcp_server.t0">Container image</span>                                 |
+| `image.tag`                                       | `1.0.0`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t1">Image tag</span>                                       |
+| `server.name`                                     | `fastmcp-server`                                          | <span data-i18n="docsCharts.auto.fastmcp_server.t2">Server name in MCP responses</span>                    |
+| `server.port`                                     | `8000`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t3">HTTP port</span>                                       |
+| `server.path`                                     | `/mcp`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t4">MCP endpoint path</span>                               |
+| `server.logFormat`                                | `text`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t5">Log format: `text` or `json`</span>                    |
+| `server.strictLoading`                            | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t6">Fail on boot if component errors</span>                |
+| `ui.enabled`                                      | `true`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t7">Enable Web UI at `/ui`</span>                          |
+| `metrics.enabled`                                 | `false`                                                   | <span data-i18n="docsCharts.common.enablePrometheusMetrics">Enable Prometheus metrics</span> at `/metrics` |
+| `auth.type`                                       | `none`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t8">Authentication: `none`, `bearer`, `jwt`</span>         |
+| `rateLimiting.default`                            | `""`                                                      | <span data-i18n="docsCharts.table.default">Default</span> rate limit (e.g., `100/min`)                     |
+| `caching.enabled`                                 | `true`                                                    | <span data-i18n="docsCharts.auto.fastmcp_server.t9">Enable result caching</span>                           |
+| `sandboxing.maxMemoryMb`                          | `0`                                                       | <span data-i18n="docsCharts.table.default">Default</span> max memory per tool (MB)                         |
+| `sandboxing.maxOutputSizeKb`                      | `0`                                                       | <span data-i18n="docsCharts.table.default">Default</span> max output per tool (KB)                         |
+| `sources.inline.tools`                            | `{}`                                                      | <span data-i18n="docsCharts.auto.fastmcp_server.t10">Inline Python tool files</span>                       |
+| `sources.inline.knowledge`                        | `{}`                                                      | <span data-i18n="docsCharts.auto.fastmcp_server.t11">Inline knowledge base files</span>                    |
+| `sources.s3.enabled`                              | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t12">Enable S3 source</span>                               |
+| `sources.s3.bucket`                               | `""`                                                      | <span data-i18n="docsCharts.common.s3BucketName">S3 bucket name</span>                                     |
+| `sources.git.enabled`                             | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t13">Enable Git source</span>                              |
+| `sources.git.repository`                          | `""`                                                      | <span data-i18n="docsCharts.auto.fastmcp_server.t14">Git repository HTTPS URL</span>                       |
+| `extraPipPackages`                                | `[]`                                                      | <span data-i18n="docsCharts.auto.fastmcp_server.t15">Extra pip packages to install at startup</span>       |
+| `initSync.enabled`                                | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t16">Run source sync as init container</span>              |
+| `persistence.enabled`                             | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t17">Enable persistent workspace volume</span>             |
+| `autoscaling.enabled`                             | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t18">Enable HPA</span>                                     |
+| `pdb.enabled`                                     | `false`                                                   | <span data-i18n="docsCharts.auto.fastmcp_server.t19">Enable PodDisruptionBudget</span>                     |
+| `ingress.enabled`                                 | `false`                                                   | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span>                                    |
 
-## Operational Notes
+## <span data-i18n="docsCharts.heading.operationalNotes">Operational Notes</span>
 
-- Merge precedence is Inline > S3 > Git — if a tool with the same filename exists in multiple sources, the highest-precedence version wins
-- Knowledge base files are served as MCP resources at `knowledge://{filename}` URIs
-- Tools are Python files with top-level functions; resources need a `RESOURCE_URI` or `RESOURCES` module-level variable
-- Tools support optional metadata: `__tags__` (set), `__timeout__` (float), `__annotations_mcp__` (dict)
-- Resource URIs can use `{param}` placeholders for dynamic templates
-- The `extraPipPackages` list installs before tools load — use it when tools import external libraries
-- The Web UI auto-refreshes every 15 seconds and requires no external dependencies
-- Init container pattern (`initSync.enabled`) separates source syncing from server startup for better Kubernetes readiness semantics
+- Merge precedence is Inline > S3 > Git — if a tool with the same filename exists in multiple sources, the highest-precedence version wins- Knowledge base files are served as MCP resources at `knowledge://{filename}` URIs- Tools are Python files with top-level functions; resources need a `RESOURCE_URI` or `RESOURCES` module-level variable- Tools support optional metadata: `__tags__` (set), `__timeout__` (float), `__annotations_mcp__` (dict)- Resource URIs can use `{param}` placeholders for dynamic templates- The `extraPipPackages` list installs before tools load — use it when tools import external libraries- The Web UI auto-refreshes every 15 seconds and requires no external dependencies- Init container pattern (`initSync.enabled`) separates source syncing from server startup for better Kubernetes readiness semantics
 
-## More Information
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
 
-- [Docker image source](https://github.com/helmforgedev/fastmcp-server)
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/fastmcp-server)
+- [Docker image source](https://github.com/helmforgedev/fastmcp-server)- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/fastmcp-server)
