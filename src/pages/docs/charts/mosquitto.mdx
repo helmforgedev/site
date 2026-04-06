@@ -8,31 +8,19 @@ description: Helm chart for Eclipse Mosquitto on Kubernetes with standalone or f
 
 Helm chart for deploying [Eclipse Mosquitto](https://mosquitto.org/) on Kubernetes using the official [`eclipse-mosquitto`](https://hub.docker.com/_/eclipse-mosquitto) Docker image, with support for standalone or federated broker topologies and an optional [`emqx/mqttx-web`](https://hub.docker.com/r/emqx/mqttx-web) companion UI.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.mosquitto.b0">Official Mosquitto image based on `eclipse-mosquitto`</span>
-- <span data-i18n="docsCharts.auto.mosquitto.b1">
-    Standalone mode single broker deployment for the simplest and most predictable runtime
-  </span>
-- <span data-i18n="docsCharts.auto.mosquitto.b2">
-    Federated mode multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers
-  </span>
-- <span data-i18n="docsCharts.auto.mosquitto.b3">
-    WebSocket listener browser-ready MQTT access on a dedicated listener
-  </span>
-- <span data-i18n="docsCharts.auto.mosquitto.b4">
-    MQTTX Web companion optional web client deployment with separate scaling controls
-  </span>
-- <span data-i18n="docsCharts.auto.mosquitto.b5">
-    Authentication and ACL optional username/password and ACL file generation
-  </span>
-- <span data-i18n="docsCharts.auto.mosquitto.b6">
-    Ingress support configurable ingress for broker WebSocket access and the optional MQTTX Web UI
-  </span>
+- **Official Mosquitto image** based on `eclipse-mosquitto`
+- **Standalone mode** single broker deployment for the simplest and most predictable runtime
+- **Federated mode** multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers
+- **WebSocket listener** browser-ready MQTT access on a dedicated listener
+- **MQTTX Web companion** optional web client deployment with separate scaling controls
+- **Authentication and ACL** optional username/password and ACL file generation
+- **Ingress support** configurable ingress for broker WebSocket access and the optional MQTTX Web UI
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**HTTPS Repository**
+### HTTPS Repository
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -40,58 +28,67 @@ helm repo update
 helm install mosquitto helmforge/mosquitto
 ```
 
-**OCI Registry**
+### OCI Registry
 
 ```bash
 helm install mosquitto oci://ghcr.io/helmforgedev/helm/mosquitto
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 ```yaml
 architecture:
-mode:
-  standalonebroker:
-replicaCount: 1
+  mode: standalone
+
+broker:
+  replicaCount: 1
+
 service:
-sessionAffinity: None
+  sessionAffinity: None
 ```
 
-## <span data-i18n="docsCharts.heading.federatedExample">Federated Example</span>
+## Federated Example
 
 ```yaml
 architecture:
-mode:
-  federatedbroker:
-replicaCount: 3mqttxWeb:
-enabled: true
-replicaCount: 1
+  mode: federated
+
+broker:
+  replicaCount: 3
+
+mqttxWeb:
+  enabled: true
+  replicaCount: 1
+
 service:
-sessionAffinity: None
+  sessionAffinity: None
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                                | Default      | Description                                          |
 | ---------------------------------- | ------------ | ---------------------------------------------------- |
-| `architecture.mode` | `standalone` | <span data-i18n="docsCharts.auto.mosquitto.t0">Broker topology: `standalone` or `federated`</span> |
-| `broker.replicaCount` | `1` | <span data-i18n="docsCharts.auto.mosquitto.t1">Number of broker replicas</span> |
-| `broker.listeners.mqtt` | `1883` | <span data-i18n="docsCharts.auto.mosquitto.t2">MQTT TCP listener port</span> |
-| `broker.listeners.websocket` | `9001` | <span data-i18n="docsCharts.auto.mosquitto.t3">MQTT over WebSocket listener port</span> |
-| `broker.federation.topicPattern` | `#` | <span data-i18n="docsCharts.auto.mosquitto.t4">Topic pattern bridged between federated brokers</span> |
-| `broker.federation.topicDirection` | `both` | <span data-i18n="docsCharts.auto.mosquitto.t5">Bridge direction between peers</span> |
-| `auth.enabled` | `false` | <span data-i18n="docsCharts.auto.mosquitto.t6">Enable username/password authentication</span> |
-| `acl.enabled` | `false` | <span data-i18n="docsCharts.auto.mosquitto.t7">Enable ACL file generation</span> |
-| `service.sessionAffinity` | `None` | <span data-i18n="docsCharts.auto.mosquitto.t8">Service routing policy for client traffic</span> |
-| `websocketIngress.enabled` | `false` | <span data-i18n="docsCharts.auto.mosquitto.t9">Expose the broker WebSocket listener through ingress</span> |
-| `mqttxWeb.enabled` | `false` | <span data-i18n="docsCharts.auto.mosquitto.t10">Deploy MQTTX Web companion UI</span> |
-| `mqttxWeb.replicaCount` | `1` | <span data-i18n="docsCharts.auto.mosquitto.t11">Number of MQTTX Web pods</span> |
+| `architecture.mode`                | `standalone` | Broker topology: `standalone` or `federated`         |
+| `broker.replicaCount`              | `1`          | Number of broker replicas                            |
+| `broker.listeners.mqtt`            | `1883`       | MQTT TCP listener port                               |
+| `broker.listeners.websocket`       | `9001`       | MQTT over WebSocket listener port                    |
+| `broker.federation.topicPattern`   | `#`          | Topic pattern bridged between federated brokers      |
+| `broker.federation.topicDirection` | `both`       | Bridge direction between peers                       |
+| `auth.enabled`                     | `false`      | Enable username/password authentication              |
+| `acl.enabled`                      | `false`      | Enable ACL file generation                           |
+| `service.sessionAffinity`          | `None`       | Service routing policy for client traffic            |
+| `websocketIngress.enabled`         | `false`      | Expose the broker WebSocket listener through ingress |
+| `mqttxWeb.enabled`                 | `false`      | Deploy MQTTX Web companion UI                        |
+| `mqttxWeb.replicaCount`            | `1`          | Number of MQTTX Web pods                             |
 
-## <span data-i18n="docsCharts.heading.topologyNotes">Topology Notes</span>
+## Topology Notes
 
-- `standalone` mode requires exactly one broker replica- `federated` mode requires at least two broker replicas- federated mode uses official Mosquitto bridge connections, not a native shared-state cluster- broker replicas do not share sessions or retained state like EMQX-style clustering- `mqttxWeb.replicaCount` is independent from `broker.replicaCount`
+- `standalone` mode requires exactly one broker replica
+- `federated` mode requires at least two broker replicas
+- federated mode uses official Mosquitto bridge connections, not a native shared-state cluster
+- broker replicas do not share sessions or retained state like EMQX-style clustering
+- `mqttxWeb.replicaCount` is independent from `broker.replicaCount`
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
+## More Information
 
 - [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mosquitto)

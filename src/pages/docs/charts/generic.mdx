@@ -4,26 +4,22 @@ title: Generic Chart
 description: HelmForge Generic chart — a multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, and CronJobs.
 ---
 
-# GenericA multi-purpose Helm chart that can deploy virtually any container workload on Kubernetes. Instead of writing boilerplate templates for each application, the Generic chart lets you configure everything through `values.yaml`.
+# Generic
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+A multi-purpose Helm chart that can deploy virtually any container workload on Kubernetes. Instead of writing boilerplate templates for each application, the Generic chart lets you configure everything through `values.yaml`.
 
-- <span data-i18n="docsCharts.auto.generic.b0">
-    Multiple workload types — Deployment, StatefulSet, DaemonSet, Job, CronJob
-  </span>
-- <span data-i18n="docsCharts.auto.generic.b1">
-    Flexible container configuration — Ports, environment variables, volumes, probes
-  </span>
-- <span data-i18n="docsCharts.auto.generic.b2">Ingress support — Configurable with `ingressClassName` and TLS</span>
-- <span data-i18n="docsCharts.auto.generic.b3">Service accounts — Create or reference existing service accounts</span>
-- <span data-i18n="docsCharts.auto.generic.b4">
-    Init containers and sidecars — Full support for multi-container pods
-  </span>
-- <span data-i18n="docsCharts.auto.generic.b5">HPA and PDB — Autoscaling and disruption budgets</span>
+## Key Features
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+- **Multiple workload types** — Deployment, StatefulSet, DaemonSet, Job, CronJob
+- **Flexible container configuration** — Ports, environment variables, volumes, probes
+- **Ingress support** — Configurable with `ingressClassName` and TLS
+- **Service accounts** — Create or reference existing service accounts
+- **Init containers and sidecars** — Full support for multi-container pods
+- **HPA and PDB** — Autoscaling and disruption budgets
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+## Installation
+
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -31,66 +27,73 @@ helm repo update
 helm install my-app helmforge/generic -f values.yaml
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install my-app oci://ghcr.io/helmforgedev/helm/generic -f values.yaml
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 Deploy a simple web application:
 
 ```yaml
 # values.yaml
 image:
-repository: nginx
-tag: '1.27'
+  repository: nginx
+  tag: '1.27'
+
 service:
-port: 80
+  port: 80
+
 ingress:
-enabled: true
-ingressClassName: traefik
-hosts:
-  - host: app.example.com
-paths:
-  - path: /
-pathType: Prefix
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
 resources:
-requests:
-  cpu: 100m
-memory: 128Mi
-limits:
-  memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
 ```
 
-## <span data-i18n="docsCharts.heading.statefulSetExample">StatefulSet Example</span>
+## StatefulSet Example
 
 ```yaml
-workloadType:
-StatefulSetimage:
+workloadType: StatefulSet
+
+image:
   repository: my-stateful-app
-tag: '2.0'replicaCount:
-3
+  tag: '2.0'
+
+replicaCount: 3
+
 persistence:
   enabled: true
-size: 10Gi
-storageClass: standard
+  size: 10Gi
+  storageClass: standard
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                   | Default      | Description                                                     |
 | --------------------- | ------------ | --------------------------------------------------------------- |
-| `workloadType` | `Deployment` | <span data-i18n="docsCharts.auto.generic.t0">Workload type: Deployment, StatefulSet, DaemonSet, Job, CronJob</span> |
-| `replicaCount` | `1` | <span data-i18n="docsCharts.common.numberOfReplicas">Number of replicas</span> |
-| `image.repository` | `""` | <span data-i18n="docsCharts.auto.generic.t1">Container image repository</span> |
-| `image.tag` | `""` | <span data-i18n="docsCharts.auto.generic.t2">Container image tag</span> |
-| `service.type` | `ClusterIP` | <span data-i18n="docsCharts.auto.generic.t3">Kubernetes service type</span> |
-| `service.port` | `80` | <span data-i18n="docsCharts.common.servicePort">Service port</span> |
-| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> resource |
-| `resources` | `{}` | <span data-i18n="docsCharts.auto.generic.t4">CPU/memory requests and limits</span> |
-| `persistence.enabled` | `false` | <span data-i18n="docsCharts.common.enablePersistentStorage">Enable persistent storage</span> |
+| `workloadType`        | `Deployment` | Workload type: Deployment, StatefulSet, DaemonSet, Job, CronJob |
+| `replicaCount`        | `1`          | Number of replicas                                              |
+| `image.repository`    | `""`         | Container image repository                                      |
+| `image.tag`           | `""`         | Container image tag                                             |
+| `service.type`        | `ClusterIP`  | Kubernetes service type                                         |
+| `service.port`        | `80`         | Service port                                                    |
+| `ingress.enabled`     | `false`      | Enable ingress resource                                         |
+| `resources`           | `{}`         | CPU/memory requests and limits                                  |
+| `persistence.enabled` | `false`      | Enable persistent storage                                       |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/generic) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/generic) on GitHub.

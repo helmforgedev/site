@@ -8,21 +8,17 @@ description: Helm chart for Heimdall application dashboard on Kubernetes with S3
 
 Helm chart for deploying [Heimdall](https://heimdall.site/) application dashboard on Kubernetes using the [`linuxserver/heimdall`](https://hub.docker.com/r/linuxserver/heimdall) Docker image.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.heimdall.b0">LinuxServer.io image based on `linuxserver/heimdall`</span>
-- <span data-i18n="docsCharts.auto.heimdall.b1">Persistent storage SQLite database and settings in `/config`</span>
-- <span data-i18n="docsCharts.auto.heimdall.b2">
-    S3-compatible backup CronJob that archives `/config` and uploads to any S3 endpoint
-  </span>
-- <span data-i18n="docsCharts.auto.heimdall.b3">PUID/PGID file ownership control</span>
-- <span data-i18n="docsCharts.common.feature.ingressConfigurableTls">
-    **Ingress support** configurable ingress with TLS
-  </span>
+- **LinuxServer.io image** based on `linuxserver/heimdall`
+- **Persistent storage** SQLite database and settings in `/config`
+- **S3-compatible backup** CronJob that archives `/config` and uploads to any S3 endpoint
+- **PUID/PGID** file ownership control
+- **Ingress support** configurable ingress with TLS
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**HTTPS Repository**
+### HTTPS Repository
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -30,59 +26,59 @@ helm repo update
 helm install heimdall helmforge/heimdall
 ```
 
-**OCI Registry**
+### OCI Registry
 
 ```bash
 helm install heimdall oci://ghcr.io/helmforgedev/helm/heimdall
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 ```yaml
 heimdall:
-timezone: 'America/New_York'
+  timezone: 'America/New_York'
+
 ingress:
-enabled: true
-ingressClassName: traefik
-hosts:
-  - host: dashboard.example.com
-paths:
-  - path: /
-pathType: Prefix
-tls:
-  - secretName: heimdall-tls
-hosts:
-  - dashboard.example.com
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: dashboard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: heimdall-tls
+      hosts:
+        - dashboard.example.com
+
 backup:
-enabled: true
-schedule: '0 3 * * *'
-s3:
-  endpoint:
-https://s3.amazonaws.com
-bucket: my-backups
-prefix: heimdall
-existingSecret: heimdall-s3-credentials
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-backups
+    prefix: heimdall
+    existingSecret: heimdall-s3-credentials
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                        | Default       | Description                              |
 | -------------------------- | ------------- | ---------------------------------------- |
-| `heimdall.puid` | `1000` | <span data-i18n="docsCharts.auto.heimdall.t0">User ID for file permissions</span> |
-| `heimdall.pgid` | `1000` | <span data-i18n="docsCharts.auto.heimdall.t1">Group ID for file permissions</span> |
-| `heimdall.timezone` | `"UTC"` | <span data-i18n="docsCharts.common.timezone">Timezone</span> |
-| `persistence.enabled` | `true` | <span data-i18n="docsCharts.common.enablePersistentStorage">Enable persistent storage</span> for /config |
-| `persistence.size` | `1Gi` | <span data-i18n="docsCharts.common.volumeSize">Volume size</span> |
-| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3BackupCronjob">Enable S3 backup CronJob</span> |
-| `backup.schedule` | `"0 3 * * *"` | <span data-i18n="docsCharts.auto.heimdall.t2">Cron schedule</span> |
-| `backup.s3.endpoint` | `""` | <span data-i18n="docsCharts.common.s3CompatibleEndpointUrl">S3-compatible endpoint URL</span> |
-| `backup.s3.bucket` | `""` | <span data-i18n="docsCharts.common.s3BucketName">S3 bucket name</span> |
-| `backup.s3.existingSecret` | `""` | <span data-i18n="docsCharts.common.existingSecretS3Credentials">Existing secret with S3 credentials</span> |
-| `service.type` | `ClusterIP` | <span data-i18n="docsCharts.common.serviceType">Service type</span> |
-| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
-| `ingress.ingressClassName` | `""` | <span data-i18n="docsCharts.common.ingressClassTraefikNginx">Ingress class (`traefik`, `nginx`, etc.)</span> |
+| `heimdall.puid`            | `1000`        | User ID for file permissions             |
+| `heimdall.pgid`            | `1000`        | Group ID for file permissions            |
+| `heimdall.timezone`        | `"UTC"`       | Timezone                                 |
+| `persistence.enabled`      | `true`        | Enable persistent storage for /config    |
+| `persistence.size`         | `1Gi`         | Volume size                              |
+| `backup.enabled`           | `false`       | Enable S3 backup CronJob                 |
+| `backup.schedule`          | `"0 3 * * *"` | Cron schedule                            |
+| `backup.s3.endpoint`       | `""`          | S3-compatible endpoint URL               |
+| `backup.s3.bucket`         | `""`          | S3 bucket name                           |
+| `backup.s3.existingSecret` | `""`          | Existing secret with S3 credentials      |
+| `service.type`             | `ClusterIP`   | Service type                             |
+| `ingress.enabled`          | `false`       | Enable ingress                           |
+| `ingress.ingressClassName` | `""`          | Ingress class (`traefik`, `nginx`, etc.) |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
+## More Information
 
 - [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/heimdall)

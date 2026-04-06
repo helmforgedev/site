@@ -6,24 +6,24 @@ description: HelmForge Strapi chart — headless CMS with SQLite, PostgreSQL, or
 
 # Strapi
 
-Deploy Strapi on Kubernetes as a headless CMS for APIs, websites, and custom admin experiences. The chart is designed for a prebuilt Strapi project image and supports SQLite, PostgreSQL, MySQL, persistent uploads, and scheduled backups.Set `ingress.ingressClassName` to the controller available in your cluster, such as `traefik`, `nginx`, or another supported ingress class.
+Deploy Strapi on Kubernetes as a headless CMS for APIs, websites, and custom admin experiences. The chart is designed for a prebuilt Strapi project image and supports SQLite, PostgreSQL, MySQL, persistent uploads, and scheduled backups.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+Set `ingress.ingressClassName` to the controller available in your cluster, such as `traefik`, `nginx`, or another supported ingress class.
 
-- <span data-i18n="docsCharts.auto.strapi.b0">
-    Prebuilt project image — intended for your own Strapi application image
-  </span>
-- <span data-i18n="docsCharts.auto.strapi.b1">SQLite by default — simple initial deployment path</span>
-- <span data-i18n="docsCharts.auto.strapi.b2">PostgreSQL subchart — bundled via HelmForge dependency</span>
-- <span data-i18n="docsCharts.auto.strapi.b3">MySQL subchart — bundled via HelmForge dependency</span>
-- <span data-i18n="docsCharts.auto.strapi.b4">External database — connect to existing PostgreSQL or MySQL</span>
-- <span data-i18n="docsCharts.auto.strapi.b5">Application secrets — auto-generated app keys and token salts</span>
-- <span data-i18n="docsCharts.auto.strapi.b6">Uploads persistence — PVC-backed media storage</span>
-- <span data-i18n="docsCharts.auto.strapi.b7">Scheduled backups — SQLite archive or SQL dump workflows to S3</span>
+## Key Features
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+- **Prebuilt project image** — intended for your own Strapi application image
+- **SQLite by default** — simple initial deployment path
+- **PostgreSQL subchart** — bundled via HelmForge dependency
+- **MySQL subchart** — bundled via HelmForge dependency
+- **External database** — connect to existing PostgreSQL or MySQL
+- **Application secrets** — auto-generated app keys and token salts
+- **Uploads persistence** — PVC-backed media storage
+- **Scheduled backups** — SQLite archive or SQL dump workflows to S3
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+## Installation
+
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -31,76 +31,80 @@ helm repo update
 helm install strapi helmforge/strapi
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 ```
 
-## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
+## Basic Example
 
 ```yaml
 image:
-repository: ghcr.io/example/my-strapi
-tag: '1.0.0'
+  repository: ghcr.io/example/my-strapi
+  tag: '1.0.0'
+
 persistence:
-enabled: true
-size: 5Gi
+  enabled: true
+  size: 5Gi
 ```
 
-## <span data-i18n="docsCharts.heading.postgresqlExample">PostgreSQL Example</span>
+## PostgreSQL Example
 
 ```yaml
 image:
-repository: ghcr.io/example/my-strapi
-tag: '1.0.0'
+  repository: ghcr.io/example/my-strapi
+  tag: '1.0.0'
+
 postgresql:
-enabled: true
-auth:
-  database: strapi
-username: strapi
-password: 'strong-password'
+  enabled: true
+  auth:
+    database: strapi
+    username: strapi
+    password: 'strong-password'
+
 ingress:
-enabled: true
-ingressClassName: traefik
-hosts:
-  - host: cms.example.com
-paths:
-  - path: /
-pathType: Prefix
-tls:
-  - secretName: strapi-tls
-hosts:
-  - cms.example.com
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: cms.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: strapi-tls
+      hosts:
+        - cms.example.com
 ```
 
-## <span data-i18n="docsCharts.heading.externalDatabase">External Database</span> Example
+## External Database Example
 
 ```yaml
 database:
-mode: external
-external:
-  vendor: postgres
-host: db.example.com
-name: strapi
-username: strapi
-existingSecret: strapi-db-credentials
+  mode: external
+  external:
+    vendor: postgres
+    host: db.example.com
+    name: strapi
+    username: strapi
+    existingSecret: strapi-db-credentials
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                         | Default            | Description                                               |
 | --------------------------- | ------------------ | --------------------------------------------------------- |
-| `image.repository` | `vshadbolt/strapi` | <span data-i18n="docsCharts.auto.strapi.t0">Container image for the Strapi project</span> |
-| `strapi.url` | `""` | <span data-i18n="docsCharts.auto.strapi.t1">Public URL (auto-detected from ingress if empty)</span> |
-| `database.mode` | `auto` | <span data-i18n="docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql">Database mode (auto, sqlite, external, postgresql, mysql)</span> |
-| `database.sqlite.directory` | `/opt/app/.tmp` | <span data-i18n="docsCharts.auto.strapi.t2">SQLite directory</span> |
-| `postgresql.enabled` | `false` | <span data-i18n="docsCharts.common.deployPostgresqlSubchart">Deploy PostgreSQL subchart</span> |
-| `mysql.enabled` | `false` | <span data-i18n="docsCharts.common.deployMysqlSubchart">Deploy MySQL subchart</span> |
-| `persistence.enabled` | `true` | <span data-i18n="docsCharts.auto.strapi.t3">Enable uploads and SQLite persistence</span> |
-| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
-| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3Backups">Enable S3 backups</span> |
-| `secrets.existingSecret` | `""` | <span data-i18n="docsCharts.auto.strapi.t4">Use an existing secret for Strapi app secrets</span> |
+| `image.repository`          | `vshadbolt/strapi` | Container image for the Strapi project                    |
+| `strapi.url`                | `""`               | Public URL (auto-detected from ingress if empty)          |
+| `database.mode`             | `auto`             | Database mode (auto, sqlite, external, postgresql, mysql) |
+| `database.sqlite.directory` | `/opt/app/.tmp`    | SQLite directory                                          |
+| `postgresql.enabled`        | `false`            | Deploy PostgreSQL subchart                                |
+| `mysql.enabled`             | `false`            | Deploy MySQL subchart                                     |
+| `persistence.enabled`       | `true`             | Enable uploads and SQLite persistence                     |
+| `ingress.enabled`           | `false`            | Enable ingress                                            |
+| `backup.enabled`            | `false`            | Enable S3 backups                                         |
+| `secrets.existingSecret`    | `""`               | Use an existing secret for Strapi app secrets             |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/strapi) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/strapi) on GitHub.

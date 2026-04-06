@@ -8,30 +8,20 @@ description: HelmForge AdGuard Home chart — DNS ad/tracker blocker with sync, 
 
 Deploy [AdGuard Home](https://adguard.com/adguard-home/overview.html) on Kubernetes using the official [adguard/adguardhome](https://hub.docker.com/r/adguard/adguardhome) Docker image. Network-wide DNS-level ad and tracker blocking for all devices.
 
-## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+## Key Features
 
-- <span data-i18n="docsCharts.auto.adguard_home.b0">
-    Network-wide ad blocking — DNS-level filtering for all devices
-  </span>
-- <span data-i18n="docsCharts.auto.adguard_home.b1">
-    Two deployment modes — wizard (port 3000) or pre-configured (port 80)
-  </span>
-- <span data-i18n="docsCharts.auto.adguard_home.b2">DNS over HTTPS / TLS — encrypted upstream DNS resolvers</span>
-- <span data-i18n="docsCharts.auto.adguard_home.b3">
-    AdGuardHome Sync — multi-instance synchronization via adguardhome-sync
-  </span>
-- <span data-i18n="docsCharts.auto.adguard_home.b4">
-    S3 backup — automated CronJob-based backup to any S3-compatible storage
-  </span>
-- <span data-i18n="docsCharts.auto.adguard_home.b5">Separate DNS service — dedicated LoadBalancer for DNS traffic</span>
-- <span data-i18n="docsCharts.auto.adguard_home.b6">Ingress support — TLS with cert-manager for the web UI</span>
-- <span data-i18n="docsCharts.auto.adguard_home.b7">
-    Config seeding — initial configuration preserved across upgrades
-  </span>
+- **Network-wide ad blocking** — DNS-level filtering for all devices
+- **Two deployment modes** — wizard (port 3000) or pre-configured (port 80)
+- **DNS over HTTPS / TLS** — encrypted upstream DNS resolvers
+- **AdGuardHome Sync** — multi-instance synchronization via adguardhome-sync
+- **S3 backup** — automated CronJob-based backup to any S3-compatible storage
+- **Separate DNS service** — dedicated LoadBalancer for DNS traffic
+- **Ingress support** — TLS with cert-manager for the web UI
+- **Config seeding** — initial configuration preserved across upgrades
 
-## <span data-i18n="docsCharts.heading.installation">Installation</span>
+## Installation
 
-**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -39,13 +29,13 @@ helm repo update
 helm install adguard-home helmforge/adguard-home
 ```
 
-**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
+**OCI registry:**
 
 ```bash
 helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home
 ```
 
-## <span data-i18n="docsCharts.heading.wizardModeDefault">Wizard Mode (Default)</span>
+## Wizard Mode (Default)
 
 By default, AdGuard Home starts in wizard mode on port 3000. Complete the setup via the web UI:
 
@@ -53,83 +43,84 @@ By default, AdGuard Home starts in wizard mode on port 3000. Complete the setup 
 helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home \
   --set service.dns.type=LoadBalancer \
   --set service.dns.loadBalancerIP=192.168.1.53
+
 kubectl port-forward svc/adguard-home-adguard-home-web 3000:80
 # Visit http://localhost:3000
 ```
 
-## <span data-i18n="docsCharts.heading.preConfiguredMode">Pre-Configured Mode</span>
+## Pre-Configured Mode
 
 Skip the wizard by providing `config.adGuardHome`:
 
 ```yaml
 config:
-adGuardHome:
-  http:
-address: 0.0.0.0:80
-users:
-  - name: admin # bcrypt hash — generate
-with: htpasswd -bnBC 10 "" 'PASSWORD' | cut
--d: -f2
-password: '$2y$10$...'
-dns:
-  bind_hosts:
-  - 0.0.0.0
-port: 53
-upstream_dns:
-  - https://dns.cloudflare.com/dns-query
-  - https://dns.google/dns-query
-bootstrap_dns:
-  - 1.1.1.1
-protection_enabled: true
-filtering_enabled: true
-filters:
-  - enabled: true
-url:
-  https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
-name: AdGuard DNS filter
-id: 1
-schema_version: 29
+  adGuardHome:
+    http:
+      address: 0.0.0.0:80
+    users:
+      - name: admin
+        # bcrypt hash — generate with: htpasswd -bnBC 10 "" 'PASSWORD' | cut -d: -f2
+        password: '$2y$10$...'
+    dns:
+      bind_hosts:
+        - 0.0.0.0
+      port: 53
+      upstream_dns:
+        - https://dns.cloudflare.com/dns-query
+        - https://dns.google/dns-query
+      bootstrap_dns:
+        - 1.1.1.1
+      protection_enabled: true
+      filtering_enabled: true
+    filters:
+      - enabled: true
+        url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+        name: AdGuard DNS filter
+        id: 1
+    schema_version: 29
+
 service:
-dns:
-  type: LoadBalancer
-loadBalancerIP: '192.168.1.53'
+  dns:
+    type: LoadBalancer
+    loadBalancerIP: '192.168.1.53'
 ```
 
-## <span data-i18n="docsCharts.heading.multiInstanceSync">Multi-Instance Sync</span>
+## Multi-Instance Sync
 
 Synchronize configuration from an origin to replicas using adguardhome-sync:
 
 ```yaml
 sync:
-enabled: true
-origin:
-  url: 'http://adguard-primary:80'
-username: admin
-password: changeme
-replicas:
-  - url: 'http://adguard-replica:80'
-username: admin
-password: changeme
+  enabled: true
+  origin:
+    url: 'http://adguard-primary:80'
+    username: admin
+    password: changeme
+  replicas:
+    - url: 'http://adguard-replica:80'
+      username: admin
+      password: changeme
 ```
 
-## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
+## Key Values
 
-| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
-
+| Key                          | Default        | Description                           |
 | ---------------------------- | -------------- | ------------------------------------- |
-| `config.adGuardHome` | `{}` | <span data-i18n="docsCharts.auto.adguard_home.t0">Pre-seed config (empty = wizard mode)</span> |
-| `config.existingSecret` | `""` | <span data-i18n="docsCharts.auto.adguard_home.t1">Existing Secret with AdGuardHome.yaml</span> |
-| `persistence.conf.enabled` | `true` | <span data-i18n="docsCharts.auto.adguard_home.t2">Enable conf volume</span> |
-| `persistence.conf.size` | `256Mi` | <span data-i18n="docsCharts.auto.adguard_home.t3">Conf <span data-i18n="docsCharts.common.pvcSize">PVC size</span></span> |
-| `persistence.work.enabled` | `true` | <span data-i18n="docsCharts.auto.adguard_home.t4">Enable work volume</span> |
-| `persistence.work.size` | `2Gi` | <span data-i18n="docsCharts.auto.adguard_home.t5">Work <span data-i18n="docsCharts.common.pvcSize">PVC size</span></span> |
-| `service.web.type` | `ClusterIP` | <span data-i18n="docsCharts.auto.adguard_home.t6">Web UI service type</span> |
-| `service.dns.type` | `LoadBalancer` | <span data-i18n="docsCharts.auto.adguard_home.t7">DNS service type</span> |
-| `service.dns.loadBalancerIP` | `""` | <span data-i18n="docsCharts.auto.adguard_home.t8">Fixed DNS IP</span> |
-| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
-| `sync.enabled` | `false` | <span data-i18n="docsCharts.auto.adguard_home.t9">Enable adguardhome-sync</span> |
-| `sync.cron` | `*/10 * * * *` | <span data-i18n="docsCharts.auto.adguard_home.t10">Sync schedule</span> |
-| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3BackupCronjob">Enable S3 backup CronJob</span> |
-| `backup.schedule` | `0 2 * * *` | <span data-i18n="docsCharts.auto.adguard_home.t11">Backup schedule</span> |
+| `config.adGuardHome`         | `{}`           | Pre-seed config (empty = wizard mode) |
+| `config.existingSecret`      | `""`           | Existing Secret with AdGuardHome.yaml |
+| `persistence.conf.enabled`   | `true`         | Enable conf volume                    |
+| `persistence.conf.size`      | `256Mi`        | Conf PVC size                         |
+| `persistence.work.enabled`   | `true`         | Enable work volume                    |
+| `persistence.work.size`      | `2Gi`          | Work PVC size                         |
+| `service.web.type`           | `ClusterIP`    | Web UI service type                   |
+| `service.dns.type`           | `LoadBalancer` | DNS service type                      |
+| `service.dns.loadBalancerIP` | `""`           | Fixed DNS IP                          |
+| `ingress.enabled`            | `false`        | Enable ingress                        |
+| `sync.enabled`               | `false`        | Enable adguardhome-sync               |
+| `sync.cron`                  | `*/10 * * * *` | Sync schedule                         |
+| `backup.enabled`             | `false`        | Enable S3 backup CronJob              |
+| `backup.schedule`            | `0 2 * * *`    | Backup schedule                       |
 
-## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/adguard-home) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/adguard-home) on GitHub.
