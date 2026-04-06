@@ -1,5 +1,5 @@
 import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n/config';
-import { messages } from '../i18n/messages';
+import { ensureLocaleMessages, getMessage } from './i18n-client-store';
 
 declare global {
   interface Window {
@@ -22,7 +22,7 @@ type Format = 'bash' | 'helmfile' | 'argocd';
 let currentFormat: Format = 'bash';
 
 function t(key: string, locale: Locale): string {
-  return messages[locale]?.[key] ?? messages[DEFAULT_LOCALE]?.[key] ?? key;
+  return getMessage(key, locale);
 }
 
 function getLocale(): Locale {
@@ -227,14 +227,15 @@ function getEmptyMessage(format: Format, locale: Locale): string {
     argocd: ['stack.empty.argocd.line1', 'stack.empty.argocd.line2'],
   };
   const [line1Key, line2Key] = keys[format];
-  return `<span class="text-zinc-500">${t(line1Key, locale)}</span>\n<span class="text-zinc-500">${t(line2Key, locale)}</span>`;
+  return `<span class="text-zinc-400">${t(line1Key, locale)}</span>\n<span class="text-zinc-400">${t(line2Key, locale)}</span>`;
 }
 
 function update() {
   const locale = getLocale();
   const selected = getSelected();
   if (codeEl) {
-    codeEl.innerHTML = selected.length > 0 ? generators[currentFormat](selected) : getEmptyMessage(currentFormat, locale);
+    codeEl.innerHTML =
+      selected.length > 0 ? generators[currentFormat](selected) : getEmptyMessage(currentFormat, locale);
   }
   if (countEl) countEl.textContent = t('stack.count', locale).replace('{count}', String(selected.length));
   if (copyBtn) copyBtn.disabled = selected.length === 0;
@@ -332,5 +333,9 @@ document.addEventListener('hf:localechange', () => {
   if (copyBtn && copyBtn.disabled) {
     copyBtn.textContent = t('stack.copy', getLocale());
   }
+  update();
+});
+
+ensureLocaleMessages(getLocale()).then(() => {
   update();
 });

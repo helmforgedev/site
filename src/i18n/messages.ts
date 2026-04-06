@@ -33,12 +33,13 @@ export const messages: Record<Locale, Messages> = {
     'footer.helmRepo': 'Helm Repository',
     'footer.rss': 'RSS Feed',
     'hero.subtitle': 'Open-source Helm charts, forged to last.',
-    'hero.description': 'The open-source alternative to Bitnami. Official upstream images, built-in S3 backups, sane security defaults, and day-two operations - MIT licensed, free forever.',
+    'hero.description':
+      'The open-source alternative to Bitnami. Official upstream images, built-in S3 backups, sane security defaults, and day-two operations - MIT licensed, free forever.',
     'hero.cta.getStarted': 'Get Started',
     'hero.cta.browseCharts': 'Browse Charts',
     'hero.github': 'Star on GitHub',
     'install.label': 'Install',
-    'install.description': 'Add the repo, pick a chart, install. That\'s it.',
+    'install.description': "Add the repo, pick a chart, install. That's it.",
     'install.step1': 'Add repo',
     'install.step2': 'Update',
     'install.step3': 'Install',
@@ -48,28 +49,36 @@ export const messages: Record<Locale, Messages> = {
     'install.chart': 'Chart:',
     'install.guide': 'Full getting-started guide',
     'features.label': 'Why HelmForge',
-    'features.description': 'Every chart follows the same direction: predictable installs, clear values, and production-minded behavior from day one.',
+    'features.description':
+      'Every chart follows the same direction: predictable installs, clear values, and production-minded behavior from day one.',
     'features.card1.title': 'Validated for real clusters',
     'features.card1.stat': 'Stable charts',
-    'features.card1.description': 'Linting, template rendering, unit tests, and live k3d validation before every release.',
+    'features.card1.description':
+      'Linting, template rendering, unit tests, and live k3d validation before every release.',
     'features.card2.title': 'Secure by default',
     'features.card2.stat': 'Non-root, hardened',
-    'features.card2.description': 'Non-root containers, read-only filesystems, network policies, GPG provenance, and Cosign-signed OCI artifacts.',
+    'features.card2.description':
+      'Non-root containers, read-only filesystems, network policies, GPG provenance, and Cosign-signed OCI artifacts.',
     'features.card3.title': 'Built-in S3 backups',
     'features.card3.stat': 'Charts with backup',
-    'features.card3.description': 'Automated CronJob-based backups to any S3-compatible storage. Restore with a single command.',
+    'features.card3.description':
+      'Automated CronJob-based backups to any S3-compatible storage. Restore with a single command.',
     'features.card4.title': 'Simple to operate',
     'features.card4.stat': 'Clean values.yaml',
-    'features.card4.description': 'Readable values, clear docs, and practical features like ingress, TLS, and observability.',
+    'features.card4.description':
+      'Readable values, clear docs, and practical features like ingress, TLS, and observability.',
     'features.card5.title': 'Official upstream images',
     'features.card5.stat': 'No custom builds',
-    'features.card5.description': 'Every chart uses the official Docker image from the upstream project. No forks, no wrappers.',
+    'features.card5.description':
+      'Every chart uses the official Docker image from the upstream project. No forks, no wrappers.',
     'features.card6.title': 'MIT Licensed',
     'features.card6.stat': 'Free forever',
-    'features.card6.description': 'Use in production, modify, redistribute. No enterprise tiers, no usage limits, no surprises.',
+    'features.card6.description':
+      'Use in production, modify, redistribute. No enterprise tiers, no usage limits, no surprises.',
     'catalog.label': 'Catalog',
     'catalog.title': 'A cleaner catalog for common Kubernetes workloads.',
-    'catalog.description': 'Browse application charts with consistent structure, documented values, and production-minded defaults.',
+    'catalog.description':
+      'Browse application charts with consistent structure, documented values, and production-minded defaults.',
     'catalog.search.label': 'Search charts',
     'catalog.search.placeholder': 'Search charts (e.g. postgres, redis, backup)...',
     'catalog.stats.charts': 'Charts',
@@ -77,7 +86,7 @@ export const messages: Record<Locale, Messages> = {
     'catalog.stats.s3': 'With S3',
     'catalog.empty.title': 'No charts found',
     'catalog.empty.description': 'Try adjusting your search terms.',
-    'catalog.request': 'Don\'t see your app? Request a chart',
+    'catalog.request': "Don't see your app? Request a chart",
     'comparison.title': 'Side-by-side: HelmForge vs the rest.',
     'comparison.description': 'Official images, no vendor lock-in, MIT licensed. See exactly where HelmForge leads.',
     'comparison.caption': 'Feature comparison between HelmForge, Bitnami, and generic community charts',
@@ -113,12 +122,12 @@ export const messages: Record<Locale, Messages> = {
     'request.form.reason': 'Why should HelmForge include this?',
     'request.form.submit': 'Open GitHub Issue',
     'request.form.note.before': 'This will open a pre-filled issue on the',
-    'request.form.note.after': 'repository. You\'ll need a GitHub account.',
+    'request.form.note.after': "repository. You'll need a GitHub account.",
     'request.open.title': 'Open requests',
     'request.open.description': 'Upvote with a reaction on GitHub to help prioritize.',
     'roadmap.label': 'Roadmap',
     'roadmap.title': 'Where HelmForge is heading.',
-    'roadmap.description': 'Our roadmap is public. Track progress, see what\'s next, and help shape the direction.',
+    'roadmap.description': "Our roadmap is public. Track progress, see what's next, and help shape the direction.",
     'roadmap.milestones': 'GitHub Milestones',
     'roadmap.active': 'Active',
     'roadmap.completed': 'Completed',
@@ -127,41 +136,48 @@ export const messages: Record<Locale, Messages> = {
     'roadmap.status.inProgress': 'In Progress',
     'roadmap.status.planned': 'Planned',
     'roadmap.cta.title': 'Have a suggestion?',
-    'roadmap.cta.description': 'The roadmap is shaped by the community. Open an issue to request a chart, suggest a feature, or propose a change.',
+    'roadmap.cta.description':
+      'The roadmap is shaped by the community. Open an issue to request a chart, suggest a feature, or propose a change.',
     'roadmap.cta.request': 'Request a Chart',
     'roadmap.cta.issue': 'Open an Issue',
     'community.label': 'Community',
     'community.title': 'Built in the open, shaped by the community.',
-    'community.description': 'HelmForge is open-source and community-driven. Every contribution makes the project better for everyone.',
+    'community.description':
+      'HelmForge is open-source and community-driven. Every contribution makes the project better for everyone.',
     'community.howToContribute': 'How to contribute',
     'community.contributors': 'Contributors',
     'community.projectGovernance': 'Project governance',
     'community.chartRequestProcess': 'Chart request process',
     'community.cta.star': 'Star on GitHub',
     'community.way.submit.title': 'Submit a Chart',
-    'community.way.submit.description': 'Build and contribute a new Helm chart for an application you use in production.',
+    'community.way.submit.description':
+      'Build and contribute a new Helm chart for an application you use in production.',
     'community.way.submit.link': 'Read CONTRIBUTING.md',
     'community.way.report.title': 'Report Issues',
     'community.way.report.description': 'Found a bug or unexpected behavior? Open an issue with reproduction steps.',
     'community.way.report.link': 'Open an issue',
     'community.way.request.title': 'Request a Chart',
-    'community.way.request.description': 'Need a chart for an application? Submit a request and the community will evaluate it.',
+    'community.way.request.description':
+      'Need a chart for an application? Submit a request and the community will evaluate it.',
     'community.way.request.link': 'Request form',
     'community.way.docs.title': 'Improve Docs',
-    'community.way.docs.description': 'Fix typos, add examples, improve explanations. Documentation PRs are always welcome.',
+    'community.way.docs.description':
+      'Fix typos, add examples, improve explanations. Documentation PRs are always welcome.',
     'community.way.docs.link': 'Site repository',
     'community.way.test.title': 'Test & Review',
     'community.way.test.description': 'Try charts on your cluster and report results. Review open pull requests.',
     'community.way.test.link': 'Open PRs',
     'community.way.spread.title': 'Spread the Word',
-    'community.way.spread.description': 'Star the repo, share on social media, or write about your experience with HelmForge.',
+    'community.way.spread.description':
+      'Star the repo, share on social media, or write about your experience with HelmForge.',
     'community.way.spread.link': 'Star on GitHub',
     'community.governance.license.label': 'License',
     'community.governance.license.description': 'All charts are open-source under the MIT license.',
     'community.governance.versioning.label': 'Versioning',
     'community.governance.versioning.description': 'Automated semantic versioning from Conventional Commits.',
     'community.governance.signing.label': 'Signing',
-    'community.governance.signing.description': 'GPG provenance files and Sigstore Cosign keyless signatures on every release.',
+    'community.governance.signing.description':
+      'GPG provenance files and Sigstore Cosign keyless signatures on every release.',
     'community.governance.maturity.label': 'Maturity',
     'community.governance.maturity.description': 'Charts progress through maturity levels with clear criteria.',
     'community.process.step1.title': 'Submit',
@@ -173,7 +189,7 @@ export const messages: Record<Locale, Messages> = {
     'community.process.step4.title': 'Release',
     'community.process.step4.description': 'Chart is published to OCI and Helm repo with signed artifacts.',
     'changelog.label': 'Changelog',
-    'changelog.title': 'What\'s new in HelmForge charts.',
+    'changelog.title': "What's new in HelmForge charts.",
     'changelog.description': 'Every release, automatically documented. Powered by Conventional Commits.',
     'changelog.empty.before': 'Unable to load releases. Check back later or visit',
     'changelog.empty.link': 'GitHub Releases',
@@ -194,7 +210,8 @@ export const messages: Record<Locale, Messages> = {
     'stack.empty.helmfile.line2': '# YAML will appear here automatically',
     'stack.empty.argocd.line1': '# Select charts on the left to generate ArgoCD Applications',
     'stack.empty.argocd.line2': '# Manifests will appear here automatically',
-    'stack.empty.hint': 'Select one or more charts to generate install commands. Switch formats to get Helmfile YAML or ArgoCD manifests.',
+    'stack.empty.hint':
+      'Select one or more charts to generate install commands. Switch formats to get Helmfile YAML or ArgoCD manifests.',
     'stack.popularStacks': 'Popular stacks',
     'stack.preset.automation.title': 'Automation Stack',
     'stack.preset.automation.description': 'PostgreSQL + Redis + n8n',
@@ -210,20 +227,23 @@ export const messages: Record<Locale, Messages> = {
     'stack.preset.network.description': 'Pi-hole + Cloudflared + Uptime Kuma',
     'newsletter.label': 'HelmForge Newsletter',
     'newsletter.title': 'Stay ahead with practical Kubernetes updates',
-    'newsletter.description': 'Receive curated Helm and Kubernetes content, new chart releases, and production tips from HelmForge.',
+    'newsletter.description':
+      'Receive curated Helm and Kubernetes content, new chart releases, and production tips from HelmForge.',
     'newsletter.form.aria': 'HelmForge newsletter form',
     'newsletter.form.email': 'E-mail',
     'newsletter.form.emailPlaceholder': 'you@company.com',
     'newsletter.form.name': 'Name (optional)',
     'newsletter.form.namePlaceholder': 'Your name',
     'newsletter.form.listTitle': 'HelmForge Newsletter',
-    'newsletter.form.listDescription': 'Official HelmForge newsletter with Kubernetes insights, chart updates, and release notes.',
+    'newsletter.form.listDescription':
+      'Official HelmForge newsletter with Kubernetes insights, chart updates, and release notes.',
     'newsletter.form.subscribe': 'Subscribe',
     'newsletter.form.rss': 'Subscribe via RSS',
     'newsletter.form.rssAria': 'Subscribe via RSS',
     'playground.label': 'Playground',
     'playground.title': 'Configure, preview, deploy.',
-    'playground.description': 'Pick a chart, tweak the values, and get a ready-to-paste install command with your customizations.',
+    'playground.description':
+      'Pick a chart, tweak the values, and get a ready-to-paste install command with your customizations.',
     'playground.selectChart': 'Select a chart',
     'playground.search.placeholder': 'Filter charts...',
     'playground.empty.title': 'Select a chart to configure',
@@ -242,7 +262,8 @@ export const messages: Record<Locale, Messages> = {
     'playground.deploy.note.before': 'For production use, save the',
     'playground.deploy.note.middle': 'output to a file and install with',
     'playground.deploy.note.after': '.',
-    'playground.deploy.note': 'For production use, save the <strong>values.yaml</strong> output to a file and install with <code class="text-primary-light">helm install -f values.yaml</code>.',
+    'playground.deploy.note':
+      'For production use, save the <strong>values.yaml</strong> output to a file and install with <code class="text-primary-light">helm install -f values.yaml</code>.',
     'playground.changes': 'Changes from defaults',
     'playground.copied': 'Copied!',
     'playground.linkCopied': 'Link copied!',
@@ -325,7 +346,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.enableDataPersistence': 'Enable data persistence',
     'docsCharts.common.applicationPort': 'Application port',
     'docsCharts.common.enablePrometheusMetrics': 'Enable Prometheus metrics',
-    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql': 'Database mode (auto, sqlite, external, postgresql, mysql)',
+    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql':
+      'Database mode (auto, sqlite, external, postgresql, mysql)',
     'docsCharts.common.logLevel': 'Log level',
     'docsCharts.common.enableBundledPostgresqlSubchart': 'Enable bundled PostgreSQL subchart',
     'docsCharts.common.backupCronSchedule': 'Backup cron schedule',
@@ -335,19 +357,27 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.timezone': 'Timezone',
     'docsCharts.common.enableBundledRedisSubchart': 'Enable bundled Redis subchart',
     'docsCharts.common.useExternalRedis': 'Use external Redis',
-    'docsCharts.common.feature.ingressCertManager': 'Ingress support — TLS via cert-manager with configurable ingress class',
+    'docsCharts.common.feature.ingressCertManager':
+      'Ingress support — TLS via cert-manager with configurable ingress class',
     'docsCharts.common.feature.ingressConfigurableTls': 'Ingress support configurable ingress with TLS',
     'docsCharts.common.feature.ingressTlsCertManager': 'Ingress Support — TLS with cert-manager',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternal': 'PostgreSQL backend — bundled subchart or external database',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternal':
+      'PostgreSQL backend — bundled subchart or external database',
     'docsCharts.common.feature.s3BackupPostgresql': 'S3 backup — scheduled PostgreSQL backup to S3-compatible storage',
-    'docsCharts.common.feature.externalDatabasePostgresqlMysql': 'External Database — connect to existing PostgreSQL or MySQL',
+    'docsCharts.common.feature.externalDatabasePostgresqlMysql':
+      'External Database — connect to existing PostgreSQL or MySQL',
     'docsCharts.common.feature.ingressSupportConfigurableTls': 'Ingress Support — configurable ingress with TLS',
-    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional': 'PostgreSQL and MySQL subcharts optional bundled database deployments',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport': 'PostgreSQL Backend — bundled PostgreSQL subchart or external database support',
+    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional':
+      'PostgreSQL and MySQL subcharts optional bundled database deployments',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport':
+      'PostgreSQL Backend — bundled PostgreSQL subchart or external database support',
     'docsCharts.common.feature.postgresqlSubchartHelmforge': 'PostgreSQL Subchart — bundled via HelmForge dependency',
-    'docsCharts.common.feature.databaseBackendsAutoDetection': 'Database backends SQLite3 (default), PostgreSQL, or MySQL with auto-detection',
-    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware': 'S3-compatible backup database-aware CronJob (SQLite tar, pg_dump, mysqldump)',
-    'docsCharts.common.feature.sqliteDatabaseEmbedded': 'SQLite database — embedded storage, no external database needed',
+    'docsCharts.common.feature.databaseBackendsAutoDetection':
+      'Database backends SQLite3 (default), PostgreSQL, or MySQL with auto-detection',
+    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware':
+      'S3-compatible backup database-aware CronJob (SQLite tar, pg_dump, mysqldump)',
+    'docsCharts.common.feature.sqliteDatabaseEmbedded':
+      'SQLite database — embedded storage, no external database needed',
     'docsCharts.common.feature.mysqlSubchartHelmforge': 'MySQL Subchart — bundled via HelmForge dependency',
     'docsCharts.moreInfo.before': 'See the',
     'docsCharts.moreInfo.link': 'source code and full values reference',
@@ -355,7 +385,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.install.httpsRepo': 'HTTPS repository:',
     'docsCharts.install.ociRegistry': 'OCI registry:',
     'docsCharts.index.title': 'Charts Overview',
-    'docsCharts.index.intro': 'HelmForge provides production-ready Helm charts for common Kubernetes workloads. Each chart supports multiple architectures, security hardening, and observability out of the box.',
+    'docsCharts.index.intro':
+      'HelmForge provides production-ready Helm charts for common Kubernetes workloads. Each chart supports multiple architectures, security hardening, and observability out of the box.',
     'docsCharts.index.category.generalPurpose': 'General Purpose',
     'docsCharts.index.category.databases': 'Databases',
     'docsCharts.index.category.cachingMessaging': 'Caching & Messaging',
@@ -371,9 +402,12 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.index.category.devopsMetrics': 'DevOps & Metrics',
     'docsCharts.index.commonFeatures': 'Common Features',
     'docsCharts.index.commonFeaturesIntro': 'All HelmForge charts share these capabilities:',
-    'docsCharts.postgresql.intro': 'Production-ready PostgreSQL deployment with support for standalone and streaming replication architectures.',
-    'docsCharts.postgresql.feature.standaloneReplication': 'Standalone and replication — Single instance or primary with streaming replicas',
-    'docsCharts.postgresql.feature.automaticInit': 'Automatic initialization — Init scripts, extensions, and custom configuration',
+    'docsCharts.postgresql.intro':
+      'Production-ready PostgreSQL deployment with support for standalone and streaming replication architectures.',
+    'docsCharts.postgresql.feature.standaloneReplication':
+      'Standalone and replication — Single instance or primary with streaming replicas',
+    'docsCharts.postgresql.feature.automaticInit':
+      'Automatic initialization — Init scripts, extensions, and custom configuration',
     'docsCharts.postgresql.feature.s3Backup': 'S3 backup — Scheduled backups to S3-compatible storage via CronJob',
     'docsCharts.postgresql.feature.metrics': 'Metrics — Prometheus exporter with ServiceMonitor',
     'docsCharts.postgresql.feature.security': 'Security — Non-root containers, network policies, TLS support',
@@ -383,27 +417,41 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.postgresql.table.authPassword': 'Password for default user',
     'docsCharts.postgresql.upgrade.callout.before': 'If upgrading across major versions, check the',
     'docsCharts.postgresql.upgrade.callout.link': 'changelog',
-    'docsCharts.postgresql.upgrade.callout.after': 'for breaking changes in values structure. Always back up your data before upgrading.',
-    'docsCharts.postgresql.upgrade.note1': 'When switching from `standalone` to `replication`, set `auth.replicationPassword` before upgrading',
-    'docsCharts.postgresql.upgrade.note2': 'PVC resize requires the storage class to support volume expansion (`allowVolumeExpansion: true`)',
+    'docsCharts.postgresql.upgrade.callout.after':
+      'for breaking changes in values structure. Always back up your data before upgrading.',
+    'docsCharts.postgresql.upgrade.note1':
+      'When switching from `standalone` to `replication`, set `auth.replicationPassword` before upgrading',
+    'docsCharts.postgresql.upgrade.note2':
+      'PVC resize requires the storage class to support volume expansion (`allowVolumeExpansion: true`)',
     'docsCharts.postgresql.upgrade.note3': 'Metrics sidecar changes may cause a pod restart during upgrade',
-    'docsCharts.postgresql.issue.crashloop': 'Usually caused by incorrect `auth.postgresPassword` on upgrade. PostgreSQL does not re-initialize auth when the data directory already exists. Check logs with `kubectl logs <pod>` and verify the password matches the existing data.',
-    'docsCharts.postgresql.issue.replicationSync': 'For large databases, initial replica sync can take time. Increase `readReplicas.resources` and ensure the storage class provides adequate IOPS. Monitor replication lag with the Prometheus exporter (`pg_replication_lag` metric).',
-    'docsCharts.postgresql.issue.connectionPoolers': 'For high-connection workloads, deploy PgBouncer alongside PostgreSQL. Point your application to PgBouncer and configure it to connect to the PostgreSQL service.',
-    'docsCharts.redis.intro': 'Production-ready Redis deployment with support for standalone and Sentinel high-availability architectures.',
-    'docsCharts.redis.feature.standaloneSentinel': 'Standalone and Sentinel — Single instance or HA with automatic failover',
+    'docsCharts.postgresql.issue.crashloop':
+      'Usually caused by incorrect `auth.postgresPassword` on upgrade. PostgreSQL does not re-initialize auth when the data directory already exists. Check logs with `kubectl logs <pod>` and verify the password matches the existing data.',
+    'docsCharts.postgresql.issue.replicationSync':
+      'For large databases, initial replica sync can take time. Increase `readReplicas.resources` and ensure the storage class provides adequate IOPS. Monitor replication lag with the Prometheus exporter (`pg_replication_lag` metric).',
+    'docsCharts.postgresql.issue.connectionPoolers':
+      'For high-connection workloads, deploy PgBouncer alongside PostgreSQL. Point your application to PgBouncer and configure it to connect to the PostgreSQL service.',
+    'docsCharts.redis.intro':
+      'Production-ready Redis deployment with support for standalone and Sentinel high-availability architectures.',
+    'docsCharts.redis.feature.standaloneSentinel':
+      'Standalone and Sentinel — Single instance or HA with automatic failover',
     'docsCharts.redis.feature.persistence': 'Persistence — RDB and AOF persistence options',
     'docsCharts.redis.feature.metrics': 'Metrics — Prometheus exporter with ServiceMonitor',
     'docsCharts.redis.feature.security': 'Security — Password authentication, non-root containers, network policies',
     'docsCharts.redis.feature.configurable': 'Configurable — Custom Redis configuration parameters',
-    'docsCharts.redis.upgrade.callout': 'In Sentinel mode, rolling upgrades may trigger a failover. This is expected behavior — Sentinel promotes a replica when the master pod restarts. Applications using Sentinel-aware clients handle this transparently.',
-    'docsCharts.redis.upgrade.note1': 'Switching from `standalone` to `sentinel` requires a fresh deployment (data migration needed)',
+    'docsCharts.redis.upgrade.callout':
+      'In Sentinel mode, rolling upgrades may trigger a failover. This is expected behavior — Sentinel promotes a replica when the master pod restarts. Applications using Sentinel-aware clients handle this transparently.',
+    'docsCharts.redis.upgrade.note1':
+      'Switching from `standalone` to `sentinel` requires a fresh deployment (data migration needed)',
     'docsCharts.redis.upgrade.note2': 'Persistence changes only affect new pods; existing PVCs retain their size',
     'docsCharts.redis.upgrade.note3': 'Custom `master.configuration` overrides are appended to the default config',
-    'docsCharts.redis.issue.oomkilled': 'Redis stores data in memory. If your dataset exceeds the pod\'s memory limit, Kubernetes kills the pod. Set `master.resources.limits.memory` higher than your expected dataset size, and configure `maxmemory` in Redis to leave headroom for overhead.',
-    'docsCharts.redis.issue.connectionRefused': 'If your application connects directly to the master pod IP instead of using the Sentinel service, connections break after failover. Use a Sentinel-aware client library or connect via the `-headless` service.',
-    'docsCharts.mysql.intro': 'Production-ready MySQL deployment with support for standalone and source-replica replication architectures.',
-    'docsCharts.mysql.feature.standaloneReplication': 'Standalone and replication — Single instance or source-replica topology',
+    'docsCharts.redis.issue.oomkilled':
+      "Redis stores data in memory. If your dataset exceeds the pod's memory limit, Kubernetes kills the pod. Set `master.resources.limits.memory` higher than your expected dataset size, and configure `maxmemory` in Redis to leave headroom for overhead.",
+    'docsCharts.redis.issue.connectionRefused':
+      'If your application connects directly to the master pod IP instead of using the Sentinel service, connections break after failover. Use a Sentinel-aware client library or connect via the `-headless` service.',
+    'docsCharts.mysql.intro':
+      'Production-ready MySQL deployment with support for standalone and source-replica replication architectures.',
+    'docsCharts.mysql.feature.standaloneReplication':
+      'Standalone and replication — Single instance or source-replica topology',
     'docsCharts.mysql.feature.automaticInit': 'Automatic initialization — Init scripts and custom configuration',
     'docsCharts.mysql.feature.backup': 'Backup support — Configurable backup CronJobs to S3-compatible storage',
     'docsCharts.mysql.feature.metrics': 'Metrics — Prometheus exporter with ServiceMonitor',
@@ -412,13 +460,18 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mysql.table.authDatabase': 'Default database to create',
     'docsCharts.mysql.table.authUsername': 'Default user to create',
     'docsCharts.mysql.table.authPassword': 'Password for default user',
-    'docsCharts.mysql.upgrade.callout': 'MySQL stores the root password during initial setup. On upgrade, ensure `auth.rootPassword` matches the original value or the pod will fail to start with an authentication error.',
-    'docsCharts.mysql.upgrade.note1': 'When enabling replication on an existing standalone instance, a full re-initialization is required',
+    'docsCharts.mysql.upgrade.callout':
+      'MySQL stores the root password during initial setup. On upgrade, ensure `auth.rootPassword` matches the original value or the pod will fail to start with an authentication error.',
+    'docsCharts.mysql.upgrade.note1':
+      'When enabling replication on an existing standalone instance, a full re-initialization is required',
     'docsCharts.mysql.upgrade.note2': 'Backup CronJob changes take effect on the next scheduled run',
     'docsCharts.mysql.upgrade.note3': 'Secondary replicas are read-only; write attempts return an error',
-    'docsCharts.mysql.issue.crashloop': 'If the root password in values doesn\'t match the existing data directory, MySQL refuses to start. Check logs with `kubectl logs <pod>` and verify the password matches.',
-    'docsCharts.mysql.issue.replicationLag': 'Enable metrics and monitor `mysql_slave_status_seconds_behind_master`. Values consistently above 0 indicate the replica cannot keep up — consider increasing replica resources or reducing write load.',
-    'docsCharts.keycloak.intro': 'Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.',
+    'docsCharts.mysql.issue.crashloop':
+      "If the root password in values doesn't match the existing data directory, MySQL refuses to start. Check logs with `kubectl logs <pod>` and verify the password matches.",
+    'docsCharts.mysql.issue.replicationLag':
+      'Enable metrics and monitor `mysql_slave_status_seconds_behind_master`. Values consistently above 0 indicate the replica cannot keep up — consider increasing replica resources or reducing write load.',
+    'docsCharts.keycloak.intro':
+      'Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.',
     'docsCharts.keycloak.feature.identity': 'Identity management — SSO, user federation, social login',
     'docsCharts.keycloak.feature.protocols': 'Protocol support — OAuth 2.0, OpenID Connect, SAML 2.0',
     'docsCharts.keycloak.feature.externalDb': 'External database — PostgreSQL or MySQL backend support',
@@ -426,24 +479,36 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.keycloak.feature.metrics': 'Metrics — Prometheus metrics with ServiceMonitor',
     'docsCharts.keycloak.feature.security': 'Security — Non-root containers, network policies, pod security',
     'docsCharts.keycloak.feature.realmImport': 'Realm import — Automatic realm configuration on startup',
-    'docsCharts.keycloak.h2Warning': 'The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence. Always use an external database for production.',
+    'docsCharts.keycloak.h2Warning':
+      'The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence. Always use an external database for production.',
     'docsCharts.keycloak.table.adminUser': 'Keycloak admin username',
     'docsCharts.keycloak.table.adminPassword': 'Keycloak admin password',
-    'docsCharts.keycloak.upgrade.callout': 'Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only one replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas simultaneously can cause conflicts.',
+    'docsCharts.keycloak.upgrade.callout':
+      'Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only one replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas simultaneously can cause conflicts.',
     'docsCharts.keycloak.upgrade.note1': 'Admin password changes in values only take effect on fresh installations',
-    'docsCharts.keycloak.upgrade.note2': 'Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting',
-    'docsCharts.keycloak.upgrade.note3': 'Ingress annotations changes require a pod restart if the ingress controller caches configuration',
-    'docsCharts.keycloak.issue.proxyHeaders': 'This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.',
-    'docsCharts.keycloak.issue.slowStartup': 'Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.',
+    'docsCharts.keycloak.upgrade.note2':
+      'Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting',
+    'docsCharts.keycloak.upgrade.note3':
+      'Ingress annotations changes require a pod restart if the ingress controller caches configuration',
+    'docsCharts.keycloak.issue.proxyHeaders':
+      'This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.',
+    'docsCharts.keycloak.issue.slowStartup':
+      'Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.',
     'docsCharts.openWebui.intro.before': 'Deploy',
-    'docsCharts.openWebui.intro.after': 'on Kubernetes — a self-hosted AI chat platform with Ollama and OpenAI-compatible backend support, RAG pipelines, multi-model conversations, and an extensible plugin system.',
-    'docsCharts.openWebui.feature.ollamaIntegration': 'Ollama integration — connect to local or remote Ollama instances for open-source LLMs',
-    'docsCharts.openWebui.feature.openaiCompatibleApi': 'OpenAI-compatible API — works with OpenAI, Azure, Anthropic proxies, LiteLLM, and more',
-    'docsCharts.openWebui.feature.sqlitePostgresql': 'SQLite or PostgreSQL — embedded SQLite for simple installs, PostgreSQL subchart for production',
-    'docsCharts.openWebui.feature.redisCoordination': 'Redis WebSocket coordination — required for multi-instance deployments',
+    'docsCharts.openWebui.intro.after':
+      'on Kubernetes — a self-hosted AI chat platform with Ollama and OpenAI-compatible backend support, RAG pipelines, multi-model conversations, and an extensible plugin system.',
+    'docsCharts.openWebui.feature.ollamaIntegration':
+      'Ollama integration — connect to local or remote Ollama instances for open-source LLMs',
+    'docsCharts.openWebui.feature.openaiCompatibleApi':
+      'OpenAI-compatible API — works with OpenAI, Azure, Anthropic proxies, LiteLLM, and more',
+    'docsCharts.openWebui.feature.sqlitePostgresql':
+      'SQLite or PostgreSQL — embedded SQLite for simple installs, PostgreSQL subchart for production',
+    'docsCharts.openWebui.feature.redisCoordination':
+      'Redis WebSocket coordination — required for multi-instance deployments',
     'docsCharts.openWebui.feature.ragPipelines': 'RAG pipelines — retrieval-augmented generation with document uploads',
     'docsCharts.openWebui.feature.s3Backup': 'S3 backup — scheduled PostgreSQL backup to S3-compatible storage',
-    'docsCharts.openWebui.feature.ingressSupport': 'Ingress support — TLS via cert-manager with configurable ingress class',
+    'docsCharts.openWebui.feature.ingressSupport':
+      'Ingress support — TLS via cert-manager with configurable ingress class',
     'docsCharts.openWebui.table.port': 'Application port',
     'docsCharts.openWebui.table.ollamaBaseUrl': 'Ollama backend URL',
     'docsCharts.openWebui.table.openaiBaseUrl': 'OpenAI-compatible API base URL',
@@ -456,17 +521,22 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.openWebui.table.ingressEnabled': 'Enable ingress',
     'docsCharts.openWebui.table.backupEnabled': 'Enable S3 backup CronJob',
     'docsCharts.openWebui.note.sqliteSingle': 'SQLite mode is single-instance only — no horizontal scaling',
-    'docsCharts.openWebui.note.postgresqlReplicas': 'PostgreSQL mode supports multiple replicas with Redis for WebSocket coordination',
+    'docsCharts.openWebui.note.postgresqlReplicas':
+      'PostgreSQL mode supports multiple replicas with Redis for WebSocket coordination',
     'docsCharts.openWebui.note.autoSecret': 'The chart auto-generates a session secret key if not provided',
     'docsCharts.openWebui.note.telemetryDisabled': 'Telemetry is disabled by default (`DO_NOT_TRACK=true`)',
     'docsCharts.superset.intro.before': 'Deploy',
-    'docsCharts.superset.intro.after': 'on Kubernetes — a modern, enterprise-ready business intelligence platform for data exploration and visualization with 60+ database connectors.',
-    'docsCharts.superset.feature.threeComponent': 'Three-component architecture — Gunicorn web, Celery workers, Celery beat scheduler for independent scaling',
+    'docsCharts.superset.intro.after':
+      'on Kubernetes — a modern, enterprise-ready business intelligence platform for data exploration and visualization with 60+ database connectors.',
+    'docsCharts.superset.feature.threeComponent':
+      'Three-component architecture — Gunicorn web, Celery workers, Celery beat scheduler for independent scaling',
     'docsCharts.superset.feature.initJob': 'Init Job — automatic database migration and admin user creation',
-    'docsCharts.superset.feature.postgresqlMetadata': 'PostgreSQL metadata store — bundled subchart or external connection',
+    'docsCharts.superset.feature.postgresqlMetadata':
+      'PostgreSQL metadata store — bundled subchart or external connection',
     'docsCharts.superset.feature.redisBroker': 'Redis broker — bundled subchart for Celery task queue or external',
     'docsCharts.superset.feature.configurable': 'Configurable — superset_config.py delivered via ConfigMap',
-    'docsCharts.superset.feature.autoSecrets': 'Auto-generated secrets — admin password, Flask SECRET_KEY, database and Redis passwords',
+    'docsCharts.superset.feature.autoSecrets':
+      'Auto-generated secrets — admin password, Flask SECRET_KEY, database and Redis passwords',
     'docsCharts.superset.feature.healthProbes': 'Health probes — startup, liveness, and readiness on /health',
     'docsCharts.superset.feature.ingressSupport': 'Ingress support — configurable class (traefik, nginx, etc.)',
     'docsCharts.superset.table.imageRepository': 'Container image',
@@ -482,18 +552,25 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.superset.table.databaseMode': 'Database mode: subchart or external',
     'docsCharts.superset.table.redisMode': 'Redis mode: subchart or external',
     'docsCharts.superset.table.ingressEnabled': 'Enable ingress',
-    'docsCharts.superset.note.initJobRuns': 'The init job runs database migrations and creates the admin user on every install/upgrade',
+    'docsCharts.superset.note.initJobRuns':
+      'The init job runs database migrations and creates the admin user on every install/upgrade',
     'docsCharts.superset.note.independentScaling': 'Web, worker, and beat components scale independently',
     'docsCharts.superset.note.extraConfig': 'Configure `superset.extraConfig` for custom superset_config.py settings',
     'docsCharts.superset.note.loadExamples': 'Use `superset.loadExamples: true` for demonstration environments',
     'docsCharts.appwrite.intro.before': 'Helm chart for deploying',
-    'docsCharts.appwrite.intro.after': 'on Kubernetes — a self-hosted Backend-as-a-Service (BaaS) platform providing authentication, databases, storage, functions, messaging, and a real-time API. Ships with bundled MariaDB and Redis by default.',
-    'docsCharts.appwrite.feature.fullStack': 'Full Appwrite stack — API, Console (v7.5.7), Realtime, 12 workers, schedulers, and maintenance',
-    'docsCharts.appwrite.feature.bundledMariadb': 'Bundled MariaDB — default install includes the HelmForge MariaDB chart',
+    'docsCharts.appwrite.intro.after':
+      'on Kubernetes — a self-hosted Backend-as-a-Service (BaaS) platform providing authentication, databases, storage, functions, messaging, and a real-time API. Ships with bundled MariaDB and Redis by default.',
+    'docsCharts.appwrite.feature.fullStack':
+      'Full Appwrite stack — API, Console (v7.5.7), Realtime, 12 workers, schedulers, and maintenance',
+    'docsCharts.appwrite.feature.bundledMariadb':
+      'Bundled MariaDB — default install includes the HelmForge MariaDB chart',
     'docsCharts.appwrite.feature.bundledRedis': 'Bundled Redis — default install includes the HelmForge Redis chart',
-    'docsCharts.appwrite.feature.externalServices': 'External services support — connect to managed MariaDB/MySQL and Redis instead of subcharts',
-    'docsCharts.appwrite.feature.pathIngress': 'Path-based ingress routing — single host with path prefixes for API (`/v1`), Console, and Realtime (`/v1/realtime`)',
-    'docsCharts.appwrite.feature.sharedPvcs': 'Shared PVCs — persistent volumes for uploads, cache, and function builds shared across components',
+    'docsCharts.appwrite.feature.externalServices':
+      'External services support — connect to managed MariaDB/MySQL and Redis instead of subcharts',
+    'docsCharts.appwrite.feature.pathIngress':
+      'Path-based ingress routing — single host with path prefixes for API (`/v1`), Console, and Realtime (`/v1/realtime`)',
+    'docsCharts.appwrite.feature.sharedPvcs':
+      'Shared PVCs — persistent volumes for uploads, cache, and function builds shared across components',
     'docsCharts.appwrite.feature.appVersion': 'appVersion 1.8.1 — tracks the latest Appwrite open-source release',
     'docsCharts.appwrite.table.domain': 'Public domain for the Appwrite instance',
     'docsCharts.appwrite.table.secretKey': 'Encryption key for Appwrite secrets',
@@ -505,17 +582,25 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.appwrite.table.uploadsSize': 'Uploads PVC size',
     'docsCharts.appwrite.table.cacheSize': 'Cache PVC size',
     'docsCharts.appwrite.table.workerReplicaCount': 'Replicas for each worker type',
-    'docsCharts.appwrite.note.alphaWorkloads': 'This alpha chart deploys approximately 20 Kubernetes workloads — use minimal worker replicas for initial testing',
-    'docsCharts.appwrite.note.paths': 'The Console is served at the root path, the API at `/v1`, and Realtime at `/v1/realtime`',
+    'docsCharts.appwrite.note.alphaWorkloads':
+      'This alpha chart deploys approximately 20 Kubernetes workloads — use minimal worker replicas for initial testing',
+    'docsCharts.appwrite.note.paths':
+      'The Console is served at the root path, the API at `/v1`, and Realtime at `/v1/realtime`',
     'docsCharts.appwrite.note.defaultBundled': 'Default installs use bundled MariaDB and Redis via HelmForge subcharts',
-    'docsCharts.appwrite.note.sameImage': 'All worker pods share the same Appwrite image with different entrypoint commands',
-    'docsCharts.kafka.intro': 'Deploy Apache Kafka on Kubernetes using the official `apache/kafka:4.2.0` image with a KRaft-only design. The chart intentionally supports a simple `single-broker` path for development and a production-oriented `cluster` path with dedicated controllers and brokers.',
+    'docsCharts.appwrite.note.sameImage':
+      'All worker pods share the same Appwrite image with different entrypoint commands',
+    'docsCharts.kafka.intro':
+      'Deploy Apache Kafka on Kubernetes using the official `apache/kafka:4.2.0` image with a KRaft-only design. The chart intentionally supports a simple `single-broker` path for development and a production-oriented `cluster` path with dedicated controllers and brokers.',
     'docsCharts.kafka.feature.latestStable': 'Latest stable Kafka — pinned to the latest stable upstream Kafka release',
     'docsCharts.kafka.feature.kraftOnly': 'KRaft only — no ZooKeeper mode in this chart',
-    'docsCharts.kafka.feature.twoTopologies': 'Two clear topologies — `single-broker` for simple environments and `cluster` for production-oriented deployments',
-    'docsCharts.kafka.feature.persistentStorage': 'Persistent storage — supported for single-broker, controllers, and brokers',
-    'docsCharts.kafka.feature.stableDns': 'Stable broker DNS — advertised listeners use StatefulSet pod DNS names inside the cluster',
-    'docsCharts.kafka.feature.optionalMetrics': 'Optional metrics — JMX exporter javaagent with optional ServiceMonitor',
+    'docsCharts.kafka.feature.twoTopologies':
+      'Two clear topologies — `single-broker` for simple environments and `cluster` for production-oriented deployments',
+    'docsCharts.kafka.feature.persistentStorage':
+      'Persistent storage — supported for single-broker, controllers, and brokers',
+    'docsCharts.kafka.feature.stableDns':
+      'Stable broker DNS — advertised listeners use StatefulSet pod DNS names inside the cluster',
+    'docsCharts.kafka.feature.optionalMetrics':
+      'Optional metrics — JMX exporter javaagent with optional ServiceMonitor',
     'docsCharts.kafka.table.architecture': '`single-broker` or `cluster`',
     'docsCharts.kafka.table.imageRepository': 'Kafka image repository',
     'docsCharts.kafka.table.imageTag': 'Kafka image tag',
@@ -526,17 +611,26 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.kafka.table.brokerReplicas': 'Dedicated broker replicas',
     'docsCharts.kafka.table.minInSyncReplicas': 'Recommended minimum ISR for cluster mode',
     'docsCharts.kafka.table.metricsEnabled': 'Enable JMX exporter metrics',
-    'docsCharts.kafka.note.singleBrokerDev': 'Use `single-broker` for development and CI, not as the production baseline',
-    'docsCharts.kafka.note.clusterProduction': 'Use `cluster` for production-oriented workloads with dedicated controllers and brokers',
+    'docsCharts.kafka.note.singleBrokerDev':
+      'Use `single-broker` for development and CI, not as the production baseline',
+    'docsCharts.kafka.note.clusterProduction':
+      'Use `cluster` for production-oriented workloads with dedicated controllers and brokers',
     'docsCharts.kafka.note.validateFlows': 'Validate topic creation, producer, and consumer flows before promotion',
-    'docsCharts.kafka.note.externalListeners': 'Plan external listeners, TLS, and auth as explicit follow-up work if your environment needs them',
+    'docsCharts.kafka.note.externalListeners':
+      'Plan external listeners, TLS, and auth as explicit follow-up work if your environment needs them',
     'docsCharts.velero.intro.before': 'Deploy',
-    'docsCharts.velero.intro.after': 'on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional filesystem backup workflows.',
-    'docsCharts.velero.feature.latestStable': 'Latest stable Velero — chart pinned to the latest stable upstream release',
-    'docsCharts.velero.feature.crdsIncluded': 'Official CRDs included — Velero CRDs shipped through the chart `crds/` directory',
-    'docsCharts.velero.feature.s3Storage': 'S3-compatible storage — validated with the AWS plugin against MinIO and similar providers',
-    'docsCharts.velero.feature.recurringSchedules': 'Recurring schedules — optional `Schedule` resources rendered from chart values',
-    'docsCharts.velero.feature.filesystemBackup': 'Filesystem backup — optional node-agent DaemonSet for pod volume backups',
+    'docsCharts.velero.intro.after':
+      'on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional filesystem backup workflows.',
+    'docsCharts.velero.feature.latestStable':
+      'Latest stable Velero — chart pinned to the latest stable upstream release',
+    'docsCharts.velero.feature.crdsIncluded':
+      'Official CRDs included — Velero CRDs shipped through the chart `crds/` directory',
+    'docsCharts.velero.feature.s3Storage':
+      'S3-compatible storage — validated with the AWS plugin against MinIO and similar providers',
+    'docsCharts.velero.feature.recurringSchedules':
+      'Recurring schedules — optional `Schedule` resources rendered from chart values',
+    'docsCharts.velero.feature.filesystemBackup':
+      'Filesystem backup — optional node-agent DaemonSet for pod volume backups',
     'docsCharts.velero.feature.metricsSupport': 'Metrics support — metrics Service and optional ServiceMonitor',
     'docsCharts.velero.table.imageRepository': 'Velero server image',
     'docsCharts.velero.table.awsTag': 'Default AWS/S3 plugin image tag',
@@ -545,17 +639,22 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.velero.table.schedules': 'Schedule resources created by the chart',
     'docsCharts.velero.table.nodeAgentEnabled': 'Deploy the filesystem backup DaemonSet',
     'docsCharts.velero.table.serviceMonitorEnabled': 'Create a Prometheus Operator ServiceMonitor',
-    'docsCharts.velero.note.confirmContext': 'Always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall',
-    'docsCharts.velero.note.validateBsl': 'For S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`',
-    'docsCharts.velero.note.realBackup': 'Create at least one real test backup before enabling recurring schedules in shared environments',
+    'docsCharts.velero.note.confirmContext':
+      'Always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall',
+    'docsCharts.velero.note.validateBsl':
+      'For S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`',
+    'docsCharts.velero.note.realBackup':
+      'Create at least one real test backup before enabling recurring schedules in shared environments',
     'docsCharts.flowise.intro.before': 'Helm chart for deploying',
-    'docsCharts.flowise.intro.after': 'on Kubernetes using the official `flowiseai/flowise` image, with a simple standalone topology and a scalable queue topology for larger workloads.',
+    'docsCharts.flowise.intro.after':
+      'on Kubernetes using the official `flowiseai/flowise` image, with a simple standalone topology and a scalable queue topology for larger workloads.',
     'docsCharts.flowise.feature.officialImage': 'Official Flowise image based on `flowiseai/flowise`',
     'docsCharts.flowise.feature.standaloneMode': 'Standalone mode — SQLite and local storage for simple installs',
     'docsCharts.flowise.feature.queueMode': 'Queue mode — separate main and worker deployments for scalable processing',
     'docsCharts.flowise.feature.bundledDeps': 'Bundled PostgreSQL and Redis — optional subcharts for queue mode',
     'docsCharts.flowise.feature.externalSql': 'External SQL support — external PostgreSQL or MySQL',
-    'docsCharts.flowise.feature.s3Storage': 'S3-backed shared storage — queue mode uses S3-compatible storage for shared blob data',
+    'docsCharts.flowise.feature.s3Storage':
+      'S3-backed shared storage — queue mode uses S3-compatible storage for shared blob data',
     'docsCharts.flowise.feature.ingressSupport': 'Ingress support — configurable ingress for the Flowise web UI',
     'docsCharts.flowise.table.architectureMode': 'Flowise topology: `standalone` or `queue`',
     'docsCharts.flowise.table.replicaCount': 'Number of main Flowise server replicas',
@@ -566,21 +665,32 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.flowise.table.storageType': 'Blob storage type: `local` or `s3`',
     'docsCharts.flowise.table.persistenceEnabled': 'Persist local Flowise data',
     'docsCharts.flowise.table.appUrl': 'Public Flowise URL',
-    'docsCharts.flowise.note.standaloneDefaults': '`standalone` defaults to SQLite plus a local PVC for the easiest install',
-    'docsCharts.flowise.note.queueRequirements': '`queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`',
-    'docsCharts.flowise.note.queueScaleOut': 'Queue mode is intended for scale-out deployments with separate main and worker pods',
+    'docsCharts.flowise.note.standaloneDefaults':
+      '`standalone` defaults to SQLite plus a local PVC for the easiest install',
+    'docsCharts.flowise.note.queueRequirements':
+      '`queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`',
+    'docsCharts.flowise.note.queueScaleOut':
+      'Queue mode is intended for scale-out deployments with separate main and worker pods',
     'docsCharts.flowise.note.localSingleNode': 'Local storage is intentionally single-node oriented',
     'docsCharts.flowise.note.versionPinned': 'The chart pins `3.1.1`',
-    'docsCharts.flowise.note.versionValidated': 'This version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag `3.1.1`',
+    'docsCharts.flowise.note.versionValidated':
+      'This version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag `3.1.1`',
     'docsCharts.listmonk.intro.before': 'Helm chart for deploying',
-    'docsCharts.listmonk.intro.after': 'on Kubernetes — a self-hosted newsletter and mailing list manager with bundled PostgreSQL, persistent uploads storage, and optional S3 backup.',
+    'docsCharts.listmonk.intro.after':
+      'on Kubernetes — a self-hosted newsletter and mailing list manager with bundled PostgreSQL, persistent uploads storage, and optional S3 backup.',
     'docsCharts.listmonk.feature.officialImage': 'Official Listmonk image based on `listmonk/listmonk`',
-    'docsCharts.listmonk.feature.bundledPostgresql': 'Bundled PostgreSQL — default install includes the HelmForge PostgreSQL chart',
-    'docsCharts.listmonk.feature.externalDatabase': 'External database support — managed PostgreSQL can be used instead of the subchart',
-    'docsCharts.listmonk.feature.persistentUploads': 'Persistent uploads — configurable PVC for media and attachment storage',
-    'docsCharts.listmonk.feature.s3Backup': 'S3 backup — optional CronJob for PostgreSQL dumps to S3-compatible storage',
-    'docsCharts.listmonk.feature.idempotentBootstrap': 'Idempotent bootstrap — init container runs `--install --idempotent --yes` and `--upgrade --yes` on every start',
-    'docsCharts.listmonk.feature.pgcrypto': 'pgcrypto extension — automatically provisioned via PostgreSQL init scripts',
+    'docsCharts.listmonk.feature.bundledPostgresql':
+      'Bundled PostgreSQL — default install includes the HelmForge PostgreSQL chart',
+    'docsCharts.listmonk.feature.externalDatabase':
+      'External database support — managed PostgreSQL can be used instead of the subchart',
+    'docsCharts.listmonk.feature.persistentUploads':
+      'Persistent uploads — configurable PVC for media and attachment storage',
+    'docsCharts.listmonk.feature.s3Backup':
+      'S3 backup — optional CronJob for PostgreSQL dumps to S3-compatible storage',
+    'docsCharts.listmonk.feature.idempotentBootstrap':
+      'Idempotent bootstrap — init container runs `--install --idempotent --yes` and `--upgrade --yes` on every start',
+    'docsCharts.listmonk.feature.pgcrypto':
+      'pgcrypto extension — automatically provisioned via PostgreSQL init scripts',
     'docsCharts.listmonk.table.replicaCount': 'Number of Listmonk application pods',
     'docsCharts.listmonk.table.adminUser': 'Admin username created on first install',
     'docsCharts.listmonk.table.adminPassword': 'Admin password (auto-generated if empty)',
@@ -591,17 +701,23 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.listmonk.table.backupEnabled': 'Enable S3 backup CronJob',
     'docsCharts.listmonk.table.backupSchedule': 'Backup cron schedule',
     'docsCharts.listmonk.table.ingressEnabled': 'Enable ingress exposure',
-    'docsCharts.listmonk.note.smtpConfig': 'SMTP configuration is done through the Listmonk admin UI after first install',
-    'docsCharts.listmonk.note.initContainer': 'The init container ensures the database schema is created and migrated on every pod start',
-    'docsCharts.listmonk.note.pgcryptoRequired': 'PostgreSQL requires the `pgcrypto` extension, which the chart provisions automatically via init scripts',
+    'docsCharts.listmonk.note.smtpConfig':
+      'SMTP configuration is done through the Listmonk admin UI after first install',
+    'docsCharts.listmonk.note.initContainer':
+      'The init container ensures the database schema is created and migrated on every pod start',
+    'docsCharts.listmonk.note.pgcryptoRequired':
+      'PostgreSQL requires the `pgcrypto` extension, which the chart provisions automatically via init scripts',
     'docsCharts.countly.intro.before': 'Deploy',
-    'docsCharts.countly.intro.after': 'on Kubernetes — a product analytics platform with event tracking, crash reporting, push notifications, A/B testing, and 41+ plugins.',
-    'docsCharts.countly.feature.fullAnalytics': 'Full analytics stack — event tracking, crash reporting, push notifications, A/B testing',
+    'docsCharts.countly.intro.after':
+      'on Kubernetes — a product analytics platform with event tracking, crash reporting, push notifications, A/B testing, and 41+ plugins.',
+    'docsCharts.countly.feature.fullAnalytics':
+      'Full analytics stack — event tracking, crash reporting, push notifications, A/B testing',
     'docsCharts.countly.feature.mongodbBackend': 'MongoDB backend — bundled subchart or external connection',
     'docsCharts.countly.feature.dualPorts': 'Dual ports — separate API (3001) and Dashboard (6001) endpoints',
     'docsCharts.countly.feature.pluginSystem': 'Plugin system — configurable plugin list for feature selection',
     'docsCharts.countly.feature.scalableWorkers': 'Scalable workers — configurable API worker processes',
-    'docsCharts.countly.feature.ingressSupport': 'Ingress support — TLS via cert-manager with configurable ingress class',
+    'docsCharts.countly.feature.ingressSupport':
+      'Ingress support — TLS via cert-manager with configurable ingress class',
     'docsCharts.countly.table.apiPort': 'API port',
     'docsCharts.countly.table.dashboardPort': 'Dashboard port',
     'docsCharts.countly.table.apiWorkers': 'API worker processes',
@@ -615,7 +731,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.countly.note.singleInstance': 'Single instance per MongoDB database',
     'docsCharts.countly.note.sameContainer': 'Dashboard and API run in the same container on separate ports',
     'docsCharts.rabbitmq.intro': 'Production-ready RabbitMQ deployment with management UI and clustering support.',
-    'docsCharts.rabbitmq.feature.standaloneClustering': 'Standalone and clustering — Single instance or multi-node cluster',
+    'docsCharts.rabbitmq.feature.standaloneClustering':
+      'Standalone and clustering — Single instance or multi-node cluster',
     'docsCharts.rabbitmq.feature.managementUi': 'Management UI — Built-in web management console with ingress support',
     'docsCharts.rabbitmq.feature.pluginSupport': 'Plugin support — Configurable RabbitMQ plugins',
     'docsCharts.rabbitmq.feature.metrics': 'Metrics — Prometheus exporter with ServiceMonitor',
@@ -629,16 +746,20 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.rabbitmq.table.ingressEnabled': 'Enable ingress for management UI',
     'docsCharts.rabbitmq.table.metricsEnabled': 'Enable Prometheus exporter',
     'docsCharts.uptimeKuma.intro.before': 'Deploy',
-    'docsCharts.uptimeKuma.intro.after': 'on Kubernetes using the official `louislam/uptime-kuma` Docker image. Self-hosted monitoring with HTTP/TCP/DNS/Ping checks, 90+ notification services, and customizable status pages.',
-    'docsCharts.uptimeKuma.feature.monitorTypes': '20+ monitor types — HTTP(s), TCP, Ping, DNS, Docker, WebSocket, and more',
-    'docsCharts.uptimeKuma.feature.notificationServices': '90+ notification services — Telegram, Discord, Slack, Email, Pushover, and more',
+    'docsCharts.uptimeKuma.intro.after':
+      'on Kubernetes using the official `louislam/uptime-kuma` Docker image. Self-hosted monitoring with HTTP/TCP/DNS/Ping checks, 90+ notification services, and customizable status pages.',
+    'docsCharts.uptimeKuma.feature.monitorTypes':
+      '20+ monitor types — HTTP(s), TCP, Ping, DNS, Docker, WebSocket, and more',
+    'docsCharts.uptimeKuma.feature.notificationServices':
+      '90+ notification services — Telegram, Discord, Slack, Email, Pushover, and more',
     'docsCharts.uptimeKuma.feature.statusPages': 'Status pages — public status pages with custom domains',
     'docsCharts.uptimeKuma.feature.sqliteMariaDb': 'SQLite or MariaDB — embedded SQLite (default) or MySQL subchart',
     'docsCharts.uptimeKuma.feature.externalDatabase': 'External database — connect to existing MariaDB instances',
     'docsCharts.uptimeKuma.feature.scheduledBackups': 'Scheduled backups — SQLite tar or mysqldump with S3 upload',
     'docsCharts.uptimeKuma.feature.ingressSupport': 'Ingress support — TLS with cert-manager',
     'docsCharts.uptimeKuma.feature.twoFa': '2FA — built-in two-factor authentication',
-    'docsCharts.uptimeKuma.setupWizard': 'After deploying, access the setup wizard via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
+    'docsCharts.uptimeKuma.setupWizard':
+      'After deploying, access the setup wizard via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
     'docsCharts.uptimeKuma.table.port': 'Application port',
     'docsCharts.uptimeKuma.table.databaseType': 'Database type (sqlite, mariadb)',
     'docsCharts.uptimeKuma.table.mysqlEnabled': 'Deploy MySQL subchart',
@@ -647,7 +768,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.uptimeKuma.table.ingressEnabled': 'Enable ingress',
     'docsCharts.uptimeKuma.table.backupEnabled': 'Enable S3 backups',
     'docsCharts.uptimeKuma.table.servicePort': 'Service port',
-    'docsCharts.pihole.intro': 'Deploy Pi-hole DNS sinkhole on Kubernetes using the official `pihole/pihole` container image. Provides network-wide ad blocking via DNS filtering with optional Unbound recursive DNS.',
+    'docsCharts.pihole.intro':
+      'Deploy Pi-hole DNS sinkhole on Kubernetes using the official `pihole/pihole` container image. Provides network-wide ad blocking via DNS filtering with optional Unbound recursive DNS.',
     'docsCharts.pihole.feature.adBlocking': 'Network-Wide Ad Blocking — DNS-level filtering for all devices',
     'docsCharts.pihole.feature.customDns': 'Custom DNS Records — Local A records, CNAME records, and dnsmasq config',
     'docsCharts.pihole.feature.unboundSidecar': 'Unbound Sidecar — Optional recursive DNS resolver for privacy',
@@ -668,9 +790,11 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.pihole.table.loadBalancerIp': 'Fixed IP for DNS',
     'docsCharts.pihole.table.persistenceEnabled': 'Enable persistent storage',
     'docsCharts.pihole.table.persistenceSize': 'PVC size',
-    'docsCharts.guacamole.intro': 'Deploy Apache Guacamole on Kubernetes using the official `guacamole/guacamole` and `guacamole/guacd` Docker images. A clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.',
+    'docsCharts.guacamole.intro':
+      'Deploy Apache Guacamole on Kubernetes using the official `guacamole/guacamole` and `guacamole/guacd` Docker images. A clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.',
     'docsCharts.guacamole.feature.guacdSidecar': 'guacd Sidecar — protocol daemon runs alongside the web app',
-    'docsCharts.guacamole.feature.postgresqlSubchart': 'PostgreSQL Subchart — bundled via HelmForge dependency (default)',
+    'docsCharts.guacamole.feature.postgresqlSubchart':
+      'PostgreSQL Subchart — bundled via HelmForge dependency (default)',
     'docsCharts.guacamole.feature.mysqlSubchart': 'MySQL Subchart — bundled via HelmForge dependency',
     'docsCharts.guacamole.feature.externalDatabase': 'External Database — connect to existing PostgreSQL or MySQL',
     'docsCharts.guacamole.feature.databaseInitJob': 'Database Init Job — automatic schema initialization on install',
@@ -679,7 +803,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.guacamole.feature.totp': 'TOTP — two-factor authentication',
     'docsCharts.guacamole.feature.scheduledBackups': 'Scheduled Backups — pg_dump or mysqldump with S3 upload',
     'docsCharts.guacamole.feature.ingressSupport': 'Ingress Support — TLS with cert-manager',
-    'docsCharts.guacamole.defaultCredentials': 'Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.',
+    'docsCharts.guacamole.defaultCredentials':
+      'Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.',
     'docsCharts.guacamole.redirectUri': 'The `redirectUri` is auto-detected from the ingress configuration.',
     'docsCharts.guacamole.table.contextPath': 'Web context path (`ROOT` = `/`)',
     'docsCharts.guacamole.table.guacdPort': 'guacd daemon port',
@@ -695,11 +820,14 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.guacamole.table.ingressEnabled': 'Enable ingress',
     'docsCharts.guacamole.table.backupEnabled': 'Enable S3 backups',
     'docsCharts.mariadb.intro.before': 'Helm chart for deploying',
-    'docsCharts.mariadb.intro.after': 'on Kubernetes using the official `mariadb` Docker image. Supports standalone and GTID-based replication architectures.',
+    'docsCharts.mariadb.intro.after':
+      'on Kubernetes using the official `mariadb` Docker image. Supports standalone and GTID-based replication architectures.',
     'docsCharts.mariadb.feature.officialImage': 'Official MariaDB image from Docker Hub (11.4 LTS)',
     'docsCharts.mariadb.feature.standaloneReplication': 'Standalone and replication modes with explicit configuration',
-    'docsCharts.mariadb.feature.gtidReplication': 'GTID-based replication using MariaDB-native `MASTER_USE_GTID=slave_pos`',
-    'docsCharts.mariadb.feature.configPresets': 'Configuration presets: small, medium, large, oltp, read-heavy, analytics',
+    'docsCharts.mariadb.feature.gtidReplication':
+      'GTID-based replication using MariaDB-native `MASTER_USE_GTID=slave_pos`',
+    'docsCharts.mariadb.feature.configPresets':
+      'Configuration presets: small, medium, large, oltp, read-heavy, analytics',
     'docsCharts.mariadb.feature.tls': 'TLS server-side encryption with optional client enforcement',
     'docsCharts.mariadb.feature.prometheusMetrics': 'Prometheus metrics via mysqld-exporter sidecar and ServiceMonitor',
     'docsCharts.mariadb.feature.s3Backup': 'S3-compatible backup CronJob with mariadb-dump',
@@ -719,17 +847,23 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mariadb.table.metricsEnabled': 'Enable mysqld-exporter',
     'docsCharts.mariadb.table.tlsEnabled': 'Enable server TLS',
     'docsCharts.mariadb.table.networkPolicyEnabled': 'Enable NetworkPolicy',
-    'docsCharts.mariadb.architectureSelection': 'When `architecture` is `standalone` (default), the chart deploys a single MariaDB instance. Set `architecture: replication` for one fixed source with asynchronous GTID-based read replicas.',
+    'docsCharts.mariadb.architectureSelection':
+      'When `architecture` is `standalone` (default), the chart deploys a single MariaDB instance. Set `architecture: replication` for one fixed source with asynchronous GTID-based read replicas.',
     'docsCharts.druid.intro.before': 'Deploy',
-    'docsCharts.druid.intro.after': 'on Kubernetes — a high-performance, real-time analytics database designed for fast slice-and-dice analytics on large datasets, commonly used for BI dashboards and real-time data exploration.',
-    'docsCharts.druid.feature.sixComponentArchitecture': '6-component architecture — coordinator, overlord, broker, router, historical, middlemanager',
+    'docsCharts.druid.intro.after':
+      'on Kubernetes — a high-performance, real-time analytics database designed for fast slice-and-dice analytics on large datasets, commonly used for BI dashboards and real-time data exploration.',
+    'docsCharts.druid.feature.sixComponentArchitecture':
+      '6-component architecture — coordinator, overlord, broker, router, historical, middlemanager',
     'docsCharts.druid.feature.routerConsole': 'Router web console — built-in Druid console accessible via ingress',
-    'docsCharts.druid.feature.postgresqlMetadataStore': 'PostgreSQL metadata store — bundled subchart or external PostgreSQL/MySQL',
+    'docsCharts.druid.feature.postgresqlMetadataStore':
+      'PostgreSQL metadata store — bundled subchart or external PostgreSQL/MySQL',
     'docsCharts.druid.feature.zookeeperCoordination': 'ZooKeeper coordination — bundled subchart or external ZooKeeper',
     'docsCharts.druid.feature.deepStorage': 'Deep storage — local or S3-compatible (MinIO, AWS S3)',
-    'docsCharts.druid.feature.persistentVolumes': 'Persistent volumes — segment cache (historical) and task storage (middlemanager)',
+    'docsCharts.druid.feature.persistentVolumes':
+      'Persistent volumes — segment cache (historical) and task storage (middlemanager)',
     'docsCharts.druid.feature.perComponentScaling': 'Per-component scaling — independent replica counts and JVM tuning',
-    'docsCharts.druid.feature.healthProbes': 'Health probes — liveness on /status/health, readiness on /status/selfDiscovered',
+    'docsCharts.druid.feature.healthProbes':
+      'Health probes — liveness on /status/health, readiness on /status/selfDiscovered',
     'docsCharts.druid.feature.ingressSupport': 'Ingress support — configurable class (traefik, nginx, etc.)',
     'docsCharts.druid.table.imageRepository': 'Druid container image',
     'docsCharts.druid.table.coordinatorEnabled': 'Enable coordinator',
@@ -745,11 +879,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.druid.table.metadataMode': 'Metadata mode: subchart or external',
     'docsCharts.druid.table.zookeeperMode': 'ZooKeeper mode: subchart or external',
     'docsCharts.druid.table.deepStorageType': 'Deep storage: local or s3',
-    'docsCharts.druid.note.memoryIntensive': 'Druid is memory-intensive — all 6 components together require 2GB+ RAM minimum',
+    'docsCharts.druid.note.memoryIntensive':
+      'Druid is memory-intensive — all 6 components together require 2GB+ RAM minimum',
     'docsCharts.druid.note.tuneJvm': 'Tune JVM heap per component via `javaOpts` for production sizing',
-    'docsCharts.druid.note.routerIngressTarget': 'The router component serves the web console and is the default ingress target',
-    'docsCharts.druid.note.s3ForProduction': 'Use S3 deep storage for production; local deep storage is only suitable for development',
-    'docsCharts.druid.note.historicalCache': 'Historical nodes cache segments on disk — size the PVC based on data volume',
+    'docsCharts.druid.note.routerIngressTarget':
+      'The router component serves the web console and is the default ingress target',
+    'docsCharts.druid.note.s3ForProduction':
+      'Use S3 deep storage for production; local deep storage is only suitable for development',
+    'docsCharts.druid.note.historicalCache':
+      'Historical nodes cache segments on disk — size the PVC based on data volume',
     'docsCharts.auto.adguard_home.b0': 'Network-wide ad blocking — DNS-level filtering for all devices',
     'docsCharts.auto.adguard_home.b1': 'Two deployment modes — wizard (port 3000) or pre-configured (port 80)',
     'docsCharts.auto.adguard_home.b2': 'DNS over HTTPS / TLS — encrypted upstream DNS resolvers',
@@ -782,7 +920,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.answer.t0': 'Site name',
     'docsCharts.auto.answer.t1': 'Full external URL (auto-detected from ingress)',
     'docsCharts.auto.answer.t2': 'Enable unattended setup',
-    'docsCharts.auto.archivebox.b0': 'Multi-format archiving — HTML, PDF, screenshot, WARC, media extraction, git clone',
+    'docsCharts.auto.archivebox.b0':
+      'Multi-format archiving — HTML, PDF, screenshot, WARC, media extraction, git clone',
     'docsCharts.auto.archivebox.b1': 'Chromium headless — full browser rendering with /dev/shm memory-backed tmpfs',
     'docsCharts.auto.archivebox.b2': 'Persistent storage — PVC for archived content and database',
     'docsCharts.auto.archivebox.b3': 'Admin credentials — managed via Kubernetes Secret with auto-generation',
@@ -823,16 +962,23 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.castopod.b5': 'Persistence — persistent storage for uploads, cache, and session data',
     'docsCharts.auto.castopod.t0': 'Public base URL (required)',
     'docsCharts.auto.castopod.t1': 'Enable bundled MariaDB subchart',
-    'docsCharts.auto.changedetection.b0': 'Website Monitoring — detect changes on any web page with configurable check intervals',
-    'docsCharts.auto.changedetection.b1': 'CSS/XPath Selectors — target specific page elements for precise change detection',
-    'docsCharts.auto.changedetection.b2': 'Browser Sidecar — optional Playwright/Chromium sidecar for JavaScript-rendered pages',
-    'docsCharts.auto.changedetection.b3': 'Notifications — email, webhook, Slack, Telegram, and many more notification channels',
+    'docsCharts.auto.changedetection.b0':
+      'Website Monitoring — detect changes on any web page with configurable check intervals',
+    'docsCharts.auto.changedetection.b1':
+      'CSS/XPath Selectors — target specific page elements for precise change detection',
+    'docsCharts.auto.changedetection.b2':
+      'Browser Sidecar — optional Playwright/Chromium sidecar for JavaScript-rendered pages',
+    'docsCharts.auto.changedetection.b3':
+      'Notifications — email, webhook, Slack, Telegram, and many more notification channels',
     'docsCharts.auto.changedetection.b4': 'REST API — programmatic access to watches and change history',
-    'docsCharts.auto.changedetection.b5': 'Persistence — SQLite database and page snapshots stored on persistent volume',
+    'docsCharts.auto.changedetection.b5':
+      'Persistence — SQLite database and page snapshots stored on persistent volume',
     'docsCharts.auto.changedetection.t0': 'Number of concurrent fetch workers',
     'docsCharts.auto.changedetection.t1': 'Enable Playwright browser sidecar',
-    'docsCharts.auto.chiefonboarding.b0': 'Task Sequences — define onboarding workflows with ordered tasks and triggers',
-    'docsCharts.auto.chiefonboarding.b1': 'Auto-Generated Secret — Django secret key generated automatically if not provided',
+    'docsCharts.auto.chiefonboarding.b0':
+      'Task Sequences — define onboarding workflows with ordered tasks and triggers',
+    'docsCharts.auto.chiefonboarding.b1':
+      'Auto-Generated Secret — Django secret key generated automatically if not provided',
     'docsCharts.auto.chiefonboarding.b2': 'Integrations — connect with Slack, Google Workspace, and other services',
     'docsCharts.auto.chiefonboarding.b3': 'Web Interface — admin dashboard for managing onboarding processes',
     'docsCharts.auto.chiefonboarding.t0': 'Django secret key (auto-generated if empty)',
@@ -863,7 +1009,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cloudflared.b5': 'Existing secrets — bring your own Secret for the tunnel token',
     'docsCharts.auto.cloudflared.b6': 'Do not use HPA — downscaling terminates active tunnel connections',
     'docsCharts.auto.cloudflared.b7': 'No ingress template — cloudflared replaces traditional ingress controllers',
-    'docsCharts.auto.cloudflared.b8': 'Routing is dashboard-managed — use the Cloudflare dashboard to map hostnames to services',
+    'docsCharts.auto.cloudflared.b8':
+      'Routing is dashboard-managed — use the Cloudflare dashboard to map hostnames to services',
     'docsCharts.auto.cloudflared.t0': 'Tunnel token from Cloudflare dashboard',
     'docsCharts.auto.cloudflared.t1': 'Existing secret with tunnel token',
     'docsCharts.auto.cloudflared.t2': 'Disable auto-update',
@@ -883,9 +1030,11 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cronicle.t2': 'SMTP server hostname',
     'docsCharts.auto.cronicle.t3': 'Auto-generate session encryption key',
     'docsCharts.auto.cronicle.t4': 'Enable persistent job storage',
-    'docsCharts.auto.ddns_updater.b0': '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more',
+    'docsCharts.auto.ddns_updater.b0':
+      '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more',
     'docsCharts.auto.ddns_updater.b1': 'Web UI — responsive dashboard for monitoring update status',
-    'docsCharts.auto.ddns_updater.b2': 'Multi-provider — manage records across different providers in a single deployment',
+    'docsCharts.auto.ddns_updater.b2':
+      'Multi-provider — manage records across different providers in a single deployment',
     'docsCharts.auto.ddns_updater.b3': 'Persistent history — update history stored in a PVC',
     'docsCharts.auto.ddns_updater.b4': 'Existing secrets — bring your own Secret for credentials',
     'docsCharts.auto.ddns_updater.b5': 'Ingress support — expose the web UI with TLS',
@@ -907,10 +1056,13 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.docmost.b0': 'Official Docmost image based on `docmost/docmost`',
     'docsCharts.auto.docmost.b1': 'Bundled PostgreSQL default install includes the HelmForge PostgreSQL chart',
     'docsCharts.auto.docmost.b2': 'Bundled Redis default install includes the HelmForge Redis chart',
-    'docsCharts.auto.docmost.b3': 'External services support managed PostgreSQL and Redis can be used instead of subcharts',
-    'docsCharts.auto.docmost.b4': 'Local or S3 storage choose persistent local storage or S3-compatible object storage for uploads',
+    'docsCharts.auto.docmost.b3':
+      'External services support managed PostgreSQL and Redis can be used instead of subcharts',
+    'docsCharts.auto.docmost.b4':
+      'Local or S3 storage choose persistent local storage or S3-compatible object storage for uploads',
     'docsCharts.auto.docmost.b5': 'Ingress support configurable ingress with stable external URL handling',
-    'docsCharts.auto.docmost.b6': 'Bootstrap-ready database PostgreSQL init scripts grant Docmost the required extension privileges on first startup',
+    'docsCharts.auto.docmost.b6':
+      'Bootstrap-ready database PostgreSQL init scripts grant Docmost the required extension privileges on first startup',
     'docsCharts.auto.docmost.t0': 'Number of Docmost application pods',
     'docsCharts.auto.docmost.t1': 'External URL used by Docmost',
     'docsCharts.auto.docmost.t2': 'Database mode: `auto`, `external`, or `postgresql`',
@@ -936,39 +1088,64 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.dolibarr.t7': 'Database mode: `auto`, `external`, `mysql`',
     'docsCharts.auto.dolibarr.t8': 'Persist `/var/www/documents`',
     'docsCharts.auto.dolibarr.t9': 'Documents <span data-i18n="docsCharts.common.pvcSize">PVC size</span>',
-    'docsCharts.auto.fastmcp_server.b0': 'Multi-source loading — tools, resources, prompts, and knowledge from inline ConfigMaps, S3-compatible storage (AWS S3, MinIO, R2), or Git repositories',
-    'docsCharts.auto.fastmcp_server.b1': 'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching the bucket',
-    'docsCharts.auto.fastmcp_server.b10': 'Built-in Web UI — dashboard at `/ui` with tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
-    'docsCharts.auto.fastmcp_server.b11': 'Prometheus metrics — tool call counts, durations, errors, source sync status at `/metrics`',
-    'docsCharts.auto.fastmcp_server.b12': 'Structured JSON logging — `LOG_FORMAT=json` for Loki, ELK, CloudWatch, Datadog',
-    'docsCharts.auto.fastmcp_server.b13': 'Dedicated health endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
+    'docsCharts.auto.fastmcp_server.b0':
+      'Multi-source loading — tools, resources, prompts, and knowledge from inline ConfigMaps, S3-compatible storage (AWS S3, MinIO, R2), or Git repositories',
+    'docsCharts.auto.fastmcp_server.b1':
+      'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching the bucket',
+    'docsCharts.auto.fastmcp_server.b10':
+      'Built-in Web UI — dashboard at `/ui` with tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
+    'docsCharts.auto.fastmcp_server.b11':
+      'Prometheus metrics — tool call counts, durations, errors, source sync status at `/metrics`',
+    'docsCharts.auto.fastmcp_server.b12':
+      'Structured JSON logging — `LOG_FORMAT=json` for Loki, ELK, CloudWatch, Datadog',
+    'docsCharts.auto.fastmcp_server.b13':
+      'Dedicated health endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
     'docsCharts.auto.fastmcp_server.b14': 'Diagnostic endpoint — `GET /debug/info` with full server introspection',
-    'docsCharts.auto.fastmcp_server.b15': 'Init container pattern — pre-sync sources before server starts via `initSync.enabled`',
-    'docsCharts.auto.fastmcp_server.b16': 'Strict loading — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors',
-    'docsCharts.auto.fastmcp_server.b17': 'Hot reload — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`',
+    'docsCharts.auto.fastmcp_server.b15':
+      'Init container pattern — pre-sync sources before server starts via `initSync.enabled`',
+    'docsCharts.auto.fastmcp_server.b16':
+      'Strict loading — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors',
+    'docsCharts.auto.fastmcp_server.b17':
+      'Hot reload — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`',
     'docsCharts.auto.fastmcp_server.b18': 'Periodic sync — poll S3/Git sources for changes at configurable intervals',
     'docsCharts.auto.fastmcp_server.b19': 'Webhook reload — `POST /reload` endpoint for CI/CD-triggered reloads',
-    'docsCharts.auto.fastmcp_server.b2': 'Bearer and JWT authentication — built-in via FastMCPs `StaticTokenVerifier` and `JWTVerifier`',
+    'docsCharts.auto.fastmcp_server.b2':
+      'Bearer and JWT authentication — built-in via FastMCPs `StaticTokenVerifier` and `JWTVerifier`',
     'docsCharts.auto.fastmcp_server.b20': 'OCI artifact source — pull tool bundles from OCI registries via ORAS',
     'docsCharts.auto.fastmcp_server.b21': 'Selective sync — include/exclude glob patterns for source filtering',
-    'docsCharts.auto.fastmcp_server.b22': 'Gateway mode — compose multiple MCP servers via `MCP_MODE=gateway` and `MCP_MOUNT_SERVERS`',
-    'docsCharts.auto.fastmcp_server.b23': 'Tag visibility — enable/disable tools by tags with `MCP_ENABLE_TAGS` and `MCP_DISABLE_TAGS`',
+    'docsCharts.auto.fastmcp_server.b22':
+      'Gateway mode — compose multiple MCP servers via `MCP_MODE=gateway` and `MCP_MOUNT_SERVERS`',
+    'docsCharts.auto.fastmcp_server.b23':
+      'Tag visibility — enable/disable tools by tags with `MCP_ENABLE_TAGS` and `MCP_DISABLE_TAGS`',
     'docsCharts.auto.fastmcp_server.b24': 'Multi-auth — combine bearer + JWT providers via `MCP_AUTH_PROVIDERS`',
     'docsCharts.auto.fastmcp_server.b25': 'Tool-level scopes — `__required_scopes__` module variable for authorization',
-    'docsCharts.auto.fastmcp_server.b26': 'Context integration — tools can use `ctx: Context` for progress, logging, sampling, elicitation, and session state',
-    'docsCharts.auto.fastmcp_server.b27': 'Rate limiting — `__rate_limit__` module variable or `MCP_RATE_LIMIT_DEFAULT` env var (sliding window)',
-    'docsCharts.auto.fastmcp_server.b28': 'Caching — `__cache_ttl__` module variable for idempotent tool result caching',
-    'docsCharts.auto.fastmcp_server.b29': 'Tool sandboxing — `__max_memory_mb__` and `__max_output_size_kb__` resource limits per tool',
-    'docsCharts.auto.fastmcp_server.b3': 'Knowledge base support — serve Markdown files as MCP resources for RAG and context injection',
+    'docsCharts.auto.fastmcp_server.b26':
+      'Context integration — tools can use `ctx: Context` for progress, logging, sampling, elicitation, and session state',
+    'docsCharts.auto.fastmcp_server.b27':
+      'Rate limiting — `__rate_limit__` module variable or `MCP_RATE_LIMIT_DEFAULT` env var (sliding window)',
+    'docsCharts.auto.fastmcp_server.b28':
+      'Caching — `__cache_ttl__` module variable for idempotent tool result caching',
+    'docsCharts.auto.fastmcp_server.b29':
+      'Tool sandboxing — `__max_memory_mb__` and `__max_output_size_kb__` resource limits per tool',
+    'docsCharts.auto.fastmcp_server.b3':
+      'Knowledge base support — serve Markdown files as MCP resources for RAG and context injection',
     'docsCharts.auto.fastmcp_server.b30': 'PodDisruptionBudget — `pdb.enabled` for zero-downtime rolling updates',
-    'docsCharts.auto.fastmcp_server.b31': 'HorizontalPodAutoscaler — `autoscaling.enabled` for auto-scaling based on CPU/memory',
-    'docsCharts.auto.fastmcp_server.b32': 'Security — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
-    'docsCharts.auto.fastmcp_server.b4': 'Extra pip packages — install additional Python packages at startup before loading tools',
-    'docsCharts.auto.fastmcp_server.b5': 'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables for tool categorization and behavior hints',
-    'docsCharts.auto.fastmcp_server.b6': 'Resource templates — parameterized URIs like `users://{user_id}/profile` for dynamic resources',
-    'docsCharts.auto.fastmcp_server.b7': 'Multiple resources per file — `RESOURCES` dict maps multiple URIs to handler functions',
-    'docsCharts.auto.fastmcp_server.b8': 'Error masking — hide internal error details from clients via `MCP_MASK_ERROR_DETAILS`',
-    'docsCharts.auto.fastmcp_server.b9': 'Duplicate handling — control behavior when tools share names via `MCP_ON_DUPLICATE_TOOLS`',
+    'docsCharts.auto.fastmcp_server.b31':
+      'HorizontalPodAutoscaler — `autoscaling.enabled` for auto-scaling based on CPU/memory',
+    'docsCharts.auto.fastmcp_server.b32':
+      'Security — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
+    'docsCharts.auto.fastmcp_server.b4':
+      'Extra pip packages — install additional Python packages at startup before loading tools',
+    'docsCharts.auto.fastmcp_server.b5':
+      'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables for tool categorization and behavior hints',
+    'docsCharts.auto.fastmcp_server.b6':
+      'Resource templates — parameterized URIs like `users://{user_id}/profile` for dynamic resources',
+    'docsCharts.auto.fastmcp_server.b7':
+      'Multiple resources per file — `RESOURCES` dict maps multiple URIs to handler functions',
+    'docsCharts.auto.fastmcp_server.b8':
+      'Error masking — hide internal error details from clients via `MCP_MASK_ERROR_DETAILS`',
+    'docsCharts.auto.fastmcp_server.b9':
+      'Duplicate handling — control behavior when tools share names via `MCP_ON_DUPLICATE_TOOLS`',
     'docsCharts.auto.fastmcp_server.t0': 'Container image',
     'docsCharts.auto.fastmcp_server.t1': 'Image tag',
     'docsCharts.auto.fastmcp_server.t10': 'Inline Python tool files',
@@ -1028,13 +1205,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.gitea.t9': 'Enable SSH service',
     'docsCharts.auto.heimdall.b0': 'LinuxServer.io image based on `linuxserver/heimdall`',
     'docsCharts.auto.heimdall.b1': 'Persistent storage SQLite database and settings in `/config`',
-    'docsCharts.auto.heimdall.b2': 'S3-compatible backup CronJob that archives `/config` and uploads to any S3 endpoint',
+    'docsCharts.auto.heimdall.b2':
+      'S3-compatible backup CronJob that archives `/config` and uploads to any S3 endpoint',
     'docsCharts.auto.heimdall.b3': 'PUID/PGID file ownership control',
     'docsCharts.auto.heimdall.t0': 'User ID for file permissions',
     'docsCharts.auto.heimdall.t1': 'Group ID for file permissions',
     'docsCharts.auto.heimdall.t2': 'Cron schedule',
     'docsCharts.auto.homarr.b0': 'Official Homarr image from `ghcr.io/homarr-labs/homarr`',
-    'docsCharts.auto.homarr.b1': 'Encryption key management auto-generated or existing secret for `SECRET_ENCRYPTION_KEY`',
+    'docsCharts.auto.homarr.b1':
+      'Encryption key management auto-generated or existing secret for `SECRET_ENCRYPTION_KEY`',
     'docsCharts.auto.homarr.b2': 'Kubernetes integration optional workload discovery via `ENABLE_KUBERNETES`',
     'docsCharts.auto.homarr.b3': 'External Redis optional external Redis for multi-instance setups',
     'docsCharts.auto.homarr.t0': 'Auth providers (credentials, ldap, oidc)',
@@ -1049,7 +1228,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.index.b4': 'Resource management — CPU/memory requests and limits with sensible defaults',
     'docsCharts.auto.index.b5': 'Pod Disruption Budgets — Configurable PDBs for high-availability deployments',
     'docsCharts.auto.karakeep.b0': 'Meilisearch Sidecar — optional full-text search engine running alongside the app',
-    'docsCharts.auto.karakeep.b1': 'Chromium Sidecar — optional headless browser for web page screenshots and archiving',
+    'docsCharts.auto.karakeep.b1':
+      'Chromium Sidecar — optional headless browser for web page screenshots and archiving',
     'docsCharts.auto.karakeep.b2': 'AI Tagging — automatic bookmark categorization and tagging',
     'docsCharts.auto.karakeep.b3': 'Full-Text Search — search across bookmarks, tags, and archived content',
     'docsCharts.auto.karakeep.b4': 'Persistence — persistent storage for SQLite database and uploaded files',
@@ -1060,7 +1240,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.komga.b0': 'SQLite Database — zero database configuration, persistent via PVC',
     'docsCharts.auto.komga.b1': 'Dual Persistent Volumes — separate PVCs for config and library data',
     'docsCharts.auto.komga.b2': 'Java Memory Tuning — configurable JVM heap via `JAVA_TOOL_OPTIONS`',
-    'docsCharts.auto.komga.b3': '<span data-i18n="docsCharts.common.timezone">Timezone</span> Support — configurable via `TZ` environment variable',
+    'docsCharts.auto.komga.b3':
+      '<span data-i18n="docsCharts.common.timezone">Timezone</span> Support — configurable via `TZ` environment variable',
     'docsCharts.auto.komga.b4': 'Scheduled Backups — config/database tar archive with S3 upload',
     'docsCharts.auto.komga.t0': 'Container port',
     'docsCharts.auto.komga.t1': 'Base URL path for reverse proxy',
@@ -1075,7 +1256,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.liwan.b2': 'Persistent storage — PVC-backed data directory',
     'docsCharts.auto.metabase.b0': 'Interactive dashboards — drag-and-drop visualization builder',
     'docsCharts.auto.metabase.b1': 'JVM tuning — configurable Java memory settings',
-    'docsCharts.auto.middleware.b0': 'All four DORA metrics — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate',
+    'docsCharts.auto.middleware.b0':
+      'All four DORA metrics — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate',
     'docsCharts.auto.middleware.b1': 'All-in-one container — frontend, analytics, and sync server in a single image',
     'docsCharts.auto.middleware.b2': 'PostgreSQL + Redis — bundled subcharts or external connections',
     'docsCharts.auto.middleware.b3': 'CI/CD integrations — tracks metrics from your existing pipelines',
@@ -1089,7 +1271,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.middleware.t6': 'Use external database',
     'docsCharts.auto.middleware.t7': 'Enable /app/keys persistence',
     'docsCharts.auto.minecraft.b0': 'Multiple Server Types — Vanilla, Paper, Spigot, Forge, Fabric, Quilt',
-    'docsCharts.auto.minecraft.b1': 'GeyserMC Cross-Play — Allow Bedrock clients (mobile, console) to join Java servers',
+    'docsCharts.auto.minecraft.b1':
+      'GeyserMC Cross-Play — Allow Bedrock clients (mobile, console) to join Java servers',
     'docsCharts.auto.minecraft.b2': 'Authentication — Online/offline mode, whitelist, operators',
     'docsCharts.auto.minecraft.b3': 'RCON — Remote console with auto-generated password',
     'docsCharts.auto.minecraft.b4': 'Scheduled Backups — CronJob-based backup to S3-compatible storage',
@@ -1107,12 +1290,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.minecraft.t8': 'Enable GeyserMC cross-play',
     'docsCharts.auto.minecraft.t9': 'Enable RCON remote console',
     'docsCharts.auto.mosquitto.b0': 'Official Mosquitto image based on `eclipse-mosquitto`',
-    'docsCharts.auto.mosquitto.b1': 'Standalone mode single broker deployment for the simplest and most predictable runtime',
-    'docsCharts.auto.mosquitto.b2': 'Federated mode multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
+    'docsCharts.auto.mosquitto.b1':
+      'Standalone mode single broker deployment for the simplest and most predictable runtime',
+    'docsCharts.auto.mosquitto.b2':
+      'Federated mode multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
     'docsCharts.auto.mosquitto.b3': 'WebSocket listener browser-ready MQTT access on a dedicated listener',
     'docsCharts.auto.mosquitto.b4': 'MQTTX Web companion optional web client deployment with separate scaling controls',
     'docsCharts.auto.mosquitto.b5': 'Authentication and ACL optional username/password and ACL file generation',
-    'docsCharts.auto.mosquitto.b6': 'Ingress support configurable ingress for broker WebSocket access and the optional MQTTX Web UI',
+    'docsCharts.auto.mosquitto.b6':
+      'Ingress support configurable ingress for broker WebSocket access and the optional MQTTX Web UI',
     'docsCharts.auto.mosquitto.t0': 'Broker topology: `standalone` or `federated`',
     'docsCharts.auto.mosquitto.t1': 'Number of broker replicas',
     'docsCharts.auto.mosquitto.t10': 'Deploy MQTTX Web companion UI',
@@ -1130,7 +1316,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.n8n.t2': 'Enable Redis-backed queue mode',
     'docsCharts.auto.n8n.t3': 'Number of worker replicas',
     'docsCharts.auto.n8n.t4': 'Jobs per worker',
-    'docsCharts.auto.ntfy.b0': 'REST API & WebSocket — publish and subscribe to topics via simple HTTP PUT/POST or WebSocket',
+    'docsCharts.auto.ntfy.b0':
+      'REST API & WebSocket — publish and subscribe to topics via simple HTTP PUT/POST or WebSocket',
     'docsCharts.auto.ntfy.b1': 'Firebase & UnifiedPush — supports Android push delivery through FCM and UnifiedPush',
     'docsCharts.auto.ntfy.b2': 'Prometheus Metrics — optional `/metrics` endpoint with ServiceMonitor support',
     'docsCharts.auto.ntfy.b3': 'Behind-Proxy Mode — trusts `X-Forwarded-For` headers for correct client identification',
@@ -1191,7 +1378,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.wordpress.t2': 'Database name',
     'docsCharts.auto.wordpress.t3': 'Custom PHP settings',
     'docsCharts.n8n.intro.before': 'Deploy n8n on Kubernetes using the official',
-    'docsCharts.n8n.intro.after': 'Docker image. Supports SQLite (default), PostgreSQL, MySQL, Redis-backed queue mode with dedicated workers, and scheduled backups.',
+    'docsCharts.n8n.intro.after':
+      'Docker image. Supports SQLite (default), PostgreSQL, MySQL, Redis-backed queue mode with dedicated workers, and scheduled backups.',
     'docsCharts.n8n.feature.sqlite': 'SQLite by Default — zero database configuration needed',
     'docsCharts.n8n.feature.postgresSubchart': 'PostgreSQL Subchart — bundled via HelmForge dependency',
     'docsCharts.n8n.feature.mysqlSubchart': 'MySQL Subchart — bundled via HelmForge dependency',
@@ -1200,25 +1388,35 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.n8n.feature.encryptionKey': 'Encryption Key — auto-generated and preserved across upgrades',
     'docsCharts.n8n.feature.backups': 'Scheduled Backups — database-aware CronJob with S3 upload',
     'docsCharts.n8n.feature.ingress': 'Ingress Support — TLS with cert-manager',
-    'docsCharts.mongodb.intro': 'Production-ready MongoDB deployment with support for standalone and replica set configurations.',
-    'docsCharts.mongodb.feature.standaloneReplicaset': 'Standalone and replica set — Single instance or multi-member replica set',
+    'docsCharts.mongodb.intro':
+      'Production-ready MongoDB deployment with support for standalone and replica set configurations.',
+    'docsCharts.mongodb.feature.standaloneReplicaset':
+      'Standalone and replica set — Single instance or multi-member replica set',
     'docsCharts.mongodb.feature.automaticInit': 'Automatic initialization — Init scripts and custom configuration',
     'docsCharts.mongodb.feature.metrics': 'Metrics — Prometheus exporter with ServiceMonitor',
     'docsCharts.mongodb.feature.security': 'Security — Authentication, non-root containers, network policies',
     'docsCharts.mongodb.feature.storage': 'Persistent storage — Configurable PVCs with storage class selection',
     'docsCharts.mongodb.feature.arbiter': 'Arbiter support — Optional arbiter for replica set elections',
-    'docsCharts.mongodb.arbiterCallout': 'An arbiter participates in elections but holds no data. Use it when you have an even number of data-bearing members to ensure a majority for elections. With 3 data members, an arbiter is not needed.',
+    'docsCharts.mongodb.arbiterCallout':
+      'An arbiter participates in elections but holds no data. Use it when you have an even number of data-bearing members to ensure a majority for elections. With 3 data members, an arbiter is not needed.',
     'docsCharts.mongodb.table.authDatabase': 'Default database to create',
     'docsCharts.mongodb.table.authUsername': 'Default user to create',
     'docsCharts.mongodb.table.authPassword': 'Password for default user',
-    'docsCharts.mongodb.upgrade.callout': 'Changing `replicaCount` triggers a replica set reconfiguration. MongoDB handles this gracefully, but scaling down removes members — ensure no data is exclusively on the removed members.',
-    'docsCharts.mongodb.upgrade.note1': 'Upgrading from standalone to replicaset requires re-initialization (dump and restore)',
-    'docsCharts.mongodb.upgrade.note2': 'Auth credentials are set during first initialization and cannot be changed via values on upgrade',
-    'docsCharts.mongodb.upgrade.note3': 'WiredTiger cache size defaults to 50% of available memory — set `resources.limits.memory` accordingly',
-    'docsCharts.mongodb.issue.recovering': 'This usually means initial sync is still in progress for large datasets. Check sync progress with `rs.status()` inside the mongo shell. If it persists, check disk IOPS and network bandwidth.',
-    'docsCharts.mongodb.issue.connectionString.before': 'Use the full replica set connection string with all members listed, or use the headless service DNS:',
+    'docsCharts.mongodb.upgrade.callout':
+      'Changing `replicaCount` triggers a replica set reconfiguration. MongoDB handles this gracefully, but scaling down removes members — ensure no data is exclusively on the removed members.',
+    'docsCharts.mongodb.upgrade.note1':
+      'Upgrading from standalone to replicaset requires re-initialization (dump and restore)',
+    'docsCharts.mongodb.upgrade.note2':
+      'Auth credentials are set during first initialization and cannot be changed via values on upgrade',
+    'docsCharts.mongodb.upgrade.note3':
+      'WiredTiger cache size defaults to 50% of available memory — set `resources.limits.memory` accordingly',
+    'docsCharts.mongodb.issue.recovering':
+      'This usually means initial sync is still in progress for large datasets. Check sync progress with `rs.status()` inside the mongo shell. If it persists, check disk IOPS and network bandwidth.',
+    'docsCharts.mongodb.issue.connectionString.before':
+      'Use the full replica set connection string with all members listed, or use the headless service DNS:',
     'docsCharts.wordpress.intro.before': 'Deploy WordPress on Kubernetes using the official',
-    'docsCharts.wordpress.intro.after': 'Docker image (Apache variant). Supports MySQL subchart or external database, scheduled backups, and monitoring.',
+    'docsCharts.wordpress.intro.after':
+      'Docker image (Apache variant). Supports MySQL subchart or external database, scheduled backups, and monitoring.',
     'docsCharts.wordpress.feature.officialImage': 'Official WordPress Image — Apache variant with PHP',
     'docsCharts.wordpress.feature.mysqlSubchart': 'MySQL Subchart — Bundled MySQL via HelmForge dependency',
     'docsCharts.wordpress.feature.externalDb': 'External Database — Connect to existing MySQL/MariaDB',
@@ -1226,37 +1424,47 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.wordpress.feature.ingress': 'Ingress Support — TLS with cert-manager',
     'docsCharts.wordpress.feature.phpConfig': 'PHP Configuration — Custom php.ini via ConfigMap',
     'docsCharts.wordpress.feature.metrics': 'Prometheus Metrics — Apache exporter sidecar',
-    'docsCharts.vaultwarden.intro': 'Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight, Rust-based implementation of the Bitwarden server API, compatible with all official Bitwarden clients.',
-    'docsCharts.vaultwarden.feature.compatible': 'Bitwarden compatible — Works with all official Bitwarden apps and browser extensions',
-    'docsCharts.vaultwarden.feature.lightweight': 'Lightweight — Minimal resource footprint compared to the official Bitwarden server',
+    'docsCharts.vaultwarden.intro':
+      'Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight, Rust-based implementation of the Bitwarden server API, compatible with all official Bitwarden clients.',
+    'docsCharts.vaultwarden.feature.compatible':
+      'Bitwarden compatible — Works with all official Bitwarden apps and browser extensions',
+    'docsCharts.vaultwarden.feature.lightweight':
+      'Lightweight — Minimal resource footprint compared to the official Bitwarden server',
     'docsCharts.vaultwarden.feature.database': 'Database backends — SQLite, PostgreSQL, or MySQL',
     'docsCharts.vaultwarden.feature.admin': 'Admin panel — Optional web-based administration interface',
     'docsCharts.vaultwarden.feature.ingress': 'Ingress support — Configurable with `ingressClassName` and TLS',
-    'docsCharts.vaultwarden.feature.security': 'Security hardening — Network policies, non-root containers, pod security',
+    'docsCharts.vaultwarden.feature.security':
+      'Security hardening — Network policies, non-root containers, pod security',
     'docsCharts.vaultwarden.feature.storage': 'Persistent storage — Data and attachment persistence',
     'docsPage.index.title': 'Documentation',
-    'docsPage.index.intro': 'Welcome to the HelmForge documentation. Here you will find everything you need to install, configure, and operate our Helm charts in production Kubernetes clusters.',
+    'docsPage.index.intro':
+      'Welcome to the HelmForge documentation. Here you will find everything you need to install, configure, and operate our Helm charts in production Kubernetes clusters.',
     'docsPage.index.quickLinks': 'Quick Links',
     'docsPage.index.gettingStarted': 'Getting Started',
     'docsPage.index.gettingStartedDesc': 'Add the repository and install your first chart',
     'docsPage.index.chartsOverview': 'Charts Overview',
     'docsPage.index.chartsOverviewDesc': 'Browse all available charts',
     'docsPage.index.whatIs': 'What is HelmForge?',
-    'docsPage.index.whatIsDesc': 'HelmForge is a collection of open-source Helm charts designed for production use. Every chart is built with the same principles:',
+    'docsPage.index.whatIsDesc':
+      'HelmForge is a collection of open-source Helm charts designed for production use. Every chart is built with the same principles:',
     'docsPage.index.security': 'Security',
     'docsPage.index.securityDesc': 'Non-root containers, network policies, pod security standards, and TLS support',
     'docsPage.index.observability': 'Observability',
-    'docsPage.index.observabilityDesc': 'Prometheus metrics endpoints, ServiceMonitor resources, and alerting configurations',
+    'docsPage.index.observabilityDesc':
+      'Prometheus metrics endpoints, ServiceMonitor resources, and alerting configurations',
     'docsPage.index.simplicity': 'Simplicity',
-    'docsPage.index.simplicityDesc': 'Product-oriented `values.yaml` files that focus on application configuration, not Kubernetes internals',
+    'docsPage.index.simplicityDesc':
+      'Product-oriented `values.yaml` files that focus on application configuration, not Kubernetes internals',
     'docsPage.index.testing': 'Testing',
-    'docsPage.index.testingDesc': 'Comprehensive unit tests, strict linting, and conformance validation on every change',
+    'docsPage.index.testingDesc':
+      'Comprehensive unit tests, strict linting, and conformance validation on every change',
     'docsPage.index.distribution': 'Distribution',
     'docsPage.index.method': 'Method',
     'docsPage.index.https': 'HTTPS Repository',
     'docsPage.index.oci': 'OCI Registry',
     'docsPage.gettingStarted.title': 'Getting Started',
-    'docsPage.gettingStarted.intro': 'This guide walks you through adding the HelmForge repository and installing your first chart.',
+    'docsPage.gettingStarted.intro':
+      'This guide walks you through adding the HelmForge repository and installing your first chart.',
     'docsPage.gettingStarted.prerequisites': 'Prerequisites',
     'docsPage.gettingStarted.before': 'Before you begin, make sure you have:',
     'docsPage.gettingStarted.helmInstalled': 'installed',
@@ -1269,9 +1477,10 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.gettingStarted.verify': 'Verify the repository was added:',
     'docsPage.gettingStarted.oci': 'OCI Registry',
     'docsPage.gettingStarted.ociNoSetup': 'No repository setup is needed for OCI. You can install charts directly:',
-    'docsPage.gettingStarted.swap': 'You can swap `redis` for `komga`, `mosquitto`, `vaultwarden`, or any other chart published in the repository.',
+    'docsPage.gettingStarted.swap':
+      'You can swap `redis` for `komga`, `mosquitto`, `vaultwarden`, or any other chart published in the repository.',
     'docsPage.gettingStarted.installFirst': 'Install Your First Chart',
-    'docsPage.gettingStarted.redisExample': 'Let\'s install Redis as an example:',
+    'docsPage.gettingStarted.redisExample': "Let's install Redis as an example:",
     'docsPage.gettingStarted.usingHttps': 'Using the HTTPS repository',
     'docsPage.gettingStarted.usingOci': 'Using the OCI registry',
     'docsPage.gettingStarted.verifyInstall': 'Verify the installation',
@@ -1311,7 +1520,8 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.faq.q17': 'Are charts signed?',
     'docsPage.faq.q18': 'What license are the charts under?',
     'docsPage.troubleshooting.title': 'Troubleshooting',
-    'docsPage.troubleshooting.intro': 'Symptom-based guide to diagnosing and resolving common issues with HelmForge charts.',
+    'docsPage.troubleshooting.intro':
+      'Symptom-based guide to diagnosing and resolving common issues with HelmForge charts.',
     'docsPage.troubleshooting.crashloop': 'Pod stays in CrashLoopBackOff',
     'docsPage.troubleshooting.pvc': 'PVC stuck in Pending',
     'docsPage.troubleshooting.db': 'Database connection refused',
@@ -1325,15 +1535,20 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.troubleshooting.commonCauses': 'Common causes:',
     'docsPage.troubleshooting.cause': 'Cause',
     'docsPage.troubleshooting.fix': 'Fix',
-    'docsPage.troubleshooting.crashloopSymptoms': 'Pod restarts repeatedly, `kubectl get pods` shows `CrashLoopBackOff` status.',
+    'docsPage.troubleshooting.crashloopSymptoms':
+      'Pod restarts repeatedly, `kubectl get pods` shows `CrashLoopBackOff` status.',
     'docsPage.troubleshooting.pvcSymptoms': '`kubectl get pvc` shows `Pending` status, pods cannot start.',
-    'docsPage.troubleshooting.dbSymptoms': 'Application pods log `connection refused` or `could not connect to server` when trying to reach a database.',
-    'docsPage.troubleshooting.ingressSymptoms': 'Ingress resource exists but the application returns 404 or 503 errors.',
+    'docsPage.troubleshooting.dbSymptoms':
+      'Application pods log `connection refused` or `could not connect to server` when trying to reach a database.',
+    'docsPage.troubleshooting.ingressSymptoms':
+      'Ingress resource exists but the application returns 404 or 503 errors.',
     'docsPage.troubleshooting.backupSymptoms': 'Backup is enabled but no backup jobs appear.',
-    'docsPage.troubleshooting.upgradeSymptoms': '`helm upgrade` fails with `cannot patch` or `field is immutable` errors.',
+    'docsPage.troubleshooting.upgradeSymptoms':
+      '`helm upgrade` fails with `cannot patch` or `field is immutable` errors.',
     'docsPage.troubleshooting.timeoutSymptoms': '`helm install --wait` times out before pods are ready.',
     'docsPage.comparison.title': 'HelmForge vs Other Charts',
-    'docsPage.comparison.intro': 'This page compares HelmForge against two common alternatives: **Bitnami** (the largest commercial chart ecosystem) and **generic community charts** (individual maintainers or small projects). This is not a critique — each approach has its place. The goal is to help you choose the right fit.',
+    'docsPage.comparison.intro':
+      'This page compares HelmForge against two common alternatives: **Bitnami** (the largest commercial chart ecosystem) and **generic community charts** (individual maintainers or small projects). This is not a critique — each approach has its place. The goal is to help you choose the right fit.',
     'docsPage.comparison.table': 'Comparison Table',
   },
   es: {
@@ -1366,7 +1581,8 @@ export const messages: Record<Locale, Messages> = {
     'footer.helmRepo': 'Repositorio Helm',
     'footer.rss': 'Feed RSS',
     'hero.subtitle': 'Helm charts open-source, forjados para durar.',
-    'hero.description': 'La alternativa open-source a Bitnami. Imágenes oficiales upstream, backups S3 integrados, seguridad sensata por defecto y operaciones day-two - licencia MIT, gratis para siempre.',
+    'hero.description':
+      'La alternativa open-source a Bitnami. Imágenes oficiales upstream, backups S3 integrados, seguridad sensata por defecto y operaciones day-two - licencia MIT, gratis para siempre.',
     'hero.cta.getStarted': 'Comenzar',
     'hero.cta.browseCharts': 'Explorar Charts',
     'hero.github': 'Dar estrella en GitHub',
@@ -1381,28 +1597,36 @@ export const messages: Record<Locale, Messages> = {
     'install.chart': 'Chart:',
     'install.guide': 'Guía completa de primeros pasos',
     'features.label': 'Por qué HelmForge',
-    'features.description': 'Cada chart sigue la misma dirección: instalaciones predecibles, values claros y comportamiento orientado a producción desde el día uno.',
+    'features.description':
+      'Cada chart sigue la misma dirección: instalaciones predecibles, values claros y comportamiento orientado a producción desde el día uno.',
     'features.card1.title': 'Validado para clusters reales',
     'features.card1.stat': 'Charts estables',
-    'features.card1.description': 'Linting, render de templates, pruebas unitarias y validación en k3d antes de cada release.',
+    'features.card1.description':
+      'Linting, render de templates, pruebas unitarias y validación en k3d antes de cada release.',
     'features.card2.title': 'Seguro por defecto',
     'features.card2.stat': 'No-root, reforzado',
-    'features.card2.description': 'Contenedores no-root, filesystem de solo lectura, network policies, procedencia GPG y artefactos OCI firmados con Cosign.',
+    'features.card2.description':
+      'Contenedores no-root, filesystem de solo lectura, network policies, procedencia GPG y artefactos OCI firmados con Cosign.',
     'features.card3.title': 'Backups S3 integrados',
     'features.card3.stat': 'Charts con backup',
-    'features.card3.description': 'Backups automáticos con CronJob hacia cualquier almacenamiento compatible con S3. Restaura con un solo comando.',
+    'features.card3.description':
+      'Backups automáticos con CronJob hacia cualquier almacenamiento compatible con S3. Restaura con un solo comando.',
     'features.card4.title': 'Simple de operar',
     'features.card4.stat': 'values.yaml limpio',
-    'features.card4.description': 'Values legibles, documentación clara y recursos prácticos como ingress, TLS y observabilidad.',
+    'features.card4.description':
+      'Values legibles, documentación clara y recursos prácticos como ingress, TLS y observabilidad.',
     'features.card5.title': 'Imágenes oficiales upstream',
     'features.card5.stat': 'Sin builds custom',
-    'features.card5.description': 'Cada chart usa la imagen Docker oficial del proyecto upstream. Sin forks ni wrappers.',
+    'features.card5.description':
+      'Cada chart usa la imagen Docker oficial del proyecto upstream. Sin forks ni wrappers.',
     'features.card6.title': 'Licencia MIT',
     'features.card6.stat': 'Gratis para siempre',
-    'features.card6.description': 'Úsalo en producción, modifícalo y redistribúyelo. Sin tiers enterprise, sin límites de uso, sin sorpresas.',
+    'features.card6.description':
+      'Úsalo en producción, modifícalo y redistribúyelo. Sin tiers enterprise, sin límites de uso, sin sorpresas.',
     'catalog.label': 'Catálogo',
     'catalog.title': 'Un catálogo más limpio para cargas comunes de Kubernetes.',
-    'catalog.description': 'Explora charts de aplicaciones con estructura consistente, values documentados y defaults orientados a producción.',
+    'catalog.description':
+      'Explora charts de aplicaciones con estructura consistente, values documentados y defaults orientados a producción.',
     'catalog.search.label': 'Buscar charts',
     'catalog.search.placeholder': 'Buscar charts (ej. postgres, redis, backup)...',
     'catalog.stats.charts': 'Charts',
@@ -1412,7 +1636,8 @@ export const messages: Record<Locale, Messages> = {
     'catalog.empty.description': 'Prueba ajustando tus términos de búsqueda.',
     'catalog.request': '¿No ves tu app? Solicita un chart',
     'comparison.title': 'Comparación lado a lado: HelmForge vs el resto.',
-    'comparison.description': 'Imágenes oficiales, sin lock-in de proveedor, licencia MIT. Mira exactamente dónde lidera HelmForge.',
+    'comparison.description':
+      'Imágenes oficiales, sin lock-in de proveedor, licencia MIT. Mira exactamente dónde lidera HelmForge.',
     'comparison.caption': 'Comparación de funcionalidades entre HelmForge, Bitnami y charts comunitarios genéricos',
     'comparison.features': 'Funcionalidades',
     'comparison.readMore': 'Leer comparación completa',
@@ -1451,7 +1676,8 @@ export const messages: Record<Locale, Messages> = {
     'request.open.description': 'Vota con una reacción en GitHub para ayudar a priorizar.',
     'roadmap.label': 'Hoja de ruta',
     'roadmap.title': 'Hacia dónde va HelmForge.',
-    'roadmap.description': 'Nuestra hoja de ruta es pública. Sigue el progreso, mira lo que viene y ayuda a definir la dirección.',
+    'roadmap.description':
+      'Nuestra hoja de ruta es pública. Sigue el progreso, mira lo que viene y ayuda a definir la dirección.',
     'roadmap.milestones': 'Hitos de GitHub',
     'roadmap.active': 'Activos',
     'roadmap.completed': 'Completados',
@@ -1460,41 +1686,50 @@ export const messages: Record<Locale, Messages> = {
     'roadmap.status.inProgress': 'En progreso',
     'roadmap.status.planned': 'Planificado',
     'roadmap.cta.title': '¿Tienes una sugerencia?',
-    'roadmap.cta.description': 'La hoja de ruta la construye la comunidad. Abre un issue para solicitar un chart, sugerir una funcionalidad o proponer un cambio.',
+    'roadmap.cta.description':
+      'La hoja de ruta la construye la comunidad. Abre un issue para solicitar un chart, sugerir una funcionalidad o proponer un cambio.',
     'roadmap.cta.request': 'Solicitar un Chart',
     'roadmap.cta.issue': 'Abrir un Issue',
     'community.label': 'Comunidad',
     'community.title': 'Construido en abierto, impulsado por la comunidad.',
-    'community.description': 'HelmForge es open-source y orientado por la comunidad. Cada contribución mejora el proyecto para todos.',
+    'community.description':
+      'HelmForge es open-source y orientado por la comunidad. Cada contribución mejora el proyecto para todos.',
     'community.howToContribute': 'Cómo contribuir',
     'community.contributors': 'Contribuidores',
     'community.projectGovernance': 'Gobernanza del proyecto',
     'community.chartRequestProcess': 'Proceso de solicitud de chart',
     'community.cta.star': 'Dar estrella en GitHub',
     'community.way.submit.title': 'Enviar un Chart',
-    'community.way.submit.description': 'Crea y contribuye un nuevo Helm chart para una aplicación que uses en producción.',
+    'community.way.submit.description':
+      'Crea y contribuye un nuevo Helm chart para una aplicación que uses en producción.',
     'community.way.submit.link': 'Leer CONTRIBUTING.md',
     'community.way.report.title': 'Reportar problemas',
-    'community.way.report.description': '¿Encontraste un bug o un comportamiento inesperado? Abre un issue con pasos de reproducción.',
+    'community.way.report.description':
+      '¿Encontraste un bug o un comportamiento inesperado? Abre un issue con pasos de reproducción.',
     'community.way.report.link': 'Abrir un issue',
     'community.way.request.title': 'Solicitar un Chart',
-    'community.way.request.description': '¿Necesitas un chart para una aplicación? Envía una solicitud y la comunidad la evaluará.',
+    'community.way.request.description':
+      '¿Necesitas un chart para una aplicación? Envía una solicitud y la comunidad la evaluará.',
     'community.way.request.link': 'Formulario de solicitud',
     'community.way.docs.title': 'Mejorar la documentación',
-    'community.way.docs.description': 'Corrige errores, agrega ejemplos y mejora explicaciones. Los PRs de documentación siempre son bienvenidos.',
+    'community.way.docs.description':
+      'Corrige errores, agrega ejemplos y mejora explicaciones. Los PRs de documentación siempre son bienvenidos.',
     'community.way.docs.link': 'Repositorio del sitio',
     'community.way.test.title': 'Probar y revisar',
-    'community.way.test.description': 'Prueba charts en tu cluster y reporta resultados. Revisa los pull requests abiertos.',
+    'community.way.test.description':
+      'Prueba charts en tu cluster y reporta resultados. Revisa los pull requests abiertos.',
     'community.way.test.link': 'PRs abiertos',
     'community.way.spread.title': 'Difundir HelmForge',
-    'community.way.spread.description': 'Dale estrella al repositorio, compártelo en redes o escribe sobre tu experiencia con HelmForge.',
+    'community.way.spread.description':
+      'Dale estrella al repositorio, compártelo en redes o escribe sobre tu experiencia con HelmForge.',
     'community.way.spread.link': 'Dar estrella en GitHub',
     'community.governance.license.label': 'Licencia',
     'community.governance.license.description': 'Todos los charts son open-source bajo la licencia MIT.',
     'community.governance.versioning.label': 'Versionado',
     'community.governance.versioning.description': 'Versionado semántico automatizado desde Conventional Commits.',
     'community.governance.signing.label': 'Firma',
-    'community.governance.signing.description': 'Archivos de procedencia GPG y firmas keyless de Sigstore Cosign en cada release.',
+    'community.governance.signing.description':
+      'Archivos de procedencia GPG y firmas keyless de Sigstore Cosign en cada release.',
     'community.governance.maturity.label': 'Madurez',
     'community.governance.maturity.description': 'Los charts avanzan por niveles de madurez con criterios claros.',
     'community.process.step1.title': 'Enviar',
@@ -1527,7 +1762,8 @@ export const messages: Record<Locale, Messages> = {
     'stack.empty.helmfile.line2': '# El YAML aparecerá aquí automáticamente',
     'stack.empty.argocd.line1': '# Selecciona charts a la izquierda para generar aplicaciones de ArgoCD',
     'stack.empty.argocd.line2': '# Los manifiestos aparecerán aquí automáticamente',
-    'stack.empty.hint': 'Selecciona uno o más charts para generar comandos de instalación. Cambia el formato para obtener YAML de Helmfile o manifiestos de ArgoCD.',
+    'stack.empty.hint':
+      'Selecciona uno o más charts para generar comandos de instalación. Cambia el formato para obtener YAML de Helmfile o manifiestos de ArgoCD.',
     'stack.popularStacks': 'Stacks populares',
     'stack.preset.automation.title': 'Stack de automatización',
     'stack.preset.automation.description': 'PostgreSQL + Redis + n8n',
@@ -1543,20 +1779,23 @@ export const messages: Record<Locale, Messages> = {
     'stack.preset.network.description': 'Pi-hole + Cloudflared + Uptime Kuma',
     'newsletter.label': 'Newsletter de HelmForge',
     'newsletter.title': 'Mantente al día con novedades prácticas de Kubernetes',
-    'newsletter.description': 'Recibe contenido curado de Helm y Kubernetes, nuevos lanzamientos de charts y consejos de producción de HelmForge.',
+    'newsletter.description':
+      'Recibe contenido curado de Helm y Kubernetes, nuevos lanzamientos de charts y consejos de producción de HelmForge.',
     'newsletter.form.aria': 'Formulario de newsletter de HelmForge',
     'newsletter.form.email': 'Correo electrónico',
     'newsletter.form.emailPlaceholder': 'tu@empresa.com',
     'newsletter.form.name': 'Nombre (opcional)',
     'newsletter.form.namePlaceholder': 'Tu nombre',
     'newsletter.form.listTitle': 'Newsletter de HelmForge',
-    'newsletter.form.listDescription': 'Newsletter oficial de HelmForge con insights de Kubernetes, actualizaciones de charts y notas de release.',
+    'newsletter.form.listDescription':
+      'Newsletter oficial de HelmForge con insights de Kubernetes, actualizaciones de charts y notas de release.',
     'newsletter.form.subscribe': 'Suscribirse',
     'newsletter.form.rss': 'Suscribirse por RSS',
     'newsletter.form.rssAria': 'Suscribirse por RSS',
     'playground.label': 'Playground',
     'playground.title': 'Configura, previsualiza y despliega.',
-    'playground.description': 'Elige un chart, ajusta values y obtén un comando de instalación listo para copiar y pegar.',
+    'playground.description':
+      'Elige un chart, ajusta values y obtén un comando de instalación listo para copiar y pegar.',
     'playground.selectChart': 'Seleccionar un chart',
     'playground.search.placeholder': 'Filtrar charts...',
     'playground.empty.title': 'Selecciona un chart para configurar',
@@ -1575,7 +1814,8 @@ export const messages: Record<Locale, Messages> = {
     'playground.deploy.note.before': 'Para producción, guarda la salida de',
     'playground.deploy.note.middle': 'en un archivo e instala con',
     'playground.deploy.note.after': '.',
-    'playground.deploy.note': 'Para producción, guarda la salida de <strong>values.yaml</strong> en un archivo e instala con <code class="text-primary-light">helm install -f values.yaml</code>.',
+    'playground.deploy.note':
+      'Para producción, guarda la salida de <strong>values.yaml</strong> en un archivo e instala con <code class="text-primary-light">helm install -f values.yaml</code>.',
     'playground.changes': 'Cambios respecto a los valores por defecto',
     'playground.copied': 'Copiado',
     'playground.linkCopied': 'Enlace copiado',
@@ -1658,7 +1898,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.enableDataPersistence': 'Habilitar persistencia de datos',
     'docsCharts.common.applicationPort': 'Puerto de la aplicación',
     'docsCharts.common.enablePrometheusMetrics': 'Habilitar métricas de Prometheus',
-    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql': 'Modo de base de datos (auto, sqlite, external, postgresql, mysql)',
+    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql':
+      'Modo de base de datos (auto, sqlite, external, postgresql, mysql)',
     'docsCharts.common.logLevel': 'Nivel de logs',
     'docsCharts.common.enableBundledPostgresqlSubchart': 'Habilitar subchart PostgreSQL incluido',
     'docsCharts.common.backupCronSchedule': 'Programación cron de backup',
@@ -1668,19 +1909,28 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.timezone': 'Zona horaria',
     'docsCharts.common.enableBundledRedisSubchart': 'Habilitar subchart Redis incluido',
     'docsCharts.common.useExternalRedis': 'Usar Redis externo',
-    'docsCharts.common.feature.ingressCertManager': 'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
+    'docsCharts.common.feature.ingressCertManager':
+      'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
     'docsCharts.common.feature.ingressConfigurableTls': 'Soporte de ingress con configuración TLS',
     'docsCharts.common.feature.ingressTlsCertManager': 'Soporte de ingress — TLS con cert-manager',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternal': 'Backend PostgreSQL — subchart incluido o base de datos externa',
-    'docsCharts.common.feature.s3BackupPostgresql': 'Backup S3 — backup programado de PostgreSQL a almacenamiento compatible con S3',
-    'docsCharts.common.feature.externalDatabasePostgresqlMysql': 'Base de datos externa — conecta PostgreSQL o MySQL existentes',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternal':
+      'Backend PostgreSQL — subchart incluido o base de datos externa',
+    'docsCharts.common.feature.s3BackupPostgresql':
+      'Backup S3 — backup programado de PostgreSQL a almacenamiento compatible con S3',
+    'docsCharts.common.feature.externalDatabasePostgresqlMysql':
+      'Base de datos externa — conecta PostgreSQL o MySQL existentes',
     'docsCharts.common.feature.ingressSupportConfigurableTls': 'Soporte de ingress — ingress configurable con TLS',
-    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional': 'Subcharts PostgreSQL y MySQL — despliegues de base incluidos opcionales',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport': 'Backend PostgreSQL — subchart PostgreSQL incluido o soporte de base externa',
+    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional':
+      'Subcharts PostgreSQL y MySQL — despliegues de base incluidos opcionales',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport':
+      'Backend PostgreSQL — subchart PostgreSQL incluido o soporte de base externa',
     'docsCharts.common.feature.postgresqlSubchartHelmforge': 'Subchart PostgreSQL — incluido vía dependencia HelmForge',
-    'docsCharts.common.feature.databaseBackendsAutoDetection': 'Backends de base de datos SQLite3 (por defecto), PostgreSQL o MySQL con autodetección',
-    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware': 'Backup compatible con S3 con CronJob según tipo de base (SQLite tar, pg_dump, mysqldump)',
-    'docsCharts.common.feature.sqliteDatabaseEmbedded': 'Base de datos SQLite — almacenamiento embebido, sin base externa',
+    'docsCharts.common.feature.databaseBackendsAutoDetection':
+      'Backends de base de datos SQLite3 (por defecto), PostgreSQL o MySQL con autodetección',
+    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware':
+      'Backup compatible con S3 con CronJob según tipo de base (SQLite tar, pg_dump, mysqldump)',
+    'docsCharts.common.feature.sqliteDatabaseEmbedded':
+      'Base de datos SQLite — almacenamiento embebido, sin base externa',
     'docsCharts.common.feature.mysqlSubchartHelmforge': 'Subchart MySQL — incluido vía dependencia HelmForge',
     'docsCharts.moreInfo.before': 'Consulta el',
     'docsCharts.moreInfo.link': 'código fuente y la referencia completa de values',
@@ -1688,7 +1938,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.install.httpsRepo': 'Repositorio HTTPS:',
     'docsCharts.install.ociRegistry': 'Registro OCI:',
     'docsCharts.index.title': 'Resumen de charts',
-    'docsCharts.index.intro': 'HelmForge ofrece Helm charts listos para producción para cargas comunes de Kubernetes. Cada chart soporta múltiples arquitecturas, hardening de seguridad y observabilidad desde el inicio.',
+    'docsCharts.index.intro':
+      'HelmForge ofrece Helm charts listos para producción para cargas comunes de Kubernetes. Cada chart soporta múltiples arquitecturas, hardening de seguridad y observabilidad desde el inicio.',
     'docsCharts.index.category.generalPurpose': 'Propósito general',
     'docsCharts.index.category.databases': 'Bases de datos',
     'docsCharts.index.category.cachingMessaging': 'Caché y mensajería',
@@ -1704,54 +1955,86 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.index.category.devopsMetrics': 'DevOps y métricas',
     'docsCharts.index.commonFeatures': 'Características comunes',
     'docsCharts.index.commonFeaturesIntro': 'Todos los charts de HelmForge comparten estas capacidades:',
-    'docsCharts.postgresql.intro': 'Despliegue de PostgreSQL listo para producción con soporte para arquitecturas standalone y replicación en streaming.',
-    'docsCharts.postgresql.feature.standaloneReplication': 'Standalone y replicación — Instancia única o primaria con réplicas en streaming',
-    'docsCharts.postgresql.feature.automaticInit': 'Inicialización automática — Scripts de init, extensiones y configuración personalizada',
-    'docsCharts.postgresql.feature.s3Backup': 'Backup S3 — Backups programados a almacenamiento compatible con S3 mediante CronJob',
+    'docsCharts.postgresql.intro':
+      'Despliegue de PostgreSQL listo para producción con soporte para arquitecturas standalone y replicación en streaming.',
+    'docsCharts.postgresql.feature.standaloneReplication':
+      'Standalone y replicación — Instancia única o primaria con réplicas en streaming',
+    'docsCharts.postgresql.feature.automaticInit':
+      'Inicialización automática — Scripts de init, extensiones y configuración personalizada',
+    'docsCharts.postgresql.feature.s3Backup':
+      'Backup S3 — Backups programados a almacenamiento compatible con S3 mediante CronJob',
     'docsCharts.postgresql.feature.metrics': 'Métricas — Exporter de Prometheus con ServiceMonitor',
     'docsCharts.postgresql.feature.security': 'Seguridad — Contenedores non-root, network policies y soporte TLS',
-    'docsCharts.postgresql.feature.storage': 'Almacenamiento persistente — PVCs configurables con selección de storage class',
+    'docsCharts.postgresql.feature.storage':
+      'Almacenamiento persistente — PVCs configurables con selección de storage class',
     'docsCharts.postgresql.table.authDatabase': 'Base de datos predeterminada a crear',
     'docsCharts.postgresql.table.authUsername': 'Usuario predeterminado a crear',
     'docsCharts.postgresql.table.authPassword': 'Contraseña del usuario predeterminado',
     'docsCharts.postgresql.upgrade.callout.before': 'Si actualizas entre versiones mayores, revisa el',
     'docsCharts.postgresql.upgrade.callout.link': 'registro de cambios',
-    'docsCharts.postgresql.upgrade.callout.after': 'para cambios incompatibles en la estructura de values. Siempre respalda tus datos antes de actualizar.',
-    'docsCharts.postgresql.upgrade.note1': 'Al cambiar de `standalone` a `replication`, define `auth.replicationPassword` antes de actualizar',
-    'docsCharts.postgresql.upgrade.note2': 'El resize de PVC requiere que la storage class soporte expansión de volumen (`allowVolumeExpansion: true`)',
-    'docsCharts.postgresql.upgrade.note3': 'Cambios en el sidecar de métricas pueden provocar reinicio de pods durante la actualización',
-    'docsCharts.postgresql.issue.crashloop': 'Suele deberse a `auth.postgresPassword` incorrecto durante un upgrade. PostgreSQL no reinicializa auth cuando el directorio de datos ya existe. Revisa logs con `kubectl logs <pod>` y verifica que la contraseña coincida con los datos existentes.',
-    'docsCharts.postgresql.issue.replicationSync': 'En bases grandes, la sincronización inicial de réplicas puede tardar. Aumenta `readReplicas.resources` y asegúrate de que la storage class ofrezca IOPS adecuados. Monitorea lag con el exporter de Prometheus (métrica `pg_replication_lag`).',
-    'docsCharts.postgresql.issue.connectionPoolers': 'Para cargas con muchas conexiones, despliega PgBouncer junto a PostgreSQL. Apunta la aplicación a PgBouncer y configúralo para conectarse al servicio PostgreSQL.',
-    'docsCharts.redis.intro': 'Despliegue de Redis listo para producción con soporte para arquitecturas standalone y alta disponibilidad con Sentinel.',
-    'docsCharts.redis.feature.standaloneSentinel': 'Standalone y Sentinel — Instancia única o HA con failover automático',
+    'docsCharts.postgresql.upgrade.callout.after':
+      'para cambios incompatibles en la estructura de values. Siempre respalda tus datos antes de actualizar.',
+    'docsCharts.postgresql.upgrade.note1':
+      'Al cambiar de `standalone` a `replication`, define `auth.replicationPassword` antes de actualizar',
+    'docsCharts.postgresql.upgrade.note2':
+      'El resize de PVC requiere que la storage class soporte expansión de volumen (`allowVolumeExpansion: true`)',
+    'docsCharts.postgresql.upgrade.note3':
+      'Cambios en el sidecar de métricas pueden provocar reinicio de pods durante la actualización',
+    'docsCharts.postgresql.issue.crashloop':
+      'Suele deberse a `auth.postgresPassword` incorrecto durante un upgrade. PostgreSQL no reinicializa auth cuando el directorio de datos ya existe. Revisa logs con `kubectl logs <pod>` y verifica que la contraseña coincida con los datos existentes.',
+    'docsCharts.postgresql.issue.replicationSync':
+      'En bases grandes, la sincronización inicial de réplicas puede tardar. Aumenta `readReplicas.resources` y asegúrate de que la storage class ofrezca IOPS adecuados. Monitorea lag con el exporter de Prometheus (métrica `pg_replication_lag`).',
+    'docsCharts.postgresql.issue.connectionPoolers':
+      'Para cargas con muchas conexiones, despliega PgBouncer junto a PostgreSQL. Apunta la aplicación a PgBouncer y configúralo para conectarse al servicio PostgreSQL.',
+    'docsCharts.redis.intro':
+      'Despliegue de Redis listo para producción con soporte para arquitecturas standalone y alta disponibilidad con Sentinel.',
+    'docsCharts.redis.feature.standaloneSentinel':
+      'Standalone y Sentinel — Instancia única o HA con failover automático',
     'docsCharts.redis.feature.persistence': 'Persistencia — Opciones de persistencia RDB y AOF',
     'docsCharts.redis.feature.metrics': 'Métricas — Exporter de Prometheus con ServiceMonitor',
-    'docsCharts.redis.feature.security': 'Seguridad — Autenticación por contraseña, contenedores non-root y network policies',
+    'docsCharts.redis.feature.security':
+      'Seguridad — Autenticación por contraseña, contenedores non-root y network policies',
     'docsCharts.redis.feature.configurable': 'Configurable — Parámetros personalizados de configuración Redis',
-    'docsCharts.redis.upgrade.callout': 'En modo Sentinel, los upgrades rolling pueden disparar failover. Es esperado: Sentinel promueve una réplica cuando reinicia el pod master. Las aplicaciones con clientes compatibles con Sentinel lo manejan de forma transparente.',
-    'docsCharts.redis.upgrade.note1': 'Cambiar de `standalone` a `sentinel` requiere despliegue nuevo (se necesita migración de datos)',
-    'docsCharts.redis.upgrade.note2': 'Cambios de persistencia solo afectan pods nuevos; los PVC existentes conservan su tamaño',
-    'docsCharts.redis.upgrade.note3': 'Sobrescrituras en `master.configuration` se agregan a la configuración por defecto',
-    'docsCharts.redis.issue.oomkilled': 'Redis almacena datos en memoria. Si el dataset supera el límite de memoria del pod, Kubernetes lo termina. Define `master.resources.limits.memory` por encima del tamaño esperado y configura `maxmemory` en Redis para dejar margen.',
-    'docsCharts.redis.issue.connectionRefused': 'Si la aplicación se conecta directo al IP del pod master en lugar del servicio Sentinel, las conexiones fallan tras el failover. Usa un cliente compatible con Sentinel o conecta mediante el servicio `-headless`.',
-    'docsCharts.mysql.intro': 'Despliegue de MySQL listo para producción con soporte para arquitecturas standalone y replicación source-replica.',
-    'docsCharts.mysql.feature.standaloneReplication': 'Standalone y replicación — Instancia única o topología source-replica',
-    'docsCharts.mysql.feature.automaticInit': 'Inicialización automática — Scripts de init y configuración personalizada',
+    'docsCharts.redis.upgrade.callout':
+      'En modo Sentinel, los upgrades rolling pueden disparar failover. Es esperado: Sentinel promueve una réplica cuando reinicia el pod master. Las aplicaciones con clientes compatibles con Sentinel lo manejan de forma transparente.',
+    'docsCharts.redis.upgrade.note1':
+      'Cambiar de `standalone` a `sentinel` requiere despliegue nuevo (se necesita migración de datos)',
+    'docsCharts.redis.upgrade.note2':
+      'Cambios de persistencia solo afectan pods nuevos; los PVC existentes conservan su tamaño',
+    'docsCharts.redis.upgrade.note3':
+      'Sobrescrituras en `master.configuration` se agregan a la configuración por defecto',
+    'docsCharts.redis.issue.oomkilled':
+      'Redis almacena datos en memoria. Si el dataset supera el límite de memoria del pod, Kubernetes lo termina. Define `master.resources.limits.memory` por encima del tamaño esperado y configura `maxmemory` en Redis para dejar margen.',
+    'docsCharts.redis.issue.connectionRefused':
+      'Si la aplicación se conecta directo al IP del pod master en lugar del servicio Sentinel, las conexiones fallan tras el failover. Usa un cliente compatible con Sentinel o conecta mediante el servicio `-headless`.',
+    'docsCharts.mysql.intro':
+      'Despliegue de MySQL listo para producción con soporte para arquitecturas standalone y replicación source-replica.',
+    'docsCharts.mysql.feature.standaloneReplication':
+      'Standalone y replicación — Instancia única o topología source-replica',
+    'docsCharts.mysql.feature.automaticInit':
+      'Inicialización automática — Scripts de init y configuración personalizada',
     'docsCharts.mysql.feature.backup': 'Soporte de backup — CronJobs configurables para S3-compatible storage',
     'docsCharts.mysql.feature.metrics': 'Métricas — Exporter de Prometheus con ServiceMonitor',
     'docsCharts.mysql.feature.security': 'Seguridad — Contenedores non-root, network policies y soporte TLS',
-    'docsCharts.mysql.feature.storage': 'Almacenamiento persistente — PVCs configurables con selección de storage class',
+    'docsCharts.mysql.feature.storage':
+      'Almacenamiento persistente — PVCs configurables con selección de storage class',
     'docsCharts.mysql.table.authDatabase': 'Base de datos predeterminada a crear',
     'docsCharts.mysql.table.authUsername': 'Usuario predeterminado a crear',
     'docsCharts.mysql.table.authPassword': 'Contraseña del usuario predeterminado',
-    'docsCharts.mysql.upgrade.callout': 'MySQL guarda la contraseña root durante la configuración inicial. En upgrades, asegúrate de que `auth.rootPassword` coincida con el valor original o el pod no iniciará por error de autenticación.',
-    'docsCharts.mysql.upgrade.note1': 'Al habilitar replicación sobre una instancia standalone existente, se requiere reinicialización completa',
-    'docsCharts.mysql.upgrade.note2': 'Los cambios del CronJob de backup se aplican en la siguiente ejecución programada',
-    'docsCharts.mysql.upgrade.note3': 'Las réplicas secundarias son de solo lectura; los intentos de escritura devuelven error',
-    'docsCharts.mysql.issue.crashloop': 'Si la contraseña root en values no coincide con el directorio de datos existente, MySQL se niega a iniciar. Revisa logs con `kubectl logs <pod>` y valida la contraseña.',
-    'docsCharts.mysql.issue.replicationLag': 'Habilita métricas y monitorea `mysql_slave_status_seconds_behind_master`. Valores persistentes arriba de 0 indican que la réplica no alcanza el ritmo; considera más recursos o menos carga de escritura.',
-    'docsCharts.keycloak.intro': 'Despliegue de Keycloak listo para producción para gestión de identidad y acceso, con soporte para SSO, OAuth 2.0, OIDC y SAML.',
+    'docsCharts.mysql.upgrade.callout':
+      'MySQL guarda la contraseña root durante la configuración inicial. En upgrades, asegúrate de que `auth.rootPassword` coincida con el valor original o el pod no iniciará por error de autenticación.',
+    'docsCharts.mysql.upgrade.note1':
+      'Al habilitar replicación sobre una instancia standalone existente, se requiere reinicialización completa',
+    'docsCharts.mysql.upgrade.note2':
+      'Los cambios del CronJob de backup se aplican en la siguiente ejecución programada',
+    'docsCharts.mysql.upgrade.note3':
+      'Las réplicas secundarias son de solo lectura; los intentos de escritura devuelven error',
+    'docsCharts.mysql.issue.crashloop':
+      'Si la contraseña root en values no coincide con el directorio de datos existente, MySQL se niega a iniciar. Revisa logs con `kubectl logs <pod>` y valida la contraseña.',
+    'docsCharts.mysql.issue.replicationLag':
+      'Habilita métricas y monitorea `mysql_slave_status_seconds_behind_master`. Valores persistentes arriba de 0 indican que la réplica no alcanza el ritmo; considera más recursos o menos carga de escritura.',
+    'docsCharts.keycloak.intro':
+      'Despliegue de Keycloak listo para producción para gestión de identidad y acceso, con soporte para SSO, OAuth 2.0, OIDC y SAML.',
     'docsCharts.keycloak.feature.identity': 'Gestión de identidad — SSO, federación de usuarios y social login',
     'docsCharts.keycloak.feature.protocols': 'Soporte de protocolos — OAuth 2.0, OpenID Connect y SAML 2.0',
     'docsCharts.keycloak.feature.externalDb': 'Base de datos externa — Soporte para PostgreSQL o MySQL',
@@ -1759,24 +2042,39 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.keycloak.feature.metrics': 'Métricas — Métricas Prometheus con ServiceMonitor',
     'docsCharts.keycloak.feature.security': 'Seguridad — Contenedores non-root, network policies y seguridad de pods',
     'docsCharts.keycloak.feature.realmImport': 'Import de realm — Configuración automática de realm al iniciar',
-    'docsCharts.keycloak.h2Warning': 'La base H2 embebida no soporta clustering y perderá datos si el pod reinicia sin persistencia. Usa siempre base externa en producción.',
+    'docsCharts.keycloak.h2Warning':
+      'La base H2 embebida no soporta clustering y perderá datos si el pod reinicia sin persistencia. Usa siempre base externa en producción.',
     'docsCharts.keycloak.table.adminUser': 'Usuario administrador de Keycloak',
     'docsCharts.keycloak.table.adminPassword': 'Contraseña del administrador de Keycloak',
-    'docsCharts.keycloak.upgrade.callout': 'Keycloak ejecuta migraciones de base automáticamente al iniciar. Al actualizar a una nueva versión, asegúrate de iniciar primero una sola réplica (escala a 1, actualiza y luego vuelve a escalar). Ejecutar migraciones desde múltiples réplicas puede causar conflictos.',
-    'docsCharts.keycloak.upgrade.note1': 'Los cambios de contraseña admin en values solo aplican en instalaciones nuevas',
-    'docsCharts.keycloak.upgrade.note2': 'El import de realm se ejecuta en cada inicio por defecto; usa `realmImport.skipExisting: true` para evitar sobrescrituras',
-    'docsCharts.keycloak.upgrade.note3': 'Cambios en annotations de ingress pueden requerir reinicio del pod si el controller cachea configuración',
-    'docsCharts.keycloak.issue.proxyHeaders': 'Suele indicar headers de proxy mal configurados. Asegura que el ingress reenvíe `X-Forwarded-For`, `X-Forwarded-Proto` y `X-Forwarded-Host`. En Traefik viene habilitado por defecto.',
-    'docsCharts.keycloak.issue.slowStartup': 'Con muchos realms, clientes o usuarios, Keycloak tarda más en iniciar. Incrementa `startupProbe.failureThreshold` y `startupProbe.periodSeconds` para evitar que Kubernetes finalice el pod antes de completar la inicialización.',
+    'docsCharts.keycloak.upgrade.callout':
+      'Keycloak ejecuta migraciones de base automáticamente al iniciar. Al actualizar a una nueva versión, asegúrate de iniciar primero una sola réplica (escala a 1, actualiza y luego vuelve a escalar). Ejecutar migraciones desde múltiples réplicas puede causar conflictos.',
+    'docsCharts.keycloak.upgrade.note1':
+      'Los cambios de contraseña admin en values solo aplican en instalaciones nuevas',
+    'docsCharts.keycloak.upgrade.note2':
+      'El import de realm se ejecuta en cada inicio por defecto; usa `realmImport.skipExisting: true` para evitar sobrescrituras',
+    'docsCharts.keycloak.upgrade.note3':
+      'Cambios en annotations de ingress pueden requerir reinicio del pod si el controller cachea configuración',
+    'docsCharts.keycloak.issue.proxyHeaders':
+      'Suele indicar headers de proxy mal configurados. Asegura que el ingress reenvíe `X-Forwarded-For`, `X-Forwarded-Proto` y `X-Forwarded-Host`. En Traefik viene habilitado por defecto.',
+    'docsCharts.keycloak.issue.slowStartup':
+      'Con muchos realms, clientes o usuarios, Keycloak tarda más en iniciar. Incrementa `startupProbe.failureThreshold` y `startupProbe.periodSeconds` para evitar que Kubernetes finalice el pod antes de completar la inicialización.',
     'docsCharts.openWebui.intro.before': 'Despliega',
-    'docsCharts.openWebui.intro.after': 'en Kubernetes — una plataforma de chat de IA self-hosted con soporte para Ollama y backends compatibles con OpenAI, pipelines RAG, conversaciones multimodelo y un sistema de plugins extensible.',
-    'docsCharts.openWebui.feature.ollamaIntegration': 'Integración con Ollama — conecta instancias locales o remotas de Ollama para LLMs open-source',
-    'docsCharts.openWebui.feature.openaiCompatibleApi': 'API compatible con OpenAI — funciona con OpenAI, Azure, proxies de Anthropic, LiteLLM y más',
-    'docsCharts.openWebui.feature.sqlitePostgresql': 'SQLite o PostgreSQL — SQLite embebido para instalaciones simples y subchart PostgreSQL para producción',
-    'docsCharts.openWebui.feature.redisCoordination': 'Coordinación WebSocket con Redis — requerida para despliegues con múltiples instancias',
-    'docsCharts.openWebui.feature.ragPipelines': 'Pipelines RAG — generación aumentada por recuperación con carga de documentos',
-    'docsCharts.openWebui.feature.s3Backup': 'Backup S3 — backup programado de PostgreSQL a almacenamiento compatible con S3',
-    'docsCharts.openWebui.feature.ingressSupport': 'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
+    'docsCharts.openWebui.intro.after':
+      'en Kubernetes — una plataforma de chat de IA self-hosted con soporte para Ollama y backends compatibles con OpenAI, pipelines RAG, conversaciones multimodelo y un sistema de plugins extensible.',
+    'docsCharts.openWebui.feature.ollamaIntegration':
+      'Integración con Ollama — conecta instancias locales o remotas de Ollama para LLMs open-source',
+    'docsCharts.openWebui.feature.openaiCompatibleApi':
+      'API compatible con OpenAI — funciona con OpenAI, Azure, proxies de Anthropic, LiteLLM y más',
+    'docsCharts.openWebui.feature.sqlitePostgresql':
+      'SQLite o PostgreSQL — SQLite embebido para instalaciones simples y subchart PostgreSQL para producción',
+    'docsCharts.openWebui.feature.redisCoordination':
+      'Coordinación WebSocket con Redis — requerida para despliegues con múltiples instancias',
+    'docsCharts.openWebui.feature.ragPipelines':
+      'Pipelines RAG — generación aumentada por recuperación con carga de documentos',
+    'docsCharts.openWebui.feature.s3Backup':
+      'Backup S3 — backup programado de PostgreSQL a almacenamiento compatible con S3',
+    'docsCharts.openWebui.feature.ingressSupport':
+      'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
     'docsCharts.openWebui.table.port': 'Puerto de la aplicación',
     'docsCharts.openWebui.table.ollamaBaseUrl': 'URL del backend Ollama',
     'docsCharts.openWebui.table.openaiBaseUrl': 'URL base de API compatible con OpenAI',
@@ -1789,17 +2087,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.openWebui.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.openWebui.table.backupEnabled': 'Habilitar CronJob de backup S3',
     'docsCharts.openWebui.note.sqliteSingle': 'El modo SQLite solo admite una instancia — sin escalado horizontal',
-    'docsCharts.openWebui.note.postgresqlReplicas': 'El modo PostgreSQL soporta múltiples réplicas con Redis para coordinación WebSocket',
-    'docsCharts.openWebui.note.autoSecret': 'El chart genera automáticamente una clave secreta de sesión si no se proporciona',
+    'docsCharts.openWebui.note.postgresqlReplicas':
+      'El modo PostgreSQL soporta múltiples réplicas con Redis para coordinación WebSocket',
+    'docsCharts.openWebui.note.autoSecret':
+      'El chart genera automáticamente una clave secreta de sesión si no se proporciona',
     'docsCharts.openWebui.note.telemetryDisabled': 'La telemetría está deshabilitada por defecto (`DO_NOT_TRACK=true`)',
     'docsCharts.superset.intro.before': 'Despliega',
-    'docsCharts.superset.intro.after': 'en Kubernetes — una plataforma moderna de business intelligence lista para empresa, para exploración y visualización de datos con más de 60 conectores de base de datos.',
-    'docsCharts.superset.feature.threeComponent': 'Arquitectura de tres componentes — web Gunicorn, workers Celery y scheduler Celery beat con escalado independiente',
-    'docsCharts.superset.feature.initJob': 'Init Job — migración automática de base de datos y creación de usuario admin',
-    'docsCharts.superset.feature.postgresqlMetadata': 'Almacén de metadatos PostgreSQL — subchart incluido o conexión externa',
+    'docsCharts.superset.intro.after':
+      'en Kubernetes — una plataforma moderna de business intelligence lista para empresa, para exploración y visualización de datos con más de 60 conectores de base de datos.',
+    'docsCharts.superset.feature.threeComponent':
+      'Arquitectura de tres componentes — web Gunicorn, workers Celery y scheduler Celery beat con escalado independiente',
+    'docsCharts.superset.feature.initJob':
+      'Init Job — migración automática de base de datos y creación de usuario admin',
+    'docsCharts.superset.feature.postgresqlMetadata':
+      'Almacén de metadatos PostgreSQL — subchart incluido o conexión externa',
     'docsCharts.superset.feature.redisBroker': 'Broker Redis — subchart incluido para cola de tareas Celery o externo',
     'docsCharts.superset.feature.configurable': 'Configurable — superset_config.py entregado mediante ConfigMap',
-    'docsCharts.superset.feature.autoSecrets': 'Secretos autogenerados — contraseña admin, Flask SECRET_KEY y contraseñas de base y Redis',
+    'docsCharts.superset.feature.autoSecrets':
+      'Secretos autogenerados — contraseña admin, Flask SECRET_KEY y contraseñas de base y Redis',
     'docsCharts.superset.feature.healthProbes': 'Health probes — startup, liveness y readiness en /health',
     'docsCharts.superset.feature.ingressSupport': 'Soporte de ingress — clase configurable (traefik, nginx, etc.)',
     'docsCharts.superset.table.imageRepository': 'Imagen del contenedor',
@@ -1815,18 +2120,27 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.superset.table.databaseMode': 'Modo de base de datos: subchart o external',
     'docsCharts.superset.table.redisMode': 'Modo Redis: subchart o external',
     'docsCharts.superset.table.ingressEnabled': 'Habilitar ingress',
-    'docsCharts.superset.note.initJobRuns': 'El init job ejecuta migraciones de base y crea el usuario admin en cada instalación/upgrade',
+    'docsCharts.superset.note.initJobRuns':
+      'El init job ejecuta migraciones de base y crea el usuario admin en cada instalación/upgrade',
     'docsCharts.superset.note.independentScaling': 'Los componentes web, worker y beat escalan de forma independiente',
-    'docsCharts.superset.note.extraConfig': 'Configura `superset.extraConfig` para ajustes personalizados de superset_config.py',
+    'docsCharts.superset.note.extraConfig':
+      'Configura `superset.extraConfig` para ajustes personalizados de superset_config.py',
     'docsCharts.superset.note.loadExamples': 'Usa `superset.loadExamples: true` para entornos de demostración',
     'docsCharts.appwrite.intro.before': 'Helm chart para desplegar',
-    'docsCharts.appwrite.intro.after': 'en Kubernetes — una plataforma Backend-as-a-Service (BaaS) self-hosted que ofrece autenticación, bases de datos, almacenamiento, funciones, mensajería y API en tiempo real. Incluye MariaDB y Redis por defecto.',
-    'docsCharts.appwrite.feature.fullStack': 'Stack completo de Appwrite — API, Console (v7.5.7), Realtime, 12 workers, schedulers y mantenimiento',
-    'docsCharts.appwrite.feature.bundledMariadb': 'MariaDB incluida — la instalación por defecto incluye el chart MariaDB de HelmForge',
-    'docsCharts.appwrite.feature.bundledRedis': 'Redis incluida — la instalación por defecto incluye el chart Redis de HelmForge',
-    'docsCharts.appwrite.feature.externalServices': 'Soporte de servicios externos — conecta MariaDB/MySQL y Redis gestionados en lugar de subcharts',
-    'docsCharts.appwrite.feature.pathIngress': 'Ruteo ingress por paths — host único con prefijos para API (`/v1`), Console y Realtime (`/v1/realtime`)',
-    'docsCharts.appwrite.feature.sharedPvcs': 'PVCs compartidos — volúmenes persistentes para uploads, caché y builds de funciones compartidos entre componentes',
+    'docsCharts.appwrite.intro.after':
+      'en Kubernetes — una plataforma Backend-as-a-Service (BaaS) self-hosted que ofrece autenticación, bases de datos, almacenamiento, funciones, mensajería y API en tiempo real. Incluye MariaDB y Redis por defecto.',
+    'docsCharts.appwrite.feature.fullStack':
+      'Stack completo de Appwrite — API, Console (v7.5.7), Realtime, 12 workers, schedulers y mantenimiento',
+    'docsCharts.appwrite.feature.bundledMariadb':
+      'MariaDB incluida — la instalación por defecto incluye el chart MariaDB de HelmForge',
+    'docsCharts.appwrite.feature.bundledRedis':
+      'Redis incluida — la instalación por defecto incluye el chart Redis de HelmForge',
+    'docsCharts.appwrite.feature.externalServices':
+      'Soporte de servicios externos — conecta MariaDB/MySQL y Redis gestionados en lugar de subcharts',
+    'docsCharts.appwrite.feature.pathIngress':
+      'Ruteo ingress por paths — host único con prefijos para API (`/v1`), Console y Realtime (`/v1/realtime`)',
+    'docsCharts.appwrite.feature.sharedPvcs':
+      'PVCs compartidos — volúmenes persistentes para uploads, caché y builds de funciones compartidos entre componentes',
     'docsCharts.appwrite.feature.appVersion': 'appVersion 1.8.1 — sigue la última release open-source de Appwrite',
     'docsCharts.appwrite.table.domain': 'Dominio público de la instancia Appwrite',
     'docsCharts.appwrite.table.secretKey': 'Clave de cifrado para secretos de Appwrite',
@@ -1838,21 +2152,30 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.appwrite.table.uploadsSize': 'Tamaño del PVC de uploads',
     'docsCharts.appwrite.table.cacheSize': 'Tamaño del PVC de caché',
     'docsCharts.appwrite.table.workerReplicaCount': 'Réplicas para cada tipo de worker',
-    'docsCharts.appwrite.note.alphaWorkloads': 'Este chart alpha despliega aproximadamente 20 workloads de Kubernetes — usa réplicas mínimas de worker para pruebas iniciales',
+    'docsCharts.appwrite.note.alphaWorkloads':
+      'Este chart alpha despliega aproximadamente 20 workloads de Kubernetes — usa réplicas mínimas de worker para pruebas iniciales',
     'docsCharts.appwrite.note.paths': 'La Console se sirve en la raíz, la API en `/v1` y Realtime en `/v1/realtime`',
-    'docsCharts.appwrite.note.defaultBundled': 'Las instalaciones por defecto usan MariaDB y Redis incluidos vía subcharts de HelmForge',
-    'docsCharts.appwrite.note.sameImage': 'Todos los pods de workers comparten la misma imagen de Appwrite con distintos comandos de entrypoint',
-    'docsCharts.kafka.intro': 'Despliega Apache Kafka en Kubernetes usando la imagen oficial `apache/kafka:4.2.0` con diseño solo KRaft. El chart soporta intencionalmente una ruta simple `single-broker` para desarrollo y una ruta `cluster` orientada a producción con controladores y brokers dedicados.',
+    'docsCharts.appwrite.note.defaultBundled':
+      'Las instalaciones por defecto usan MariaDB y Redis incluidos vía subcharts de HelmForge',
+    'docsCharts.appwrite.note.sameImage':
+      'Todos los pods de workers comparten la misma imagen de Appwrite con distintos comandos de entrypoint',
+    'docsCharts.kafka.intro':
+      'Despliega Apache Kafka en Kubernetes usando la imagen oficial `apache/kafka:4.2.0` con diseño solo KRaft. El chart soporta intencionalmente una ruta simple `single-broker` para desarrollo y una ruta `cluster` orientada a producción con controladores y brokers dedicados.',
     'docsCharts.kafka.feature.latestStable': 'Kafka estable más reciente — fijado a la última release estable upstream',
     'docsCharts.kafka.feature.kraftOnly': 'Solo KRaft — este chart no incluye modo ZooKeeper',
-    'docsCharts.kafka.feature.twoTopologies': 'Dos topologías claras — `single-broker` para entornos simples y `cluster` para despliegues orientados a producción',
-    'docsCharts.kafka.feature.persistentStorage': 'Almacenamiento persistente — soportado para single-broker, controladores y brokers',
-    'docsCharts.kafka.feature.stableDns': 'DNS estable de brokers — los listeners anunciados usan nombres DNS de pods StatefulSet dentro del cluster',
-    'docsCharts.kafka.feature.optionalMetrics': 'Métricas opcionales — javaagent JMX exporter con ServiceMonitor opcional',
+    'docsCharts.kafka.feature.twoTopologies':
+      'Dos topologías claras — `single-broker` para entornos simples y `cluster` para despliegues orientados a producción',
+    'docsCharts.kafka.feature.persistentStorage':
+      'Almacenamiento persistente — soportado para single-broker, controladores y brokers',
+    'docsCharts.kafka.feature.stableDns':
+      'DNS estable de brokers — los listeners anunciados usan nombres DNS de pods StatefulSet dentro del cluster',
+    'docsCharts.kafka.feature.optionalMetrics':
+      'Métricas opcionales — javaagent JMX exporter con ServiceMonitor opcional',
     'docsCharts.kafka.table.architecture': '`single-broker` o `cluster`',
     'docsCharts.kafka.table.imageRepository': 'Repositorio de imagen Kafka',
     'docsCharts.kafka.table.imageTag': 'Tag de imagen Kafka',
-    'docsCharts.kafka.table.existingSecret': 'Secret existente con ID de cluster KRaft e IDs de directorio de controladores',
+    'docsCharts.kafka.table.existingSecret':
+      'Secret existente con ID de cluster KRaft e IDs de directorio de controladores',
     'docsCharts.kafka.table.clientPort': 'Puerto de cliente Kafka',
     'docsCharts.kafka.table.controllerPort': 'Puerto de controlador KRaft',
     'docsCharts.kafka.table.controllerReplicas': 'Réplicas dedicadas de controladores',
@@ -1860,16 +2183,25 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.kafka.table.minInSyncReplicas': 'Mínimo ISR recomendado para modo cluster',
     'docsCharts.kafka.table.metricsEnabled': 'Habilitar métricas de JMX exporter',
     'docsCharts.kafka.note.singleBrokerDev': 'Usa `single-broker` para desarrollo y CI, no como base de producción',
-    'docsCharts.kafka.note.clusterProduction': 'Usa `cluster` para workloads orientados a producción con controladores y brokers dedicados',
-    'docsCharts.kafka.note.validateFlows': 'Valida creación de topics y flujos de productor/consumidor antes de promover',
-    'docsCharts.kafka.note.externalListeners': 'Planifica listeners externos, TLS y autenticación como trabajo explícito posterior si tu entorno lo necesita',
+    'docsCharts.kafka.note.clusterProduction':
+      'Usa `cluster` para workloads orientados a producción con controladores y brokers dedicados',
+    'docsCharts.kafka.note.validateFlows':
+      'Valida creación de topics y flujos de productor/consumidor antes de promover',
+    'docsCharts.kafka.note.externalListeners':
+      'Planifica listeners externos, TLS y autenticación como trabajo explícito posterior si tu entorno lo necesita',
     'docsCharts.velero.intro.before': 'Despliega',
-    'docsCharts.velero.intro.after': 'en Kubernetes usando la imagen oficial `docker.io/velero/velero` para backup, restore, migración y flujos opcionales de backup de filesystem.',
-    'docsCharts.velero.feature.latestStable': 'Velero estable más reciente — chart fijado a la última release estable upstream',
-    'docsCharts.velero.feature.crdsIncluded': 'CRDs oficiales incluidos — los CRDs de Velero se entregan en el directorio `crds/` del chart',
-    'docsCharts.velero.feature.s3Storage': 'Almacenamiento compatible con S3 — validado con el plugin AWS sobre MinIO y proveedores similares',
-    'docsCharts.velero.feature.recurringSchedules': 'Programaciones recurrentes — recursos `Schedule` opcionales generados desde values',
-    'docsCharts.velero.feature.filesystemBackup': 'Backup de filesystem — DaemonSet node-agent opcional para backups de volúmenes de pods',
+    'docsCharts.velero.intro.after':
+      'en Kubernetes usando la imagen oficial `docker.io/velero/velero` para backup, restore, migración y flujos opcionales de backup de filesystem.',
+    'docsCharts.velero.feature.latestStable':
+      'Velero estable más reciente — chart fijado a la última release estable upstream',
+    'docsCharts.velero.feature.crdsIncluded':
+      'CRDs oficiales incluidos — los CRDs de Velero se entregan en el directorio `crds/` del chart',
+    'docsCharts.velero.feature.s3Storage':
+      'Almacenamiento compatible con S3 — validado con el plugin AWS sobre MinIO y proveedores similares',
+    'docsCharts.velero.feature.recurringSchedules':
+      'Programaciones recurrentes — recursos `Schedule` opcionales generados desde values',
+    'docsCharts.velero.feature.filesystemBackup':
+      'Backup de filesystem — DaemonSet node-agent opcional para backups de volúmenes de pods',
     'docsCharts.velero.feature.metricsSupport': 'Soporte de métricas — Service de métricas y ServiceMonitor opcional',
     'docsCharts.velero.table.imageRepository': 'Imagen del servidor Velero',
     'docsCharts.velero.table.awsTag': 'Tag por defecto de imagen del plugin AWS/S3',
@@ -1878,17 +2210,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.velero.table.schedules': 'Recursos Schedule creados por el chart',
     'docsCharts.velero.table.nodeAgentEnabled': 'Desplegar DaemonSet de backup de filesystem',
     'docsCharts.velero.table.serviceMonitorEnabled': 'Crear ServiceMonitor de Prometheus Operator',
-    'docsCharts.velero.note.confirmContext': 'Confirma siempre el contexto activo de `kubectl` antes de instalar, actualizar o desinstalar en validación local',
-    'docsCharts.velero.note.validateBsl': 'Para almacenamiento S3 compatible, valida que `BackupStorageLocation` llegue a `Available`',
-    'docsCharts.velero.note.realBackup': 'Crea al menos un backup real de prueba antes de habilitar programaciones recurrentes en entornos compartidos',
+    'docsCharts.velero.note.confirmContext':
+      'Confirma siempre el contexto activo de `kubectl` antes de instalar, actualizar o desinstalar en validación local',
+    'docsCharts.velero.note.validateBsl':
+      'Para almacenamiento S3 compatible, valida que `BackupStorageLocation` llegue a `Available`',
+    'docsCharts.velero.note.realBackup':
+      'Crea al menos un backup real de prueba antes de habilitar programaciones recurrentes en entornos compartidos',
     'docsCharts.flowise.intro.before': 'Helm chart para desplegar',
-    'docsCharts.flowise.intro.after': 'en Kubernetes usando la imagen oficial `flowiseai/flowise`, con una topología standalone simple y una topología de cola escalable para cargas mayores.',
+    'docsCharts.flowise.intro.after':
+      'en Kubernetes usando la imagen oficial `flowiseai/flowise`, con una topología standalone simple y una topología de cola escalable para cargas mayores.',
     'docsCharts.flowise.feature.officialImage': 'Imagen oficial de Flowise basada en `flowiseai/flowise`',
-    'docsCharts.flowise.feature.standaloneMode': 'Modo standalone — SQLite y almacenamiento local para instalaciones simples',
-    'docsCharts.flowise.feature.queueMode': 'Modo cola — despliegues separados de main y workers para procesamiento escalable',
+    'docsCharts.flowise.feature.standaloneMode':
+      'Modo standalone — SQLite y almacenamiento local para instalaciones simples',
+    'docsCharts.flowise.feature.queueMode':
+      'Modo cola — despliegues separados de main y workers para procesamiento escalable',
     'docsCharts.flowise.feature.bundledDeps': 'PostgreSQL y Redis incluidos — subcharts opcionales para modo cola',
     'docsCharts.flowise.feature.externalSql': 'Soporte SQL externo — PostgreSQL o MySQL externos',
-    'docsCharts.flowise.feature.s3Storage': 'Almacenamiento compartido con S3 — el modo cola usa almacenamiento compatible con S3 para blobs compartidos',
+    'docsCharts.flowise.feature.s3Storage':
+      'Almacenamiento compartido con S3 — el modo cola usa almacenamiento compatible con S3 para blobs compartidos',
     'docsCharts.flowise.feature.ingressSupport': 'Soporte de ingress — ingress configurable para la UI web de Flowise',
     'docsCharts.flowise.table.architectureMode': 'Topología de Flowise: `standalone` o `queue`',
     'docsCharts.flowise.table.replicaCount': 'Número de réplicas del servidor principal de Flowise',
@@ -1899,21 +2238,32 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.flowise.table.storageType': 'Tipo de almacenamiento de blobs: `local` o `s3`',
     'docsCharts.flowise.table.persistenceEnabled': 'Persistir datos locales de Flowise',
     'docsCharts.flowise.table.appUrl': 'URL pública de Flowise',
-    'docsCharts.flowise.note.standaloneDefaults': '`standalone` usa por defecto SQLite más un PVC local para la instalación más simple',
-    'docsCharts.flowise.note.queueRequirements': '`queue` requiere Redis, una base SQL, `storage.type=s3` y `persistence.enabled=false`',
-    'docsCharts.flowise.note.queueScaleOut': 'El modo cola está pensado para despliegues scale-out con pods main y worker separados',
+    'docsCharts.flowise.note.standaloneDefaults':
+      '`standalone` usa por defecto SQLite más un PVC local para la instalación más simple',
+    'docsCharts.flowise.note.queueRequirements':
+      '`queue` requiere Redis, una base SQL, `storage.type=s3` y `persistence.enabled=false`',
+    'docsCharts.flowise.note.queueScaleOut':
+      'El modo cola está pensado para despliegues scale-out con pods main y worker separados',
     'docsCharts.flowise.note.localSingleNode': 'El almacenamiento local está orientado intencionalmente a un solo nodo',
     'docsCharts.flowise.note.versionPinned': 'El chart fija la versión `3.1.1`',
-    'docsCharts.flowise.note.versionValidated': 'Esta versión fue validada contra la release oficial de GitHub `flowise@3.1.1` y el tag oficial de Docker Hub `3.1.1`',
+    'docsCharts.flowise.note.versionValidated':
+      'Esta versión fue validada contra la release oficial de GitHub `flowise@3.1.1` y el tag oficial de Docker Hub `3.1.1`',
     'docsCharts.listmonk.intro.before': 'Helm chart para desplegar',
-    'docsCharts.listmonk.intro.after': 'en Kubernetes — un gestor self-hosted de newsletters y listas de correo con PostgreSQL incluido, almacenamiento persistente de uploads y backup S3 opcional.',
+    'docsCharts.listmonk.intro.after':
+      'en Kubernetes — un gestor self-hosted de newsletters y listas de correo con PostgreSQL incluido, almacenamiento persistente de uploads y backup S3 opcional.',
     'docsCharts.listmonk.feature.officialImage': 'Imagen oficial de Listmonk basada en `listmonk/listmonk`',
-    'docsCharts.listmonk.feature.bundledPostgresql': 'PostgreSQL incluido — la instalación por defecto incluye el chart PostgreSQL de HelmForge',
-    'docsCharts.listmonk.feature.externalDatabase': 'Soporte de base externa — se puede usar PostgreSQL gestionado en lugar del subchart',
-    'docsCharts.listmonk.feature.persistentUploads': 'Uploads persistentes — PVC configurable para almacenamiento de medios y adjuntos',
-    'docsCharts.listmonk.feature.s3Backup': 'Backup S3 — CronJob opcional para dumps de PostgreSQL a almacenamiento compatible con S3',
-    'docsCharts.listmonk.feature.idempotentBootstrap': 'Bootstrap idempotente — el contenedor init ejecuta `--install --idempotent --yes` y `--upgrade --yes` en cada inicio',
-    'docsCharts.listmonk.feature.pgcrypto': 'Extensión pgcrypto — provisionada automáticamente mediante scripts init de PostgreSQL',
+    'docsCharts.listmonk.feature.bundledPostgresql':
+      'PostgreSQL incluido — la instalación por defecto incluye el chart PostgreSQL de HelmForge',
+    'docsCharts.listmonk.feature.externalDatabase':
+      'Soporte de base externa — se puede usar PostgreSQL gestionado en lugar del subchart',
+    'docsCharts.listmonk.feature.persistentUploads':
+      'Uploads persistentes — PVC configurable para almacenamiento de medios y adjuntos',
+    'docsCharts.listmonk.feature.s3Backup':
+      'Backup S3 — CronJob opcional para dumps de PostgreSQL a almacenamiento compatible con S3',
+    'docsCharts.listmonk.feature.idempotentBootstrap':
+      'Bootstrap idempotente — el contenedor init ejecuta `--install --idempotent --yes` y `--upgrade --yes` en cada inicio',
+    'docsCharts.listmonk.feature.pgcrypto':
+      'Extensión pgcrypto — provisionada automáticamente mediante scripts init de PostgreSQL',
     'docsCharts.listmonk.table.replicaCount': 'Número de pods de la aplicación Listmonk',
     'docsCharts.listmonk.table.adminUser': 'Usuario admin creado en la primera instalación',
     'docsCharts.listmonk.table.adminPassword': 'Contraseña admin (autogenerada si está vacía)',
@@ -1924,17 +2274,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.listmonk.table.backupEnabled': 'Habilitar CronJob de backup S3',
     'docsCharts.listmonk.table.backupSchedule': 'Cron de backup',
     'docsCharts.listmonk.table.ingressEnabled': 'Habilitar exposición por ingress',
-    'docsCharts.listmonk.note.smtpConfig': 'La configuración SMTP se realiza desde la UI admin de Listmonk después de la primera instalación',
-    'docsCharts.listmonk.note.initContainer': 'El contenedor init garantiza que el esquema de base se cree y migre en cada inicio del pod',
-    'docsCharts.listmonk.note.pgcryptoRequired': 'PostgreSQL requiere la extensión `pgcrypto`, que el chart provisiona automáticamente mediante scripts init',
+    'docsCharts.listmonk.note.smtpConfig':
+      'La configuración SMTP se realiza desde la UI admin de Listmonk después de la primera instalación',
+    'docsCharts.listmonk.note.initContainer':
+      'El contenedor init garantiza que el esquema de base se cree y migre en cada inicio del pod',
+    'docsCharts.listmonk.note.pgcryptoRequired':
+      'PostgreSQL requiere la extensión `pgcrypto`, que el chart provisiona automáticamente mediante scripts init',
     'docsCharts.countly.intro.before': 'Despliega',
-    'docsCharts.countly.intro.after': 'en Kubernetes — una plataforma de analítica de producto con tracking de eventos, crash reporting, notificaciones push, A/B testing y más de 41 plugins.',
-    'docsCharts.countly.feature.fullAnalytics': 'Stack completo de analítica — tracking de eventos, crash reporting, push notifications y A/B testing',
+    'docsCharts.countly.intro.after':
+      'en Kubernetes — una plataforma de analítica de producto con tracking de eventos, crash reporting, notificaciones push, A/B testing y más de 41 plugins.',
+    'docsCharts.countly.feature.fullAnalytics':
+      'Stack completo de analítica — tracking de eventos, crash reporting, push notifications y A/B testing',
     'docsCharts.countly.feature.mongodbBackend': 'Backend MongoDB — subchart incluido o conexión externa',
     'docsCharts.countly.feature.dualPorts': 'Puertos duales — endpoints separados para API (3001) y dashboard (6001)',
-    'docsCharts.countly.feature.pluginSystem': 'Sistema de plugins — lista de plugins configurable para selección de funcionalidades',
+    'docsCharts.countly.feature.pluginSystem':
+      'Sistema de plugins — lista de plugins configurable para selección de funcionalidades',
     'docsCharts.countly.feature.scalableWorkers': 'Workers escalables — procesos API workers configurables',
-    'docsCharts.countly.feature.ingressSupport': 'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
+    'docsCharts.countly.feature.ingressSupport':
+      'Soporte de ingress — TLS con cert-manager y clase de ingress configurable',
     'docsCharts.countly.table.apiPort': 'Puerto de API',
     'docsCharts.countly.table.dashboardPort': 'Puerto del dashboard',
     'docsCharts.countly.table.apiWorkers': 'Procesos API workers',
@@ -1947,13 +2304,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.countly.note.mongodbOnly': 'Solo MongoDB — sin soporte para PostgreSQL',
     'docsCharts.countly.note.singleInstance': 'Instancia única por base de datos MongoDB',
     'docsCharts.countly.note.sameContainer': 'Dashboard y API se ejecutan en el mismo contenedor en puertos separados',
-    'docsCharts.rabbitmq.intro': 'Despliegue de RabbitMQ listo para producción con UI de administración y soporte de clustering.',
+    'docsCharts.rabbitmq.intro':
+      'Despliegue de RabbitMQ listo para producción con UI de administración y soporte de clustering.',
     'docsCharts.rabbitmq.feature.standaloneClustering': 'Standalone y clustering — instancia única o cluster multinodo',
     'docsCharts.rabbitmq.feature.managementUi': 'UI de administración — consola web integrada con soporte de ingress',
     'docsCharts.rabbitmq.feature.pluginSupport': 'Soporte de plugins — plugins de RabbitMQ configurables',
     'docsCharts.rabbitmq.feature.metrics': 'Métricas — exporter de Prometheus con ServiceMonitor',
     'docsCharts.rabbitmq.feature.security': 'Seguridad — autenticación, contenedores non-root, network policies y TLS',
-    'docsCharts.rabbitmq.feature.persistentStorage': 'Almacenamiento persistente — persistencia de mensajes tras reinicios',
+    'docsCharts.rabbitmq.feature.persistentStorage':
+      'Almacenamiento persistente — persistencia de mensajes tras reinicios',
     'docsCharts.rabbitmq.table.replicaCount': 'Número de nodos RabbitMQ',
     'docsCharts.rabbitmq.table.authUsername': 'Usuario admin por defecto',
     'docsCharts.rabbitmq.table.authPassword': 'Contraseña admin',
@@ -1962,16 +2321,20 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.rabbitmq.table.ingressEnabled': 'Habilitar ingress para la UI de administración',
     'docsCharts.rabbitmq.table.metricsEnabled': 'Habilitar exporter de Prometheus',
     'docsCharts.uptimeKuma.intro.before': 'Despliega',
-    'docsCharts.uptimeKuma.intro.after': 'en Kubernetes usando la imagen oficial `louislam/uptime-kuma`. Monitoreo self-hosted con checks HTTP/TCP/DNS/Ping, más de 90 servicios de notificación y páginas de estado personalizables.',
-    'docsCharts.uptimeKuma.feature.monitorTypes': '20+ tipos de monitor — HTTP(s), TCP, Ping, DNS, Docker, WebSocket y más',
-    'docsCharts.uptimeKuma.feature.notificationServices': '90+ servicios de notificación — Telegram, Discord, Slack, Email, Pushover y más',
+    'docsCharts.uptimeKuma.intro.after':
+      'en Kubernetes usando la imagen oficial `louislam/uptime-kuma`. Monitoreo self-hosted con checks HTTP/TCP/DNS/Ping, más de 90 servicios de notificación y páginas de estado personalizables.',
+    'docsCharts.uptimeKuma.feature.monitorTypes':
+      '20+ tipos de monitor — HTTP(s), TCP, Ping, DNS, Docker, WebSocket y más',
+    'docsCharts.uptimeKuma.feature.notificationServices':
+      '90+ servicios de notificación — Telegram, Discord, Slack, Email, Pushover y más',
     'docsCharts.uptimeKuma.feature.statusPages': 'Páginas de estado — páginas públicas con dominios personalizados',
     'docsCharts.uptimeKuma.feature.sqliteMariaDb': 'SQLite o MariaDB — SQLite embebido (por defecto) o subchart MySQL',
     'docsCharts.uptimeKuma.feature.externalDatabase': 'Base de datos externa — conecta instancias MariaDB existentes',
     'docsCharts.uptimeKuma.feature.scheduledBackups': 'Backups programados — tar de SQLite o mysqldump con subida a S3',
     'docsCharts.uptimeKuma.feature.ingressSupport': 'Soporte de ingress — TLS con cert-manager',
     'docsCharts.uptimeKuma.feature.twoFa': '2FA — autenticación de dos factores integrada',
-    'docsCharts.uptimeKuma.setupWizard': 'Después del despliegue, accede al asistente con `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
+    'docsCharts.uptimeKuma.setupWizard':
+      'Después del despliegue, accede al asistente con `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
     'docsCharts.uptimeKuma.table.port': 'Puerto de la aplicación',
     'docsCharts.uptimeKuma.table.databaseType': 'Tipo de base de datos (sqlite, mariadb)',
     'docsCharts.uptimeKuma.table.mysqlEnabled': 'Desplegar subchart MySQL',
@@ -1980,8 +2343,10 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.uptimeKuma.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.uptimeKuma.table.backupEnabled': 'Habilitar backups S3',
     'docsCharts.uptimeKuma.table.servicePort': 'Puerto del servicio',
-    'docsCharts.pihole.intro': 'Despliega el DNS sinkhole Pi-hole en Kubernetes usando la imagen oficial `pihole/pihole`. Provee bloqueo de anuncios a nivel de red mediante filtrado DNS con DNS recursivo Unbound opcional.',
-    'docsCharts.pihole.feature.adBlocking': 'Bloqueo de anuncios en toda la red — filtrado DNS para todos los dispositivos',
+    'docsCharts.pihole.intro':
+      'Despliega el DNS sinkhole Pi-hole en Kubernetes usando la imagen oficial `pihole/pihole`. Provee bloqueo de anuncios a nivel de red mediante filtrado DNS con DNS recursivo Unbound opcional.',
+    'docsCharts.pihole.feature.adBlocking':
+      'Bloqueo de anuncios en toda la red — filtrado DNS para todos los dispositivos',
     'docsCharts.pihole.feature.customDns': 'Registros DNS personalizados — registros A locales, CNAME y config dnsmasq',
     'docsCharts.pihole.feature.unboundSidecar': 'Sidecar Unbound — resolvedor DNS recursivo opcional para privacidad',
     'docsCharts.pihole.feature.v6Config': 'Pi-hole v6+ — configuración moderna vía variables FTLCONF',
@@ -2001,19 +2366,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.pihole.table.loadBalancerIp': 'IP fija para DNS',
     'docsCharts.pihole.table.persistenceEnabled': 'Habilitar almacenamiento persistente',
     'docsCharts.pihole.table.persistenceSize': 'Tamaño del PVC',
-    'docsCharts.guacamole.intro': 'Despliega Apache Guacamole en Kubernetes usando las imágenes oficiales `guacamole/guacamole` y `guacamole/guacd`. Gateway de escritorio remoto sin cliente para RDP, VNC, SSH y telnet con SSO OIDC/SAML.',
+    'docsCharts.guacamole.intro':
+      'Despliega Apache Guacamole en Kubernetes usando las imágenes oficiales `guacamole/guacamole` y `guacamole/guacd`. Gateway de escritorio remoto sin cliente para RDP, VNC, SSH y telnet con SSO OIDC/SAML.',
     'docsCharts.guacamole.feature.guacdSidecar': 'Sidecar guacd — el daemon de protocolo corre junto a la app web',
-    'docsCharts.guacamole.feature.postgresqlSubchart': 'Subchart PostgreSQL — incluido vía dependencia HelmForge (por defecto)',
+    'docsCharts.guacamole.feature.postgresqlSubchart':
+      'Subchart PostgreSQL — incluido vía dependencia HelmForge (por defecto)',
     'docsCharts.guacamole.feature.mysqlSubchart': 'Subchart MySQL — incluido vía dependencia HelmForge',
     'docsCharts.guacamole.feature.externalDatabase': 'Base de datos externa — conecta PostgreSQL o MySQL existentes',
-    'docsCharts.guacamole.feature.databaseInitJob': 'Job de init de base — inicialización automática de schema en la instalación',
+    'docsCharts.guacamole.feature.databaseInitJob':
+      'Job de init de base — inicialización automática de schema en la instalación',
     'docsCharts.guacamole.feature.openidConnect': 'OpenID Connect — SSO con Keycloak, Okta, Azure AD y otros',
     'docsCharts.guacamole.feature.saml': 'SAML — SSO con cualquier proveedor SAML 2.0',
     'docsCharts.guacamole.feature.totp': 'TOTP — autenticación de dos factores',
     'docsCharts.guacamole.feature.scheduledBackups': 'Backups programados — pg_dump o mysqldump con subida a S3',
     'docsCharts.guacamole.feature.ingressSupport': 'Soporte de ingress — TLS con cert-manager',
-    'docsCharts.guacamole.defaultCredentials': 'Credenciales por defecto: `guacadmin` / `guacadmin` — cámbialas inmediatamente tras el primer acceso.',
-    'docsCharts.guacamole.redirectUri': 'El `redirectUri` se detecta automáticamente desde la configuración de ingress.',
+    'docsCharts.guacamole.defaultCredentials':
+      'Credenciales por defecto: `guacadmin` / `guacadmin` — cámbialas inmediatamente tras el primer acceso.',
+    'docsCharts.guacamole.redirectUri':
+      'El `redirectUri` se detecta automáticamente desde la configuración de ingress.',
     'docsCharts.guacamole.table.contextPath': 'Ruta de contexto web (`ROOT` = `/`)',
     'docsCharts.guacamole.table.guacdPort': 'Puerto del daemon guacd',
     'docsCharts.guacamole.table.guacdLogLevel': 'Nivel de log de guacd',
@@ -2028,13 +2398,17 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.guacamole.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.guacamole.table.backupEnabled': 'Habilitar backups S3',
     'docsCharts.mariadb.intro.before': 'Helm chart para desplegar',
-    'docsCharts.mariadb.intro.after': 'en Kubernetes usando la imagen Docker oficial `mariadb`. Soporta arquitecturas standalone y replicación basada en GTID.',
+    'docsCharts.mariadb.intro.after':
+      'en Kubernetes usando la imagen Docker oficial `mariadb`. Soporta arquitecturas standalone y replicación basada en GTID.',
     'docsCharts.mariadb.feature.officialImage': 'Imagen oficial de MariaDB desde Docker Hub (11.4 LTS)',
     'docsCharts.mariadb.feature.standaloneReplication': 'Modos standalone y replicación con configuración explícita',
-    'docsCharts.mariadb.feature.gtidReplication': 'Replicación basada en GTID usando `MASTER_USE_GTID=slave_pos` nativo de MariaDB',
-    'docsCharts.mariadb.feature.configPresets': 'Presets de configuración: small, medium, large, oltp, read-heavy, analytics',
+    'docsCharts.mariadb.feature.gtidReplication':
+      'Replicación basada en GTID usando `MASTER_USE_GTID=slave_pos` nativo de MariaDB',
+    'docsCharts.mariadb.feature.configPresets':
+      'Presets de configuración: small, medium, large, oltp, read-heavy, analytics',
     'docsCharts.mariadb.feature.tls': 'Cifrado TLS del lado del servidor con enforcement opcional del cliente',
-    'docsCharts.mariadb.feature.prometheusMetrics': 'Métricas de Prometheus vía sidecar mysqld-exporter y ServiceMonitor',
+    'docsCharts.mariadb.feature.prometheusMetrics':
+      'Métricas de Prometheus vía sidecar mysqld-exporter y ServiceMonitor',
     'docsCharts.mariadb.feature.s3Backup': 'CronJob de backup compatible con S3 usando mariadb-dump',
     'docsCharts.mariadb.feature.networkPolicyPdb': 'NetworkPolicy y PDB para cargas de producción',
     'docsCharts.mariadb.table.architecture': 'Modo de despliegue: standalone o replication',
@@ -2044,7 +2418,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mariadb.table.username': 'Usuario de la aplicación',
     'docsCharts.mariadb.table.password': 'Contraseña de la aplicación (autogenerada si está vacía)',
     'docsCharts.mariadb.table.existingSecret': 'Secret existente con contraseñas',
-    'docsCharts.mariadb.table.configPreset': 'Preset de configuración: small, medium, large, oltp, read-heavy, analytics',
+    'docsCharts.mariadb.table.configPreset':
+      'Preset de configuración: small, medium, large, oltp, read-heavy, analytics',
     'docsCharts.mariadb.table.standaloneSize': 'Tamaño de PVC en standalone',
     'docsCharts.mariadb.table.readReplicas': 'Número de réplicas de lectura',
     'docsCharts.mariadb.table.binlogFormat': 'Formato de binlog',
@@ -2052,17 +2427,25 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mariadb.table.metricsEnabled': 'Habilitar mysqld-exporter',
     'docsCharts.mariadb.table.tlsEnabled': 'Habilitar TLS del servidor',
     'docsCharts.mariadb.table.networkPolicyEnabled': 'Habilitar NetworkPolicy',
-    'docsCharts.mariadb.architectureSelection': 'Cuando `architecture` es `standalone` (por defecto), el chart despliega una sola instancia de MariaDB. Define `architecture: replication` para una fuente fija con réplicas de lectura asíncronas basadas en GTID.',
+    'docsCharts.mariadb.architectureSelection':
+      'Cuando `architecture` es `standalone` (por defecto), el chart despliega una sola instancia de MariaDB. Define `architecture: replication` para una fuente fija con réplicas de lectura asíncronas basadas en GTID.',
     'docsCharts.druid.intro.before': 'Despliega',
-    'docsCharts.druid.intro.after': 'en Kubernetes — una base de datos analítica en tiempo real de alto rendimiento, diseñada para analytics rápidos de slice-and-dice sobre grandes datasets, usada comúnmente en dashboards BI y exploración de datos en tiempo real.',
-    'docsCharts.druid.feature.sixComponentArchitecture': 'Arquitectura de 6 componentes — coordinator, overlord, broker, router, historical, middlemanager',
+    'docsCharts.druid.intro.after':
+      'en Kubernetes — una base de datos analítica en tiempo real de alto rendimiento, diseñada para analytics rápidos de slice-and-dice sobre grandes datasets, usada comúnmente en dashboards BI y exploración de datos en tiempo real.',
+    'docsCharts.druid.feature.sixComponentArchitecture':
+      'Arquitectura de 6 componentes — coordinator, overlord, broker, router, historical, middlemanager',
     'docsCharts.druid.feature.routerConsole': 'Consola web del router — consola Druid integrada accesible por ingress',
-    'docsCharts.druid.feature.postgresqlMetadataStore': 'Store de metadatos PostgreSQL — subchart incluido o PostgreSQL/MySQL externo',
-    'docsCharts.druid.feature.zookeeperCoordination': 'Coordinación con ZooKeeper — subchart incluido o ZooKeeper externo',
+    'docsCharts.druid.feature.postgresqlMetadataStore':
+      'Store de metadatos PostgreSQL — subchart incluido o PostgreSQL/MySQL externo',
+    'docsCharts.druid.feature.zookeeperCoordination':
+      'Coordinación con ZooKeeper — subchart incluido o ZooKeeper externo',
     'docsCharts.druid.feature.deepStorage': 'Deep storage — local o compatible con S3 (MinIO, AWS S3)',
-    'docsCharts.druid.feature.persistentVolumes': 'Volúmenes persistentes — caché de segmentos (historical) y storage de tareas (middlemanager)',
-    'docsCharts.druid.feature.perComponentScaling': 'Escalado por componente — conteos de réplicas y tuning JVM independientes',
-    'docsCharts.druid.feature.healthProbes': 'Health probes — liveness en /status/health, readiness en /status/selfDiscovered',
+    'docsCharts.druid.feature.persistentVolumes':
+      'Volúmenes persistentes — caché de segmentos (historical) y storage de tareas (middlemanager)',
+    'docsCharts.druid.feature.perComponentScaling':
+      'Escalado por componente — conteos de réplicas y tuning JVM independientes',
+    'docsCharts.druid.feature.healthProbes':
+      'Health probes — liveness en /status/health, readiness en /status/selfDiscovered',
     'docsCharts.druid.feature.ingressSupport': 'Soporte de ingress — clase configurable (traefik, nginx, etc.)',
     'docsCharts.druid.table.imageRepository': 'Imagen de contenedor Druid',
     'docsCharts.druid.table.coordinatorEnabled': 'Habilitar coordinator',
@@ -2078,11 +2461,16 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.druid.table.metadataMode': 'Modo de metadatos: subchart o external',
     'docsCharts.druid.table.zookeeperMode': 'Modo ZooKeeper: subchart o external',
     'docsCharts.druid.table.deepStorageType': 'Deep storage: local o s3',
-    'docsCharts.druid.note.memoryIntensive': 'Druid consume mucha memoria — los 6 componentes juntos requieren mínimo 2GB+ de RAM',
-    'docsCharts.druid.note.tuneJvm': 'Ajusta el heap JVM por componente vía `javaOpts` para dimensionamiento de producción',
-    'docsCharts.druid.note.routerIngressTarget': 'El componente router sirve la consola web y es el target de ingress por defecto',
-    'docsCharts.druid.note.s3ForProduction': 'Usa deep storage S3 en producción; deep storage local solo es adecuado para desarrollo',
-    'docsCharts.druid.note.historicalCache': 'Los nodos historical cachean segmentos en disco — dimensiona el PVC según volumen de datos',
+    'docsCharts.druid.note.memoryIntensive':
+      'Druid consume mucha memoria — los 6 componentes juntos requieren mínimo 2GB+ de RAM',
+    'docsCharts.druid.note.tuneJvm':
+      'Ajusta el heap JVM por componente vía `javaOpts` para dimensionamiento de producción',
+    'docsCharts.druid.note.routerIngressTarget':
+      'El componente router sirve la consola web y es el target de ingress por defecto',
+    'docsCharts.druid.note.s3ForProduction':
+      'Usa deep storage S3 en producción; deep storage local solo es adecuado para desarrollo',
+    'docsCharts.druid.note.historicalCache':
+      'Los nodos historical cachean segmentos en disco — dimensiona el PVC según volumen de datos',
     'docsCharts.auto.adguard_home.b0': 'Network-wide ad blocking — DNS-level filtering para all devices',
     'docsCharts.auto.adguard_home.b1': 'Two deployment modes — wizard (puerto 3000) or pre-configured (puerto 80)',
     'docsCharts.auto.adguard_home.b2': 'DNS sobre HTTPS / TLS — resolvedores DNS upstream cifrados',
@@ -2115,7 +2503,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.answer.t0': 'Nombre del sitio',
     'docsCharts.auto.answer.t1': 'Full externo URL (auto-detected desde ingress)',
     'docsCharts.auto.answer.t2': 'Habilitar unattended setup',
-    'docsCharts.auto.archivebox.b0': 'Archivado multiformato — HTML, PDF, captura de pantalla, WARC, extracción de medios, clonación git',
+    'docsCharts.auto.archivebox.b0':
+      'Archivado multiformato — HTML, PDF, captura de pantalla, WARC, extracción de medios, clonación git',
     'docsCharts.auto.archivebox.b1': 'Chromium headless — full browser rendering con /dev/shm memory-backed tmpfs',
     'docsCharts.auto.archivebox.b2': 'Persistente almacenamiento — PVC para archived content y base de datos',
     'docsCharts.auto.archivebox.b3': 'Admin credentials — managed via Kubernetes Secret con auto-generation',
@@ -2156,16 +2545,22 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.castopod.b5': 'Persistence — persistente almacenamiento para uploads, cache, y session data',
     'docsCharts.auto.castopod.t0': 'Público base URL (requerido)',
     'docsCharts.auto.castopod.t1': 'Habilitar bundled MariaDB subchart',
-    'docsCharts.auto.changedetection.b0': 'Website Monitoring — detect changes en any web page con configurable check intervals',
-    'docsCharts.auto.changedetection.b1': 'CSS/XPath Selectors — target specific page elements para precise change detection',
-    'docsCharts.auto.changedetection.b2': 'Browser Sidecar — optional Playwright/Chromium sidecar para JavaScript-rendered pages',
-    'docsCharts.auto.changedetection.b3': 'Notifications — email, webhook, Slack, Telegram, y many more notification channels',
+    'docsCharts.auto.changedetection.b0':
+      'Website Monitoring — detect changes en any web page con configurable check intervals',
+    'docsCharts.auto.changedetection.b1':
+      'CSS/XPath Selectors — target specific page elements para precise change detection',
+    'docsCharts.auto.changedetection.b2':
+      'Browser Sidecar — optional Playwright/Chromium sidecar para JavaScript-rendered pages',
+    'docsCharts.auto.changedetection.b3':
+      'Notifications — email, webhook, Slack, Telegram, y many more notification channels',
     'docsCharts.auto.changedetection.b4': 'REST API — programmatic access a watches y change history',
-    'docsCharts.auto.changedetection.b5': 'Persistence — SQLite base de datos y page snapshots stored en persistente volume',
+    'docsCharts.auto.changedetection.b5':
+      'Persistence — SQLite base de datos y page snapshots stored en persistente volume',
     'docsCharts.auto.changedetection.t0': 'Número de concurrent fetch workers',
     'docsCharts.auto.changedetection.t1': 'Habilitar Playwright browser sidecar',
     'docsCharts.auto.chiefonboarding.b0': 'Task Sequences — define onboarding workflows con ordered tasks y triggers',
-    'docsCharts.auto.chiefonboarding.b1': 'Auto-Generated Secret — Django secret key generado automatically if not provided',
+    'docsCharts.auto.chiefonboarding.b1':
+      'Auto-Generated Secret — Django secret key generado automatically if not provided',
     'docsCharts.auto.chiefonboarding.b2': 'Integrations — connect con Slack, Google Workspace, y other services',
     'docsCharts.auto.chiefonboarding.b3': 'Web Interface — admin dashboard para managing onboarding processes',
     'docsCharts.auto.chiefonboarding.t0': 'Clave secreta de Django (auto-generated if empty)',
@@ -2195,8 +2590,10 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cloudflared.b4': 'ServiceMonitor — optional Prometheus Operator integración',
     'docsCharts.auto.cloudflared.b5': 'Existente secrets — bring your own Secret para el tunnel token',
     'docsCharts.auto.cloudflared.b6': 'No usar HPA — el escalado hacia abajo termina conexiones de túnel activas',
-    'docsCharts.auto.cloudflared.b7': 'Sin plantilla de ingress — cloudflared reemplaza los controladores ingress tradicionales',
-    'docsCharts.auto.cloudflared.b8': 'Routing is dashboard-managed — use el Cloudflare dashboard a map hostnames a services',
+    'docsCharts.auto.cloudflared.b7':
+      'Sin plantilla de ingress — cloudflared reemplaza los controladores ingress tradicionales',
+    'docsCharts.auto.cloudflared.b8':
+      'Routing is dashboard-managed — use el Cloudflare dashboard a map hostnames a services',
     'docsCharts.auto.cloudflared.t0': 'Tunnel token desde Cloudflare dashboard',
     'docsCharts.auto.cloudflared.t1': 'Existente secret con tunnel token',
     'docsCharts.auto.cloudflared.t2': 'Deshabilitar auto-update',
@@ -2210,15 +2607,18 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cronicle.b2': 'Job Almacenamiento — persistente almacenamiento para job data, history, y state',
     'docsCharts.auto.cronicle.b3': 'Email Notifications — configurable SMTP para job success/failure alerts',
     'docsCharts.auto.cronicle.b4': 'Session Encryption — auto-generated secret key para secure sessions',
-    'docsCharts.auto.cronicle.b5': 'Control de concurrencia — máximo configurable de trabajos concurrentes por servidor',
+    'docsCharts.auto.cronicle.b5':
+      'Control de concurrencia — máximo configurable de trabajos concurrentes por servidor',
     'docsCharts.auto.cronicle.t0': 'Máximo de trabajos concurrentes (0 = unlimited)',
     'docsCharts.auto.cronicle.t1': 'Email sender address para notifications',
     'docsCharts.auto.cronicle.t2': 'Nombre de host del servidor SMTP',
     'docsCharts.auto.cronicle.t3': 'Autogenerar clave de cifrado de sesión',
     'docsCharts.auto.cronicle.t4': 'Habilitar persistente job almacenamiento',
-    'docsCharts.auto.ddns_updater.b0': '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, y more',
+    'docsCharts.auto.ddns_updater.b0':
+      '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, y more',
     'docsCharts.auto.ddns_updater.b1': 'Web UI — responsive dashboard para monitoring update status',
-    'docsCharts.auto.ddns_updater.b2': 'Multi-provider — manage records across diferente providers en a único despliegue',
+    'docsCharts.auto.ddns_updater.b2':
+      'Multi-provider — manage records across diferente providers en a único despliegue',
     'docsCharts.auto.ddns_updater.b3': 'Persistente history — update history stored in a PVC',
     'docsCharts.auto.ddns_updater.b4': 'Existente secrets — bring your own Secret para credentials',
     'docsCharts.auto.ddns_updater.b5': 'Ingress support — expose el web UI con TLS',
@@ -2233,17 +2633,21 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.discount_bandit.b1': 'SQLite Persistence — lightweight base de datos con no externo dependencies',
     'docsCharts.auto.discount_bandit.b2': 'Auto-Generated App Key — Laravel application key generado automatically',
     'docsCharts.auto.discount_bandit.b3': 'Price History — track price changes over time con historical data',
-    'docsCharts.auto.discount_bandit.b4': 'Alertas de ofertas — recibe notificaciones cuando los precios bajen de tu objetivo',
+    'docsCharts.auto.discount_bandit.b4':
+      'Alertas de ofertas — recibe notificaciones cuando los precios bajen de tu objetivo',
     'docsCharts.auto.discount_bandit.b5': 'Interfaz web — manage tracked products through a clean panel',
     'docsCharts.auto.discount_bandit.t0': 'Public URL de el instance',
     'docsCharts.auto.discount_bandit.t1': 'Habilitar SQLite persistence',
     'docsCharts.auto.docmost.b0': 'Official Docmost image based en `docmost/docmost`',
     'docsCharts.auto.docmost.b1': 'Bundled PostgreSQL predeterminado install includes el HelmForge PostgreSQL chart',
     'docsCharts.auto.docmost.b2': 'Bundled Redis predeterminado install includes el HelmForge Redis chart',
-    'docsCharts.auto.docmost.b3': 'Externo services support managed PostgreSQL y Redis can be used instead de subcharts',
-    'docsCharts.auto.docmost.b4': 'Local or S3 almacenamiento choose persistente local almacenamiento or S3-compatible object almacenamiento para uploads',
+    'docsCharts.auto.docmost.b3':
+      'Externo services support managed PostgreSQL y Redis can be used instead de subcharts',
+    'docsCharts.auto.docmost.b4':
+      'Local or S3 almacenamiento choose persistente local almacenamiento or S3-compatible object almacenamiento para uploads',
     'docsCharts.auto.docmost.b5': 'Ingress support configurable ingress con stable externo URL handling',
-    'docsCharts.auto.docmost.b6': 'Bootstrap-ready base de datos PostgreSQL init scripts grant Docmost el required extension privileges en first startup',
+    'docsCharts.auto.docmost.b6':
+      'Bootstrap-ready base de datos PostgreSQL init scripts grant Docmost el required extension privileges en first startup',
     'docsCharts.auto.docmost.t0': 'Número de Docmost application pods',
     'docsCharts.auto.docmost.t1': 'Externo URL used by Docmost',
     'docsCharts.auto.docmost.t2': 'Base de datos modo: `auto`, `externo`, or `postgresql`',
@@ -2256,7 +2660,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.dolibarr.b2': 'Externo MySQL/MariaDB connect a a managed base de datos',
     'docsCharts.auto.dolibarr.b3': 'Instalación automática desatendida mediante variables de entorno `DOLI_*`',
     'docsCharts.auto.dolibarr.b4': 'Persistente almacenamiento separate PVCs para documents y custom modules',
-    'docsCharts.auto.dolibarr.b5': 'Secret preservation admin, runtime, y base de datos secrets preserved across upgrades',
+    'docsCharts.auto.dolibarr.b5':
+      'Secret preservation admin, runtime, y base de datos secrets preserved across upgrades',
     'docsCharts.auto.dolibarr.t0': 'Full externo URL (auto-detected desde ingress if empty)',
     'docsCharts.auto.dolibarr.t1': 'Company name para unattended setup',
     'docsCharts.auto.dolibarr.t10': 'Persistir `/var/www/html/custom`',
@@ -2269,39 +2674,66 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.dolibarr.t7': 'Base de datos modo: `auto`, `externo`, `mysql`',
     'docsCharts.auto.dolibarr.t8': 'Persistir `/var/www/documents`',
     'docsCharts.auto.dolibarr.t9': 'Documents <span data-i18n="docsCharts.common.pvcSize">PVC tamaño</span>',
-    'docsCharts.auto.fastmcp_server.b0': 'Multi-source loading — tools, resources, prompts, y knowledge desde inline ConfigMaps, S3-compatible almacenamiento (AWS S3, MinIO, R2), or Git repositories',
-    'docsCharts.auto.fastmcp_server.b1': 'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching el bucket',
-    'docsCharts.auto.fastmcp_server.b10': 'Built-in Web UI — dashboard at `/ui` con tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
-    'docsCharts.auto.fastmcp_server.b11': 'Prometheus métricas — tool call counts, durations, errors, source sync status at `/métricas`',
-    'docsCharts.auto.fastmcp_server.b12': 'Structured JSON logging — `LOG_FORMAT=json` para Loki, ELK, CloudWatch, Datadog',
-    'docsCharts.auto.fastmcp_server.b13': 'Dedicated salud endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
+    'docsCharts.auto.fastmcp_server.b0':
+      'Multi-source loading — tools, resources, prompts, y knowledge desde inline ConfigMaps, S3-compatible almacenamiento (AWS S3, MinIO, R2), or Git repositories',
+    'docsCharts.auto.fastmcp_server.b1':
+      'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching el bucket',
+    'docsCharts.auto.fastmcp_server.b10':
+      'Built-in Web UI — dashboard at `/ui` con tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
+    'docsCharts.auto.fastmcp_server.b11':
+      'Prometheus métricas — tool call counts, durations, errors, source sync status at `/métricas`',
+    'docsCharts.auto.fastmcp_server.b12':
+      'Structured JSON logging — `LOG_FORMAT=json` para Loki, ELK, CloudWatch, Datadog',
+    'docsCharts.auto.fastmcp_server.b13':
+      'Dedicated salud endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
     'docsCharts.auto.fastmcp_server.b14': 'Diagnostic endpoint — `GET /debug/info` con full server introspection',
-    'docsCharts.auto.fastmcp_server.b15': 'Patrón de contenedor init — presincroniza fuentes antes de iniciar el servidor con `initSync.enabled`',
-    'docsCharts.auto.fastmcp_server.b16': 'Strict loading — `MCP_STRICT_LOADING=true` fails en boot if any tool/resource has errors',
-    'docsCharts.auto.fastmcp_server.b17': 'Hot reload — automatic tool/resource reload en filesystem changes via `MCP_HOT_RELOAD=true`',
+    'docsCharts.auto.fastmcp_server.b15':
+      'Patrón de contenedor init — presincroniza fuentes antes de iniciar el servidor con `initSync.enabled`',
+    'docsCharts.auto.fastmcp_server.b16':
+      'Strict loading — `MCP_STRICT_LOADING=true` fails en boot if any tool/resource has errors',
+    'docsCharts.auto.fastmcp_server.b17':
+      'Hot reload — automatic tool/resource reload en filesystem changes via `MCP_HOT_RELOAD=true`',
     'docsCharts.auto.fastmcp_server.b18': 'Periodic sync — poll S3/Git sources para changes at configurable intervals',
     'docsCharts.auto.fastmcp_server.b19': 'Webhook reload — `POST /reload` endpoint para CI/CD-triggered reloads',
-    'docsCharts.auto.fastmcp_server.b2': 'Bearer y JWT authentication — built-in via FastMCPs `StaticTokenVerifier` y `JWTVerifier`',
+    'docsCharts.auto.fastmcp_server.b2':
+      'Bearer y JWT authentication — built-in via FastMCPs `StaticTokenVerifier` y `JWTVerifier`',
     'docsCharts.auto.fastmcp_server.b20': 'OCI artifact source — pull tool bundles desde OCI registries via ORAS',
     'docsCharts.auto.fastmcp_server.b21': 'Selective sync — include/exclude glob patterns para source filtering',
-    'docsCharts.auto.fastmcp_server.b22': 'Gateway modo — compose multiple MCP servers via `MCP_MODE=gateway` y `MCP_MOUNT_SERVERS`',
-    'docsCharts.auto.fastmcp_server.b23': 'Tag visibility — enable/disable tools by tags con `MCP_ENABLE_TAGS` y `MCP_DISABLE_TAGS`',
-    'docsCharts.auto.fastmcp_server.b24': 'Autenticación múltiple — combina proveedores bearer + JWT mediante `MCP_AUTH_PROVIDERS`',
-    'docsCharts.auto.fastmcp_server.b25': 'Tool-level scopes — `__required_scopes__` module variable para authorization',
-    'docsCharts.auto.fastmcp_server.b26': 'Context integration — tools can use `ctx: Context` para progress, logging, sampling, elicitation, y session state',
-    'docsCharts.auto.fastmcp_server.b27': 'Límite de tasa — variable de módulo `__rate_limit__` o variable de entorno `MCP_RATE_LIMIT_DEFAULT` (ventana deslizante)',
-    'docsCharts.auto.fastmcp_server.b28': 'Caching — `__cache_ttl__` module variable para idempotent tool result caching',
-    'docsCharts.auto.fastmcp_server.b29': 'Tool sandboxing — `__max_memory_mb__` y `__max_output_size_kb__` resource limits per tool',
-    'docsCharts.auto.fastmcp_server.b3': 'Knowledge base support — serve Markdown files as MCP resources para RAG y context injection',
+    'docsCharts.auto.fastmcp_server.b22':
+      'Gateway modo — compose multiple MCP servers via `MCP_MODE=gateway` y `MCP_MOUNT_SERVERS`',
+    'docsCharts.auto.fastmcp_server.b23':
+      'Tag visibility — enable/disable tools by tags con `MCP_ENABLE_TAGS` y `MCP_DISABLE_TAGS`',
+    'docsCharts.auto.fastmcp_server.b24':
+      'Autenticación múltiple — combina proveedores bearer + JWT mediante `MCP_AUTH_PROVIDERS`',
+    'docsCharts.auto.fastmcp_server.b25':
+      'Tool-level scopes — `__required_scopes__` module variable para authorization',
+    'docsCharts.auto.fastmcp_server.b26':
+      'Context integration — tools can use `ctx: Context` para progress, logging, sampling, elicitation, y session state',
+    'docsCharts.auto.fastmcp_server.b27':
+      'Límite de tasa — variable de módulo `__rate_limit__` o variable de entorno `MCP_RATE_LIMIT_DEFAULT` (ventana deslizante)',
+    'docsCharts.auto.fastmcp_server.b28':
+      'Caching — `__cache_ttl__` module variable para idempotent tool result caching',
+    'docsCharts.auto.fastmcp_server.b29':
+      'Tool sandboxing — `__max_memory_mb__` y `__max_output_size_kb__` resource limits per tool',
+    'docsCharts.auto.fastmcp_server.b3':
+      'Knowledge base support — serve Markdown files as MCP resources para RAG y context injection',
     'docsCharts.auto.fastmcp_server.b30': 'PodDisruptionBudget — `pdb.enabled` para zero-downtime rolling updates',
-    'docsCharts.auto.fastmcp_server.b31': 'HorizontalPodAutoscaler — `autoscaling.enabled` para auto-scaling based en CPU/memory',
-    'docsCharts.auto.fastmcp_server.b32': 'Seguridad — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
-    'docsCharts.auto.fastmcp_server.b4': 'Paquetes pip extra — instala paquetes Python adicionales al iniciar antes de cargar herramientas',
-    'docsCharts.auto.fastmcp_server.b5': 'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables para tool categorization y behavior hints',
-    'docsCharts.auto.fastmcp_server.b6': 'Resource templates — parameterized URIs like `users://{user_id}/profile` para dynamic resources',
-    'docsCharts.auto.fastmcp_server.b7': 'Multiple resources per file — `RESOURCES` dict maps multiple URIs a handler functions',
-    'docsCharts.auto.fastmcp_server.b8': 'Error masking — hide internal error details desde clients via `MCP_MASK_ERROR_DETAILS`',
-    'docsCharts.auto.fastmcp_server.b9': 'Manejo de duplicados — controla el comportamiento cuando las herramientas comparten nombres mediante `MCP_ON_DUPLICATE_TOOLS`',
+    'docsCharts.auto.fastmcp_server.b31':
+      'HorizontalPodAutoscaler — `autoscaling.enabled` para auto-scaling based en CPU/memory',
+    'docsCharts.auto.fastmcp_server.b32':
+      'Seguridad — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
+    'docsCharts.auto.fastmcp_server.b4':
+      'Paquetes pip extra — instala paquetes Python adicionales al iniciar antes de cargar herramientas',
+    'docsCharts.auto.fastmcp_server.b5':
+      'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables para tool categorization y behavior hints',
+    'docsCharts.auto.fastmcp_server.b6':
+      'Resource templates — parameterized URIs like `users://{user_id}/profile` para dynamic resources',
+    'docsCharts.auto.fastmcp_server.b7':
+      'Multiple resources per file — `RESOURCES` dict maps multiple URIs a handler functions',
+    'docsCharts.auto.fastmcp_server.b8':
+      'Error masking — hide internal error details desde clients via `MCP_MASK_ERROR_DETAILS`',
+    'docsCharts.auto.fastmcp_server.b9':
+      'Manejo de duplicados — controla el comportamiento cuando las herramientas comparten nombres mediante `MCP_ON_DUPLICATE_TOOLS`',
     'docsCharts.auto.fastmcp_server.t0': 'Container imagen',
     'docsCharts.auto.fastmcp_server.t1': 'Imagen tag',
     'docsCharts.auto.fastmcp_server.t10': 'Archivos inline de herramientas Python',
@@ -2323,7 +2755,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.fastmcp_server.t8': 'Autenticación: `none`, `bearer`, `jwt`',
     'docsCharts.auto.fastmcp_server.t9': 'Habilitar result caching',
     'docsCharts.auto.generic.b0': 'Multiple workload types — Despliegue, StatefulSet, DaemonSet, Job, CronJob',
-    'docsCharts.auto.generic.b1': 'Flexible container configuración — Puertos, environment variables, volúmenes, probes',
+    'docsCharts.auto.generic.b1':
+      'Flexible container configuración — Puertos, environment variables, volúmenes, probes',
     'docsCharts.auto.generic.b2': 'Ingress support — Configurable con `ingressClassName` y TLS',
     'docsCharts.auto.generic.b3': 'Servicio accounts — Create or reference existente servicio accounts',
     'docsCharts.auto.generic.b4': 'Init containers y sidecars — Full support para multi-container pods',
@@ -2367,7 +2800,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.heimdall.t1': 'Group ID para file permissions',
     'docsCharts.auto.heimdall.t2': 'Cron programación',
     'docsCharts.auto.homarr.b0': 'Official Homarr image desde `ghcr.io/homarr-labs/homarr`',
-    'docsCharts.auto.homarr.b1': 'Encryption key management auto-generated or existente secret para `SECRET_ENCRYPTION_KEY`',
+    'docsCharts.auto.homarr.b1':
+      'Encryption key management auto-generated or existente secret para `SECRET_ENCRYPTION_KEY`',
     'docsCharts.auto.homarr.b2': 'Kubernetes integración optional workload discovery via `ENABLE_KUBERNETES`',
     'docsCharts.auto.homarr.b3': 'Externo Redis optional externo Redis para multi-instance setups',
     'docsCharts.auto.homarr.t0': 'Proveedores de autenticación (credentials, ldap, oidc)',
@@ -2385,7 +2819,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.karakeep.b1': 'Chromium Sidecar — optional headless browser para web page screenshots y archiving',
     'docsCharts.auto.karakeep.b2': 'AI Tagging — automatic bookmark categorization y tagging',
     'docsCharts.auto.karakeep.b3': 'Full-Text Search — search across bookmarks, tags, y archived content',
-    'docsCharts.auto.karakeep.b4': 'Persistence — persistente almacenamiento para SQLite base de datos y uploaded files',
+    'docsCharts.auto.karakeep.b4':
+      'Persistence — persistente almacenamiento para SQLite base de datos y uploaded files',
     'docsCharts.auto.karakeep.b5': 'Lightweight — single-pod deployment con optional sidecars',
     'docsCharts.auto.karakeep.t0': 'Public URL de el Karakeep instance',
     'docsCharts.auto.karakeep.t1': 'Habilitar Meilisearch sidecar para full-text search',
@@ -2393,7 +2828,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.komga.b0': 'SQLite Base de datos — zero base de datos configuration, persistente via PVC',
     'docsCharts.auto.komga.b1': 'Dual Persistente Volumes — separate PVCs para config y library data',
     'docsCharts.auto.komga.b2': 'Java Memoria Tuning — configurable JVM heap via `JAVA_TOOL_OPTIONS`',
-    'docsCharts.auto.komga.b3': '<span data-i18n="docsCharts.common.timezone">Timezone</span> Soporte — configurable via `TZ` environment variable',
+    'docsCharts.auto.komga.b3':
+      '<span data-i18n="docsCharts.common.timezone">Timezone</span> Soporte — configurable via `TZ` environment variable',
     'docsCharts.auto.komga.b4': 'Scheduled Backups — config/base de datos tar archive con S3 upload',
     'docsCharts.auto.komga.t0': 'Container puerto',
     'docsCharts.auto.komga.t1': 'Base URL path para reverse proxy',
@@ -2408,7 +2844,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.liwan.b2': 'Persistente almacenamiento — PVC-backed data directory',
     'docsCharts.auto.metabase.b0': 'Interactive dashboards — drag-y-drop visualization builder',
     'docsCharts.auto.metabase.b1': 'JVM tuning — configurable Java memoria settings',
-    'docsCharts.auto.middleware.b0': 'All four DORA métricas — Despliegue Frequency, Lead Time para Changes, MTTR, Change Failure Rate',
+    'docsCharts.auto.middleware.b0':
+      'All four DORA métricas — Despliegue Frequency, Lead Time para Changes, MTTR, Change Failure Rate',
     'docsCharts.auto.middleware.b1': 'All-in-one container — frontend, analytics, y sync server in a single image',
     'docsCharts.auto.middleware.b2': 'PostgreSQL + Redis — bundled subcharts or externo connections',
     'docsCharts.auto.middleware.b3': 'CI/CD integrations — tracks métricas desde your existente pipelines',
@@ -2440,12 +2877,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.minecraft.t8': 'Habilitar GeyserMC cross-play',
     'docsCharts.auto.minecraft.t9': 'Habilitar RCON remote console',
     'docsCharts.auto.mosquitto.b0': 'Official Mosquitto image based en `eclipse-mosquitto`',
-    'docsCharts.auto.mosquitto.b1': 'Standalone modo single broker deployment para el simplest y most predictable runtime',
-    'docsCharts.auto.mosquitto.b2': 'Federated modo multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
+    'docsCharts.auto.mosquitto.b1':
+      'Standalone modo single broker deployment para el simplest y most predictable runtime',
+    'docsCharts.auto.mosquitto.b2':
+      'Federated modo multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
     'docsCharts.auto.mosquitto.b3': 'WebSocket listener browser-ready MQTT access en a dedicated listener',
     'docsCharts.auto.mosquitto.b4': 'MQTTX Web companion optional web client deployment con separate scaling controls',
     'docsCharts.auto.mosquitto.b5': 'Authentication y ACL optional username/contraseña y ACL file generation',
-    'docsCharts.auto.mosquitto.b6': 'Ingress support configurable ingress para broker WebSocket access y el optional MQTTX Web UI',
+    'docsCharts.auto.mosquitto.b6':
+      'Ingress support configurable ingress para broker WebSocket access y el optional MQTTX Web UI',
     'docsCharts.auto.mosquitto.t0': 'Topología del broker: `standalone` or `federated`',
     'docsCharts.auto.mosquitto.t1': 'Número de broker replicas',
     'docsCharts.auto.mosquitto.t10': 'Desplegar MQTTX Web companion UI',
@@ -2463,10 +2903,12 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.n8n.t2': 'Habilitar Redis-backed queue modo',
     'docsCharts.auto.n8n.t3': 'Número de worker replicas',
     'docsCharts.auto.n8n.t4': 'Trabajos por worker',
-    'docsCharts.auto.ntfy.b0': 'REST API & WebSocket — publish y subscribe a topics via simple HTTP PUT/POST or WebSocket',
+    'docsCharts.auto.ntfy.b0':
+      'REST API & WebSocket — publish y subscribe a topics via simple HTTP PUT/POST or WebSocket',
     'docsCharts.auto.ntfy.b1': 'Firebase & UnifiedPush — supports Android push delivery through FCM y UnifiedPush',
     'docsCharts.auto.ntfy.b2': 'Prometheus Métricas — optional `/métricas` endpoint con ServiceMonitor support',
-    'docsCharts.auto.ntfy.b3': 'Behind-Proxy Modo — trusts `X-Forwarded-For` headers para correct client identification',
+    'docsCharts.auto.ntfy.b3':
+      'Behind-Proxy Modo — trusts `X-Forwarded-For` headers para correct client identification',
     'docsCharts.auto.ntfy.b4': 'Attachment Support — configurable file attachment size y expiry limits',
     'docsCharts.auto.ntfy.b5': 'Persistence — persistente almacenamiento para cache y authentication databases',
     'docsCharts.auto.ntfy.t0': 'Confiar en encabezados X-Forwarded-For',
@@ -2524,7 +2966,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.wordpress.t2': 'Base de datos name',
     'docsCharts.auto.wordpress.t3': 'Configuraciones PHP personalizadas',
     'docsCharts.n8n.intro.before': 'Despliega n8n en Kubernetes usando la imagen oficial',
-    'docsCharts.n8n.intro.after': 'Docker. Soporta SQLite (por defecto), PostgreSQL, MySQL, modo cola con Redis y workers dedicados, y backups programados.',
+    'docsCharts.n8n.intro.after':
+      'Docker. Soporta SQLite (por defecto), PostgreSQL, MySQL, modo cola con Redis y workers dedicados, y backups programados.',
     'docsCharts.n8n.feature.sqlite': 'SQLite por defecto — no requiere configuración de base',
     'docsCharts.n8n.feature.postgresSubchart': 'Subchart PostgreSQL — incluido como dependencia de HelmForge',
     'docsCharts.n8n.feature.mysqlSubchart': 'Subchart MySQL — incluido como dependencia de HelmForge',
@@ -2533,25 +2976,37 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.n8n.feature.encryptionKey': 'Clave de cifrado — autogenerada y preservada en upgrades',
     'docsCharts.n8n.feature.backups': 'Backups programados — CronJob según base de datos con subida a S3',
     'docsCharts.n8n.feature.ingress': 'Soporte de ingress — TLS con cert-manager',
-    'docsCharts.mongodb.intro': 'Despliegue de MongoDB listo para producción con soporte para configuraciones standalone y replica set.',
-    'docsCharts.mongodb.feature.standaloneReplicaset': 'Standalone y replica set — instancia única o replica set de múltiples miembros',
-    'docsCharts.mongodb.feature.automaticInit': 'Inicialización automática — scripts de init y configuración personalizada',
+    'docsCharts.mongodb.intro':
+      'Despliegue de MongoDB listo para producción con soporte para configuraciones standalone y replica set.',
+    'docsCharts.mongodb.feature.standaloneReplicaset':
+      'Standalone y replica set — instancia única o replica set de múltiples miembros',
+    'docsCharts.mongodb.feature.automaticInit':
+      'Inicialización automática — scripts de init y configuración personalizada',
     'docsCharts.mongodb.feature.metrics': 'Métricas — exporter de Prometheus con ServiceMonitor',
     'docsCharts.mongodb.feature.security': 'Seguridad — autenticación, contenedores non-root y network policies',
-    'docsCharts.mongodb.feature.storage': 'Almacenamiento persistente — PVCs configurables con selección de storage class',
+    'docsCharts.mongodb.feature.storage':
+      'Almacenamiento persistente — PVCs configurables con selección de storage class',
     'docsCharts.mongodb.feature.arbiter': 'Soporte de arbiter — arbiter opcional para elecciones del replica set',
-    'docsCharts.mongodb.arbiterCallout': 'Un arbiter participa en elecciones pero no almacena datos. Úsalo cuando tengas un número par de miembros con datos para asegurar mayoría. Con 3 miembros de datos no hace falta arbiter.',
+    'docsCharts.mongodb.arbiterCallout':
+      'Un arbiter participa en elecciones pero no almacena datos. Úsalo cuando tengas un número par de miembros con datos para asegurar mayoría. Con 3 miembros de datos no hace falta arbiter.',
     'docsCharts.mongodb.table.authDatabase': 'Base de datos predeterminada a crear',
     'docsCharts.mongodb.table.authUsername': 'Usuario predeterminado a crear',
     'docsCharts.mongodb.table.authPassword': 'Contraseña del usuario predeterminado',
-    'docsCharts.mongodb.upgrade.callout': 'Cambiar `replicaCount` dispara reconfiguración del replica set. MongoDB lo maneja bien, pero al reducir escala se eliminan miembros; asegúrate de que no haya datos exclusivos en miembros removidos.',
-    'docsCharts.mongodb.upgrade.note1': 'Actualizar de standalone a replicaset requiere reinicialización (dump y restore)',
-    'docsCharts.mongodb.upgrade.note2': 'Credenciales auth se definen en la primera inicialización y no pueden cambiarse por values en upgrades',
-    'docsCharts.mongodb.upgrade.note3': 'El caché WiredTiger usa 50% de memoria disponible por defecto — ajusta `resources.limits.memory`',
-    'docsCharts.mongodb.issue.recovering': 'Suele significar que el sync inicial sigue en progreso para datasets grandes. Revisa avance con `rs.status()` en la shell mongo. Si persiste, revisa IOPS de disco y ancho de banda.',
-    'docsCharts.mongodb.issue.connectionString.before': 'Usa la cadena completa de replica set con todos los miembros o el DNS del servicio headless:',
+    'docsCharts.mongodb.upgrade.callout':
+      'Cambiar `replicaCount` dispara reconfiguración del replica set. MongoDB lo maneja bien, pero al reducir escala se eliminan miembros; asegúrate de que no haya datos exclusivos en miembros removidos.',
+    'docsCharts.mongodb.upgrade.note1':
+      'Actualizar de standalone a replicaset requiere reinicialización (dump y restore)',
+    'docsCharts.mongodb.upgrade.note2':
+      'Credenciales auth se definen en la primera inicialización y no pueden cambiarse por values en upgrades',
+    'docsCharts.mongodb.upgrade.note3':
+      'El caché WiredTiger usa 50% de memoria disponible por defecto — ajusta `resources.limits.memory`',
+    'docsCharts.mongodb.issue.recovering':
+      'Suele significar que el sync inicial sigue en progreso para datasets grandes. Revisa avance con `rs.status()` en la shell mongo. Si persiste, revisa IOPS de disco y ancho de banda.',
+    'docsCharts.mongodb.issue.connectionString.before':
+      'Usa la cadena completa de replica set con todos los miembros o el DNS del servicio headless:',
     'docsCharts.wordpress.intro.before': 'Despliega WordPress en Kubernetes usando la imagen oficial',
-    'docsCharts.wordpress.intro.after': 'Docker (variante Apache). Soporta subchart MySQL o base externa, backups programados y monitoreo.',
+    'docsCharts.wordpress.intro.after':
+      'Docker (variante Apache). Soporta subchart MySQL o base externa, backups programados y monitoreo.',
     'docsCharts.wordpress.feature.officialImage': 'Imagen oficial de WordPress — variante Apache con PHP',
     'docsCharts.wordpress.feature.mysqlSubchart': 'Subchart MySQL — MySQL incluido vía dependencia HelmForge',
     'docsCharts.wordpress.feature.externalDb': 'Base de datos externa — conexión a MySQL/MariaDB existente',
@@ -2559,37 +3014,46 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.wordpress.feature.ingress': 'Soporte de ingress — TLS con cert-manager',
     'docsCharts.wordpress.feature.phpConfig': 'Configuración PHP — php.ini personalizado vía ConfigMap',
     'docsCharts.wordpress.feature.metrics': 'Métricas Prometheus — sidecar de exporter Apache',
-    'docsCharts.vaultwarden.intro': 'Gestor de contraseñas self-hosted compatible con Bitwarden. Vaultwarden es una implementación ligera en Rust de la API del servidor Bitwarden, compatible con clientes oficiales.',
+    'docsCharts.vaultwarden.intro':
+      'Gestor de contraseñas self-hosted compatible con Bitwarden. Vaultwarden es una implementación ligera en Rust de la API del servidor Bitwarden, compatible con clientes oficiales.',
     'docsCharts.vaultwarden.feature.compatible': 'Compatible con Bitwarden — funciona con apps y extensiones oficiales',
     'docsCharts.vaultwarden.feature.lightweight': 'Ligero — menor consumo que el servidor oficial de Bitwarden',
     'docsCharts.vaultwarden.feature.database': 'Backends de base de datos — SQLite, PostgreSQL o MySQL',
     'docsCharts.vaultwarden.feature.admin': 'Panel admin — interfaz web opcional de administración',
     'docsCharts.vaultwarden.feature.ingress': 'Soporte de ingress — configurable con `ingressClassName` y TLS',
-    'docsCharts.vaultwarden.feature.security': 'Hardening de seguridad — network policies, contenedores non-root y seguridad de pod',
+    'docsCharts.vaultwarden.feature.security':
+      'Hardening de seguridad — network policies, contenedores non-root y seguridad de pod',
     'docsCharts.vaultwarden.feature.storage': 'Almacenamiento persistente — persistencia de datos y adjuntos',
     'docsPage.index.title': 'Documentación',
-    'docsPage.index.intro': 'Bienvenido a la documentación de HelmForge. Aquí encontrarás todo lo necesario para instalar, configurar y operar nuestros charts en clusters de Kubernetes en producción.',
+    'docsPage.index.intro':
+      'Bienvenido a la documentación de HelmForge. Aquí encontrarás todo lo necesario para instalar, configurar y operar nuestros charts en clusters de Kubernetes en producción.',
     'docsPage.index.quickLinks': 'Enlaces rápidos',
     'docsPage.index.gettingStarted': 'Primeros pasos',
     'docsPage.index.gettingStartedDesc': 'Agrega el repositorio e instala tu primer chart',
     'docsPage.index.chartsOverview': 'Resumen de Charts',
     'docsPage.index.chartsOverviewDesc': 'Explora todos los charts disponibles',
     'docsPage.index.whatIs': '¿Qué es HelmForge?',
-    'docsPage.index.whatIsDesc': 'HelmForge es una colección de charts Helm open-source diseñados para producción. Cada chart se construye con los mismos principios:',
+    'docsPage.index.whatIsDesc':
+      'HelmForge es una colección de charts Helm open-source diseñados para producción. Cada chart se construye con los mismos principios:',
     'docsPage.index.security': 'Seguridad',
-    'docsPage.index.securityDesc': 'Contenedores no-root, network policies, estándares de seguridad de pods y soporte TLS',
+    'docsPage.index.securityDesc':
+      'Contenedores no-root, network policies, estándares de seguridad de pods y soporte TLS',
     'docsPage.index.observability': 'Observabilidad',
-    'docsPage.index.observabilityDesc': 'Endpoints de métricas Prometheus, recursos ServiceMonitor y configuraciones de alertas',
+    'docsPage.index.observabilityDesc':
+      'Endpoints de métricas Prometheus, recursos ServiceMonitor y configuraciones de alertas',
     'docsPage.index.simplicity': 'Simplicidad',
-    'docsPage.index.simplicityDesc': 'Archivos `values.yaml` orientados al producto, enfocados en configuración de la aplicación y no en internals de Kubernetes',
+    'docsPage.index.simplicityDesc':
+      'Archivos `values.yaml` orientados al producto, enfocados en configuración de la aplicación y no en internals de Kubernetes',
     'docsPage.index.testing': 'Pruebas',
-    'docsPage.index.testingDesc': 'Pruebas unitarias completas, linting estricto y validación de conformidad en cada cambio',
+    'docsPage.index.testingDesc':
+      'Pruebas unitarias completas, linting estricto y validación de conformidad en cada cambio',
     'docsPage.index.distribution': 'Distribución',
     'docsPage.index.method': 'Método',
     'docsPage.index.https': 'Repositorio HTTPS',
     'docsPage.index.oci': 'Registro OCI',
     'docsPage.gettingStarted.title': 'Primeros pasos',
-    'docsPage.gettingStarted.intro': 'Esta guía te muestra cómo agregar el repositorio HelmForge e instalar tu primer chart.',
+    'docsPage.gettingStarted.intro':
+      'Esta guía te muestra cómo agregar el repositorio HelmForge e instalar tu primer chart.',
     'docsPage.gettingStarted.prerequisites': 'Prerequisitos',
     'docsPage.gettingStarted.before': 'Antes de comenzar, asegúrate de tener:',
     'docsPage.gettingStarted.helmInstalled': 'instalado',
@@ -2601,15 +3065,18 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.gettingStarted.https': 'Repositorio HTTPS',
     'docsPage.gettingStarted.verify': 'Verifica que el repositorio se agregó:',
     'docsPage.gettingStarted.oci': 'Registro OCI',
-    'docsPage.gettingStarted.ociNoSetup': 'No se necesita configuración de repositorio para OCI. Puedes instalar charts directamente:',
-    'docsPage.gettingStarted.swap': 'Puedes cambiar `redis` por `komga`, `mosquitto`, `vaultwarden` o cualquier otro chart publicado en el repositorio.',
+    'docsPage.gettingStarted.ociNoSetup':
+      'No se necesita configuración de repositorio para OCI. Puedes instalar charts directamente:',
+    'docsPage.gettingStarted.swap':
+      'Puedes cambiar `redis` por `komga`, `mosquitto`, `vaultwarden` o cualquier otro chart publicado en el repositorio.',
     'docsPage.gettingStarted.installFirst': 'Instala tu primer chart',
     'docsPage.gettingStarted.redisExample': 'Instalemos Redis como ejemplo:',
     'docsPage.gettingStarted.usingHttps': 'Usando el repositorio HTTPS',
     'docsPage.gettingStarted.usingOci': 'Usando el registro OCI',
     'docsPage.gettingStarted.verifyInstall': 'Verifica la instalación',
     'docsPage.gettingStarted.customizing': 'Personalizar values',
-    'docsPage.gettingStarted.defaults': 'Cada chart incluye defaults razonables, pero puedes sobrescribir cualquier valor:',
+    'docsPage.gettingStarted.defaults':
+      'Cada chart incluye defaults razonables, pero puedes sobrescribir cualquier valor:',
     'docsPage.gettingStarted.valuesFile': 'O usa un archivo de values:',
     'docsPage.gettingStarted.nextSteps': 'Siguientes pasos',
     'docsPage.gettingStarted.next1': 'Explora',
@@ -2644,7 +3111,8 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.faq.q17': '¿Los charts están firmados?',
     'docsPage.faq.q18': '¿Bajo qué licencia se publican los charts?',
     'docsPage.troubleshooting.title': 'Resolución de problemas',
-    'docsPage.troubleshooting.intro': 'Guía basada en síntomas para diagnosticar y resolver problemas comunes en charts HelmForge.',
+    'docsPage.troubleshooting.intro':
+      'Guía basada en síntomas para diagnosticar y resolver problemas comunes en charts HelmForge.',
     'docsPage.troubleshooting.crashloop': 'El pod queda en CrashLoopBackOff',
     'docsPage.troubleshooting.pvc': 'PVC atascado en Pending',
     'docsPage.troubleshooting.db': 'Conexión a base de datos rechazada',
@@ -2658,15 +3126,20 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.troubleshooting.commonCauses': 'Causas comunes:',
     'docsPage.troubleshooting.cause': 'Causa',
     'docsPage.troubleshooting.fix': 'Solución',
-    'docsPage.troubleshooting.crashloopSymptoms': 'El pod se reinicia repetidamente y `kubectl get pods` muestra estado `CrashLoopBackOff`.',
+    'docsPage.troubleshooting.crashloopSymptoms':
+      'El pod se reinicia repetidamente y `kubectl get pods` muestra estado `CrashLoopBackOff`.',
     'docsPage.troubleshooting.pvcSymptoms': '`kubectl get pvc` muestra estado `Pending` y los pods no pueden iniciar.',
-    'docsPage.troubleshooting.dbSymptoms': 'Los pods de la aplicación registran `connection refused` o `could not connect to server` al intentar llegar a la base de datos.',
-    'docsPage.troubleshooting.ingressSymptoms': 'El recurso Ingress existe pero la aplicación devuelve errores 404 o 503.',
+    'docsPage.troubleshooting.dbSymptoms':
+      'Los pods de la aplicación registran `connection refused` o `could not connect to server` al intentar llegar a la base de datos.',
+    'docsPage.troubleshooting.ingressSymptoms':
+      'El recurso Ingress existe pero la aplicación devuelve errores 404 o 503.',
     'docsPage.troubleshooting.backupSymptoms': 'El backup está habilitado, pero no aparecen jobs de backup.',
-    'docsPage.troubleshooting.upgradeSymptoms': '`helm upgrade` falla con errores `cannot patch` o `field is immutable`.',
+    'docsPage.troubleshooting.upgradeSymptoms':
+      '`helm upgrade` falla con errores `cannot patch` o `field is immutable`.',
     'docsPage.troubleshooting.timeoutSymptoms': '`helm install --wait` expira antes de que los pods estén listos.',
     'docsPage.comparison.title': 'HelmForge vs otros charts',
-    'docsPage.comparison.intro': 'Esta página compara HelmForge con dos alternativas comunes: **Bitnami** (el ecosistema comercial de charts más grande) y **charts comunitarios genéricos** (mantenedores individuales o proyectos pequeños). No es una crítica: cada enfoque tiene su lugar. El objetivo es ayudarte a elegir la opción correcta.',
+    'docsPage.comparison.intro':
+      'Esta página compara HelmForge con dos alternativas comunes: **Bitnami** (el ecosistema comercial de charts más grande) y **charts comunitarios genéricos** (mantenedores individuales o proyectos pequeños). No es una crítica: cada enfoque tiene su lugar. El objetivo es ayudarte a elegir la opción correcta.',
     'docsPage.comparison.table': 'Tabla de comparación',
   },
   'pt-BR': {
@@ -2699,7 +3172,8 @@ export const messages: Record<Locale, Messages> = {
     'footer.helmRepo': 'Repositório Helm',
     'footer.rss': 'Feed RSS',
     'hero.subtitle': 'Helm charts open-source, forjados para durar.',
-    'hero.description': 'A alternativa open-source ao Bitnami. Imagens oficiais upstream, backups S3 nativos, padrões de segurança sensatos e operação day-two - licença MIT, grátis para sempre.',
+    'hero.description':
+      'A alternativa open-source ao Bitnami. Imagens oficiais upstream, backups S3 nativos, padrões de segurança sensatos e operação day-two - licença MIT, grátis para sempre.',
     'hero.cta.getStarted': 'Começar',
     'hero.cta.browseCharts': 'Ver Charts',
     'hero.github': 'Dar estrela no GitHub',
@@ -2714,28 +3188,36 @@ export const messages: Record<Locale, Messages> = {
     'install.chart': 'Chart:',
     'install.guide': 'Guia completo de primeiros passos',
     'features.label': 'Por que HelmForge',
-    'features.description': 'Todo chart segue a mesma direção: instalações previsíveis, values claros e comportamento orientado à produção desde o dia um.',
+    'features.description':
+      'Todo chart segue a mesma direção: instalações previsíveis, values claros e comportamento orientado à produção desde o dia um.',
     'features.card1.title': 'Validado para clusters reais',
     'features.card1.stat': 'Charts estáveis',
-    'features.card1.description': 'Lint, render de templates, testes unitários e validação em k3d antes de cada release.',
+    'features.card1.description':
+      'Lint, render de templates, testes unitários e validação em k3d antes de cada release.',
     'features.card2.title': 'Seguro por padrão',
     'features.card2.stat': 'Não-root, endurecido',
-    'features.card2.description': 'Containers não-root, filesystem somente leitura, network policies, proveniência GPG e artefatos OCI assinados com Cosign.',
+    'features.card2.description':
+      'Containers não-root, filesystem somente leitura, network policies, proveniência GPG e artefatos OCI assinados com Cosign.',
     'features.card3.title': 'Backups S3 nativos',
     'features.card3.stat': 'Charts com backup',
-    'features.card3.description': 'Backups automáticos via CronJob para qualquer storage compatível com S3. Restaure com um único comando.',
+    'features.card3.description':
+      'Backups automáticos via CronJob para qualquer storage compatível com S3. Restaure com um único comando.',
     'features.card4.title': 'Simples de operar',
     'features.card4.stat': 'values.yaml limpo',
-    'features.card4.description': 'Values legíveis, docs claras e recursos práticos como ingress, TLS e observabilidade.',
+    'features.card4.description':
+      'Values legíveis, docs claras e recursos práticos como ingress, TLS e observabilidade.',
     'features.card5.title': 'Imagens oficiais upstream',
     'features.card5.stat': 'Sem builds custom',
-    'features.card5.description': 'Todo chart usa a imagem Docker oficial do projeto upstream. Sem forks, sem wrappers.',
+    'features.card5.description':
+      'Todo chart usa a imagem Docker oficial do projeto upstream. Sem forks, sem wrappers.',
     'features.card6.title': 'Licença MIT',
     'features.card6.stat': 'Grátis para sempre',
-    'features.card6.description': 'Use em produção, modifique e redistribua. Sem tiers enterprise, sem limites de uso, sem surpresas.',
+    'features.card6.description':
+      'Use em produção, modifique e redistribua. Sem tiers enterprise, sem limites de uso, sem surpresas.',
     'catalog.label': 'Catálogo',
     'catalog.title': 'Um catálogo mais limpo para workloads comuns de Kubernetes.',
-    'catalog.description': 'Navegue por charts de aplicações com estrutura consistente, values documentados e padrões voltados para produção.',
+    'catalog.description':
+      'Navegue por charts de aplicações com estrutura consistente, values documentados e padrões voltados para produção.',
     'catalog.search.label': 'Buscar charts',
     'catalog.search.placeholder': 'Buscar charts (ex. postgres, redis, backup)...',
     'catalog.stats.charts': 'Charts',
@@ -2745,7 +3227,8 @@ export const messages: Record<Locale, Messages> = {
     'catalog.empty.description': 'Tente ajustar os termos de busca.',
     'catalog.request': 'Não encontrou seu app? Solicite um chart',
     'comparison.title': 'Comparação lado a lado: HelmForge vs o restante.',
-    'comparison.description': 'Imagens oficiais, sem lock-in de fornecedor, licença MIT. Veja exatamente onde HelmForge lidera.',
+    'comparison.description':
+      'Imagens oficiais, sem lock-in de fornecedor, licença MIT. Veja exatamente onde HelmForge lidera.',
     'comparison.caption': 'Comparação de recursos entre HelmForge, Bitnami e charts comunitários genéricos',
     'comparison.features': 'Recursos',
     'comparison.readMore': 'Ler comparação completa',
@@ -2784,7 +3267,8 @@ export const messages: Record<Locale, Messages> = {
     'request.open.description': 'Vote com uma reação no GitHub para ajudar a priorizar.',
     'roadmap.label': 'Roadmap',
     'roadmap.title': 'Para onde a HelmForge está indo.',
-    'roadmap.description': 'Nosso roadmap é público. Acompanhe o progresso, veja o que vem a seguir e ajude a definir a direção.',
+    'roadmap.description':
+      'Nosso roadmap é público. Acompanhe o progresso, veja o que vem a seguir e ajude a definir a direção.',
     'roadmap.milestones': 'Marcos do GitHub',
     'roadmap.active': 'Ativos',
     'roadmap.completed': 'Concluídos',
@@ -2793,12 +3277,14 @@ export const messages: Record<Locale, Messages> = {
     'roadmap.status.inProgress': 'Em progresso',
     'roadmap.status.planned': 'Planejado',
     'roadmap.cta.title': 'Tem uma sugestão?',
-    'roadmap.cta.description': 'O roadmap é moldado pela comunidade. Abra uma issue para solicitar um chart, sugerir um recurso ou propor uma mudança.',
+    'roadmap.cta.description':
+      'O roadmap é moldado pela comunidade. Abra uma issue para solicitar um chart, sugerir um recurso ou propor uma mudança.',
     'roadmap.cta.request': 'Solicitar Chart',
     'roadmap.cta.issue': 'Abrir Issue',
     'community.label': 'Comunidade',
     'community.title': 'Construído em aberto, moldado pela comunidade.',
-    'community.description': 'HelmForge é open-source e orientado pela comunidade. Cada contribuição melhora o projeto para todos.',
+    'community.description':
+      'HelmForge é open-source e orientado pela comunidade. Cada contribuição melhora o projeto para todos.',
     'community.howToContribute': 'Como contribuir',
     'community.contributors': 'Contribuidores',
     'community.projectGovernance': 'Governança do projeto',
@@ -2808,26 +3294,32 @@ export const messages: Record<Locale, Messages> = {
     'community.way.submit.description': 'Crie e contribua com um novo Helm chart para uma aplicação usada em produção.',
     'community.way.submit.link': 'Ler CONTRIBUTING.md',
     'community.way.report.title': 'Reportar problemas',
-    'community.way.report.description': 'Encontrou um bug ou comportamento inesperado? Abra uma issue com passos para reproduzir.',
+    'community.way.report.description':
+      'Encontrou um bug ou comportamento inesperado? Abra uma issue com passos para reproduzir.',
     'community.way.report.link': 'Abrir issue',
     'community.way.request.title': 'Solicitar um Chart',
-    'community.way.request.description': 'Precisa de um chart para uma aplicação? Envie uma solicitação e a comunidade vai avaliar.',
+    'community.way.request.description':
+      'Precisa de um chart para uma aplicação? Envie uma solicitação e a comunidade vai avaliar.',
     'community.way.request.link': 'Formulário de solicitação',
     'community.way.docs.title': 'Melhorar documentação',
-    'community.way.docs.description': 'Corrija erros, adicione exemplos e melhore explicações. PRs de documentação são sempre bem-vindos.',
+    'community.way.docs.description':
+      'Corrija erros, adicione exemplos e melhore explicações. PRs de documentação são sempre bem-vindos.',
     'community.way.docs.link': 'Repositório do site',
     'community.way.test.title': 'Testar e revisar',
     'community.way.test.description': 'Teste charts no seu cluster e reporte resultados. Revise pull requests abertos.',
     'community.way.test.link': 'PRs abertas',
     'community.way.spread.title': 'Espalhar a palavra',
-    'community.way.spread.description': 'Dê estrela no repositório, compartilhe nas redes ou escreva sobre sua experiência com HelmForge.',
+    'community.way.spread.description':
+      'Dê estrela no repositório, compartilhe nas redes ou escreva sobre sua experiência com HelmForge.',
     'community.way.spread.link': 'Dar estrela no GitHub',
     'community.governance.license.label': 'Licença',
     'community.governance.license.description': 'Todos os charts são open-source sob licença MIT.',
     'community.governance.versioning.label': 'Versionamento',
-    'community.governance.versioning.description': 'Versionamento semântico automatizado a partir de Conventional Commits.',
+    'community.governance.versioning.description':
+      'Versionamento semântico automatizado a partir de Conventional Commits.',
     'community.governance.signing.label': 'Assinatura',
-    'community.governance.signing.description': 'Arquivos de proveniência GPG e assinaturas keyless do Sigstore Cosign em cada release.',
+    'community.governance.signing.description':
+      'Arquivos de proveniência GPG e assinaturas keyless do Sigstore Cosign em cada release.',
     'community.governance.maturity.label': 'Maturidade',
     'community.governance.maturity.description': 'Os charts evoluem por níveis de maturidade com critérios claros.',
     'community.process.step1.title': 'Enviar',
@@ -2847,7 +3339,8 @@ export const messages: Record<Locale, Messages> = {
     'changelog.viewOnGithub': 'Ver no GitHub',
     'stack.label': 'Stack Builder',
     'stack.title': 'Monte seu stack em cliques, faça deploy em segundos.',
-    'stack.description': 'Escolha os charts que você precisa e gere um script de instalação pronto para copiar e colar.',
+    'stack.description':
+      'Escolha os charts que você precisa e gere um script de instalação pronto para copiar e colar.',
     'stack.selectCharts': 'Selecionar charts',
     'stack.count': '{count} selecionados',
     'stack.search.placeholder': 'Filtrar charts...',
@@ -2860,7 +3353,8 @@ export const messages: Record<Locale, Messages> = {
     'stack.empty.helmfile.line2': '# O YAML aparecerá aqui automaticamente',
     'stack.empty.argocd.line1': '# Selecione charts à esquerda para gerar aplicações ArgoCD',
     'stack.empty.argocd.line2': '# Os manifests aparecerão aqui automaticamente',
-    'stack.empty.hint': 'Selecione um ou mais charts para gerar comandos de instalação. Alterne o formato para obter YAML de Helmfile ou manifests do ArgoCD.',
+    'stack.empty.hint':
+      'Selecione um ou mais charts para gerar comandos de instalação. Alterne o formato para obter YAML de Helmfile ou manifests do ArgoCD.',
     'stack.popularStacks': 'Stacks populares',
     'stack.preset.automation.title': 'Stack de automação',
     'stack.preset.automation.description': 'PostgreSQL + Redis + n8n',
@@ -2876,20 +3370,23 @@ export const messages: Record<Locale, Messages> = {
     'stack.preset.network.description': 'Pi-hole + Cloudflared + Uptime Kuma',
     'newsletter.label': 'Newsletter da HelmForge',
     'newsletter.title': 'Fique à frente com atualizações práticas de Kubernetes',
-    'newsletter.description': 'Receba conteúdo curado de Helm e Kubernetes, novos releases de charts e dicas de produção da HelmForge.',
+    'newsletter.description':
+      'Receba conteúdo curado de Helm e Kubernetes, novos releases de charts e dicas de produção da HelmForge.',
     'newsletter.form.aria': 'Formulário da newsletter da HelmForge',
     'newsletter.form.email': 'E-mail',
     'newsletter.form.emailPlaceholder': 'voce@empresa.com',
     'newsletter.form.name': 'Nome (opcional)',
     'newsletter.form.namePlaceholder': 'Seu nome',
     'newsletter.form.listTitle': 'Newsletter da HelmForge',
-    'newsletter.form.listDescription': 'Newsletter oficial da HelmForge com insights de Kubernetes, atualizações de charts e notas de release.',
+    'newsletter.form.listDescription':
+      'Newsletter oficial da HelmForge com insights de Kubernetes, atualizações de charts e notas de release.',
     'newsletter.form.subscribe': 'Inscrever-se',
     'newsletter.form.rss': 'Inscrever via RSS',
     'newsletter.form.rssAria': 'Inscrever via RSS',
     'playground.label': 'Playground',
     'playground.title': 'Configure, visualize, faça deploy.',
-    'playground.description': 'Escolha um chart, ajuste os values e obtenha um comando de instalação pronto para copiar e colar.',
+    'playground.description':
+      'Escolha um chart, ajuste os values e obtenha um comando de instalação pronto para copiar e colar.',
     'playground.selectChart': 'Selecionar um chart',
     'playground.search.placeholder': 'Filtrar charts...',
     'playground.empty.title': 'Selecione um chart para configurar',
@@ -2908,7 +3405,8 @@ export const messages: Record<Locale, Messages> = {
     'playground.deploy.note.before': 'Para uso em produção, salve a saída de',
     'playground.deploy.note.middle': 'em um arquivo e instale com',
     'playground.deploy.note.after': '.',
-    'playground.deploy.note': 'Para uso em produção, salve a saída de <strong>values.yaml</strong> em um arquivo e instale com <code class="text-primary-light">helm install -f values.yaml</code>.',
+    'playground.deploy.note':
+      'Para uso em produção, salve a saída de <strong>values.yaml</strong> em um arquivo e instale com <code class="text-primary-light">helm install -f values.yaml</code>.',
     'playground.changes': 'Mudanças em relação aos padrões',
     'playground.copied': 'Copiado',
     'playground.linkCopied': 'Link copiado',
@@ -2991,7 +3489,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.enableDataPersistence': 'Habilitar persistência de dados',
     'docsCharts.common.applicationPort': 'Porta da aplicação',
     'docsCharts.common.enablePrometheusMetrics': 'Habilitar métricas Prometheus',
-    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql': 'Modo de banco de dados (auto, sqlite, external, postgresql, mysql)',
+    'docsCharts.common.databaseModeAutoSqliteExternalPostgresqlMysql':
+      'Modo de banco de dados (auto, sqlite, external, postgresql, mysql)',
     'docsCharts.common.logLevel': 'Nível de logs',
     'docsCharts.common.enableBundledPostgresqlSubchart': 'Habilitar subchart PostgreSQL embutido',
     'docsCharts.common.backupCronSchedule': 'Agendamento cron de backup',
@@ -3001,19 +3500,28 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.common.timezone': 'Fuso horário',
     'docsCharts.common.enableBundledRedisSubchart': 'Habilitar subchart Redis embutido',
     'docsCharts.common.useExternalRedis': 'Usar Redis externo',
-    'docsCharts.common.feature.ingressCertManager': 'Suporte a ingress — TLS via cert-manager com classe de ingress configurável',
+    'docsCharts.common.feature.ingressCertManager':
+      'Suporte a ingress — TLS via cert-manager com classe de ingress configurável',
     'docsCharts.common.feature.ingressConfigurableTls': 'Suporte a ingress com configuração TLS',
     'docsCharts.common.feature.ingressTlsCertManager': 'Suporte a ingress — TLS com cert-manager',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternal': 'Backend PostgreSQL — subchart embutido ou banco externo',
-    'docsCharts.common.feature.s3BackupPostgresql': 'Backup S3 — backup agendado de PostgreSQL para storage compatível com S3',
-    'docsCharts.common.feature.externalDatabasePostgresqlMysql': 'Banco externo — conectar PostgreSQL ou MySQL existentes',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternal':
+      'Backend PostgreSQL — subchart embutido ou banco externo',
+    'docsCharts.common.feature.s3BackupPostgresql':
+      'Backup S3 — backup agendado de PostgreSQL para storage compatível com S3',
+    'docsCharts.common.feature.externalDatabasePostgresqlMysql':
+      'Banco externo — conectar PostgreSQL ou MySQL existentes',
     'docsCharts.common.feature.ingressSupportConfigurableTls': 'Suporte a ingress — ingress configurável com TLS',
-    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional': 'Subcharts PostgreSQL e MySQL — deploys opcionais de banco embutido',
-    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport': 'Backend PostgreSQL — subchart PostgreSQL embutido ou suporte a banco externo',
+    'docsCharts.common.feature.postgresqlMysqlSubchartsOptional':
+      'Subcharts PostgreSQL e MySQL — deploys opcionais de banco embutido',
+    'docsCharts.common.feature.postgresqlBackendBundledOrExternalSupport':
+      'Backend PostgreSQL — subchart PostgreSQL embutido ou suporte a banco externo',
     'docsCharts.common.feature.postgresqlSubchartHelmforge': 'Subchart PostgreSQL — incluído via dependência HelmForge',
-    'docsCharts.common.feature.databaseBackendsAutoDetection': 'Backends de banco SQLite3 (padrão), PostgreSQL ou MySQL com auto-detecção',
-    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware': 'Backup compatível com S3 com CronJob sensível ao tipo de banco (SQLite tar, pg_dump, mysqldump)',
-    'docsCharts.common.feature.sqliteDatabaseEmbedded': 'Banco SQLite — storage embutido, sem necessidade de banco externo',
+    'docsCharts.common.feature.databaseBackendsAutoDetection':
+      'Backends de banco SQLite3 (padrão), PostgreSQL ou MySQL com auto-detecção',
+    'docsCharts.common.feature.s3CompatibleBackupDatabaseAware':
+      'Backup compatível com S3 com CronJob sensível ao tipo de banco (SQLite tar, pg_dump, mysqldump)',
+    'docsCharts.common.feature.sqliteDatabaseEmbedded':
+      'Banco SQLite — storage embutido, sem necessidade de banco externo',
     'docsCharts.common.feature.mysqlSubchartHelmforge': 'Subchart MySQL — incluído via dependência HelmForge',
     'docsCharts.moreInfo.before': 'Veja o',
     'docsCharts.moreInfo.link': 'código-fonte e a referência completa de values',
@@ -3021,7 +3529,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.install.httpsRepo': 'Repositório HTTPS:',
     'docsCharts.install.ociRegistry': 'Registro OCI:',
     'docsCharts.index.title': 'Visão geral dos charts',
-    'docsCharts.index.intro': 'A HelmForge fornece Helm charts prontos para produção para workloads comuns de Kubernetes. Cada chart suporta múltiplas arquiteturas, hardening de segurança e observabilidade nativamente.',
+    'docsCharts.index.intro':
+      'A HelmForge fornece Helm charts prontos para produção para workloads comuns de Kubernetes. Cada chart suporta múltiplas arquiteturas, hardening de segurança e observabilidade nativamente.',
     'docsCharts.index.category.generalPurpose': 'Uso geral',
     'docsCharts.index.category.databases': 'Bancos de dados',
     'docsCharts.index.category.cachingMessaging': 'Cache e mensageria',
@@ -3037,39 +3546,60 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.index.category.devopsMetrics': 'DevOps e métricas',
     'docsCharts.index.commonFeatures': 'Recursos comuns',
     'docsCharts.index.commonFeaturesIntro': 'Todos os charts da HelmForge compartilham estas capacidades:',
-    'docsCharts.postgresql.intro': 'Deploy de PostgreSQL pronto para produção com suporte a arquiteturas standalone e replicação por streaming.',
-    'docsCharts.postgresql.feature.standaloneReplication': 'Standalone e replicação — Instância única ou primária com réplicas em streaming',
-    'docsCharts.postgresql.feature.automaticInit': 'Inicialização automática — Scripts de init, extensões e configuração customizada',
-    'docsCharts.postgresql.feature.s3Backup': 'Backup S3 — Backups agendados para storage compatível com S3 via CronJob',
+    'docsCharts.postgresql.intro':
+      'Deploy de PostgreSQL pronto para produção com suporte a arquiteturas standalone e replicação por streaming.',
+    'docsCharts.postgresql.feature.standaloneReplication':
+      'Standalone e replicação — Instância única ou primária com réplicas em streaming',
+    'docsCharts.postgresql.feature.automaticInit':
+      'Inicialização automática — Scripts de init, extensões e configuração customizada',
+    'docsCharts.postgresql.feature.s3Backup':
+      'Backup S3 — Backups agendados para storage compatível com S3 via CronJob',
     'docsCharts.postgresql.feature.metrics': 'Métricas — Exporter Prometheus com ServiceMonitor',
     'docsCharts.postgresql.feature.security': 'Segurança — Containers non-root, network policies e suporte TLS',
-    'docsCharts.postgresql.feature.storage': 'Armazenamento persistente — PVCs configuráveis com seleção de storage class',
+    'docsCharts.postgresql.feature.storage':
+      'Armazenamento persistente — PVCs configuráveis com seleção de storage class',
     'docsCharts.postgresql.table.authDatabase': 'Banco de dados padrão a ser criado',
     'docsCharts.postgresql.table.authUsername': 'Usuário padrão a ser criado',
     'docsCharts.postgresql.table.authPassword': 'Senha do usuário padrão',
     'docsCharts.postgresql.upgrade.callout.before': 'Ao atualizar entre versões maiores, verifique o',
     'docsCharts.postgresql.upgrade.callout.link': 'registro de mudanças',
-    'docsCharts.postgresql.upgrade.callout.after': 'para mudanças incompatíveis na estrutura de values. Sempre faça backup dos dados antes de atualizar.',
-    'docsCharts.postgresql.upgrade.note1': 'Ao trocar de `standalone` para `replication`, defina `auth.replicationPassword` antes do upgrade',
-    'docsCharts.postgresql.upgrade.note2': 'Resize de PVC exige que a storage class suporte expansão de volume (`allowVolumeExpansion: true`)',
-    'docsCharts.postgresql.upgrade.note3': 'Mudanças no sidecar de métricas podem causar reinício do pod durante upgrade',
-    'docsCharts.postgresql.issue.crashloop': 'Geralmente causado por `auth.postgresPassword` incorreto no upgrade. O PostgreSQL não reinicializa auth quando o diretório de dados já existe. Verifique logs com `kubectl logs <pod>` e confirme que a senha corresponde aos dados existentes.',
-    'docsCharts.postgresql.issue.replicationSync': 'Para bases grandes, a sincronização inicial de réplicas pode demorar. Aumente `readReplicas.resources` e garanta IOPS adequados na storage class. Monitore o lag de replicação com o exporter Prometheus (métrica `pg_replication_lag`).',
-    'docsCharts.postgresql.issue.connectionPoolers': 'Para workloads com muitas conexões, faça deploy do PgBouncer junto ao PostgreSQL. Aponte a aplicação para o PgBouncer e configure a conexão ao serviço PostgreSQL.',
-    'docsCharts.redis.intro': 'Deploy de Redis pronto para produção com suporte a arquiteturas standalone e alta disponibilidade com Sentinel.',
-    'docsCharts.redis.feature.standaloneSentinel': 'Standalone e Sentinel — Instância única ou HA com failover automático',
+    'docsCharts.postgresql.upgrade.callout.after':
+      'para mudanças incompatíveis na estrutura de values. Sempre faça backup dos dados antes de atualizar.',
+    'docsCharts.postgresql.upgrade.note1':
+      'Ao trocar de `standalone` para `replication`, defina `auth.replicationPassword` antes do upgrade',
+    'docsCharts.postgresql.upgrade.note2':
+      'Resize de PVC exige que a storage class suporte expansão de volume (`allowVolumeExpansion: true`)',
+    'docsCharts.postgresql.upgrade.note3':
+      'Mudanças no sidecar de métricas podem causar reinício do pod durante upgrade',
+    'docsCharts.postgresql.issue.crashloop':
+      'Geralmente causado por `auth.postgresPassword` incorreto no upgrade. O PostgreSQL não reinicializa auth quando o diretório de dados já existe. Verifique logs com `kubectl logs <pod>` e confirme que a senha corresponde aos dados existentes.',
+    'docsCharts.postgresql.issue.replicationSync':
+      'Para bases grandes, a sincronização inicial de réplicas pode demorar. Aumente `readReplicas.resources` e garanta IOPS adequados na storage class. Monitore o lag de replicação com o exporter Prometheus (métrica `pg_replication_lag`).',
+    'docsCharts.postgresql.issue.connectionPoolers':
+      'Para workloads com muitas conexões, faça deploy do PgBouncer junto ao PostgreSQL. Aponte a aplicação para o PgBouncer e configure a conexão ao serviço PostgreSQL.',
+    'docsCharts.redis.intro':
+      'Deploy de Redis pronto para produção com suporte a arquiteturas standalone e alta disponibilidade com Sentinel.',
+    'docsCharts.redis.feature.standaloneSentinel':
+      'Standalone e Sentinel — Instância única ou HA com failover automático',
     'docsCharts.redis.feature.persistence': 'Persistência — Opções de persistência RDB e AOF',
     'docsCharts.redis.feature.metrics': 'Métricas — Exporter Prometheus com ServiceMonitor',
     'docsCharts.redis.feature.security': 'Segurança — Autenticação por senha, containers non-root e network policies',
     'docsCharts.redis.feature.configurable': 'Configurável — Parâmetros customizados de configuração Redis',
-    'docsCharts.redis.upgrade.callout': 'No modo Sentinel, upgrades rolling podem acionar failover. Esse comportamento é esperado: o Sentinel promove uma réplica quando o pod master reinicia. Aplicações com clientes compatíveis com Sentinel lidam com isso de forma transparente.',
-    'docsCharts.redis.upgrade.note1': 'Trocar de `standalone` para `sentinel` exige novo deploy (com migração de dados)',
-    'docsCharts.redis.upgrade.note2': 'Mudanças de persistência afetam apenas pods novos; PVCs existentes mantêm o tamanho',
+    'docsCharts.redis.upgrade.callout':
+      'No modo Sentinel, upgrades rolling podem acionar failover. Esse comportamento é esperado: o Sentinel promove uma réplica quando o pod master reinicia. Aplicações com clientes compatíveis com Sentinel lidam com isso de forma transparente.',
+    'docsCharts.redis.upgrade.note1':
+      'Trocar de `standalone` para `sentinel` exige novo deploy (com migração de dados)',
+    'docsCharts.redis.upgrade.note2':
+      'Mudanças de persistência afetam apenas pods novos; PVCs existentes mantêm o tamanho',
     'docsCharts.redis.upgrade.note3': 'Overrides em `master.configuration` são anexados à configuração padrão',
-    'docsCharts.redis.issue.oomkilled': 'Redis armazena dados em memória. Se o dataset ultrapassar o limite do pod, o Kubernetes encerra o pod. Defina `master.resources.limits.memory` acima do tamanho esperado e configure `maxmemory` no Redis para manter folga.',
-    'docsCharts.redis.issue.connectionRefused': 'Se a aplicação conecta direto ao IP do pod master em vez do serviço Sentinel, as conexões quebram após failover. Use cliente compatível com Sentinel ou conecte pelo serviço `-headless`.',
-    'docsCharts.mysql.intro': 'Deploy de MySQL pronto para produção com suporte a arquiteturas standalone e replicação source-replica.',
-    'docsCharts.mysql.feature.standaloneReplication': 'Standalone e replicação — Instância única ou topologia source-replica',
+    'docsCharts.redis.issue.oomkilled':
+      'Redis armazena dados em memória. Se o dataset ultrapassar o limite do pod, o Kubernetes encerra o pod. Defina `master.resources.limits.memory` acima do tamanho esperado e configure `maxmemory` no Redis para manter folga.',
+    'docsCharts.redis.issue.connectionRefused':
+      'Se a aplicação conecta direto ao IP do pod master em vez do serviço Sentinel, as conexões quebram após failover. Use cliente compatível com Sentinel ou conecte pelo serviço `-headless`.',
+    'docsCharts.mysql.intro':
+      'Deploy de MySQL pronto para produção com suporte a arquiteturas standalone e replicação source-replica.',
+    'docsCharts.mysql.feature.standaloneReplication':
+      'Standalone e replicação — Instância única ou topologia source-replica',
     'docsCharts.mysql.feature.automaticInit': 'Inicialização automática — Scripts de init e configuração customizada',
     'docsCharts.mysql.feature.backup': 'Suporte a backup — CronJobs configuráveis para storage compatível com S3',
     'docsCharts.mysql.feature.metrics': 'Métricas — Exporter Prometheus com ServiceMonitor',
@@ -3078,13 +3608,18 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mysql.table.authDatabase': 'Banco de dados padrão a ser criado',
     'docsCharts.mysql.table.authUsername': 'Usuário padrão a ser criado',
     'docsCharts.mysql.table.authPassword': 'Senha do usuário padrão',
-    'docsCharts.mysql.upgrade.callout': 'MySQL armazena a senha root na configuração inicial. Em upgrades, garanta que `auth.rootPassword` corresponda ao valor original ou o pod falhará ao iniciar por erro de autenticação.',
-    'docsCharts.mysql.upgrade.note1': 'Ao habilitar replicação em instância standalone existente, é necessária reinicialização completa',
+    'docsCharts.mysql.upgrade.callout':
+      'MySQL armazena a senha root na configuração inicial. Em upgrades, garanta que `auth.rootPassword` corresponda ao valor original ou o pod falhará ao iniciar por erro de autenticação.',
+    'docsCharts.mysql.upgrade.note1':
+      'Ao habilitar replicação em instância standalone existente, é necessária reinicialização completa',
     'docsCharts.mysql.upgrade.note2': 'Mudanças no CronJob de backup entram em vigor na próxima execução agendada',
     'docsCharts.mysql.upgrade.note3': 'Réplicas secundárias são somente leitura; tentativas de escrita retornam erro',
-    'docsCharts.mysql.issue.crashloop': 'Se a senha root em values não corresponder ao diretório de dados existente, MySQL se recusa a iniciar. Verifique logs com `kubectl logs <pod>` e valide a senha.',
-    'docsCharts.mysql.issue.replicationLag': 'Ative métricas e monitore `mysql_slave_status_seconds_behind_master`. Valores consistentemente acima de 0 indicam que a réplica não acompanha; considere aumentar recursos ou reduzir carga de escrita.',
-    'docsCharts.keycloak.intro': 'Deploy de Keycloak pronto para produção para gestão de identidade e acesso, com suporte a SSO, OAuth 2.0, OIDC e SAML.',
+    'docsCharts.mysql.issue.crashloop':
+      'Se a senha root em values não corresponder ao diretório de dados existente, MySQL se recusa a iniciar. Verifique logs com `kubectl logs <pod>` e valide a senha.',
+    'docsCharts.mysql.issue.replicationLag':
+      'Ative métricas e monitore `mysql_slave_status_seconds_behind_master`. Valores consistentemente acima de 0 indicam que a réplica não acompanha; considere aumentar recursos ou reduzir carga de escrita.',
+    'docsCharts.keycloak.intro':
+      'Deploy de Keycloak pronto para produção para gestão de identidade e acesso, com suporte a SSO, OAuth 2.0, OIDC e SAML.',
     'docsCharts.keycloak.feature.identity': 'Gestão de identidade — SSO, federação de usuários e social login',
     'docsCharts.keycloak.feature.protocols': 'Suporte a protocolos — OAuth 2.0, OpenID Connect e SAML 2.0',
     'docsCharts.keycloak.feature.externalDb': 'Banco externo — Suporte a backend PostgreSQL ou MySQL',
@@ -3092,24 +3627,37 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.keycloak.feature.metrics': 'Métricas — Métricas Prometheus com ServiceMonitor',
     'docsCharts.keycloak.feature.security': 'Segurança — Containers non-root, network policies e segurança de pod',
     'docsCharts.keycloak.feature.realmImport': 'Import de realm — Configuração automática de realm na inicialização',
-    'docsCharts.keycloak.h2Warning': 'O banco H2 embutido não suporta clusterização e perde dados se o pod reiniciar sem persistência. Use sempre banco externo em produção.',
+    'docsCharts.keycloak.h2Warning':
+      'O banco H2 embutido não suporta clusterização e perde dados se o pod reiniciar sem persistência. Use sempre banco externo em produção.',
     'docsCharts.keycloak.table.adminUser': 'Usuário administrador do Keycloak',
     'docsCharts.keycloak.table.adminPassword': 'Senha do administrador do Keycloak',
-    'docsCharts.keycloak.upgrade.callout': 'Keycloak executa migrações de banco automaticamente na inicialização. Ao atualizar para nova versão, garanta que apenas uma réplica inicie primeiro (escale para 1, atualize e depois reescale). Rodar migrações em múltiplas réplicas pode causar conflitos.',
+    'docsCharts.keycloak.upgrade.callout':
+      'Keycloak executa migrações de banco automaticamente na inicialização. Ao atualizar para nova versão, garanta que apenas uma réplica inicie primeiro (escale para 1, atualize e depois reescale). Rodar migrações em múltiplas réplicas pode causar conflitos.',
     'docsCharts.keycloak.upgrade.note1': 'Mudanças de senha admin em values só têm efeito em instalações novas',
-    'docsCharts.keycloak.upgrade.note2': 'Import de realm roda em toda inicialização por padrão — use `realmImport.skipExisting: true` para evitar sobrescrita',
-    'docsCharts.keycloak.upgrade.note3': 'Mudanças em annotations de ingress podem exigir reinício do pod se o controller cachear configuração',
-    'docsCharts.keycloak.issue.proxyHeaders': 'Geralmente indica headers de proxy mal configurados. Garanta que o ingress encaminhe `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host`. No Traefik isso vem habilitado por padrão.',
-    'docsCharts.keycloak.issue.slowStartup': 'Com muitos realms, clientes ou usuários, o Keycloak demora mais para iniciar. Aumente `startupProbe.failureThreshold` e `startupProbe.periodSeconds` para evitar que o Kubernetes finalize o pod antes do fim da inicialização.',
+    'docsCharts.keycloak.upgrade.note2':
+      'Import de realm roda em toda inicialização por padrão — use `realmImport.skipExisting: true` para evitar sobrescrita',
+    'docsCharts.keycloak.upgrade.note3':
+      'Mudanças em annotations de ingress podem exigir reinício do pod se o controller cachear configuração',
+    'docsCharts.keycloak.issue.proxyHeaders':
+      'Geralmente indica headers de proxy mal configurados. Garanta que o ingress encaminhe `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host`. No Traefik isso vem habilitado por padrão.',
+    'docsCharts.keycloak.issue.slowStartup':
+      'Com muitos realms, clientes ou usuários, o Keycloak demora mais para iniciar. Aumente `startupProbe.failureThreshold` e `startupProbe.periodSeconds` para evitar que o Kubernetes finalize o pod antes do fim da inicialização.',
     'docsCharts.openWebui.intro.before': 'Faça deploy do',
-    'docsCharts.openWebui.intro.after': 'no Kubernetes — uma plataforma de chat com IA self-hosted com suporte a Ollama e backends compatíveis com OpenAI, pipelines RAG, conversas multimodelo e um sistema extensível de plugins.',
-    'docsCharts.openWebui.feature.ollamaIntegration': 'Integração com Ollama — conecte instâncias locais ou remotas do Ollama para LLMs open-source',
-    'docsCharts.openWebui.feature.openaiCompatibleApi': 'API compatível com OpenAI — funciona com OpenAI, Azure, proxies Anthropic, LiteLLM e mais',
-    'docsCharts.openWebui.feature.sqlitePostgresql': 'SQLite ou PostgreSQL — SQLite embutido para instalações simples e subchart PostgreSQL para produção',
-    'docsCharts.openWebui.feature.redisCoordination': 'Coordenação WebSocket com Redis — necessária para deploys com múltiplas instâncias',
-    'docsCharts.openWebui.feature.ragPipelines': 'Pipelines RAG — geração aumentada por recuperação com upload de documentos',
+    'docsCharts.openWebui.intro.after':
+      'no Kubernetes — uma plataforma de chat com IA self-hosted com suporte a Ollama e backends compatíveis com OpenAI, pipelines RAG, conversas multimodelo e um sistema extensível de plugins.',
+    'docsCharts.openWebui.feature.ollamaIntegration':
+      'Integração com Ollama — conecte instâncias locais ou remotas do Ollama para LLMs open-source',
+    'docsCharts.openWebui.feature.openaiCompatibleApi':
+      'API compatível com OpenAI — funciona com OpenAI, Azure, proxies Anthropic, LiteLLM e mais',
+    'docsCharts.openWebui.feature.sqlitePostgresql':
+      'SQLite ou PostgreSQL — SQLite embutido para instalações simples e subchart PostgreSQL para produção',
+    'docsCharts.openWebui.feature.redisCoordination':
+      'Coordenação WebSocket com Redis — necessária para deploys com múltiplas instâncias',
+    'docsCharts.openWebui.feature.ragPipelines':
+      'Pipelines RAG — geração aumentada por recuperação com upload de documentos',
     'docsCharts.openWebui.feature.s3Backup': 'Backup S3 — backup agendado do PostgreSQL para storage compatível com S3',
-    'docsCharts.openWebui.feature.ingressSupport': 'Suporte a ingress — TLS via cert-manager com classe de ingress configurável',
+    'docsCharts.openWebui.feature.ingressSupport':
+      'Suporte a ingress — TLS via cert-manager com classe de ingress configurável',
     'docsCharts.openWebui.table.port': 'Porta da aplicação',
     'docsCharts.openWebui.table.ollamaBaseUrl': 'URL do backend Ollama',
     'docsCharts.openWebui.table.openaiBaseUrl': 'URL base da API compatível com OpenAI',
@@ -3121,18 +3669,27 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.openWebui.table.persistenceSize': 'Tamanho do PVC',
     'docsCharts.openWebui.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.openWebui.table.backupEnabled': 'Habilitar CronJob de backup S3',
-    'docsCharts.openWebui.note.sqliteSingle': 'O modo SQLite suporta apenas instância única — sem escalonamento horizontal',
-    'docsCharts.openWebui.note.postgresqlReplicas': 'O modo PostgreSQL suporta múltiplas réplicas com Redis para coordenação WebSocket',
-    'docsCharts.openWebui.note.autoSecret': 'O chart gera automaticamente uma chave secreta de sessão quando não informada',
+    'docsCharts.openWebui.note.sqliteSingle':
+      'O modo SQLite suporta apenas instância única — sem escalonamento horizontal',
+    'docsCharts.openWebui.note.postgresqlReplicas':
+      'O modo PostgreSQL suporta múltiplas réplicas com Redis para coordenação WebSocket',
+    'docsCharts.openWebui.note.autoSecret':
+      'O chart gera automaticamente uma chave secreta de sessão quando não informada',
     'docsCharts.openWebui.note.telemetryDisabled': 'A telemetria vem desabilitada por padrão (`DO_NOT_TRACK=true`)',
     'docsCharts.superset.intro.before': 'Faça deploy do',
-    'docsCharts.superset.intro.after': 'no Kubernetes — uma plataforma moderna de business intelligence pronta para empresas, para exploração e visualização de dados com mais de 60 conectores de banco de dados.',
-    'docsCharts.superset.feature.threeComponent': 'Arquitetura de três componentes — web com Gunicorn, workers Celery e scheduler Celery beat com escalonamento independente',
-    'docsCharts.superset.feature.initJob': 'Init Job — migração automática de banco de dados e criação de usuário admin',
-    'docsCharts.superset.feature.postgresqlMetadata': 'Armazenamento de metadados PostgreSQL — subchart embutido ou conexão externa',
-    'docsCharts.superset.feature.redisBroker': 'Broker Redis — subchart embutido para fila de tarefas Celery ou externo',
+    'docsCharts.superset.intro.after':
+      'no Kubernetes — uma plataforma moderna de business intelligence pronta para empresas, para exploração e visualização de dados com mais de 60 conectores de banco de dados.',
+    'docsCharts.superset.feature.threeComponent':
+      'Arquitetura de três componentes — web com Gunicorn, workers Celery e scheduler Celery beat com escalonamento independente',
+    'docsCharts.superset.feature.initJob':
+      'Init Job — migração automática de banco de dados e criação de usuário admin',
+    'docsCharts.superset.feature.postgresqlMetadata':
+      'Armazenamento de metadados PostgreSQL — subchart embutido ou conexão externa',
+    'docsCharts.superset.feature.redisBroker':
+      'Broker Redis — subchart embutido para fila de tarefas Celery ou externo',
     'docsCharts.superset.feature.configurable': 'Configurável — superset_config.py entregue via ConfigMap',
-    'docsCharts.superset.feature.autoSecrets': 'Segredos auto-gerados — senha admin, Flask SECRET_KEY e senhas de banco e Redis',
+    'docsCharts.superset.feature.autoSecrets':
+      'Segredos auto-gerados — senha admin, Flask SECRET_KEY e senhas de banco e Redis',
     'docsCharts.superset.feature.healthProbes': 'Health probes — startup, liveness e readiness em /health',
     'docsCharts.superset.feature.ingressSupport': 'Suporte a ingress — classe configurável (traefik, nginx, etc.)',
     'docsCharts.superset.table.imageRepository': 'Imagem do container',
@@ -3148,19 +3705,28 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.superset.table.databaseMode': 'Modo de banco de dados: subchart ou external',
     'docsCharts.superset.table.redisMode': 'Modo Redis: subchart ou external',
     'docsCharts.superset.table.ingressEnabled': 'Habilitar ingress',
-    'docsCharts.superset.note.initJobRuns': 'O init job executa migrações de banco e cria o usuário admin em cada instalação/upgrade',
+    'docsCharts.superset.note.initJobRuns':
+      'O init job executa migrações de banco e cria o usuário admin em cada instalação/upgrade',
     'docsCharts.superset.note.independentScaling': 'Os componentes web, worker e beat escalam de forma independente',
-    'docsCharts.superset.note.extraConfig': 'Configure `superset.extraConfig` para ajustes personalizados de superset_config.py',
+    'docsCharts.superset.note.extraConfig':
+      'Configure `superset.extraConfig` para ajustes personalizados de superset_config.py',
     'docsCharts.superset.note.loadExamples': 'Use `superset.loadExamples: true` para ambientes de demonstração',
     'docsCharts.appwrite.intro.before': 'Helm chart para fazer deploy do',
-    'docsCharts.appwrite.intro.after': 'no Kubernetes — uma plataforma Backend-as-a-Service (BaaS) self-hosted que oferece autenticação, bancos de dados, armazenamento, funções, mensageria e API em tempo real. Inclui MariaDB e Redis por padrão.',
-    'docsCharts.appwrite.feature.fullStack': 'Stack completo do Appwrite — API, Console (v7.5.7), Realtime, 12 workers, schedulers e manutenção',
-    'docsCharts.appwrite.feature.bundledMariadb': 'MariaDB embutido — instalação padrão inclui o chart MariaDB da HelmForge',
+    'docsCharts.appwrite.intro.after':
+      'no Kubernetes — uma plataforma Backend-as-a-Service (BaaS) self-hosted que oferece autenticação, bancos de dados, armazenamento, funções, mensageria e API em tempo real. Inclui MariaDB e Redis por padrão.',
+    'docsCharts.appwrite.feature.fullStack':
+      'Stack completo do Appwrite — API, Console (v7.5.7), Realtime, 12 workers, schedulers e manutenção',
+    'docsCharts.appwrite.feature.bundledMariadb':
+      'MariaDB embutido — instalação padrão inclui o chart MariaDB da HelmForge',
     'docsCharts.appwrite.feature.bundledRedis': 'Redis embutido — instalação padrão inclui o chart Redis da HelmForge',
-    'docsCharts.appwrite.feature.externalServices': 'Suporte a serviços externos — conecte MariaDB/MySQL e Redis gerenciados em vez de subcharts',
-    'docsCharts.appwrite.feature.pathIngress': 'Roteamento de ingress por path — host único com prefixos para API (`/v1`), Console e Realtime (`/v1/realtime`)',
-    'docsCharts.appwrite.feature.sharedPvcs': 'PVCs compartilhados — volumes persistentes para uploads, cache e builds de funções compartilhados entre componentes',
-    'docsCharts.appwrite.feature.appVersion': 'appVersion 1.8.1 — acompanha a release open-source mais recente do Appwrite',
+    'docsCharts.appwrite.feature.externalServices':
+      'Suporte a serviços externos — conecte MariaDB/MySQL e Redis gerenciados em vez de subcharts',
+    'docsCharts.appwrite.feature.pathIngress':
+      'Roteamento de ingress por path — host único com prefixos para API (`/v1`), Console e Realtime (`/v1/realtime`)',
+    'docsCharts.appwrite.feature.sharedPvcs':
+      'PVCs compartilhados — volumes persistentes para uploads, cache e builds de funções compartilhados entre componentes',
+    'docsCharts.appwrite.feature.appVersion':
+      'appVersion 1.8.1 — acompanha a release open-source mais recente do Appwrite',
     'docsCharts.appwrite.table.domain': 'Domínio público da instância Appwrite',
     'docsCharts.appwrite.table.secretKey': 'Chave de criptografia para segredos do Appwrite',
     'docsCharts.appwrite.table.mariadbEnabled': 'Fazer deploy do MariaDB embutido',
@@ -3171,38 +3737,57 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.appwrite.table.uploadsSize': 'Tamanho do PVC de uploads',
     'docsCharts.appwrite.table.cacheSize': 'Tamanho do PVC de cache',
     'docsCharts.appwrite.table.workerReplicaCount': 'Réplicas para cada tipo de worker',
-    'docsCharts.appwrite.note.alphaWorkloads': 'Este chart alpha faz deploy de aproximadamente 20 workloads Kubernetes — use o mínimo de réplicas de worker para testes iniciais',
+    'docsCharts.appwrite.note.alphaWorkloads':
+      'Este chart alpha faz deploy de aproximadamente 20 workloads Kubernetes — use o mínimo de réplicas de worker para testes iniciais',
     'docsCharts.appwrite.note.paths': 'O Console é servido na raiz, a API em `/v1` e o Realtime em `/v1/realtime`',
-    'docsCharts.appwrite.note.defaultBundled': 'Instalações padrão usam MariaDB e Redis embutidos via subcharts HelmForge',
-    'docsCharts.appwrite.note.sameImage': 'Todos os pods de worker compartilham a mesma imagem Appwrite com comandos de entrypoint diferentes',
-    'docsCharts.kafka.intro': 'Faça deploy do Apache Kafka no Kubernetes usando a imagem oficial `apache/kafka:4.2.0` com design somente KRaft. O chart suporta intencionalmente um caminho simples `single-broker` para desenvolvimento e um caminho `cluster` orientado à produção com controllers e brokers dedicados.',
+    'docsCharts.appwrite.note.defaultBundled':
+      'Instalações padrão usam MariaDB e Redis embutidos via subcharts HelmForge',
+    'docsCharts.appwrite.note.sameImage':
+      'Todos os pods de worker compartilham a mesma imagem Appwrite com comandos de entrypoint diferentes',
+    'docsCharts.kafka.intro':
+      'Faça deploy do Apache Kafka no Kubernetes usando a imagem oficial `apache/kafka:4.2.0` com design somente KRaft. O chart suporta intencionalmente um caminho simples `single-broker` para desenvolvimento e um caminho `cluster` orientado à produção com controllers e brokers dedicados.',
     'docsCharts.kafka.feature.latestStable': 'Kafka estável mais recente — fixado na última release estável upstream',
     'docsCharts.kafka.feature.kraftOnly': 'Somente KRaft — este chart não inclui modo ZooKeeper',
-    'docsCharts.kafka.feature.twoTopologies': 'Duas topologias claras — `single-broker` para ambientes simples e `cluster` para deploys orientados à produção',
-    'docsCharts.kafka.feature.persistentStorage': 'Armazenamento persistente — suportado para single-broker, controllers e brokers',
-    'docsCharts.kafka.feature.stableDns': 'DNS estável de brokers — listeners anunciados usam nomes DNS dos pods StatefulSet no cluster',
-    'docsCharts.kafka.feature.optionalMetrics': 'Métricas opcionais — javaagent JMX exporter com ServiceMonitor opcional',
+    'docsCharts.kafka.feature.twoTopologies':
+      'Duas topologias claras — `single-broker` para ambientes simples e `cluster` para deploys orientados à produção',
+    'docsCharts.kafka.feature.persistentStorage':
+      'Armazenamento persistente — suportado para single-broker, controllers e brokers',
+    'docsCharts.kafka.feature.stableDns':
+      'DNS estável de brokers — listeners anunciados usam nomes DNS dos pods StatefulSet no cluster',
+    'docsCharts.kafka.feature.optionalMetrics':
+      'Métricas opcionais — javaagent JMX exporter com ServiceMonitor opcional',
     'docsCharts.kafka.table.architecture': '`single-broker` ou `cluster`',
     'docsCharts.kafka.table.imageRepository': 'Repositório da imagem Kafka',
     'docsCharts.kafka.table.imageTag': 'Tag da imagem Kafka',
-    'docsCharts.kafka.table.existingSecret': 'Secret existente com ID do cluster KRaft e IDs de diretório dos controllers',
+    'docsCharts.kafka.table.existingSecret':
+      'Secret existente com ID do cluster KRaft e IDs de diretório dos controllers',
     'docsCharts.kafka.table.clientPort': 'Porta de cliente Kafka',
     'docsCharts.kafka.table.controllerPort': 'Porta do controller KRaft',
     'docsCharts.kafka.table.controllerReplicas': 'Réplicas dedicadas de controllers',
     'docsCharts.kafka.table.brokerReplicas': 'Réplicas dedicadas de brokers',
     'docsCharts.kafka.table.minInSyncReplicas': 'ISR mínimo recomendado para modo cluster',
     'docsCharts.kafka.table.metricsEnabled': 'Habilitar métricas do JMX exporter',
-    'docsCharts.kafka.note.singleBrokerDev': 'Use `single-broker` para desenvolvimento e CI, não como baseline de produção',
-    'docsCharts.kafka.note.clusterProduction': 'Use `cluster` para workloads orientados à produção com controllers e brokers dedicados',
-    'docsCharts.kafka.note.validateFlows': 'Valide criação de tópicos e fluxos de produtor/consumidor antes da promoção',
-    'docsCharts.kafka.note.externalListeners': 'Planeje listeners externos, TLS e autenticação como trabalho explícito de follow-up se seu ambiente precisar',
+    'docsCharts.kafka.note.singleBrokerDev':
+      'Use `single-broker` para desenvolvimento e CI, não como baseline de produção',
+    'docsCharts.kafka.note.clusterProduction':
+      'Use `cluster` para workloads orientados à produção com controllers e brokers dedicados',
+    'docsCharts.kafka.note.validateFlows':
+      'Valide criação de tópicos e fluxos de produtor/consumidor antes da promoção',
+    'docsCharts.kafka.note.externalListeners':
+      'Planeje listeners externos, TLS e autenticação como trabalho explícito de follow-up se seu ambiente precisar',
     'docsCharts.velero.intro.before': 'Faça deploy do',
-    'docsCharts.velero.intro.after': 'no Kubernetes usando a imagem oficial `docker.io/velero/velero` para backup, restore, migração e fluxos opcionais de backup de filesystem.',
-    'docsCharts.velero.feature.latestStable': 'Velero estável mais recente — chart fixado na última release estável upstream',
-    'docsCharts.velero.feature.crdsIncluded': 'CRDs oficiais incluídos — CRDs do Velero entregues pelo diretório `crds/` do chart',
-    'docsCharts.velero.feature.s3Storage': 'Storage compatível com S3 — validado com o plugin AWS em MinIO e provedores similares',
-    'docsCharts.velero.feature.recurringSchedules': 'Agendamentos recorrentes — recursos `Schedule` opcionais renderizados a partir dos values',
-    'docsCharts.velero.feature.filesystemBackup': 'Backup de filesystem — DaemonSet node-agent opcional para backup de volumes dos pods',
+    'docsCharts.velero.intro.after':
+      'no Kubernetes usando a imagem oficial `docker.io/velero/velero` para backup, restore, migração e fluxos opcionais de backup de filesystem.',
+    'docsCharts.velero.feature.latestStable':
+      'Velero estável mais recente — chart fixado na última release estável upstream',
+    'docsCharts.velero.feature.crdsIncluded':
+      'CRDs oficiais incluídos — CRDs do Velero entregues pelo diretório `crds/` do chart',
+    'docsCharts.velero.feature.s3Storage':
+      'Storage compatível com S3 — validado com o plugin AWS em MinIO e provedores similares',
+    'docsCharts.velero.feature.recurringSchedules':
+      'Agendamentos recorrentes — recursos `Schedule` opcionais renderizados a partir dos values',
+    'docsCharts.velero.feature.filesystemBackup':
+      'Backup de filesystem — DaemonSet node-agent opcional para backup de volumes dos pods',
     'docsCharts.velero.feature.metricsSupport': 'Suporte a métricas — Service de métricas e ServiceMonitor opcional',
     'docsCharts.velero.table.imageRepository': 'Imagem do servidor Velero',
     'docsCharts.velero.table.awsTag': 'Tag padrão da imagem do plugin AWS/S3',
@@ -3211,17 +3796,23 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.velero.table.schedules': 'Recursos Schedule criados pelo chart',
     'docsCharts.velero.table.nodeAgentEnabled': 'Fazer deploy do DaemonSet de backup de filesystem',
     'docsCharts.velero.table.serviceMonitorEnabled': 'Criar ServiceMonitor do Prometheus Operator',
-    'docsCharts.velero.note.confirmContext': 'Sempre confirme o contexto ativo do `kubectl` antes de instalar, atualizar ou desinstalar em validação local',
-    'docsCharts.velero.note.validateBsl': 'Para storage compatível com S3, valide que o `BackupStorageLocation` atinja `Available`',
-    'docsCharts.velero.note.realBackup': 'Crie pelo menos um backup real de teste antes de habilitar agendamentos recorrentes em ambientes compartilhados',
+    'docsCharts.velero.note.confirmContext':
+      'Sempre confirme o contexto ativo do `kubectl` antes de instalar, atualizar ou desinstalar em validação local',
+    'docsCharts.velero.note.validateBsl':
+      'Para storage compatível com S3, valide que o `BackupStorageLocation` atinja `Available`',
+    'docsCharts.velero.note.realBackup':
+      'Crie pelo menos um backup real de teste antes de habilitar agendamentos recorrentes em ambientes compartilhados',
     'docsCharts.flowise.intro.before': 'Helm chart para fazer deploy do',
-    'docsCharts.flowise.intro.after': 'no Kubernetes usando a imagem oficial `flowiseai/flowise`, com uma topologia standalone simples e uma topologia de fila escalável para workloads maiores.',
+    'docsCharts.flowise.intro.after':
+      'no Kubernetes usando a imagem oficial `flowiseai/flowise`, com uma topologia standalone simples e uma topologia de fila escalável para workloads maiores.',
     'docsCharts.flowise.feature.officialImage': 'Imagem oficial do Flowise baseada em `flowiseai/flowise`',
     'docsCharts.flowise.feature.standaloneMode': 'Modo standalone — SQLite e storage local para instalações simples',
-    'docsCharts.flowise.feature.queueMode': 'Modo fila — deploys separados de main e workers para processamento escalável',
+    'docsCharts.flowise.feature.queueMode':
+      'Modo fila — deploys separados de main e workers para processamento escalável',
     'docsCharts.flowise.feature.bundledDeps': 'PostgreSQL e Redis embutidos — subcharts opcionais para modo fila',
     'docsCharts.flowise.feature.externalSql': 'Suporte SQL externo — PostgreSQL ou MySQL externos',
-    'docsCharts.flowise.feature.s3Storage': 'Storage compartilhado com S3 — o modo fila usa storage compatível com S3 para blobs compartilhados',
+    'docsCharts.flowise.feature.s3Storage':
+      'Storage compartilhado com S3 — o modo fila usa storage compatível com S3 para blobs compartilhados',
     'docsCharts.flowise.feature.ingressSupport': 'Suporte a ingress — ingress configurável para a UI web do Flowise',
     'docsCharts.flowise.table.architectureMode': 'Topologia do Flowise: `standalone` ou `queue`',
     'docsCharts.flowise.table.replicaCount': 'Número de réplicas do servidor principal do Flowise',
@@ -3232,21 +3823,32 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.flowise.table.storageType': 'Tipo de storage de blobs: `local` ou `s3`',
     'docsCharts.flowise.table.persistenceEnabled': 'Persistir dados locais do Flowise',
     'docsCharts.flowise.table.appUrl': 'URL pública do Flowise',
-    'docsCharts.flowise.note.standaloneDefaults': '`standalone` usa SQLite por padrão com PVC local para instalação mais simples',
-    'docsCharts.flowise.note.queueRequirements': '`queue` exige Redis, banco SQL, `storage.type=s3` e `persistence.enabled=false`',
-    'docsCharts.flowise.note.queueScaleOut': 'O modo fila é voltado para deploys scale-out com pods main e worker separados',
+    'docsCharts.flowise.note.standaloneDefaults':
+      '`standalone` usa SQLite por padrão com PVC local para instalação mais simples',
+    'docsCharts.flowise.note.queueRequirements':
+      '`queue` exige Redis, banco SQL, `storage.type=s3` e `persistence.enabled=false`',
+    'docsCharts.flowise.note.queueScaleOut':
+      'O modo fila é voltado para deploys scale-out com pods main e worker separados',
     'docsCharts.flowise.note.localSingleNode': 'O storage local é intencionalmente orientado a nó único',
     'docsCharts.flowise.note.versionPinned': 'O chart fixa a versão `3.1.1`',
-    'docsCharts.flowise.note.versionValidated': 'Esta versão foi validada contra a release oficial do GitHub `flowise@3.1.1` e a tag oficial do Docker Hub `3.1.1`',
+    'docsCharts.flowise.note.versionValidated':
+      'Esta versão foi validada contra a release oficial do GitHub `flowise@3.1.1` e a tag oficial do Docker Hub `3.1.1`',
     'docsCharts.listmonk.intro.before': 'Helm chart para fazer deploy do',
-    'docsCharts.listmonk.intro.after': 'no Kubernetes — um gerenciador self-hosted de newsletter e mailing list com PostgreSQL embutido, storage persistente de uploads e backup S3 opcional.',
+    'docsCharts.listmonk.intro.after':
+      'no Kubernetes — um gerenciador self-hosted de newsletter e mailing list com PostgreSQL embutido, storage persistente de uploads e backup S3 opcional.',
     'docsCharts.listmonk.feature.officialImage': 'Imagem oficial do Listmonk baseada em `listmonk/listmonk`',
-    'docsCharts.listmonk.feature.bundledPostgresql': 'PostgreSQL embutido — instalação padrão inclui o chart PostgreSQL da HelmForge',
-    'docsCharts.listmonk.feature.externalDatabase': 'Suporte a banco externo — PostgreSQL gerenciado pode ser usado em vez do subchart',
-    'docsCharts.listmonk.feature.persistentUploads': 'Uploads persistentes — PVC configurável para armazenamento de mídia e anexos',
-    'docsCharts.listmonk.feature.s3Backup': 'Backup S3 — CronJob opcional para dumps de PostgreSQL em storage compatível com S3',
-    'docsCharts.listmonk.feature.idempotentBootstrap': 'Bootstrap idempotente — init container executa `--install --idempotent --yes` e `--upgrade --yes` em todo start',
-    'docsCharts.listmonk.feature.pgcrypto': 'Extensão pgcrypto — provisionada automaticamente via scripts init do PostgreSQL',
+    'docsCharts.listmonk.feature.bundledPostgresql':
+      'PostgreSQL embutido — instalação padrão inclui o chart PostgreSQL da HelmForge',
+    'docsCharts.listmonk.feature.externalDatabase':
+      'Suporte a banco externo — PostgreSQL gerenciado pode ser usado em vez do subchart',
+    'docsCharts.listmonk.feature.persistentUploads':
+      'Uploads persistentes — PVC configurável para armazenamento de mídia e anexos',
+    'docsCharts.listmonk.feature.s3Backup':
+      'Backup S3 — CronJob opcional para dumps de PostgreSQL em storage compatível com S3',
+    'docsCharts.listmonk.feature.idempotentBootstrap':
+      'Bootstrap idempotente — init container executa `--install --idempotent --yes` e `--upgrade --yes` em todo start',
+    'docsCharts.listmonk.feature.pgcrypto':
+      'Extensão pgcrypto — provisionada automaticamente via scripts init do PostgreSQL',
     'docsCharts.listmonk.table.replicaCount': 'Número de pods da aplicação Listmonk',
     'docsCharts.listmonk.table.adminUser': 'Usuário admin criado na primeira instalação',
     'docsCharts.listmonk.table.adminPassword': 'Senha admin (auto-gerada quando vazia)',
@@ -3257,17 +3859,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.listmonk.table.backupEnabled': 'Habilitar CronJob de backup S3',
     'docsCharts.listmonk.table.backupSchedule': 'Agendamento cron de backup',
     'docsCharts.listmonk.table.ingressEnabled': 'Habilitar exposição via ingress',
-    'docsCharts.listmonk.note.smtpConfig': 'A configuração SMTP é feita pela UI admin do Listmonk após a primeira instalação',
-    'docsCharts.listmonk.note.initContainer': 'O init container garante criação e migração do schema em todo start do pod',
-    'docsCharts.listmonk.note.pgcryptoRequired': 'O PostgreSQL exige a extensão `pgcrypto`, provisionada automaticamente pelo chart via scripts init',
+    'docsCharts.listmonk.note.smtpConfig':
+      'A configuração SMTP é feita pela UI admin do Listmonk após a primeira instalação',
+    'docsCharts.listmonk.note.initContainer':
+      'O init container garante criação e migração do schema em todo start do pod',
+    'docsCharts.listmonk.note.pgcryptoRequired':
+      'O PostgreSQL exige a extensão `pgcrypto`, provisionada automaticamente pelo chart via scripts init',
     'docsCharts.countly.intro.before': 'Faça deploy do',
-    'docsCharts.countly.intro.after': 'no Kubernetes — uma plataforma de product analytics com rastreamento de eventos, crash reporting, notificações push, A/B testing e mais de 41 plugins.',
-    'docsCharts.countly.feature.fullAnalytics': 'Stack completo de analytics — rastreamento de eventos, crash reporting, push notifications e A/B testing',
+    'docsCharts.countly.intro.after':
+      'no Kubernetes — uma plataforma de product analytics com rastreamento de eventos, crash reporting, notificações push, A/B testing e mais de 41 plugins.',
+    'docsCharts.countly.feature.fullAnalytics':
+      'Stack completo de analytics — rastreamento de eventos, crash reporting, push notifications e A/B testing',
     'docsCharts.countly.feature.mongodbBackend': 'Backend MongoDB — subchart embutido ou conexão externa',
     'docsCharts.countly.feature.dualPorts': 'Portas duais — endpoints separados de API (3001) e Dashboard (6001)',
-    'docsCharts.countly.feature.pluginSystem': 'Sistema de plugins — lista configurável de plugins para seleção de recursos',
+    'docsCharts.countly.feature.pluginSystem':
+      'Sistema de plugins — lista configurável de plugins para seleção de recursos',
     'docsCharts.countly.feature.scalableWorkers': 'Workers escaláveis — processos de API configuráveis',
-    'docsCharts.countly.feature.ingressSupport': 'Suporte a ingress — TLS com cert-manager e classe de ingress configurável',
+    'docsCharts.countly.feature.ingressSupport':
+      'Suporte a ingress — TLS com cert-manager e classe de ingress configurável',
     'docsCharts.countly.table.apiPort': 'Porta da API',
     'docsCharts.countly.table.dashboardPort': 'Porta do dashboard',
     'docsCharts.countly.table.apiWorkers': 'Processos de worker da API',
@@ -3280,7 +3889,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.countly.note.mongodbOnly': 'Somente MongoDB — sem suporte a PostgreSQL',
     'docsCharts.countly.note.singleInstance': 'Instância única por banco MongoDB',
     'docsCharts.countly.note.sameContainer': 'Dashboard e API rodam no mesmo container em portas separadas',
-    'docsCharts.rabbitmq.intro': 'Deploy de RabbitMQ pronto para produção com UI de gerenciamento e suporte a clustering.',
+    'docsCharts.rabbitmq.intro':
+      'Deploy de RabbitMQ pronto para produção com UI de gerenciamento e suporte a clustering.',
     'docsCharts.rabbitmq.feature.standaloneClustering': 'Standalone e clustering — instância única ou cluster multinó',
     'docsCharts.rabbitmq.feature.managementUi': 'UI de gerenciamento — console web embutido com suporte a ingress',
     'docsCharts.rabbitmq.feature.pluginSupport': 'Suporte a plugins — plugins RabbitMQ configuráveis',
@@ -3295,16 +3905,21 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.rabbitmq.table.ingressEnabled': 'Habilitar ingress para UI de gerenciamento',
     'docsCharts.rabbitmq.table.metricsEnabled': 'Habilitar exporter Prometheus',
     'docsCharts.uptimeKuma.intro.before': 'Faça deploy do',
-    'docsCharts.uptimeKuma.intro.after': 'no Kubernetes usando a imagem oficial `louislam/uptime-kuma`. Monitoramento self-hosted com checks HTTP/TCP/DNS/Ping, mais de 90 serviços de notificação e páginas de status customizáveis.',
-    'docsCharts.uptimeKuma.feature.monitorTypes': '20+ tipos de monitor — HTTP(s), TCP, Ping, DNS, Docker, WebSocket e mais',
-    'docsCharts.uptimeKuma.feature.notificationServices': '90+ serviços de notificação — Telegram, Discord, Slack, Email, Pushover e mais',
+    'docsCharts.uptimeKuma.intro.after':
+      'no Kubernetes usando a imagem oficial `louislam/uptime-kuma`. Monitoramento self-hosted com checks HTTP/TCP/DNS/Ping, mais de 90 serviços de notificação e páginas de status customizáveis.',
+    'docsCharts.uptimeKuma.feature.monitorTypes':
+      '20+ tipos de monitor — HTTP(s), TCP, Ping, DNS, Docker, WebSocket e mais',
+    'docsCharts.uptimeKuma.feature.notificationServices':
+      '90+ serviços de notificação — Telegram, Discord, Slack, Email, Pushover e mais',
     'docsCharts.uptimeKuma.feature.statusPages': 'Páginas de status — páginas públicas com domínios customizados',
     'docsCharts.uptimeKuma.feature.sqliteMariaDb': 'SQLite ou MariaDB — SQLite embutido (padrão) ou subchart MySQL',
     'docsCharts.uptimeKuma.feature.externalDatabase': 'Banco externo — conecte instâncias MariaDB existentes',
-    'docsCharts.uptimeKuma.feature.scheduledBackups': 'Backups agendados — tar de SQLite ou mysqldump com upload para S3',
+    'docsCharts.uptimeKuma.feature.scheduledBackups':
+      'Backups agendados — tar de SQLite ou mysqldump com upload para S3',
     'docsCharts.uptimeKuma.feature.ingressSupport': 'Suporte a ingress — TLS com cert-manager',
     'docsCharts.uptimeKuma.feature.twoFa': '2FA — autenticação de dois fatores nativa',
-    'docsCharts.uptimeKuma.setupWizard': 'Após o deploy, acesse o assistente de setup via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
+    'docsCharts.uptimeKuma.setupWizard':
+      'Após o deploy, acesse o assistente de setup via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.',
     'docsCharts.uptimeKuma.table.port': 'Porta da aplicação',
     'docsCharts.uptimeKuma.table.databaseType': 'Tipo de banco (sqlite, mariadb)',
     'docsCharts.uptimeKuma.table.mysqlEnabled': 'Fazer deploy do subchart MySQL',
@@ -3313,8 +3928,10 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.uptimeKuma.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.uptimeKuma.table.backupEnabled': 'Habilitar backups S3',
     'docsCharts.uptimeKuma.table.servicePort': 'Porta do serviço',
-    'docsCharts.pihole.intro': 'Faça deploy do DNS sinkhole Pi-hole no Kubernetes usando a imagem oficial `pihole/pihole`. Fornece bloqueio de anúncios em toda a rede via filtragem DNS com DNS recursivo Unbound opcional.',
-    'docsCharts.pihole.feature.adBlocking': 'Bloqueio de anúncios em toda a rede — filtragem DNS para todos os dispositivos',
+    'docsCharts.pihole.intro':
+      'Faça deploy do DNS sinkhole Pi-hole no Kubernetes usando a imagem oficial `pihole/pihole`. Fornece bloqueio de anúncios em toda a rede via filtragem DNS com DNS recursivo Unbound opcional.',
+    'docsCharts.pihole.feature.adBlocking':
+      'Bloqueio de anúncios em toda a rede — filtragem DNS para todos os dispositivos',
     'docsCharts.pihole.feature.customDns': 'Registros DNS customizados — registros A locais, CNAME e config dnsmasq',
     'docsCharts.pihole.feature.unboundSidecar': 'Sidecar Unbound — resolvedor DNS recursivo opcional para privacidade',
     'docsCharts.pihole.feature.v6Config': 'Pi-hole v6+ — configuração moderna via variáveis de ambiente FTLCONF',
@@ -3334,19 +3951,24 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.pihole.table.loadBalancerIp': 'IP fixo para DNS',
     'docsCharts.pihole.table.persistenceEnabled': 'Habilitar storage persistente',
     'docsCharts.pihole.table.persistenceSize': 'Tamanho do PVC',
-    'docsCharts.guacamole.intro': 'Faça deploy do Apache Guacamole no Kubernetes usando as imagens oficiais `guacamole/guacamole` e `guacamole/guacd`. Gateway de desktop remoto clientless com suporte a RDP, VNC, SSH e telnet com SSO OIDC/SAML.',
+    'docsCharts.guacamole.intro':
+      'Faça deploy do Apache Guacamole no Kubernetes usando as imagens oficiais `guacamole/guacamole` e `guacamole/guacd`. Gateway de desktop remoto clientless com suporte a RDP, VNC, SSH e telnet com SSO OIDC/SAML.',
     'docsCharts.guacamole.feature.guacdSidecar': 'Sidecar guacd — daemon de protocolo executa junto da aplicação web',
-    'docsCharts.guacamole.feature.postgresqlSubchart': 'Subchart PostgreSQL — incluído via dependência HelmForge (padrão)',
+    'docsCharts.guacamole.feature.postgresqlSubchart':
+      'Subchart PostgreSQL — incluído via dependência HelmForge (padrão)',
     'docsCharts.guacamole.feature.mysqlSubchart': 'Subchart MySQL — incluído via dependência HelmForge',
     'docsCharts.guacamole.feature.externalDatabase': 'Banco externo — conectar PostgreSQL ou MySQL existentes',
-    'docsCharts.guacamole.feature.databaseInitJob': 'Job de init de banco — inicialização automática do schema na instalação',
+    'docsCharts.guacamole.feature.databaseInitJob':
+      'Job de init de banco — inicialização automática do schema na instalação',
     'docsCharts.guacamole.feature.openidConnect': 'OpenID Connect — SSO com Keycloak, Okta, Azure AD e outros',
     'docsCharts.guacamole.feature.saml': 'SAML — SSO com qualquer provedor de identidade SAML 2.0',
     'docsCharts.guacamole.feature.totp': 'TOTP — autenticação de dois fatores',
     'docsCharts.guacamole.feature.scheduledBackups': 'Backups agendados — pg_dump ou mysqldump com upload para S3',
     'docsCharts.guacamole.feature.ingressSupport': 'Suporte a ingress — TLS com cert-manager',
-    'docsCharts.guacamole.defaultCredentials': 'Credenciais padrão: `guacadmin` / `guacadmin` — altere imediatamente após o primeiro login.',
-    'docsCharts.guacamole.redirectUri': 'O `redirectUri` é detectado automaticamente a partir da configuração de ingress.',
+    'docsCharts.guacamole.defaultCredentials':
+      'Credenciais padrão: `guacadmin` / `guacadmin` — altere imediatamente após o primeiro login.',
+    'docsCharts.guacamole.redirectUri':
+      'O `redirectUri` é detectado automaticamente a partir da configuração de ingress.',
     'docsCharts.guacamole.table.contextPath': 'Caminho de contexto web (`ROOT` = `/`)',
     'docsCharts.guacamole.table.guacdPort': 'Porta do daemon guacd',
     'docsCharts.guacamole.table.guacdLogLevel': 'Nível de log do guacd',
@@ -3361,11 +3983,14 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.guacamole.table.ingressEnabled': 'Habilitar ingress',
     'docsCharts.guacamole.table.backupEnabled': 'Habilitar backups S3',
     'docsCharts.mariadb.intro.before': 'Helm chart para fazer deploy do',
-    'docsCharts.mariadb.intro.after': 'no Kubernetes usando a imagem Docker oficial `mariadb`. Suporta arquiteturas standalone e replicação baseada em GTID.',
+    'docsCharts.mariadb.intro.after':
+      'no Kubernetes usando a imagem Docker oficial `mariadb`. Suporta arquiteturas standalone e replicação baseada em GTID.',
     'docsCharts.mariadb.feature.officialImage': 'Imagem oficial do MariaDB no Docker Hub (11.4 LTS)',
     'docsCharts.mariadb.feature.standaloneReplication': 'Modos standalone e replicação com configuração explícita',
-    'docsCharts.mariadb.feature.gtidReplication': 'Replicação baseada em GTID usando `MASTER_USE_GTID=slave_pos` nativo do MariaDB',
-    'docsCharts.mariadb.feature.configPresets': 'Presets de configuração: small, medium, large, oltp, read-heavy, analytics',
+    'docsCharts.mariadb.feature.gtidReplication':
+      'Replicação baseada em GTID usando `MASTER_USE_GTID=slave_pos` nativo do MariaDB',
+    'docsCharts.mariadb.feature.configPresets':
+      'Presets de configuração: small, medium, large, oltp, read-heavy, analytics',
     'docsCharts.mariadb.feature.tls': 'Criptografia TLS no servidor com enforcement opcional no cliente',
     'docsCharts.mariadb.feature.prometheusMetrics': 'Métricas Prometheus via sidecar mysqld-exporter e ServiceMonitor',
     'docsCharts.mariadb.feature.s3Backup': 'CronJob de backup compatível com S3 usando mariadb-dump',
@@ -3377,7 +4002,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mariadb.table.username': 'Usuário da aplicação',
     'docsCharts.mariadb.table.password': 'Senha da aplicação (auto-gerada quando vazia)',
     'docsCharts.mariadb.table.existingSecret': 'Secret existente com senhas',
-    'docsCharts.mariadb.table.configPreset': 'Preset de configuração: small, medium, large, oltp, read-heavy, analytics',
+    'docsCharts.mariadb.table.configPreset':
+      'Preset de configuração: small, medium, large, oltp, read-heavy, analytics',
     'docsCharts.mariadb.table.standaloneSize': 'Tamanho do PVC em standalone',
     'docsCharts.mariadb.table.readReplicas': 'Número de réplicas de leitura',
     'docsCharts.mariadb.table.binlogFormat': 'Formato do binlog',
@@ -3385,17 +4011,25 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.mariadb.table.metricsEnabled': 'Habilitar mysqld-exporter',
     'docsCharts.mariadb.table.tlsEnabled': 'Habilitar TLS no servidor',
     'docsCharts.mariadb.table.networkPolicyEnabled': 'Habilitar NetworkPolicy',
-    'docsCharts.mariadb.architectureSelection': 'Quando `architecture` é `standalone` (padrão), o chart faz deploy de uma única instância MariaDB. Defina `architecture: replication` para uma source fixa com réplicas de leitura assíncronas baseadas em GTID.',
+    'docsCharts.mariadb.architectureSelection':
+      'Quando `architecture` é `standalone` (padrão), o chart faz deploy de uma única instância MariaDB. Defina `architecture: replication` para uma source fixa com réplicas de leitura assíncronas baseadas em GTID.',
     'docsCharts.druid.intro.before': 'Faça deploy do',
-    'docsCharts.druid.intro.after': 'no Kubernetes — um banco analítico em tempo real de alta performance, projetado para análises rápidas de slice-and-dice em grandes datasets, com uso comum em dashboards BI e exploração de dados em tempo real.',
-    'docsCharts.druid.feature.sixComponentArchitecture': 'Arquitetura com 6 componentes — coordinator, overlord, broker, router, historical, middlemanager',
+    'docsCharts.druid.intro.after':
+      'no Kubernetes — um banco analítico em tempo real de alta performance, projetado para análises rápidas de slice-and-dice em grandes datasets, com uso comum em dashboards BI e exploração de dados em tempo real.',
+    'docsCharts.druid.feature.sixComponentArchitecture':
+      'Arquitetura com 6 componentes — coordinator, overlord, broker, router, historical, middlemanager',
     'docsCharts.druid.feature.routerConsole': 'Console web do router — console Druid nativo acessível via ingress',
-    'docsCharts.druid.feature.postgresqlMetadataStore': 'Store de metadados PostgreSQL — subchart embutido ou PostgreSQL/MySQL externo',
-    'docsCharts.druid.feature.zookeeperCoordination': 'Coordenação com ZooKeeper — subchart embutido ou ZooKeeper externo',
+    'docsCharts.druid.feature.postgresqlMetadataStore':
+      'Store de metadados PostgreSQL — subchart embutido ou PostgreSQL/MySQL externo',
+    'docsCharts.druid.feature.zookeeperCoordination':
+      'Coordenação com ZooKeeper — subchart embutido ou ZooKeeper externo',
     'docsCharts.druid.feature.deepStorage': 'Deep storage — local ou compatível com S3 (MinIO, AWS S3)',
-    'docsCharts.druid.feature.persistentVolumes': 'Volumes persistentes — cache de segmentos (historical) e storage de tarefas (middlemanager)',
-    'docsCharts.druid.feature.perComponentScaling': 'Escalonamento por componente — réplicas e tuning de JVM independentes',
-    'docsCharts.druid.feature.healthProbes': 'Health probes — liveness em /status/health e readiness em /status/selfDiscovered',
+    'docsCharts.druid.feature.persistentVolumes':
+      'Volumes persistentes — cache de segmentos (historical) e storage de tarefas (middlemanager)',
+    'docsCharts.druid.feature.perComponentScaling':
+      'Escalonamento por componente — réplicas e tuning de JVM independentes',
+    'docsCharts.druid.feature.healthProbes':
+      'Health probes — liveness em /status/health e readiness em /status/selfDiscovered',
     'docsCharts.druid.feature.ingressSupport': 'Suporte a ingress — classe configurável (traefik, nginx, etc.)',
     'docsCharts.druid.table.imageRepository': 'Imagem de container Druid',
     'docsCharts.druid.table.coordinatorEnabled': 'Habilitar coordinator',
@@ -3411,16 +4045,20 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.druid.table.metadataMode': 'Modo de metadados: subchart ou external',
     'docsCharts.druid.table.zookeeperMode': 'Modo ZooKeeper: subchart ou external',
     'docsCharts.druid.table.deepStorageType': 'Deep storage: local ou s3',
-    'docsCharts.druid.note.memoryIntensive': 'Druid é intensivo em memória — os 6 componentes juntos exigem no mínimo 2GB+ de RAM',
+    'docsCharts.druid.note.memoryIntensive':
+      'Druid é intensivo em memória — os 6 componentes juntos exigem no mínimo 2GB+ de RAM',
     'docsCharts.druid.note.tuneJvm': 'Ajuste heap de JVM por componente via `javaOpts` para sizing de produção',
     'docsCharts.druid.note.routerIngressTarget': 'O componente router serve o console web e é o alvo padrão de ingress',
-    'docsCharts.druid.note.s3ForProduction': 'Use deep storage em S3 para produção; deep storage local é indicado apenas para desenvolvimento',
-    'docsCharts.druid.note.historicalCache': 'Nós historical fazem cache de segmentos em disco — dimensione o PVC pelo volume de dados',
+    'docsCharts.druid.note.s3ForProduction':
+      'Use deep storage em S3 para produção; deep storage local é indicado apenas para desenvolvimento',
+    'docsCharts.druid.note.historicalCache':
+      'Nós historical fazem cache de segmentos em disco — dimensione o PVC pelo volume de dados',
     'docsCharts.auto.adguard_home.b0': 'Network-wide ad blocking — DNS-level filtering para all devices',
     'docsCharts.auto.adguard_home.b1': 'Two deployment modes — wizard (porta 3000) or pre-configured (porta 80)',
     'docsCharts.auto.adguard_home.b2': 'DNS sobre HTTPS / TLS — resolvedores DNS upstream criptografados',
     'docsCharts.auto.adguard_home.b3': 'AdGuardHome Sync — sincronização multi-instância via adguardhome-sync',
-    'docsCharts.auto.adguard_home.b4': 'S3 backup — automated CronJob-based backup para any S3-compatible armazenamento',
+    'docsCharts.auto.adguard_home.b4':
+      'S3 backup — automated CronJob-based backup para any S3-compatible armazenamento',
     'docsCharts.auto.adguard_home.b5': 'Separate DNS serviço — dedicated LoadBalancer para DNS traffic',
     'docsCharts.auto.adguard_home.b6': 'Ingress support — TLS com cert-manager para o web UI',
     'docsCharts.auto.adguard_home.b7': 'Config seeding — initial configuração preserved across upgrades',
@@ -3448,7 +4086,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.answer.t0': 'Nome do site',
     'docsCharts.auto.answer.t1': 'Full externo URL (auto-detected de ingress)',
     'docsCharts.auto.answer.t2': 'Habilitar unattended setup',
-    'docsCharts.auto.archivebox.b0': 'Arquivamento em múltiplos formatos — HTML, PDF, captura de tela, WARC, extração de mídia, git clone',
+    'docsCharts.auto.archivebox.b0':
+      'Arquivamento em múltiplos formatos — HTML, PDF, captura de tela, WARC, extração de mídia, git clone',
     'docsCharts.auto.archivebox.b1': 'Chromium headless — full browser rendering com /dev/shm memory-backed tmpfs',
     'docsCharts.auto.archivebox.b2': 'Persistente armazenamento — PVC para archived content e banco de dados',
     'docsCharts.auto.archivebox.b3': 'Admin credentials — managed via Kubernetes Secret com auto-generation',
@@ -3489,16 +4128,22 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.castopod.b5': 'Persistence — persistente armazenamento para uploads, cache, e session data',
     'docsCharts.auto.castopod.t0': 'Público base URL (obrigatório)',
     'docsCharts.auto.castopod.t1': 'Habilitar bundled MariaDB subchart',
-    'docsCharts.auto.changedetection.b0': 'Website Monitoring — detect changes em any web page com configurable check intervals',
-    'docsCharts.auto.changedetection.b1': 'CSS/XPath Selectors — target specific page elements para precise change detection',
-    'docsCharts.auto.changedetection.b2': 'Browser Sidecar — optional Playwright/Chromium sidecar para JavaScript-rendered pages',
-    'docsCharts.auto.changedetection.b3': 'Notifications — email, webhook, Slack, Telegram, e many more notification channels',
+    'docsCharts.auto.changedetection.b0':
+      'Website Monitoring — detect changes em any web page com configurable check intervals',
+    'docsCharts.auto.changedetection.b1':
+      'CSS/XPath Selectors — target specific page elements para precise change detection',
+    'docsCharts.auto.changedetection.b2':
+      'Browser Sidecar — optional Playwright/Chromium sidecar para JavaScript-rendered pages',
+    'docsCharts.auto.changedetection.b3':
+      'Notifications — email, webhook, Slack, Telegram, e many more notification channels',
     'docsCharts.auto.changedetection.b4': 'REST API — programmatic access para watches e change history',
-    'docsCharts.auto.changedetection.b5': 'Persistence — SQLite banco de dados e page snapshots stored em persistente volume',
+    'docsCharts.auto.changedetection.b5':
+      'Persistence — SQLite banco de dados e page snapshots stored em persistente volume',
     'docsCharts.auto.changedetection.t0': 'Número de concurrent fetch workers',
     'docsCharts.auto.changedetection.t1': 'Habilitar Playwright browser sidecar',
     'docsCharts.auto.chiefonboarding.b0': 'Task Sequences — define onboarding workflows com ordered tasks e triggers',
-    'docsCharts.auto.chiefonboarding.b1': 'Auto-Generated Secret — Django secret key gerado automatically if not provided',
+    'docsCharts.auto.chiefonboarding.b1':
+      'Auto-Generated Secret — Django secret key gerado automatically if not provided',
     'docsCharts.auto.chiefonboarding.b2': 'Integrations — connect com Slack, Google Workspace, e other services',
     'docsCharts.auto.chiefonboarding.b3': 'Web Interface — admin dashboard para managing onboarding processes',
     'docsCharts.auto.chiefonboarding.t0': 'Chave secreta do Django (auto-generated if empty)',
@@ -3529,7 +4174,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cloudflared.b5': 'Existente secrets — bring your own Secret para o tunnel token',
     'docsCharts.auto.cloudflared.b6': 'Não use HPA — reduzir escala encerra conexões de túnel ativas',
     'docsCharts.auto.cloudflared.b7': 'Não ingress template — cloudflared replaces traditional ingress controllers',
-    'docsCharts.auto.cloudflared.b8': 'Routing is dashboard-managed — use o Cloudflare dashboard para map hostnames para services',
+    'docsCharts.auto.cloudflared.b8':
+      'Routing is dashboard-managed — use o Cloudflare dashboard para map hostnames para services',
     'docsCharts.auto.cloudflared.t0': 'Tunnel token de Cloudflare dashboard',
     'docsCharts.auto.cloudflared.t1': 'Existente secret com tunnel token',
     'docsCharts.auto.cloudflared.t2': 'Desabilitar auto-update',
@@ -3549,7 +4195,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.cronicle.t2': 'Hostname do servidor SMTP',
     'docsCharts.auto.cronicle.t3': 'Gerar automaticamente chave de criptografia da sessão',
     'docsCharts.auto.cronicle.t4': 'Habilitar persistente job armazenamento',
-    'docsCharts.auto.ddns_updater.b0': '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, e more',
+    'docsCharts.auto.ddns_updater.b0':
+      '50+ DNS providers — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, e more',
     'docsCharts.auto.ddns_updater.b1': 'Web UI — responsive dashboard para monitoring update status',
     'docsCharts.auto.ddns_updater.b2': 'Multi-provider — manage records across diferente providers em a único deploy',
     'docsCharts.auto.ddns_updater.b3': 'Persistente history — update history stored in a PVC',
@@ -3566,17 +4213,21 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.discount_bandit.b1': 'SQLite Persistence — lightweight banco de dados com no externo dependencies',
     'docsCharts.auto.discount_bandit.b2': 'Auto-Generated App Key — Laravel application key gerado automatically',
     'docsCharts.auto.discount_bandit.b3': 'Price History — track price changes over time com historical data',
-    'docsCharts.auto.discount_bandit.b4': 'Alertas de ofertas — receba notificação quando o preço cair abaixo da sua meta',
+    'docsCharts.auto.discount_bandit.b4':
+      'Alertas de ofertas — receba notificação quando o preço cair abaixo da sua meta',
     'docsCharts.auto.discount_bandit.b5': 'Interface web — manage tracked products through a clean dashboard',
     'docsCharts.auto.discount_bandit.t0': 'Public URL de o instance',
     'docsCharts.auto.discount_bandit.t1': 'Habilitar SQLite persistence',
     'docsCharts.auto.docmost.b0': 'Official Docmost image based em `docmost/docmost`',
     'docsCharts.auto.docmost.b1': 'Bundled PostgreSQL padrão install includes o HelmForge PostgreSQL chart',
     'docsCharts.auto.docmost.b2': 'Bundled Redis padrão install includes o HelmForge Redis chart',
-    'docsCharts.auto.docmost.b3': 'Externo services support managed PostgreSQL e Redis can be used instead de subcharts',
-    'docsCharts.auto.docmost.b4': 'Local or S3 armazenamento choose persistente local armazenamento or S3-compatible object armazenamento para uploads',
+    'docsCharts.auto.docmost.b3':
+      'Externo services support managed PostgreSQL e Redis can be used instead de subcharts',
+    'docsCharts.auto.docmost.b4':
+      'Local or S3 armazenamento choose persistente local armazenamento or S3-compatible object armazenamento para uploads',
     'docsCharts.auto.docmost.b5': 'Ingress support configurable ingress com stable externo URL handling',
-    'docsCharts.auto.docmost.b6': 'Bootstrap-ready banco de dados PostgreSQL init scripts grant Docmost o required extension privileges em first startup',
+    'docsCharts.auto.docmost.b6':
+      'Bootstrap-ready banco de dados PostgreSQL init scripts grant Docmost o required extension privileges em first startup',
     'docsCharts.auto.docmost.t0': 'Número de Docmost application pods',
     'docsCharts.auto.docmost.t1': 'Externo URL used by Docmost',
     'docsCharts.auto.docmost.t2': 'Banco de dados modo: `auto`, `externo`, or `postgresql`',
@@ -3589,7 +4240,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.dolibarr.b2': 'Externo MySQL/MariaDB connect para a managed banco de dados',
     'docsCharts.auto.dolibarr.b3': 'Instalação automática sem intervenção via variáveis de ambiente `DOLI_*`',
     'docsCharts.auto.dolibarr.b4': 'Persistente armazenamento separate PVCs para documents e custom modules',
-    'docsCharts.auto.dolibarr.b5': 'Secret preservation admin, runtime, e banco de dados secrets preserved across upgrades',
+    'docsCharts.auto.dolibarr.b5':
+      'Secret preservation admin, runtime, e banco de dados secrets preserved across upgrades',
     'docsCharts.auto.dolibarr.t0': 'Full externo URL (auto-detected de ingress if empty)',
     'docsCharts.auto.dolibarr.t1': 'Company name para unattended setup',
     'docsCharts.auto.dolibarr.t10': 'Persistir `/var/www/html/custom`',
@@ -3602,39 +4254,66 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.dolibarr.t7': 'Banco de dados modo: `auto`, `externo`, `mysql`',
     'docsCharts.auto.dolibarr.t8': 'Persistir `/var/www/documents`',
     'docsCharts.auto.dolibarr.t9': 'Documents <span data-i18n="docsCharts.common.pvcSize">PVC tamanho</span>',
-    'docsCharts.auto.fastmcp_server.b0': 'Multi-source loading — tools, resources, prompts, e knowledge de inline ConfigMaps, S3-compatible armazenamento (AWS S3, MinIO, R2), or Git repositories',
-    'docsCharts.auto.fastmcp_server.b1': 'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching o bucket',
-    'docsCharts.auto.fastmcp_server.b10': 'Built-in Web UI — dashboard at `/ui` com tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
-    'docsCharts.auto.fastmcp_server.b11': 'Prometheus métricas — tool call counts, durations, errors, source sync status at `/métricas`',
-    'docsCharts.auto.fastmcp_server.b12': 'Structured JSON logging — `LOG_FORMAT=json` para Loki, ELK, CloudWatch, Datadog',
-    'docsCharts.auto.fastmcp_server.b13': 'Dedicated saúde endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
+    'docsCharts.auto.fastmcp_server.b0':
+      'Multi-source loading — tools, resources, prompts, e knowledge de inline ConfigMaps, S3-compatible armazenamento (AWS S3, MinIO, R2), or Git repositories',
+    'docsCharts.auto.fastmcp_server.b1':
+      'Merge precedence — Inline (highest) > S3 > Git (lowest) — override S3 tools locally without touching o bucket',
+    'docsCharts.auto.fastmcp_server.b10':
+      'Built-in Web UI — dashboard at `/ui` com tools/resources/prompts explorer (Alpine.js + Tailwind CDN)',
+    'docsCharts.auto.fastmcp_server.b11':
+      'Prometheus métricas — tool call counts, durations, errors, source sync status at `/métricas`',
+    'docsCharts.auto.fastmcp_server.b12':
+      'Structured JSON logging — `LOG_FORMAT=json` para Loki, ELK, CloudWatch, Datadog',
+    'docsCharts.auto.fastmcp_server.b13':
+      'Dedicated saúde endpoints — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)',
     'docsCharts.auto.fastmcp_server.b14': 'Diagnostic endpoint — `GET /debug/info` com full server introspection',
-    'docsCharts.auto.fastmcp_server.b15': 'Padrão de contêiner init — pré-sincroniza fontes antes de iniciar o servidor via `initSync.enabled`',
-    'docsCharts.auto.fastmcp_server.b16': 'Strict loading — `MCP_STRICT_LOADING=true` fails em boot if any tool/resource has errors',
-    'docsCharts.auto.fastmcp_server.b17': 'Hot reload — automatic tool/resource reload em filesystem changes via `MCP_HOT_RELOAD=true`',
+    'docsCharts.auto.fastmcp_server.b15':
+      'Padrão de contêiner init — pré-sincroniza fontes antes de iniciar o servidor via `initSync.enabled`',
+    'docsCharts.auto.fastmcp_server.b16':
+      'Strict loading — `MCP_STRICT_LOADING=true` fails em boot if any tool/resource has errors',
+    'docsCharts.auto.fastmcp_server.b17':
+      'Hot reload — automatic tool/resource reload em filesystem changes via `MCP_HOT_RELOAD=true`',
     'docsCharts.auto.fastmcp_server.b18': 'Periodic sync — poll S3/Git sources para changes at configurable intervals',
     'docsCharts.auto.fastmcp_server.b19': 'Webhook reload — `POST /reload` endpoint para CI/CD-triggered reloads',
-    'docsCharts.auto.fastmcp_server.b2': 'Bearer e JWT authentication — built-in via FastMCPs `StaticTokenVerifier` e `JWTVerifier`',
+    'docsCharts.auto.fastmcp_server.b2':
+      'Bearer e JWT authentication — built-in via FastMCPs `StaticTokenVerifier` e `JWTVerifier`',
     'docsCharts.auto.fastmcp_server.b20': 'OCI artifact source — pull tool bundles de OCI registries via ORAS',
     'docsCharts.auto.fastmcp_server.b21': 'Selective sync — include/exclude glob patterns para source filtering',
-    'docsCharts.auto.fastmcp_server.b22': 'Gateway modo — compose multiple MCP servers via `MCP_MODE=gateway` e `MCP_MOUNT_SERVERS`',
-    'docsCharts.auto.fastmcp_server.b23': 'Tag visibility — enable/disable tools by tags com `MCP_ENABLE_TAGS` e `MCP_DISABLE_TAGS`',
-    'docsCharts.auto.fastmcp_server.b24': 'Autenticação múltipla — combine provedores bearer + JWT via `MCP_AUTH_PROVIDERS`',
-    'docsCharts.auto.fastmcp_server.b25': 'Tool-level scopes — `__required_scopes__` module variable para authorization',
-    'docsCharts.auto.fastmcp_server.b26': 'Context integration — tools can use `ctx: Context` para progress, logging, sampling, elicitation, e session state',
-    'docsCharts.auto.fastmcp_server.b27': 'Limite de taxa — variável de módulo `__rate_limit__` ou variável de ambiente `MCP_RATE_LIMIT_DEFAULT` (janela deslizante)',
-    'docsCharts.auto.fastmcp_server.b28': 'Caching — `__cache_ttl__` module variable para idempotent tool result caching',
-    'docsCharts.auto.fastmcp_server.b29': 'Tool sandboxing — `__max_memory_mb__` e `__max_output_size_kb__` resource limits per tool',
-    'docsCharts.auto.fastmcp_server.b3': 'Knowledge base support — serve Markdown files as MCP resources para RAG e context injection',
+    'docsCharts.auto.fastmcp_server.b22':
+      'Gateway modo — compose multiple MCP servers via `MCP_MODE=gateway` e `MCP_MOUNT_SERVERS`',
+    'docsCharts.auto.fastmcp_server.b23':
+      'Tag visibility — enable/disable tools by tags com `MCP_ENABLE_TAGS` e `MCP_DISABLE_TAGS`',
+    'docsCharts.auto.fastmcp_server.b24':
+      'Autenticação múltipla — combine provedores bearer + JWT via `MCP_AUTH_PROVIDERS`',
+    'docsCharts.auto.fastmcp_server.b25':
+      'Tool-level scopes — `__required_scopes__` module variable para authorization',
+    'docsCharts.auto.fastmcp_server.b26':
+      'Context integration — tools can use `ctx: Context` para progress, logging, sampling, elicitation, e session state',
+    'docsCharts.auto.fastmcp_server.b27':
+      'Limite de taxa — variável de módulo `__rate_limit__` ou variável de ambiente `MCP_RATE_LIMIT_DEFAULT` (janela deslizante)',
+    'docsCharts.auto.fastmcp_server.b28':
+      'Caching — `__cache_ttl__` module variable para idempotent tool result caching',
+    'docsCharts.auto.fastmcp_server.b29':
+      'Tool sandboxing — `__max_memory_mb__` e `__max_output_size_kb__` resource limits per tool',
+    'docsCharts.auto.fastmcp_server.b3':
+      'Knowledge base support — serve Markdown files as MCP resources para RAG e context injection',
     'docsCharts.auto.fastmcp_server.b30': 'PodDisruptionBudget — `pdb.enabled` para zero-downtime rolling updates',
-    'docsCharts.auto.fastmcp_server.b31': 'HorizontalPodAutoscaler — `autoscaling.enabled` para auto-scaling based em CPU/memory',
-    'docsCharts.auto.fastmcp_server.b32': 'Segurança — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
-    'docsCharts.auto.fastmcp_server.b4': 'Pacotes pip extras — instala pacotes Python adicionais na inicialização antes de carregar ferramentas',
-    'docsCharts.auto.fastmcp_server.b5': 'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables para tool categorization e behavior hints',
-    'docsCharts.auto.fastmcp_server.b6': 'Resource templates — parameterized URIs like `users://{user_id}/profile` para dynamic resources',
-    'docsCharts.auto.fastmcp_server.b7': 'Multiple resources per file — `RESOURCES` dict maps multiple URIs para handler functions',
-    'docsCharts.auto.fastmcp_server.b8': 'Error masking — hide internal error details de clients via `MCP_MASK_ERROR_DETAILS`',
-    'docsCharts.auto.fastmcp_server.b9': 'Tratamento de duplicados — controla o comportamento quando ferramentas compartilham nomes via `MCP_ON_DUPLICATE_TOOLS`',
+    'docsCharts.auto.fastmcp_server.b31':
+      'HorizontalPodAutoscaler — `autoscaling.enabled` para auto-scaling based em CPU/memory',
+    'docsCharts.auto.fastmcp_server.b32':
+      'Segurança — Trivy vulnerability scan, CycloneDX SBOM, Cosign keyless signing, SLSA provenance',
+    'docsCharts.auto.fastmcp_server.b4':
+      'Pacotes pip extras — instala pacotes Python adicionais na inicialização antes de carregar ferramentas',
+    'docsCharts.auto.fastmcp_server.b5':
+      'Tool metadata — optional `__tags__`, `__timeout__`, `__annotations_mcp__` module variables para tool categorization e behavior hints',
+    'docsCharts.auto.fastmcp_server.b6':
+      'Resource templates — parameterized URIs like `users://{user_id}/profile` para dynamic resources',
+    'docsCharts.auto.fastmcp_server.b7':
+      'Multiple resources per file — `RESOURCES` dict maps multiple URIs para handler functions',
+    'docsCharts.auto.fastmcp_server.b8':
+      'Error masking — hide internal error details de clients via `MCP_MASK_ERROR_DETAILS`',
+    'docsCharts.auto.fastmcp_server.b9':
+      'Tratamento de duplicados — controla o comportamento quando ferramentas compartilham nomes via `MCP_ON_DUPLICATE_TOOLS`',
     'docsCharts.auto.fastmcp_server.t0': 'Container imagem',
     'docsCharts.auto.fastmcp_server.t1': 'Imagem tag',
     'docsCharts.auto.fastmcp_server.t10': 'Arquivos inline de ferramentas Python',
@@ -3694,13 +4373,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.gitea.t9': 'Habilitar SSH serviço',
     'docsCharts.auto.heimdall.b0': 'LinuxServer.io image based em `linuxserver/heimdall`',
     'docsCharts.auto.heimdall.b1': 'Persistente armazenamento SQLite banco de dados e settings in `/config`',
-    'docsCharts.auto.heimdall.b2': 'S3-compatible backup CronJob that archives `/config` e uploads para any S3 endpoint',
+    'docsCharts.auto.heimdall.b2':
+      'S3-compatible backup CronJob that archives `/config` e uploads para any S3 endpoint',
     'docsCharts.auto.heimdall.b3': 'Controle de propriedade de arquivos PUID/PGID',
     'docsCharts.auto.heimdall.t0': 'Usuário ID para file permissions',
     'docsCharts.auto.heimdall.t1': 'Group ID para file permissions',
     'docsCharts.auto.heimdall.t2': 'Cron agendamento',
     'docsCharts.auto.homarr.b0': 'Official Homarr image de `ghcr.io/homarr-labs/homarr`',
-    'docsCharts.auto.homarr.b1': 'Encryption key management auto-generated or existente secret para `SECRET_ENCRYPTION_KEY`',
+    'docsCharts.auto.homarr.b1':
+      'Encryption key management auto-generated or existente secret para `SECRET_ENCRYPTION_KEY`',
     'docsCharts.auto.homarr.b2': 'Kubernetes integração optional workload discovery via `ENABLE_KUBERNETES`',
     'docsCharts.auto.homarr.b3': 'Externo Redis optional externo Redis para multi-instance setups',
     'docsCharts.auto.homarr.t0': 'Provedores de autenticação (credentials, ldap, oidc)',
@@ -3718,7 +4399,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.karakeep.b1': 'Chromium Sidecar — optional headless browser para web page screenshots e archiving',
     'docsCharts.auto.karakeep.b2': 'AI Tagging — automatic bookmark categorization e tagging',
     'docsCharts.auto.karakeep.b3': 'Full-Text Search — search across bookmarks, tags, e archived content',
-    'docsCharts.auto.karakeep.b4': 'Persistence — persistente armazenamento para SQLite banco de dados e uploaded files',
+    'docsCharts.auto.karakeep.b4':
+      'Persistence — persistente armazenamento para SQLite banco de dados e uploaded files',
     'docsCharts.auto.karakeep.b5': 'Lightweight — single-pod deployment com optional sidecars',
     'docsCharts.auto.karakeep.t0': 'Public URL de o Karakeep instance',
     'docsCharts.auto.karakeep.t1': 'Habilitar Meilisearch sidecar para full-text search',
@@ -3726,7 +4408,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.komga.b0': 'SQLite Banco de dados — zero banco de dados configuration, persistente via PVC',
     'docsCharts.auto.komga.b1': 'Dual Persistente Volumes — separate PVCs para config e library data',
     'docsCharts.auto.komga.b2': 'Java Memória Tuning — configurável JVM heap via `JAVA_TOOL_OPTIONS`',
-    'docsCharts.auto.komga.b3': '<span data-i18n="docsCharts.common.timezone">Timezone</span> Suporte — configurável via `TZ` environment variable',
+    'docsCharts.auto.komga.b3':
+      '<span data-i18n="docsCharts.common.timezone">Timezone</span> Suporte — configurável via `TZ` environment variable',
     'docsCharts.auto.komga.b4': 'Scheduled Backups — config/banco de dados tar archive com S3 upload',
     'docsCharts.auto.komga.t0': 'Container porta',
     'docsCharts.auto.komga.t1': 'Base URL path para reverse proxy',
@@ -3741,7 +4424,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.liwan.b2': 'Persistente armazenamento — PVC-backed data directory',
     'docsCharts.auto.metabase.b0': 'Interactive dashboards — drag-e-drop visualization builder',
     'docsCharts.auto.metabase.b1': 'JVM tuning — configurável Java memória settings',
-    'docsCharts.auto.middleware.b0': 'All four DORA métricas — Deploy Frequency, Lead Time para Changes, MTTR, Change Failure Rate',
+    'docsCharts.auto.middleware.b0':
+      'All four DORA métricas — Deploy Frequency, Lead Time para Changes, MTTR, Change Failure Rate',
     'docsCharts.auto.middleware.b1': 'All-in-one container — frontend, analytics, e sync server in a single image',
     'docsCharts.auto.middleware.b2': 'PostgreSQL + Redis — bundled subcharts or externo connections',
     'docsCharts.auto.middleware.b3': 'CI/CD integrations — tracks métricas de your existente pipelines',
@@ -3755,7 +4439,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.middleware.t6': 'Use externo banco de dados',
     'docsCharts.auto.middleware.t7': 'Habilitar /app/keys persistence',
     'docsCharts.auto.minecraft.b0': 'Múltiplos Server Types — Vanilla, Paper, Spigot, Forge, Fabric, Quilt',
-    'docsCharts.auto.minecraft.b1': 'GeyserMC Cross-Play — Allow Bedrock clients (mobile, console) para join Java servers',
+    'docsCharts.auto.minecraft.b1':
+      'GeyserMC Cross-Play — Allow Bedrock clients (mobile, console) para join Java servers',
     'docsCharts.auto.minecraft.b2': 'Authentication — Online/offline modo, whitelist, operators',
     'docsCharts.auto.minecraft.b3': 'RCON — Remote console com auto-generated senha',
     'docsCharts.auto.minecraft.b4': 'Scheduled Backups — CronJob-based backup para S3-compatible armazenamento',
@@ -3773,12 +4458,15 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.minecraft.t8': 'Habilitar GeyserMC cross-play',
     'docsCharts.auto.minecraft.t9': 'Habilitar RCON remote console',
     'docsCharts.auto.mosquitto.b0': 'Official Mosquitto image based em `eclipse-mosquitto`',
-    'docsCharts.auto.mosquitto.b1': 'Standalone modo single broker deployment para o simplest e most predictable runtime',
-    'docsCharts.auto.mosquitto.b2': 'Federated modo multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
+    'docsCharts.auto.mosquitto.b1':
+      'Standalone modo single broker deployment para o simplest e most predictable runtime',
+    'docsCharts.auto.mosquitto.b2':
+      'Federated modo multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers',
     'docsCharts.auto.mosquitto.b3': 'WebSocket listener browser-ready MQTT access em a dedicated listener',
     'docsCharts.auto.mosquitto.b4': 'MQTTX Web companion optional web client deployment com separate scaling controls',
     'docsCharts.auto.mosquitto.b5': 'Authentication e ACL optional username/senha e ACL file generation',
-    'docsCharts.auto.mosquitto.b6': 'Ingress support configurable ingress para broker WebSocket access e o optional MQTTX Web UI',
+    'docsCharts.auto.mosquitto.b6':
+      'Ingress support configurable ingress para broker WebSocket access e o optional MQTTX Web UI',
     'docsCharts.auto.mosquitto.t0': 'Topologia do broker: `standalone` or `federated`',
     'docsCharts.auto.mosquitto.t1': 'Número de broker replicas',
     'docsCharts.auto.mosquitto.t10': 'Fazer deploy de MQTTX Web companion UI',
@@ -3796,10 +4484,12 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.n8n.t2': 'Habilitar Redis-backed queue modo',
     'docsCharts.auto.n8n.t3': 'Número de worker replicas',
     'docsCharts.auto.n8n.t4': 'Jobs por worker',
-    'docsCharts.auto.ntfy.b0': 'REST API & WebSocket — publish e subscribe para topics via simple HTTP PUT/POST or WebSocket',
+    'docsCharts.auto.ntfy.b0':
+      'REST API & WebSocket — publish e subscribe para topics via simple HTTP PUT/POST or WebSocket',
     'docsCharts.auto.ntfy.b1': 'Firebase & UnifiedPush — supports Android push delivery through FCM e UnifiedPush',
     'docsCharts.auto.ntfy.b2': 'Prometheus Métricas — optional `/métricas` endpoint com ServiceMonitor support',
-    'docsCharts.auto.ntfy.b3': 'Behind-Proxy Modo — trusts `X-Forwarded-For` headers para correct client identification',
+    'docsCharts.auto.ntfy.b3':
+      'Behind-Proxy Modo — trusts `X-Forwarded-For` headers para correct client identification',
     'docsCharts.auto.ntfy.b4': 'Attachment Support — configurable file attachment size e expiry limits',
     'docsCharts.auto.ntfy.b5': 'Persistence — persistente armazenamento para cache e authentication databases',
     'docsCharts.auto.ntfy.t0': 'Confiar nos cabeçalhos X-Forwarded-For',
@@ -3857,7 +4547,8 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.auto.wordpress.t2': 'Banco de dados name',
     'docsCharts.auto.wordpress.t3': 'Configurações personalizadas de PHP',
     'docsCharts.n8n.intro.before': 'Faça deploy do n8n no Kubernetes usando a imagem oficial',
-    'docsCharts.n8n.intro.after': 'Docker. Suporta SQLite (padrão), PostgreSQL, MySQL, modo fila com Redis e workers dedicados, e backups agendados.',
+    'docsCharts.n8n.intro.after':
+      'Docker. Suporta SQLite (padrão), PostgreSQL, MySQL, modo fila com Redis e workers dedicados, e backups agendados.',
     'docsCharts.n8n.feature.sqlite': 'SQLite por padrão — zero configuração de banco',
     'docsCharts.n8n.feature.postgresSubchart': 'Subchart PostgreSQL — incluído via dependência HelmForge',
     'docsCharts.n8n.feature.mysqlSubchart': 'Subchart MySQL — incluído via dependência HelmForge',
@@ -3866,25 +4557,34 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.n8n.feature.encryptionKey': 'Chave de criptografia — auto-gerada e preservada entre upgrades',
     'docsCharts.n8n.feature.backups': 'Backups agendados — CronJob com upload S3 sensível ao tipo de banco',
     'docsCharts.n8n.feature.ingress': 'Suporte a ingress — TLS com cert-manager',
-    'docsCharts.mongodb.intro': 'Deploy de MongoDB pronto para produção com suporte a configurações standalone e replica set.',
-    'docsCharts.mongodb.feature.standaloneReplicaset': 'Standalone e replica set — instância única ou replica set com múltiplos membros',
+    'docsCharts.mongodb.intro':
+      'Deploy de MongoDB pronto para produção com suporte a configurações standalone e replica set.',
+    'docsCharts.mongodb.feature.standaloneReplicaset':
+      'Standalone e replica set — instância única ou replica set com múltiplos membros',
     'docsCharts.mongodb.feature.automaticInit': 'Inicialização automática — scripts de init e configuração customizada',
     'docsCharts.mongodb.feature.metrics': 'Métricas — exporter Prometheus com ServiceMonitor',
     'docsCharts.mongodb.feature.security': 'Segurança — autenticação, containers non-root e network policies',
     'docsCharts.mongodb.feature.storage': 'Armazenamento persistente — PVCs configuráveis com seleção de storage class',
     'docsCharts.mongodb.feature.arbiter': 'Suporte a arbiter — arbiter opcional para eleições do replica set',
-    'docsCharts.mongodb.arbiterCallout': 'Um arbiter participa das eleições, mas não armazena dados. Use quando houver número par de membros com dados para garantir maioria. Com 3 membros de dados, arbiter não é necessário.',
+    'docsCharts.mongodb.arbiterCallout':
+      'Um arbiter participa das eleições, mas não armazena dados. Use quando houver número par de membros com dados para garantir maioria. Com 3 membros de dados, arbiter não é necessário.',
     'docsCharts.mongodb.table.authDatabase': 'Banco de dados padrão a ser criado',
     'docsCharts.mongodb.table.authUsername': 'Usuário padrão a ser criado',
     'docsCharts.mongodb.table.authPassword': 'Senha do usuário padrão',
-    'docsCharts.mongodb.upgrade.callout': 'Alterar `replicaCount` dispara reconfiguração do replica set. O MongoDB lida bem, mas reduzir escala remove membros — garanta que não haja dados exclusivos nos membros removidos.',
+    'docsCharts.mongodb.upgrade.callout':
+      'Alterar `replicaCount` dispara reconfiguração do replica set. O MongoDB lida bem, mas reduzir escala remove membros — garanta que não haja dados exclusivos nos membros removidos.',
     'docsCharts.mongodb.upgrade.note1': 'Upgrade de standalone para replicaset exige reinicialização (dump e restore)',
-    'docsCharts.mongodb.upgrade.note2': 'Credenciais de auth são definidas na primeira inicialização e não podem ser alteradas por values em upgrades',
-    'docsCharts.mongodb.upgrade.note3': 'Cache WiredTiger usa 50% da memória disponível por padrão — ajuste `resources.limits.memory`',
-    'docsCharts.mongodb.issue.recovering': 'Normalmente significa sync inicial ainda em andamento para datasets grandes. Verifique progresso com `rs.status()` no shell mongo. Se persistir, avalie IOPS de disco e banda de rede.',
-    'docsCharts.mongodb.issue.connectionString.before': 'Use a connection string completa do replica set com todos os membros, ou o DNS do serviço headless:',
+    'docsCharts.mongodb.upgrade.note2':
+      'Credenciais de auth são definidas na primeira inicialização e não podem ser alteradas por values em upgrades',
+    'docsCharts.mongodb.upgrade.note3':
+      'Cache WiredTiger usa 50% da memória disponível por padrão — ajuste `resources.limits.memory`',
+    'docsCharts.mongodb.issue.recovering':
+      'Normalmente significa sync inicial ainda em andamento para datasets grandes. Verifique progresso com `rs.status()` no shell mongo. Se persistir, avalie IOPS de disco e banda de rede.',
+    'docsCharts.mongodb.issue.connectionString.before':
+      'Use a connection string completa do replica set com todos os membros, ou o DNS do serviço headless:',
     'docsCharts.wordpress.intro.before': 'Faça deploy do WordPress no Kubernetes usando a imagem oficial',
-    'docsCharts.wordpress.intro.after': 'Docker (variante Apache). Suporta subchart MySQL ou banco externo, backups agendados e monitoramento.',
+    'docsCharts.wordpress.intro.after':
+      'Docker (variante Apache). Suporta subchart MySQL ou banco externo, backups agendados e monitoramento.',
     'docsCharts.wordpress.feature.officialImage': 'Imagem oficial do WordPress — variante Apache com PHP',
     'docsCharts.wordpress.feature.mysqlSubchart': 'Subchart MySQL — MySQL embarcado via dependência HelmForge',
     'docsCharts.wordpress.feature.externalDb': 'Banco externo — conexão com MySQL/MariaDB existente',
@@ -3892,37 +4592,47 @@ export const messages: Record<Locale, Messages> = {
     'docsCharts.wordpress.feature.ingress': 'Suporte a ingress — TLS com cert-manager',
     'docsCharts.wordpress.feature.phpConfig': 'Configuração PHP — php.ini customizado via ConfigMap',
     'docsCharts.wordpress.feature.metrics': 'Métricas Prometheus — sidecar exporter Apache',
-    'docsCharts.vaultwarden.intro': 'Gerenciador de senhas self-hosted compatível com Bitwarden. Vaultwarden é uma implementação leve em Rust da API do servidor Bitwarden, compatível com todos os clientes oficiais.',
+    'docsCharts.vaultwarden.intro':
+      'Gerenciador de senhas self-hosted compatível com Bitwarden. Vaultwarden é uma implementação leve em Rust da API do servidor Bitwarden, compatível com todos os clientes oficiais.',
     'docsCharts.vaultwarden.feature.compatible': 'Compatível com Bitwarden — funciona com apps e extensões oficiais',
-    'docsCharts.vaultwarden.feature.lightweight': 'Leve — consumo mínimo de recursos comparado ao servidor oficial do Bitwarden',
+    'docsCharts.vaultwarden.feature.lightweight':
+      'Leve — consumo mínimo de recursos comparado ao servidor oficial do Bitwarden',
     'docsCharts.vaultwarden.feature.database': 'Backends de banco — SQLite, PostgreSQL ou MySQL',
     'docsCharts.vaultwarden.feature.admin': 'Painel admin — interface web opcional de administração',
     'docsCharts.vaultwarden.feature.ingress': 'Suporte a ingress — configurável com `ingressClassName` e TLS',
-    'docsCharts.vaultwarden.feature.security': 'Hardening de segurança — network policies, containers non-root e segurança de pod',
+    'docsCharts.vaultwarden.feature.security':
+      'Hardening de segurança — network policies, containers non-root e segurança de pod',
     'docsCharts.vaultwarden.feature.storage': 'Armazenamento persistente — persistência de dados e anexos',
     'docsPage.index.title': 'Documentação',
-    'docsPage.index.intro': 'Bem-vindo à documentação da HelmForge. Aqui você encontra tudo o que precisa para instalar, configurar e operar nossos charts em clusters Kubernetes de produção.',
+    'docsPage.index.intro':
+      'Bem-vindo à documentação da HelmForge. Aqui você encontra tudo o que precisa para instalar, configurar e operar nossos charts em clusters Kubernetes de produção.',
     'docsPage.index.quickLinks': 'Links rápidos',
     'docsPage.index.gettingStarted': 'Primeiros passos',
     'docsPage.index.gettingStartedDesc': 'Adicione o repositório e instale seu primeiro chart',
     'docsPage.index.chartsOverview': 'Visão geral dos charts',
     'docsPage.index.chartsOverviewDesc': 'Navegue por todos os charts disponíveis',
     'docsPage.index.whatIs': 'O que é HelmForge?',
-    'docsPage.index.whatIsDesc': 'HelmForge é uma coleção de charts Helm open-source projetados para produção. Todo chart é construído com os mesmos princípios:',
+    'docsPage.index.whatIsDesc':
+      'HelmForge é uma coleção de charts Helm open-source projetados para produção. Todo chart é construído com os mesmos princípios:',
     'docsPage.index.security': 'Segurança',
-    'docsPage.index.securityDesc': 'Containers não-root, network policies, padrões de segurança de pods e suporte a TLS',
+    'docsPage.index.securityDesc':
+      'Containers não-root, network policies, padrões de segurança de pods e suporte a TLS',
     'docsPage.index.observability': 'Observabilidade',
-    'docsPage.index.observabilityDesc': 'Endpoints de métricas Prometheus, recursos ServiceMonitor e configurações de alertas',
+    'docsPage.index.observabilityDesc':
+      'Endpoints de métricas Prometheus, recursos ServiceMonitor e configurações de alertas',
     'docsPage.index.simplicity': 'Simplicidade',
-    'docsPage.index.simplicityDesc': 'Arquivos `values.yaml` orientados ao produto, focados na configuração da aplicação e não em detalhes internos do Kubernetes',
+    'docsPage.index.simplicityDesc':
+      'Arquivos `values.yaml` orientados ao produto, focados na configuração da aplicação e não em detalhes internos do Kubernetes',
     'docsPage.index.testing': 'Testes',
-    'docsPage.index.testingDesc': 'Testes unitários abrangentes, lint estrito e validação de conformidade em cada alteração',
+    'docsPage.index.testingDesc':
+      'Testes unitários abrangentes, lint estrito e validação de conformidade em cada alteração',
     'docsPage.index.distribution': 'Distribuição',
     'docsPage.index.method': 'Método',
     'docsPage.index.https': 'Repositório HTTPS',
     'docsPage.index.oci': 'Registro OCI',
     'docsPage.gettingStarted.title': 'Primeiros passos',
-    'docsPage.gettingStarted.intro': 'Este guia mostra como adicionar o repositório HelmForge e instalar seu primeiro chart.',
+    'docsPage.gettingStarted.intro':
+      'Este guia mostra como adicionar o repositório HelmForge e instalar seu primeiro chart.',
     'docsPage.gettingStarted.prerequisites': 'Pré-requisitos',
     'docsPage.gettingStarted.before': 'Antes de começar, garanta que você tenha:',
     'docsPage.gettingStarted.helmInstalled': 'instalado',
@@ -3934,21 +4644,25 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.gettingStarted.https': 'Repositório HTTPS',
     'docsPage.gettingStarted.verify': 'Verifique se o repositório foi adicionado:',
     'docsPage.gettingStarted.oci': 'Registro OCI',
-    'docsPage.gettingStarted.ociNoSetup': 'Nenhuma configuração de repositório é necessária para OCI. Você pode instalar charts diretamente:',
-    'docsPage.gettingStarted.swap': 'Você pode trocar `redis` por `komga`, `mosquitto`, `vaultwarden` ou qualquer outro chart publicado no repositório.',
+    'docsPage.gettingStarted.ociNoSetup':
+      'Nenhuma configuração de repositório é necessária para OCI. Você pode instalar charts diretamente:',
+    'docsPage.gettingStarted.swap':
+      'Você pode trocar `redis` por `komga`, `mosquitto`, `vaultwarden` ou qualquer outro chart publicado no repositório.',
     'docsPage.gettingStarted.installFirst': 'Instale seu primeiro chart',
     'docsPage.gettingStarted.redisExample': 'Vamos instalar o Redis como exemplo:',
     'docsPage.gettingStarted.usingHttps': 'Usando o repositório HTTPS',
     'docsPage.gettingStarted.usingOci': 'Usando o registro OCI',
     'docsPage.gettingStarted.verifyInstall': 'Verifique a instalação',
     'docsPage.gettingStarted.customizing': 'Personalizando values',
-    'docsPage.gettingStarted.defaults': 'Todo chart vem com padrões sensatos, mas você pode sobrescrever qualquer valor:',
+    'docsPage.gettingStarted.defaults':
+      'Todo chart vem com padrões sensatos, mas você pode sobrescrever qualquer valor:',
     'docsPage.gettingStarted.valuesFile': 'Ou use um arquivo de values:',
     'docsPage.gettingStarted.nextSteps': 'Próximos passos',
     'docsPage.gettingStarted.next1': 'Navegue por',
     'docsPage.gettingStarted.next1Link': 'Visão geral dos charts',
     'docsPage.gettingStarted.next1End': 'para ver todos os charts disponíveis',
-    'docsPage.gettingStarted.next2': 'Leia a documentação individual de cada chart para opções detalhadas de configuração',
+    'docsPage.gettingStarted.next2':
+      'Leia a documentação individual de cada chart para opções detalhadas de configuração',
     'docsPage.gettingStarted.next3': 'Visite o',
     'docsPage.gettingStarted.next3End': 'para código-fonte e issues',
     'docsPage.faq.title': 'Perguntas frequentes',
@@ -3977,7 +4691,8 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.faq.q17': 'Os charts são assinados?',
     'docsPage.faq.q18': 'Qual a licença dos charts?',
     'docsPage.troubleshooting.title': 'Solução de problemas',
-    'docsPage.troubleshooting.intro': 'Guia baseado em sintomas para diagnosticar e resolver problemas comuns em charts HelmForge.',
+    'docsPage.troubleshooting.intro':
+      'Guia baseado em sintomas para diagnosticar e resolver problemas comuns em charts HelmForge.',
     'docsPage.troubleshooting.crashloop': 'Pod fica em CrashLoopBackOff',
     'docsPage.troubleshooting.pvc': 'PVC preso em Pending',
     'docsPage.troubleshooting.db': 'Conexão com banco recusada',
@@ -3991,15 +4706,20 @@ export const messages: Record<Locale, Messages> = {
     'docsPage.troubleshooting.commonCauses': 'Causas comuns:',
     'docsPage.troubleshooting.cause': 'Causa',
     'docsPage.troubleshooting.fix': 'Correção',
-    'docsPage.troubleshooting.crashloopSymptoms': 'O pod reinicia repetidamente e `kubectl get pods` mostra status `CrashLoopBackOff`.',
-    'docsPage.troubleshooting.pvcSymptoms': '`kubectl get pvc` mostra status `Pending` e os pods não conseguem iniciar.',
-    'docsPage.troubleshooting.dbSymptoms': 'Pods da aplicação registram `connection refused` ou `could not connect to server` ao tentar acessar o banco.',
+    'docsPage.troubleshooting.crashloopSymptoms':
+      'O pod reinicia repetidamente e `kubectl get pods` mostra status `CrashLoopBackOff`.',
+    'docsPage.troubleshooting.pvcSymptoms':
+      '`kubectl get pvc` mostra status `Pending` e os pods não conseguem iniciar.',
+    'docsPage.troubleshooting.dbSymptoms':
+      'Pods da aplicação registram `connection refused` ou `could not connect to server` ao tentar acessar o banco.',
     'docsPage.troubleshooting.ingressSymptoms': 'O recurso Ingress existe, mas a aplicação retorna erros 404 ou 503.',
     'docsPage.troubleshooting.backupSymptoms': 'Backup está habilitado, mas nenhum job de backup aparece.',
-    'docsPage.troubleshooting.upgradeSymptoms': '`helm upgrade` falha com erros `cannot patch` ou `field is immutable`.',
+    'docsPage.troubleshooting.upgradeSymptoms':
+      '`helm upgrade` falha com erros `cannot patch` ou `field is immutable`.',
     'docsPage.troubleshooting.timeoutSymptoms': '`helm install --wait` expira antes de os pods ficarem prontos.',
     'docsPage.comparison.title': 'HelmForge vs outros charts',
-    'docsPage.comparison.intro': 'Esta página compara HelmForge com duas alternativas comuns: **Bitnami** (o maior ecossistema comercial de charts) e **charts comunitários genéricos** (mantenedores individuais ou projetos pequenos). Não é uma crítica - cada abordagem tem seu espaço. O objetivo é ajudar você a escolher a melhor opção.',
+    'docsPage.comparison.intro':
+      'Esta página compara HelmForge com duas alternativas comuns: **Bitnami** (o maior ecossistema comercial de charts) e **charts comunitários genéricos** (mantenedores individuais ou projetos pequenos). Não é uma crítica - cada abordagem tem seu espaço. O objetivo é ajudar você a escolher a melhor opção.',
     'docsPage.comparison.table': 'Tabela de comparação',
   },
 };

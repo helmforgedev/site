@@ -1,10 +1,10 @@
 import { DEFAULT_LOCALE, LOCALE_LABELS, LOCALE_FLAGS, normalizeLocale, type Locale } from '../i18n/config';
-import { messages } from '../i18n/messages';
+import { ensureLocaleMessages, getMessage } from './i18n-client-store';
 
 declare global {
   interface Window {
     __HF_LOCALE__?: Locale;
-    __HF_SET_LOCALE__?: (locale: Locale) => void;
+    __HF_SET_LOCALE__?: (locale: Locale) => Promise<void>;
   }
 }
 
@@ -36,10 +36,6 @@ function detectLocale(): Locale {
   return DEFAULT_LOCALE;
 }
 
-function t(locale: Locale, key: string): string {
-  return messages[locale][key] ?? messages[DEFAULT_LOCALE][key] ?? key;
-}
-
 function applyTranslations(locale: Locale): void {
   document.documentElement.lang = locale === 'pt-BR' ? 'pt-BR' : locale;
   document.documentElement.setAttribute('data-locale', locale);
@@ -48,7 +44,7 @@ function applyTranslations(locale: Locale): void {
   for (const node of nodes) {
     const key = node.dataset.i18n;
     if (!key) continue;
-    node.textContent = t(locale, key);
+    node.textContent = getMessage(key, locale);
   }
 
   const attrNodes = document.querySelectorAll<HTMLElement>('[data-i18n-attr][data-i18n-key]');
@@ -56,7 +52,7 @@ function applyTranslations(locale: Locale): void {
     const attr = node.dataset.i18nAttr;
     const key = node.dataset.i18nKey;
     if (!attr || !key) continue;
-    node.setAttribute(attr, t(locale, key));
+    node.setAttribute(attr, getMessage(key, locale));
   }
 
   const flags = document.querySelectorAll<HTMLElement>('[data-locale-current-flag]');
@@ -70,17 +66,18 @@ function applyTranslations(locale: Locale): void {
     label.textContent = LOCALE_LABELS[locale];
   });
   buttons.forEach((button) => {
-    button.setAttribute('aria-label', t(locale, 'language.switcher.label'));
+    button.setAttribute('aria-label', getMessage('language.switcher.label', locale));
   });
 
   document.dispatchEvent(new CustomEvent('hf:localechange', { detail: { locale } }));
 }
 
-function setLocale(locale: Locale): void {
-  window.__HF_LOCALE__ = locale;
-  localStorage.setItem(COOKIE_NAME, locale);
-  setCookie(COOKIE_NAME, locale);
-  applyTranslations(locale);
+async function setLocale(locale: Locale): Promise<void> {
+  const resolved = await ensureLocaleMessages(locale);
+  window.__HF_LOCALE__ = resolved;
+  localStorage.setItem(COOKIE_NAME, resolved);
+  setCookie(COOKIE_NAME, resolved);
+  applyTranslations(resolved);
 }
 
 function wireLocaleSwitcher(): void {
@@ -110,9 +107,9 @@ function wireLocaleSwitcher(): void {
     });
 
     options.forEach((option) => {
-      option.addEventListener('click', () => {
+      option.addEventListener('click', async () => {
         const next = normalizeLocale(option.dataset.locale);
-        setLocale(next);
+        await setLocale(next);
         close();
       });
     });
@@ -128,10 +125,10 @@ function wireLocaleSwitcher(): void {
   });
 }
 
-function bootstrapLocale(): void {
-  const locale = detectLocale();
-  setLocale(locale);
+async function bootstrapLocale(): Promise<void> {
   wireLocaleSwitcher();
+  const locale = detectLocale();
+  await setLocale(locale);
 }
 
 window.__HF_SET_LOCALE__ = setLocale;

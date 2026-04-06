@@ -1,5 +1,5 @@
 import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n/config';
-import { messages } from '../i18n/messages';
+import { ensureLocaleMessages, getMessage } from './i18n-client-store';
 
 declare global {
   interface Window {
@@ -62,7 +62,7 @@ let currentValues: Record<string, string> = {};
 let expandedSections: Set<string> = new Set();
 
 function t(key: string, locale: Locale): string {
-  return messages[locale]?.[key] ?? messages[DEFAULT_LOCALE]?.[key] ?? key;
+  return getMessage(key, locale);
 }
 
 function getLocale(): Locale {
@@ -754,5 +754,9 @@ document.addEventListener('hf:localechange', () => {
     if (shareBtn.disabled) shareBtn.textContent = t('playground.share', locale);
   }
   if (copyBtn && copyBtn.disabled) copyBtn.textContent = t('playground.copy', locale);
+  if (selectedSlug) updateOutput();
+});
+
+ensureLocaleMessages(getLocale()).then(() => {
   if (selectedSlug) updateOutput();
 });
