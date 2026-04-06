@@ -8,18 +8,17 @@ description: HelmForge Cloudflare Tunnel chart — secure outbound-only connecti
 
 Deploy Cloudflare Tunnel on Kubernetes using the official [cloudflare/cloudflared](https://hub.docker.com/r/cloudflare/cloudflared) Docker image. Secure, outbound-only connections between your cluster and Cloudflare's network — no open ports, no public IP required.
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b0">Zero-trust networking — no inbound firewall rules needed</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b1">Remotely-managed — configure routes in the Cloudflare dashboard</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b2">High availability — 2 replicas with PodDisruptionBudget by default</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b3">Prometheus metrics — `/ready` and `/metrics` on port 2000</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b4">ServiceMonitor — optional Prometheus Operator integration</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b5">Existing secrets — bring your own Secret for the tunnel token</span>
 
-- **Zero-trust networking** — no inbound firewall rules needed
-- **Remotely-managed** — configure routes in the Cloudflare dashboard
-- **High availability** — 2 replicas with PodDisruptionBudget by default
-- **Prometheus metrics** — `/ready` and `/metrics` on port 2000
-- **ServiceMonitor** — optional Prometheus Operator integration
-- **Existing secrets** — bring your own Secret for the tunnel token
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-## Installation
-
-**HTTPS repository:**
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -27,68 +26,61 @@ helm repo update
 helm install cloudflared helmforge/cloudflared -f values.yaml
 ```
 
-**OCI registry:**
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install cloudflared oci://ghcr.io/helmforgedev/helm/cloudflared -f values.yaml
 ```
 
-## Basic Example
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
 
 ```yaml
 # values.yaml
 tunnel:
-  token: 'eyJhIjoiY2Y...' # From Cloudflare dashboard
+token: 'eyJhIjoiY2Y...' # From Cloudflare dashboard
 ```
 
 Create a tunnel in the [Cloudflare dashboard](https://one.dash.cloudflare.com) under **Networks → Tunnels**, copy the token, and configure public hostnames to route traffic to your Kubernetes services.
 
-## Production Example
+## <span data-i18n="docsCharts.heading.productionExample">Production Example</span>
 
 ```yaml
 tunnel:
   existingSecret: cloudflare-tunnel
-
 replicaCount: 2
-
 pdb:
   enabled: true
   minAvailable: 1
-
 resources:
   requests:
     cpu: 50m
     memory: 64Mi
   limits:
     memory: 128Mi
-
 serviceMonitor:
   enabled: true
-  labels:
-    release: prometheus
+labels:
+  release: prometheus
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                        | Default | Description                            |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
 | -------------------------- | ------- | -------------------------------------- |
-| `tunnel.token`             | `""`    | Tunnel token from Cloudflare dashboard |
-| `tunnel.existingSecret`    | `""`    | Existing secret with tunnel token      |
-| `replicaCount`             | `2`     | Number of replicas                     |
-| `cloudflared.logLevel`     | `info`  | Log level                              |
-| `cloudflared.noAutoupdate` | `true`  | Disable auto-update                    |
-| `cloudflared.metricsPort`  | `2000`  | Metrics listen port                    |
-| `pdb.enabled`              | `true`  | Create PodDisruptionBudget             |
-| `pdb.minAvailable`         | `1`     | Min available during disruption        |
-| `metrics.enabled`          | `true`  | Expose metrics service                 |
-| `serviceMonitor.enabled`   | `false` | Create Prometheus ServiceMonitor       |
+| `tunnel.token` | `""` | <span data-i18n="docsCharts.auto.cloudflared.t0">Tunnel token from Cloudflare dashboard</span> |
+| `tunnel.existingSecret` | `""` | <span data-i18n="docsCharts.auto.cloudflared.t1">Existing secret with tunnel token</span> |
+| `replicaCount` | `2` | <span data-i18n="docsCharts.common.numberOfReplicas">Number of replicas</span> |
+| `cloudflared.logLevel` | `info` | <span data-i18n="docsCharts.common.logLevel">Log level</span> |
+| `cloudflared.noAutoupdate` | `true` | <span data-i18n="docsCharts.auto.cloudflared.t2">Disable auto-update</span> |
+| `cloudflared.metricsPort` | `2000` | <span data-i18n="docsCharts.auto.cloudflared.t3">Metrics listen port</span> |
+| `pdb.enabled` | `true` | <span data-i18n="docsCharts.auto.cloudflared.t4">Create PodDisruptionBudget</span> |
+| `pdb.minAvailable` | `1` | <span data-i18n="docsCharts.auto.cloudflared.t5">Min available during disruption</span> |
+| `metrics.enabled` | `true` | <span data-i18n="docsCharts.auto.cloudflared.t6">Expose metrics service</span> |
+| `serviceMonitor.enabled` | `false` | <span data-i18n="docsCharts.auto.cloudflared.t7">Create Prometheus ServiceMonitor</span> |
 
-## Important Notes
+## <span data-i18n="docsCharts.heading.importantNotes">Important Notes</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b6">Do not use HPA — downscaling terminates active tunnel connections</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b7">No ingress template — cloudflared replaces traditional ingress controllers</span>
+- <span data-i18n="docsCharts.auto.cloudflared.b8">Routing is dashboard-managed — use the Cloudflare dashboard to map hostnames to services</span>
 
-- **Do not use HPA** — downscaling terminates active tunnel connections
-- **No ingress template** — cloudflared replaces traditional ingress controllers
-- **Routing is dashboard-managed** — use the Cloudflare dashboard to map hostnames to services
-
-## More Information
-
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/cloudflared) on GitHub.
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/cloudflared) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>

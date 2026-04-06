@@ -3,19 +3,31 @@ interface Props {
   label?: string;
   title: string;
   description?: string;
+  labelKey?: string;
+  titleKey?: string;
+  descriptionKey?: string;
   align?: 'left' | 'center';
   class?: string;
 }
 
-const { label, title, description, align = 'left', class: className = '' } = Astro.props;
+const { label, title, description, labelKey, titleKey, descriptionKey, align = 'left', class: className = '' } =
+  Astro.props;
 
 const alignClass = align === 'center' ? 'text-center mx-auto' : '';
 ---
 
 <div class:list={['max-w-2xl', alignClass, className]}>
-  {label && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary">{label}</p>}
+  {label && (
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary" data-i18n={labelKey}>
+      {label}
+    </p>
+  )}
   <h2 class:list={['text-3xl sm:text-4xl font-bold tracking-tight text-text-base heading-font', label && 'mt-3']}>
-    <Fragment set:html={title} />
+    {titleKey ? <span data-i18n={titleKey}>{title}</span> : <Fragment set:html={title} />}
   </h2>
-  {description && <p class="mt-4 text-base sm:text-lg text-text-muted leading-relaxed">{description}</p>}
+  {description && (
+    <p class="mt-4 text-base sm:text-lg text-text-muted leading-relaxed" data-i18n={descriptionKey}>
+      {description}
+    </p>
+  )}
 </div>

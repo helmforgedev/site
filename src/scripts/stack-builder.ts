@@ -1,3 +1,12 @@
+import { DEFAULT_LOCALE, normalizeLocale, type Locale } from '../i18n/config';
+import { messages } from '../i18n/messages';
+
+declare global {
+  interface Window {
+    __HF_LOCALE__?: Locale;
+  }
+}
+
 const checkboxes = document.querySelectorAll<HTMLInputElement>('.stack-checkbox');
 const codeEl = document.getElementById('stack-code');
 const countEl = document.getElementById('stack-count');
@@ -11,6 +20,14 @@ const filenameEl = document.getElementById('stack-filename');
 
 type Format = 'bash' | 'helmfile' | 'argocd';
 let currentFormat: Format = 'bash';
+
+function t(key: string, locale: Locale): string {
+  return messages[locale]?.[key] ?? messages[DEFAULT_LOCALE]?.[key] ?? key;
+}
+
+function getLocale(): Locale {
+  return normalizeLocale(window.__HF_LOCALE__) || DEFAULT_LOCALE;
+}
 
 const filenames: Record<Format, string> = {
   bash: 'stack-builder.sh',
@@ -203,20 +220,23 @@ const plainGenerators: Record<Format, (c: { name: string; slug: string }[]) => s
   argocd: getPlainArgoCD,
 };
 
-const emptyMessages: Record<Format, string> = {
-  bash: '<span class="text-zinc-500"># Select charts on the left to generate your install script</span>\n<span class="text-zinc-500"># Commands will appear here automatically</span>',
-  helmfile:
-    '<span class="text-zinc-500"># Select charts on the left to generate helmfile.yaml</span>\n<span class="text-zinc-500"># YAML will appear here automatically</span>',
-  argocd:
-    '<span class="text-zinc-500"># Select charts on the left to generate ArgoCD Applications</span>\n<span class="text-zinc-500"># Manifests will appear here automatically</span>',
-};
+function getEmptyMessage(format: Format, locale: Locale): string {
+  const keys: Record<Format, [string, string]> = {
+    bash: ['stack.empty.bash.line1', 'stack.empty.bash.line2'],
+    helmfile: ['stack.empty.helmfile.line1', 'stack.empty.helmfile.line2'],
+    argocd: ['stack.empty.argocd.line1', 'stack.empty.argocd.line2'],
+  };
+  const [line1Key, line2Key] = keys[format];
+  return `<span class="text-zinc-500">${t(line1Key, locale)}</span>\n<span class="text-zinc-500">${t(line2Key, locale)}</span>`;
+}
 
 function update() {
+  const locale = getLocale();
   const selected = getSelected();
   if (codeEl) {
-    codeEl.innerHTML = selected.length > 0 ? generators[currentFormat](selected) : emptyMessages[currentFormat];
+    codeEl.innerHTML = selected.length > 0 ? generators[currentFormat](selected) : getEmptyMessage(currentFormat, locale);
   }
-  if (countEl) countEl.textContent = `${selected.length} selected`;
+  if (countEl) countEl.textContent = t('stack.count', locale).replace('{count}', String(selected.length));
   if (copyBtn) copyBtn.disabled = selected.length === 0;
   if (hintEl) hintEl.style.display = selected.length > 0 ? 'none' : '';
   if (filenameEl) filenameEl.textContent = filenames[currentFormat];
@@ -278,8 +298,8 @@ if (copyBtn) {
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => (copyBtn.textContent = 'Copy to clipboard'), 2000);
+      copyBtn.textContent = t('stack.copied', getLocale());
+      setTimeout(() => (copyBtn.textContent = t('stack.copy', getLocale())), 2000);
     } catch {
       // Fallback
     }
@@ -306,4 +326,11 @@ presets.forEach((preset) => {
     });
     update();
   });
+});
+
+document.addEventListener('hf:localechange', () => {
+  if (copyBtn && copyBtn.disabled) {
+    copyBtn.textContent = t('stack.copy', getLocale());
+  }
+  update();
 });

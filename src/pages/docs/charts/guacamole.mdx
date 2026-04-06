@@ -6,24 +6,39 @@ description: HelmForge Apache Guacamole chart — remote desktop gateway with gu
 
 # Apache Guacamole
 
-Deploy Apache Guacamole on Kubernetes using the official [guacamole/guacamole](https://hub.docker.com/r/guacamole/guacamole) and [guacamole/guacd](https://hub.docker.com/r/guacamole/guacd) Docker images. A clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.
+<span data-i18n="docsCharts.guacamole.intro">
+  Deploy Apache Guacamole on Kubernetes using the official `guacamole/guacamole` and `guacamole/guacd` Docker images. A
+  clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.
+</span>
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **guacd Sidecar** — protocol daemon runs alongside the web app
-- **PostgreSQL Subchart** — bundled via HelmForge dependency (default)
-- **MySQL Subchart** — bundled via HelmForge dependency
-- **External Database** — connect to existing PostgreSQL or MySQL
-- **Database Init Job** — automatic schema initialization on install
-- **OpenID Connect** — SSO with Keycloak, Okta, Azure AD, and others
-- **SAML** — SSO with any SAML 2.0 identity provider
-- **TOTP** — two-factor authentication
-- **Scheduled Backups** — pg_dump or mysqldump with S3 upload
-- **Ingress Support** — TLS with cert-manager
+- <span data-i18n="docsCharts.guacamole.feature.guacdSidecar">
+    guacd Sidecar — protocol daemon runs alongside the web app
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.postgresqlSubchart">
+    PostgreSQL Subchart — bundled via HelmForge dependency (default)
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.mysqlSubchart">MySQL Subchart — bundled via HelmForge dependency</span>
+- <span data-i18n="docsCharts.guacamole.feature.externalDatabase">
+    External Database — connect to existing PostgreSQL or MySQL
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.databaseInitJob">
+    Database Init Job — automatic schema initialization on install
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.openidConnect">
+    OpenID Connect — SSO with Keycloak, Okta, Azure AD, and others
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.saml">SAML — SSO with any SAML 2.0 identity provider</span>
+- <span data-i18n="docsCharts.guacamole.feature.totp">TOTP — two-factor authentication</span>
+- <span data-i18n="docsCharts.guacamole.feature.scheduledBackups">
+    Scheduled Backups — pg_dump or mysqldump with S3 upload
+  </span>
+- <span data-i18n="docsCharts.guacamole.feature.ingressSupport">Ingress Support — TLS with cert-manager</span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-**HTTPS repository:**
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -31,13 +46,13 @@ helm repo update
 helm install guacamole helmforge/guacamole -f values.yaml
 ```
 
-**OCI registry:**
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install guacamole oci://ghcr.io/helmforgedev/helm/guacamole -f values.yaml
 ```
 
-## Basic Example (PostgreSQL)
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span> (PostgreSQL)
 
 ```yaml
 # values.yaml
@@ -46,16 +61,21 @@ postgresql:
     password: 'change-me'
 ```
 
-Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.
+<span data-i18n="docsCharts.guacamole.defaultCredentials">
+  Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.
+</span>
 
-## OIDC with Keycloak
+## <span data-i18n="docsCharts.heading.oidcWithKeycloak">OIDC with Keycloak</span>
 
 ```yaml
 oidc:
   enabled: true
-  authorizationEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/auth
-  jwksEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/certs
-  issuer: https://keycloak.example.com/realms/master
+  authorizationEndpoint:
+    https://keycloak.example.com/realms/master/protocol/openid-connect/auth
+  jwksEndpoint:
+    https://keycloak.example.com/realms/master/protocol/openid-connect/certs
+  issuer:
+    https://keycloak.example.com/realms/master
   clientId: guacamole
 
 ingress:
@@ -72,9 +92,11 @@ ingress:
         - guacamole.example.com
 ```
 
-The `redirectUri` is auto-detected from the ingress configuration.
+<span data-i18n="docsCharts.guacamole.redirectUri">
+  The `redirectUri` is auto-detected from the ingress configuration.
+</span>
 
-## External Database
+## <span data-i18n="docsCharts.heading.externalDatabase">External Database</span>
 
 ```yaml
 postgresql:
@@ -89,24 +111,27 @@ database:
     existingSecret: guacamole-db-credentials
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                     | Default      | Description                       |
-| ----------------------- | ------------ | --------------------------------- |
-| `guacamole.contextPath` | `ROOT`       | Web context path (`ROOT` = `/`)   |
-| `guacd.port`            | `4822`       | guacd daemon port                 |
-| `guacd.logLevel`        | `info`       | guacd log level                   |
-| `database.type`         | `postgresql` | Database type (postgresql, mysql) |
-| `postgresql.enabled`    | `true`       | Deploy PostgreSQL subchart        |
-| `mysql.enabled`         | `false`      | Deploy MySQL subchart             |
-| `initDb.enabled`        | `true`       | Auto-initialize database schema   |
-| `oidc.enabled`          | `false`      | Enable OpenID Connect SSO         |
-| `oidc.clientId`         | `""`         | OIDC client ID                    |
-| `saml.enabled`          | `false`      | Enable SAML SSO                   |
-| `totp.enabled`          | `false`      | Enable TOTP 2FA                   |
-| `ingress.enabled`       | `false`      | Enable ingress                    |
-| `backup.enabled`        | `false`      | Enable S3 backups                 |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span> |
+| ------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guacamole.contextPath`                           | `ROOT`                                                    | <span data-i18n="docsCharts.guacamole.table.contextPath">Web context path (`ROOT` = `/`)</span> |
+| `guacd.port`                                      | `4822`                                                    | <span data-i18n="docsCharts.guacamole.table.guacdPort">guacd daemon port</span> |
+| `guacd.logLevel`                                  | `info`                                                    | <span data-i18n="docsCharts.guacamole.table.guacdLogLevel">guacd log level</span> |
+| `database.type`                                   | `postgresql`                                              | <span data-i18n="docsCharts.guacamole.table.databaseType">Database type (postgresql, mysql)</span> |
+| `postgresql.enabled`                              | `true`                                                    | <span data-i18n="docsCharts.guacamole.table.postgresqlEnabled"><span data-i18n="docsCharts.common.deployPostgresqlSubchart">Deploy PostgreSQL subchart</span></span> |
+| `mysql.enabled`                                   | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.mysqlEnabled"><span data-i18n="docsCharts.common.deployMysqlSubchart">Deploy MySQL subchart</span></span> |
+| `initDb.enabled`                                  | `true`                                                    | <span data-i18n="docsCharts.guacamole.table.initDbEnabled">Auto-initialize database schema</span> |
+| `oidc.enabled`                                    | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.oidcEnabled">Enable OpenID Connect SSO</span> |
+| `oidc.clientId`                                   | `""`                                                      | <span data-i18n="docsCharts.guacamole.table.oidcClientId">OIDC client ID</span> |
+| `saml.enabled`                                    | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.samlEnabled">Enable SAML SSO</span> |
+| `totp.enabled`                                    | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.totpEnabled">Enable TOTP 2FA</span> |
+| `ingress.enabled`                                 | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.ingressEnabled"><span data-i18n="docsCharts.common.enableIngress">Enable ingress</span></span> |
+| `backup.enabled`                                  | `false`                                                   | <span data-i18n="docsCharts.guacamole.table.backupEnabled"><span data-i18n="docsCharts.common.enableS3Backups">Enable S3 backups</span></span>                       |
 
-## More Information
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/guacamole) on GitHub.
+<span data-i18n="docsCharts.moreInfo.before">See the</span> [
+<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>
+](https://github.com/helmforgedev/charts/tree/main/charts/guacamole)
+<span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>

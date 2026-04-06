@@ -6,20 +6,36 @@ description: HelmForge Velero chart for Kubernetes backup, restore, migration, s
 
 # Velero
 
-Deploy [Velero](https://velero.io/) on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional filesystem backup workflows.
+<span data-i18n="docsCharts.velero.intro.before">Deploy</span> [Velero](https://velero.io/)
+<span data-i18n="docsCharts.velero.intro.after">
+  on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional
+  filesystem backup workflows.
+</span>
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
 
-- **Latest stable Velero** — chart pinned to the latest stable upstream release
-- **Official CRDs included** — Velero CRDs shipped through the chart `crds/` directory
-- **S3-compatible storage** — validated with the AWS plugin against MinIO and similar providers
-- **Recurring schedules** — optional `Schedule` resources rendered from chart values
-- **Filesystem backup** — optional node-agent DaemonSet for pod volume backups
-- **Metrics support** — metrics Service and optional ServiceMonitor
+- <span data-i18n="docsCharts.velero.feature.latestStable">
+    Latest stable Velero — chart pinned to the latest stable upstream release
+  </span>
+- <span data-i18n="docsCharts.velero.feature.crdsIncluded">
+    Official CRDs included — Velero CRDs shipped through the chart `crds/` directory
+  </span>
+- <span data-i18n="docsCharts.velero.feature.s3Storage">
+    S3-compatible storage — validated with the AWS plugin against MinIO and similar providers
+  </span>
+- <span data-i18n="docsCharts.velero.feature.recurringSchedules">
+    Recurring schedules — optional `Schedule` resources rendered from chart values
+  </span>
+- <span data-i18n="docsCharts.velero.feature.filesystemBackup">
+    Filesystem backup — optional node-agent DaemonSet for pod volume backups
+  </span>
+- <span data-i18n="docsCharts.velero.feature.metricsSupport">
+    Metrics support — metrics Service and optional ServiceMonitor
+  </span>
 
-## Installation
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-**HTTPS repository:**
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -27,13 +43,13 @@ helm repo update
 helm install velero helmforge/velero -n velero --create-namespace -f values.yaml
 ```
 
-**OCI registry:**
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install velero oci://ghcr.io/helmforgedev/helm/velero -n velero --create-namespace -f values.yaml
 ```
 
-## S3-Compatible Example
+## <span data-i18n="docsCharts.heading.s3CompatibleExample">S3-Compatible Example</span>
 
 ```yaml
 credentials:
@@ -50,12 +66,13 @@ configuration:
       default: true
       config:
         region: minio
-        s3Url: http://minio.minio.svc.cluster.local:9000
+        s3Url:
+          http://minio.minio.svc.cluster.local:9000
         s3ForcePathStyle: true
         insecureSkipTLSVerify: true
 ```
 
-## Scheduled Backup Example
+## <span data-i18n="docsCharts.heading.scheduledBackupExample">Scheduled Backup Example</span>
 
 ```yaml
 schedules:
@@ -69,24 +86,33 @@ schedules:
       defaultVolumesToFsBackup: true
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                                     | Default                   | Description                                 |
-| --------------------------------------- | ------------------------- | ------------------------------------------- |
-| `image.repository`                      | `docker.io/velero/velero` | Velero server image                         |
-| `plugins.aws.tag`                       | `v1.14.0`                 | Default AWS/S3 plugin image tag             |
-| `configuration.backupStorageLocations`  | one default entry         | Backup storage definitions                  |
-| `configuration.volumeSnapshotLocations` | `[]`                      | Snapshot storage definitions                |
-| `schedules`                             | `[]`                      | Schedule resources created by the chart     |
-| `nodeAgent.enabled`                     | `false`                   | Deploy the filesystem backup DaemonSet      |
-| `metrics.serviceMonitor.enabled`        | `false`                   | Create a Prometheus Operator ServiceMonitor |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span> |
+| ------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `image.repository`                                | `docker.io/velero/velero`                                 | <span data-i18n="docsCharts.velero.table.imageRepository">Velero server image</span> |
+| `plugins.aws.tag`                                 | `v1.14.0`                                                 | <span data-i18n="docsCharts.velero.table.awsTag">Default AWS/S3 plugin image tag</span> |
+| `configuration.backupStorageLocations`            | one default entry                                         | <span data-i18n="docsCharts.velero.table.backupStorageLocations">Backup storage definitions</span> |
+| `configuration.volumeSnapshotLocations`           | `[]`                                                      | <span data-i18n="docsCharts.velero.table.volumeSnapshotLocations">Snapshot storage definitions</span> |
+| `schedules`                                       | `[]`                                                      | <span data-i18n="docsCharts.velero.table.schedules">Schedule resources created by the chart</span> |
+| `nodeAgent.enabled`                               | `false`                                                   | <span data-i18n="docsCharts.velero.table.nodeAgentEnabled">Deploy the filesystem backup DaemonSet</span> |
+| `metrics.serviceMonitor.enabled`                  | `false`                                                   | <span data-i18n="docsCharts.velero.table.serviceMonitorEnabled">Create a Prometheus Operator ServiceMonitor</span> |
 
-## Validation Guidance
+## <span data-i18n="docsCharts.heading.validationGuidance">Validation Guidance</span>
 
-- always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall
-- for S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`
-- create at least one real test backup before enabling recurring schedules in shared environments
+- <span data-i18n="docsCharts.velero.note.confirmContext">
+    Always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall
+  </span>
+- <span data-i18n="docsCharts.velero.note.validateBsl">
+    For S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`
+  </span>
+- <span data-i18n="docsCharts.velero.note.realBackup">
+    Create at least one real test backup before enabling recurring schedules in shared environments
+  </span>
 
-## More Information
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span>
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/velero) on GitHub.
+<span data-i18n="docsCharts.moreInfo.before">See the</span> [
+<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>
+](https://github.com/helmforgedev/charts/tree/main/charts/velero)
+<span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>

@@ -8,18 +8,17 @@ description: HelmForge Komga chart — media server for comics and manga with OP
 
 Deploy Komga on Kubernetes using the official [gotson/komga](https://hub.docker.com/r/gotson/komga) Docker image. A media server for comics, mangas, BDs, magazines, and eBooks with OPDS support and a modern web reader.
 
-## Key Features
+## <span data-i18n="docsCharts.heading.keyFeatures">Key Features</span>
+- <span data-i18n="docsCharts.auto.komga.b0">SQLite Database — zero database configuration, persistent via PVC</span>
+- <span data-i18n="docsCharts.auto.komga.b1">Dual Persistent Volumes — separate PVCs for config and library data</span>
+- <span data-i18n="docsCharts.auto.komga.b2">Java Memory Tuning — configurable JVM heap via `JAVA_TOOL_OPTIONS`</span>
+- <span data-i18n="docsCharts.auto.komga.b3"><span data-i18n="docsCharts.common.timezone">Timezone</span> Support — configurable via `TZ` environment variable</span>
+- <span data-i18n="docsCharts.auto.komga.b4">Scheduled Backups — config/database tar archive with S3 upload</span>
+- <span data-i18n="docsCharts.common.feature.ingressTlsCertManager">**Ingress Support** — TLS with cert-manager</span>
 
-- **SQLite Database** — zero database configuration, persistent via PVC
-- **Dual Persistent Volumes** — separate PVCs for config and library data
-- **Java Memory Tuning** — configurable JVM heap via `JAVA_TOOL_OPTIONS`
-- **Timezone Support** — configurable via `TZ` environment variable
-- **Scheduled Backups** — config/database tar archive with S3 upload
-- **Ingress Support** — TLS with cert-manager
+## <span data-i18n="docsCharts.heading.installation">Installation</span>
 
-## Installation
-
-**HTTPS repository:**
+**<span data-i18n="docsCharts.install.httpsRepo">HTTPS repository:</span>**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -27,78 +26,76 @@ helm repo update
 helm install komga helmforge/komga
 ```
 
-**OCI registry:**
+**<span data-i18n="docsCharts.install.ociRegistry">OCI registry:</span>**
 
 ```bash
 helm install komga oci://ghcr.io/helmforgedev/helm/komga
 ```
 
-## Basic Example
+## <span data-i18n="docsCharts.heading.basicExample">Basic Example</span>
 
 ```yaml
 # values.yaml
 persistence:
-  config:
-    enabled: true
-    size: 2Gi
-  data:
-    enabled: true
-    size: 100Gi
+config:
+  enabled: true
+size: 2Gi
+data:
+  enabled: true
+size: 100Gi
 ```
 
-## Production Example
+## <span data-i18n="docsCharts.heading.productionExample">Production Example</span>
 
 ```yaml
 komga:
-  timezone: 'America/Sao_Paulo'
-  javaMemory: '-Xmx2g'
-  sessionTimeout: '7d'
-
+timezone: 'America/Sao_Paulo'
+javaMemory: '-Xmx2g'
+sessionTimeout: '7d'
 persistence:
-  config:
-    size: 5Gi
-  data:
-    size: 500Gi
-
+config:
+  size: 5Gi
+data:
+  size:
+500Gi
 ingress:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: komga.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: komga-tls
-      hosts:
-        - komga.example.com
-
+ingressClassName: traefik
+hosts:
+  - host: komga.example.com
+paths:
+  - path: /
+pathType: Prefix
+tls:
+  - secretName: komga-tls
+hosts:
+  - komga.example.com
 backup:
-  enabled: true
-  schedule: '0 3 * * *'
-  s3:
-    endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: komga
-    existingSecret: komga-s3-credentials
+enabled: true
+schedule: '0 3 * * *'
+s3:
+  endpoint:
+https://s3.amazonaws.com
+bucket: my-backups
+prefix: komga
+existingSecret: komga-s3-credentials
 ```
 
-## Key Values
+## <span data-i18n="docsCharts.heading.keyValues">Key Values</span>
 
-| Key                          | Default | Description                     |
+| <span data-i18n="docsCharts.table.key">Key</span> | <span data-i18n="docsCharts.table.default">Default</span> | <span data-i18n="docsCharts.table.description">Description</span>
+
 | ---------------------------- | ------- | ------------------------------- |
-| `komga.port`                 | `25600` | Container port                  |
-| `komga.contextPath`          | `/`     | Base URL path for reverse proxy |
-| `komga.sessionTimeout`       | `30m`   | Session timeout                 |
-| `komga.timezone`             | `UTC`   | Timezone                        |
-| `komga.javaMemory`           | `""`    | JVM options (e.g. `-Xmx2g`)     |
-| `persistence.config.enabled` | `true`  | Persist /config (database)      |
-| `persistence.config.size`    | `2Gi`   | Config PVC size                 |
-| `persistence.data.enabled`   | `true`  | Persist /data (libraries)       |
-| `persistence.data.size`      | `50Gi`  | Data PVC size                   |
-| `ingress.enabled`            | `false` | Enable ingress                  |
-| `backup.enabled`             | `false` | Enable S3 backups               |
+| `komga.port` | `25600` | <span data-i18n="docsCharts.auto.komga.t0">Container port</span> |
+| `komga.contextPath` | `/` | <span data-i18n="docsCharts.auto.komga.t1">Base URL path for reverse proxy</span> |
+| `komga.sessionTimeout` | `30m` | <span data-i18n="docsCharts.auto.komga.t2">Session timeout</span> |
+| `komga.timezone` | `UTC` | <span data-i18n="docsCharts.common.timezone">Timezone</span> |
+| `komga.javaMemory` | `""` | <span data-i18n="docsCharts.auto.komga.t3">JVM options (e.g. `-Xmx2g`)</span> |
+| `persistence.config.enabled` | `true` | <span data-i18n="docsCharts.auto.komga.t4">Persist /config (database)</span> |
+| `persistence.config.size` | `2Gi` | <span data-i18n="docsCharts.auto.komga.t5">Config <span data-i18n="docsCharts.common.pvcSize">PVC size</span></span> |
+| `persistence.data.enabled` | `true` | <span data-i18n="docsCharts.auto.komga.t6">Persist /data (libraries)</span> |
+| `persistence.data.size` | `50Gi` | <span data-i18n="docsCharts.auto.komga.t7">Data <span data-i18n="docsCharts.common.pvcSize">PVC size</span></span> |
+| `ingress.enabled` | `false` | <span data-i18n="docsCharts.common.enableIngress">Enable ingress</span> |
+| `backup.enabled` | `false` | <span data-i18n="docsCharts.common.enableS3Backups">Enable S3 backups</span> |
 
-## More Information
-
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/komga) on GitHub.
+## <span data-i18n="docsCharts.heading.moreInformation">More Information</span><span data-i18n="docsCharts.moreInfo.before">See the</span> [<span data-i18n="docsCharts.moreInfo.link">source code and full values reference</span>](https://github.com/helmforgedev/charts/tree/main/charts/komga) <span data-i18n="docsCharts.moreInfo.after">on GitHub.</span>
