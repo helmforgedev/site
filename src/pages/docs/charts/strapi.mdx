@@ -12,6 +12,8 @@ Deploy Strapi on Kubernetes as a production-ready headless CMS for APIs, website
 
 The HelmForge Strapi chart transforms basic Strapi deployments into production-ready, horizontally-scalable systems with comprehensive configuration options for uploads, email, database pooling, security hardening, and performance tuning.
 
+This chart uses the official **HelmForge Strapi base image** (`docker.io/helmforge/strapi-base`), a production-optimized image built specifically for Kubernetes deployments.
+
 ## Key Features
 
 ### Core Capabilities
@@ -48,6 +50,125 @@ helm install strapi helmforge/strapi
 helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 ```
 
+## HelmForge Base Image
+
+### Why Use helmforge/strapi-base?
+
+The chart uses **HelmForge's production-ready Strapi base image** instead of the generic Strapi image. This provides significant advantages for Kubernetes deployments:
+
+**Image:** `docker.io/helmforge/strapi-base:0.1.6`
+
+### Key Features
+
+- **Strapi 5.42.0** — Latest stable version with security patches
+- **All official plugins included** — Upload providers, email, database plugins pre-installed
+- **Multi-database support** — SQLite, PostgreSQL, and MySQL drivers included
+- **Health check endpoint** — HTTP `/_health` endpoint for Kubernetes probes
+- **Security hardened** — Non-root user (UID 1000), minimal attack surface
+- **Multi-architecture** — Supports linux/amd64 and linux/arm64
+- **Production optimized** — Pre-built dependencies, smaller image size
+- **Regularly updated** — Security patches and Strapi updates applied promptly
+
+### Using the Base Image
+
+**Default (recommended for testing):**
+
+```yaml
+image:
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
+```
+
+This provides a working Strapi instance with default configuration, perfect for:
+
+- Testing Strapi features
+- Proof of concept deployments
+- Development environments
+- Learning Kubernetes deployments
+
+**Custom Strapi Project:**
+
+For production deployments with custom content types and configurations:
+
+```dockerfile
+# Dockerfile
+FROM docker.io/helmforge/strapi-base:0.1.6
+
+# Copy your Strapi project
+COPY --chown=strapi:strapi . /opt/app
+
+# Build admin panel (if customized)
+RUN npm run build
+
+# Your custom startup command (optional)
+CMD ["npm", "run", "start"]
+```
+
+Then use your custom image:
+
+```yaml
+image:
+  repository: ghcr.io/myorg/my-custom-strapi
+  tag: 'v1.0.0'
+```
+
+### Image Specifications
+
+| Specification      | Value                          |
+| ------------------ | ------------------------------ |
+| **Registry**       | docker.io                      |
+| **Repository**     | helmforge/strapi-base          |
+| **Current Tag**    | 0.1.6                          |
+| **Strapi Version** | 5.42.0                         |
+| **Base Image**     | node:20-alpine                 |
+| **User**           | strapi (UID 1000, GID 1000)    |
+| **Working Dir**    | /opt/app                       |
+| **Exposed Port**   | 1337                           |
+| **Architectures**  | linux/amd64, linux/arm64       |
+| **Size**           | ~350MB (amd64), ~320MB (arm64) |
+
+### Included Features
+
+**Pre-installed Plugins:**
+
+- Upload providers (local, AWS S3, Cloudinary)
+- Email providers (SMTP, SendGrid)
+- Database connectors (PostgreSQL, MySQL, SQLite)
+- Admin panel with all features
+- GraphQL plugin
+- Documentation plugin
+- Internationalization (i18n)
+
+**Security Features:**
+
+- Non-root user execution
+- Minimal Alpine-based image
+- No unnecessary system packages
+- Regular security updates
+- Follows Kubernetes security best practices
+
+**Health Check Support:**
+
+The image includes a custom `/_health` endpoint that returns HTTP 200 when Strapi is ready:
+
+```bash
+curl http://localhost:1337/_health
+# Returns: {"status":"ok"}
+```
+
+This enables proper Kubernetes health checks:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /_health
+    port: 1337
+readinessProbe:
+  httpGet:
+    path: /_health
+    port: 1337
+```
+
 ## Quick Start Examples
 
 ### Basic SQLite Deployment
@@ -56,8 +177,8 @@ Simplest deployment for development or testing:
 
 ```yaml
 image:
-  repository: ghcr.io/myorg/my-strapi
-  tag: '1.0.0'
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
 
 persistence:
   enabled: true
@@ -81,8 +202,8 @@ Production-ready deployment with horizontal scaling:
 replicaCount: 3
 
 image:
-  repository: ghcr.io/myorg/my-strapi
-  tag: '1.0.0'
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
 
 # S3 uploads enable multi-replica scaling
 strapi:
@@ -606,14 +727,14 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 
 ### Essential Values
 
-| Key                        | Default            | Description                                        |
-| -------------------------- | ------------------ | -------------------------------------------------- |
-| `replicaCount`             | `1`                | Number of replicas (requires S3/Cloudinary if > 1) |
-| `image.repository`         | `vshadbolt/strapi` | Strapi application image                           |
-| `image.tag`                | `5.40.0`           | Image tag                                          |
-| `strapi.url`               | `""`               | Public URL (auto-detected from ingress)            |
-| `strapi.nodeEnv`           | `production`       | Node environment                                   |
-| `strapi.telemetryDisabled` | `true`             | Disable Strapi telemetry                           |
+| Key                        | Default                 | Description                                           |
+| -------------------------- | ----------------------- | ----------------------------------------------------- |
+| `replicaCount`             | `1`                     | Number of replicas (requires S3/Cloudinary if > 1)    |
+| `image.repository`         | `helmforge/strapi-base` | Strapi application image (HelmForge production-ready) |
+| `image.tag`                | `0.1.6`                 | HelmForge Strapi base image version                   |
+| `strapi.url`               | `""`                    | Public URL (auto-detected from ingress)               |
+| `strapi.nodeEnv`           | `production`            | Node environment                                      |
+| `strapi.telemetryDisabled` | `true`                  | Disable Strapi telemetry                              |
 
 ### Upload Provider Values
 
@@ -677,15 +798,15 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 
 ### Scenario 1: Development Environment
 
-SQLite with local uploads:
+SQLite with local uploads (using HelmForge base image):
 
 ```yaml
 replicaCount: 1
 
 image:
-  repository: my-strapi
-  tag: dev
-  pullPolicy: Never
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
+  pullPolicy: IfNotPresent
 
 database:
   mode: sqlite
@@ -718,8 +839,8 @@ External PostgreSQL with S3 uploads:
 replicaCount: 2
 
 image:
-  repository: ghcr.io/myorg/my-strapi
-  tag: staging
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
 
 database:
   mode: external
@@ -763,8 +884,8 @@ Multi-region with PostgreSQL replication:
 replicaCount: 3
 
 image:
-  repository: ghcr.io/myorg/my-strapi
-  tag: v1.2.3
+  repository: docker.io/helmforge/strapi-base
+  tag: '0.1.6'
 
 postgresql:
   enabled: true
