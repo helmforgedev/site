@@ -1,0 +1,365 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Elasticsearch Chart
+description: HelmForge Elasticsearch chart — production-ready multi-role cluster with intelligent presets, automated backups, ILM policies, data tiers, and security by default.
+---
+
+# Elasticsearch
+
+Deploy production-ready Elasticsearch clusters on Kubernetes with a single `clusterProfile` setting. The chart drives multi-role architecture (master, data, coordinating), auto-calculated heap sizing, automated S3 snapshots, ILM retention policies, and data tier management — all from a minimal values file.
+
+## Key Features
+
+- **Three cluster profiles** — `dev` (single node), `staging` (1m+2d), `production-ha` (3m+3d+2c) with tuned defaults
+- **Multi-role architecture** — dedicated StatefulSets per role: master, data, coordinating, and optional ingest
+- **Auto heap sizing** — 50% rule applied automatically from container memory limit (max 31 GB)
+- **Split-brain prevention** — validates odd master count, auto-calculates quorum (`minimum_master_nodes`)
+- **Data tiers** — optional hot/warm StatefulSets with separate storage classes and ILM routing via `node.attr.data`
+- **Automated S3 backups** — scheduled CronJob with configurable retention and one-click restore
+- **ILM policy templates** — pre-built policies for logs, metrics, and traces with configurable hot→warm→cold→delete phases
+- **Security by default** — X-Pack enabled, auto-generated passwords, cert-manager TLS integration
+- **Monitoring** — Prometheus exporter sidecar, ServiceMonitor, PrometheusRule (5 alerts), and Grafana dashboards
+- **Optional Kibana** — auto-connected with shared TLS, Ingress support
+- **PodDisruptionBudgets** — node maintenance safety for HA deployments
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install es helmforge/elasticsearch
+```
+
+**OCI registry:**
+
+```bash
+helm install es oci://ghcr.io/helmforgedev/helm/elasticsearch
+```
+
+## Quick Start
+
+### Development (single node, no TLS)
+
+```bash
+helm install es helmforge/elasticsearch
+# clusterProfile defaults to "dev" — one node, minimal resources
+```
+
+### Staging (small cluster)
+
+```yaml
+# staging-values.yaml
+clusterProfile: staging
+
+master:
+  persistence:
+    size: 20Gi
+
+data:
+  persistence:
+    size: 100Gi
+```
+
+```bash
+helm install es helmforge/elasticsearch -f staging-values.yaml
+```
+
+### Production HA
+
+```yaml
+# production-values.yaml
+clusterProfile: production-ha
+
+clusterName: my-production-cluster
+
+master:
+  persistence:
+    size: 20Gi
+
+data:
+  persistence:
+    size: 500Gi
+
+security:
+  enabled: true
+  tls:
+    certManager:
+      enabled: true
+      clusterIssuer: true
+      issuerName: letsencrypt-prod
+
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    bucket: my-es-backups
+    region: us-east-1
+    existingSecret: es-s3-creds
+
+ilm:
+  logs:
+    enabled: true
+  metrics:
+    enabled: true
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  grafana:
+    dashboards: true
+```
+
+```bash
+helm install es helmforge/elasticsearch -f production-values.yaml
+```
+
+## Cluster Profiles
+
+| Setting              | `dev`                  | `staging` | `production-ha`           |
+| -------------------- | ---------------------- | --------- | ------------------------- |
+| Master nodes         | 1 (all roles)          | 1         | 3 dedicated               |
+| Data nodes           | 0 (master handles all) | 2         | 3 dedicated               |
+| Coordinating nodes   | 0                      | 0         | 2 dedicated               |
+| Master heap          | 1 g                    | 2 g       | 2 g                       |
+| Data heap            | —                      | 4 g       | 8 g                       |
+| Master PVC           | 10 Gi                  | 10 Gi     | 20 Gi                     |
+| Data PVC             | — (emptyDir)           | 50 Gi     | 200 Gi                    |
+| Security (TLS)       | disabled               | disabled  | auto-enabled              |
+| Anti-affinity        | disabled               | disabled  | preferredDuringScheduling |
+| PodDisruptionBudgets | —                      | —         | maxUnavailable: 1         |
+
+## Data Tier Architecture
+
+Enable explicit hot/warm tiers for cost-optimized storage. ILM policies automatically migrate data between tiers.
+
+```yaml
+dataTiers:
+  hot:
+    enabled: true
+    replicas: 3
+    storage: 200Gi
+    storageClass: fast-ssd # NVMe / SSD
+
+  warm:
+    enabled: true
+    replicas: 2
+    storage: 1Ti
+    storageClass: standard # HDD / object storage
+```
+
+When tiers are enabled, the `data` StatefulSet uses `data_content` role (mixed), while hot nodes get `data_hot` and warm nodes get `data_warm`. ILM `allocate` action routes indices automatically based on `node.attr.data`.
+
+## Automated Backups (S3)
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 2 * * *' # daily at 2am
+  retention:
+    days: 30 # delete snapshots older than 30 days
+
+  s3:
+    bucket: my-es-backups
+    region: us-east-1
+    endpoint: '' # leave empty for AWS; set for MinIO
+    existingSecret: es-s3-creds # keys: access-key, secret-key
+```
+
+**Trigger a manual backup:**
+
+```bash
+kubectl create job --from=cronjob/es-backup manual-$(date +%s) -n <namespace>
+```
+
+**List snapshots:**
+
+```bash
+kubectl port-forward svc/es-elasticsearch 9200 -n <namespace>
+curl http://localhost:9200/_snapshot/helmforge-s3/_all?pretty
+```
+
+**Restore a snapshot:**
+
+```bash
+curl -X POST "localhost:9200/_snapshot/helmforge-s3/<snapshot-name>/_restore?pretty"
+```
+
+## ILM Policies
+
+```yaml
+ilm:
+  logs:
+    enabled: true
+    hotDays: 7 # stay hot for 7 days (fast storage, active writes)
+    warmDays: 30 # move to warm at day 7, stay until day 37
+    coldDays: 90 # move to cold at day 37
+    deleteDays: 180 # delete at day 180
+    rolloverSize: '50gb'
+
+  metrics:
+    enabled: true
+    hotDays: 3
+    warmDays: 14
+    deleteDays: 30
+
+  traces:
+    enabled: true
+    hotDays: 1
+    warmDays: 7
+    deleteDays: 30
+```
+
+Apply the ILM policy to an index template:
+
+```bash
+curl -X PUT "localhost:9200/_index_template/logs-template" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "index_patterns": ["logs-*"],
+    "template": {
+      "settings": {
+        "index.lifecycle.name": "helmforge-logs",
+        "index.lifecycle.rollover_alias": "logs"
+      }
+    }
+  }'
+```
+
+## Security and TLS
+
+### Auto-generated passwords
+
+When `security.enabled: true` and no `existingCredentialsSecret` is set, the chart auto-generates random passwords:
+
+```bash
+kubectl get secret es-elasticsearch-credentials \
+  -o jsonpath='{.data.elastic-password}' | base64 -d
+```
+
+### cert-manager TLS
+
+```yaml
+security:
+  enabled: true
+  tls:
+    certManager:
+      enabled: true
+      clusterIssuer: true # use a ClusterIssuer
+      issuerName: letsencrypt-prod # your ClusterIssuer name
+```
+
+### Bring your own certificates
+
+```yaml
+security:
+  enabled: true
+  existingTlsSecret: my-tls-secret # keys: ca.crt, tls.crt, tls.key
+  existingCredentialsSecret: my-creds-secret # keys: elastic-password
+```
+
+## Monitoring
+
+```yaml
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true # Prometheus Operator ServiceMonitor
+    interval: '30s'
+  prometheusRule:
+    enabled: true # 5 alert rules
+  grafana:
+    dashboards: true # 3 Grafana dashboards via ConfigMap
+```
+
+**Available alerts:**
+
+- `ElasticsearchClusterRed` — cluster status RED for 5+ minutes (critical)
+- `ElasticsearchClusterYellow` — cluster status YELLOW for 30+ minutes (warning)
+- `ElasticsearchDiskSpaceHigh` — disk usage >85% (warning)
+- `ElasticsearchDiskSpaceCritical` — disk usage >95% (critical)
+- `ElasticsearchHeapHigh` — JVM heap >90% (warning)
+- `ElasticsearchNodeDown` — fewer nodes than expected (critical)
+
+**Grafana dashboards available:**
+
+- `Elasticsearch / Cluster Health` — nodes, shards, disk usage
+- `Elasticsearch / JVM Metrics` — heap usage, GC, thread pools
+- `Elasticsearch / Query Performance` — search rate, latency, indexing throughput
+
+## Key Values
+
+| Key                                | Default                     | Description                                       |
+| ---------------------------------- | --------------------------- | ------------------------------------------------- |
+| `clusterProfile`                   | `dev`                       | Cluster preset: `dev`, `staging`, `production-ha` |
+| `clusterName`                      | `helmforge-cluster`         | Elasticsearch cluster name                        |
+| `image.tag`                        | `8.17.4`                    | Elasticsearch version                             |
+| `master.replicaCount`              | profile-driven              | Number of master-eligible nodes (must be odd)     |
+| `master.heapSize`                  | auto (50% mem)              | JVM heap for master nodes                         |
+| `data.replicaCount`                | profile-driven              | Number of data nodes                              |
+| `data.heapSize`                    | auto (50% mem)              | JVM heap for data nodes                           |
+| `coordinating.replicaCount`        | profile-driven              | Number of coordinating nodes                      |
+| `security.enabled`                 | `false` (`true` in prod-ha) | Enable X-Pack security                            |
+| `security.tls.certManager.enabled` | `false`                     | Auto-issue TLS via cert-manager                   |
+| `backup.enabled`                   | `false`                     | Enable S3 snapshot CronJob                        |
+| `backup.schedule`                  | `"0 2 * * *"`               | Cron schedule for snapshots                       |
+| `ilm.logs.enabled`                 | `false`                     | Enable logs ILM policy                            |
+| `ilm.metrics.enabled`              | `false`                     | Enable metrics ILM policy                         |
+| `dataTiers.hot.enabled`            | `false`                     | Enable dedicated hot tier nodes                   |
+| `dataTiers.warm.enabled`           | `false`                     | Enable dedicated warm tier nodes                  |
+| `monitoring.enabled`               | `false`                     | Enable Prometheus exporter sidecar                |
+| `kibana.enabled`                   | `false`                     | Deploy optional Kibana                            |
+
+## Troubleshooting
+
+**Pods stuck in Init — vm.max_map_count:**
+
+```bash
+# The sysctl init container requires privileged mode
+kubectl describe pod <es-pod> -n <namespace>
+# Check: sysctl -w vm.max_map_count=262144 must succeed
+# Alternative: set on nodes: sysctl -w vm.max_map_count=262144
+```
+
+**Cluster health RED after startup:**
+
+```bash
+kubectl exec -it <es-master-0> -n <namespace> -- \
+  curl -s localhost:9200/_cluster/health?pretty
+# Check number_of_nodes matches expected count
+# Check unassigned_shards > 0 (wait for data nodes to start)
+```
+
+**PVCs not provisioning:**
+
+```bash
+kubectl get pvc -n <namespace>
+kubectl describe pvc <pvc-name> -n <namespace>
+# Ensure storage class exists and has capacity
+```
+
+**Out of memory (OOM killed):**
+
+```bash
+# Verify heap setting is correct (should be ~50% of limit)
+kubectl exec -it <es-pod> -- env | grep ES_JAVA_OPTS
+# Override explicitly:
+# master.heapSize: "2g"
+# master.resources.limits.memory: "4Gi"
+```
+
+**Pod evicted — disk pressure:**
+
+```bash
+kubectl get events -n <namespace> | grep -i evict
+# Check disk usage: kubectl exec -it <pod> -- df -h
+# Enable monitoring.enabled=true to get disk alerts before eviction
+```
+
+## More Information
+
+See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/elasticsearch) on GitHub.
