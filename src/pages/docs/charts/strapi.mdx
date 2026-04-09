@@ -1,29 +1,38 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Strapi Chart
-description: HelmForge Strapi chart — headless CMS with SQLite, PostgreSQL, or MySQL, uploads persistence, and S3 backup.
+description: Production-ready Strapi headless CMS with multi-replica support, S3/Cloudinary uploads, email providers, advanced security, and comprehensive configuration.
 ---
 
 # Strapi
 
-Deploy Strapi on Kubernetes as a headless CMS for APIs, websites, and custom admin experiences. The chart is designed for a prebuilt Strapi project image and supports SQLite, PostgreSQL, MySQL, persistent uploads, and scheduled backups.
+Deploy Strapi on Kubernetes as a production-ready headless CMS for APIs, websites, and custom admin experiences. This chart is designed for prebuilt Strapi project images and includes enterprise-grade features for scalability, security, and observability.
 
-Set `ingress.ingressClassName` to the controller available in your cluster, such as `traefik`, `nginx`, or another supported ingress class.
+## Overview
+
+The HelmForge Strapi chart transforms basic Strapi deployments into production-ready, horizontally-scalable systems with comprehensive configuration options for uploads, email, database pooling, security hardening, and performance tuning.
 
 ## Key Features
 
-- **Prebuilt project image** — intended for your own Strapi application image
-- **SQLite by default** — simple initial deployment path
-- **PostgreSQL subchart** — bundled via HelmForge dependency
-- **MySQL subchart** — bundled via HelmForge dependency
-- **External database** — connect to existing PostgreSQL or MySQL
-- **Application secrets** — auto-generated app keys and token salts
-- **Uploads persistence** — PVC-backed media storage
-- **Scheduled backups** — SQLite archive or SQL dump workflows to S3
+### Core Capabilities
+- **Multi-replica deployments** — horizontal scaling with S3/Cloudinary uploads
+- **S3-compatible upload providers** — AWS S3, MinIO, Cloudflare R2, Backblaze B2
+- **Cloudinary integration** — managed media delivery and transformation
+- **Email providers** — SMTP, SendGrid for notifications and password reset
+- **Database connection pooling** — production-grade PostgreSQL/MySQL management
+- **Multiple database backends** — SQLite, PostgreSQL, MySQL, or external databases
+
+### Production Features
+- **Admin panel security** — custom paths, JWT expiration, rate limiting
+- **Performance tuning** — Node.js memory configuration, log levels, structured logs
+- **HTTP health checks** — application-level health validation via `/_health`
+- **GraphQL configuration** — playground, introspection, depth/complexity limits
+- **Scheduled S3 backups** — automated database dumps and uploads archiving
+- **Application secrets management** — auto-generated keys with upgrade preservation
 
 ## Installation
 
-**HTTPS repository:**
+### HTTPS Repository
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -31,41 +40,122 @@ helm repo update
 helm install strapi helmforge/strapi
 ```
 
-**OCI registry:**
+### OCI Registry
 
 ```bash
 helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 ```
 
-## Basic Example
+## Quick Start Examples
+
+### Basic SQLite Deployment
+
+Simplest deployment for development or testing:
 
 ```yaml
 image:
-  repository: ghcr.io/example/my-strapi
+  repository: ghcr.io/myorg/my-strapi
   tag: '1.0.0'
 
 persistence:
   enabled: true
   size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: cms-dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## PostgreSQL Example
+### Production Multi-Replica with S3
+
+Production-ready deployment with horizontal scaling:
 
 ```yaml
+replicaCount: 3
+
 image:
-  repository: ghcr.io/example/my-strapi
+  repository: ghcr.io/myorg/my-strapi
   tag: '1.0.0'
 
+# S3 uploads enable multi-replica scaling
+strapi:
+  url: https://cms.example.com
+  upload:
+    provider: aws-s3
+    s3:
+      enabled: true
+      bucket: mycompany-strapi-uploads
+      region: us-east-1
+      existingSecret: strapi-s3-secret
+
+  # Email for password reset and notifications
+  email:
+    provider: smtp
+    defaultFrom: noreply@example.com
+    smtp:
+      host: smtp.sendgrid.net
+      port: 587
+      existingSecret: strapi-smtp-secret
+
+  # Security hardening
+  admin:
+    path: /secure-admin
+    jwtExpiration: 7d
+    rateLimit:
+      enabled: true
+      max: 5
+      timeWindow: 900000
+
+  # Performance optimization
+  performance:
+    nodeOptions: "--max-old-space-size=2048"
+    logLevel: warn
+    forceJsonLogs: true
+
+# PostgreSQL with connection pooling
 postgresql:
   enabled: true
   auth:
     database: strapi
     username: strapi
-    password: 'strong-password'
+    existingSecret: strapi-postgresql-secret
+  primary:
+    persistence:
+      size: 20Gi
+
+database:
+  pool:
+    min: 2
+    max: 8
+
+# Automated backups
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: mycompany-strapi-backups
+    existingSecret: strapi-backup-s3-secret
+
+# Production resources
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2.5Gi
 
 ingress:
   enabled: true
-  ingressClassName: traefik
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: cms.example.com
       paths:
@@ -77,34 +167,791 @@ ingress:
         - cms.example.com
 ```
 
-## External Database Example
+## Upload Providers
+
+### Why Upload Providers Matter
+
+By default, Strapi stores uploads on the local filesystem. This works for single-replica deployments but **prevents horizontal scaling**. Upload providers solve this by storing media in shared object storage.
+
+### S3-Compatible Storage
+
+Supports AWS S3, MinIO, Cloudflare R2, Backblaze B2, and other S3-compatible services:
+
+```yaml
+strapi:
+  upload:
+    provider: aws-s3
+    s3:
+      enabled: true
+      
+      # For AWS S3 (leave endpoint empty)
+      region: us-east-1
+      bucket: my-strapi-uploads
+      
+      # For MinIO/R2/Backblaze (specify endpoint)
+      endpoint: https://minio.example.com
+      
+      # Credentials (use existingSecret in production)
+      existingSecret: strapi-s3-secret
+      # Or inline (not recommended):
+      # accessKey: AKIAIOSFODNN7EXAMPLE
+      # secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      
+      # Optional configuration
+      prefix: uploads/  # Folder prefix
+      acl: private      # Access control
+      baseUrl: https://cdn.example.com  # CDN URL
+```
+
+**Create the secret:**
+
+```bash
+kubectl create secret generic strapi-s3-secret \
+  --from-literal=access-key=AKIAIOSFODNN7EXAMPLE \
+  --from-literal=secret-key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+  -n strapi
+```
+
+### Cloudinary
+
+Managed media delivery with transformation capabilities:
+
+```yaml
+strapi:
+  upload:
+    provider: cloudinary
+    cloudinary:
+      enabled: true
+      cloudName: mycompany
+      existingSecret: strapi-cloudinary-secret
+      # Or inline:
+      # apiKey: "123456789012345"
+      # apiSecret: "abcdefghijklmnopqrstuvwxyz"
+```
+
+**Create the secret:**
+
+```bash
+kubectl create secret generic strapi-cloudinary-secret \
+  --from-literal=api-key=123456789012345 \
+  --from-literal=api-secret=abcdefghijklmnopqrstuvwxyz \
+  -n strapi
+```
+
+### Multi-Replica Requirements
+
+The chart enforces upload provider requirements:
+
+- `replicaCount: 1` — works with any upload provider (local, S3, Cloudinary)
+- `replicaCount > 1` — **requires S3 or Cloudinary**
+
+Attempting multi-replica with local uploads fails at render time with a helpful error message.
+
+## Email Configuration
+
+Email providers enable password reset, user invitations, and notifications.
+
+### SMTP
+
+Generic SMTP provider (SendGrid, Mailgun, Postmark, etc.):
+
+```yaml
+strapi:
+  email:
+    provider: smtp
+    defaultFrom: noreply@example.com
+    defaultReplyTo: support@example.com
+    smtp:
+      host: smtp.sendgrid.net
+      port: 587
+      username: apikey
+      existingSecret: strapi-smtp-secret
+      secure: false      # Use STARTTLS
+      requireTLS: true   # Enforce TLS
+```
+
+**Create the secret:**
+
+```bash
+kubectl create secret generic strapi-smtp-secret \
+  --from-literal=smtp-password=SG.abc123... \
+  -n strapi
+```
+
+### SendGrid
+
+Dedicated SendGrid integration:
+
+```yaml
+strapi:
+  email:
+    provider: sendgrid
+    defaultFrom: noreply@example.com
+    sendgrid:
+      existingSecret: strapi-sendgrid-secret
+```
+
+**Create the secret:**
+
+```bash
+kubectl create secret generic strapi-sendgrid-secret \
+  --from-literal=sendgrid-api-key=SG.abc123... \
+  -n strapi
+```
+
+## Database Configuration
+
+### SQLite (Default)
+
+Simple filesystem-based database for development:
+
+```yaml
+database:
+  mode: sqlite  # or auto (default)
+  sqlite:
+    directory: /opt/app/.tmp
+    filename: data.db
+
+persistence:
+  enabled: true
+  size: 5Gi
+```
+
+**Important:** SQLite requires `persistence.enabled: true` and `replicaCount: 1`.
+
+### PostgreSQL Subchart
+
+Bundled PostgreSQL for complete Helm release:
+
+```yaml
+postgresql:
+  enabled: true
+  architecture: standalone  # or replication
+  auth:
+    database: strapi
+    username: strapi
+    password: ""  # auto-generated if empty
+    existingSecret: strapi-postgresql-secret
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+```
+
+### MySQL Subchart
+
+Bundled MySQL alternative:
+
+```yaml
+mysql:
+  enabled: true
+  architecture: standalone  # or replication
+  auth:
+    database: strapi
+    username: strapi
+    password: ""  # auto-generated if empty
+    existingSecret: strapi-mysql-secret
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+```
+
+### External Database
+
+Connect to existing database:
 
 ```yaml
 database:
   mode: external
   external:
-    vendor: postgres
-    host: db.example.com
+    vendor: postgres  # or mysql
+    host: postgres.database.svc.cluster.local
+    port: 5432
     name: strapi
     username: strapi
-    existingSecret: strapi-db-credentials
+    existingSecret: strapi-db-secret
+    ssl:
+      enabled: true
 ```
 
-## Key Values
+### Connection Pooling
 
-| Key                         | Default            | Description                                               |
-| --------------------------- | ------------------ | --------------------------------------------------------- |
-| `image.repository`          | `vshadbolt/strapi` | Container image for the Strapi project                    |
-| `strapi.url`                | `""`               | Public URL (auto-detected from ingress if empty)          |
-| `database.mode`             | `auto`             | Database mode (auto, sqlite, external, postgresql, mysql) |
-| `database.sqlite.directory` | `/opt/app/.tmp`    | SQLite directory                                          |
-| `postgresql.enabled`        | `false`            | Deploy PostgreSQL subchart                                |
-| `mysql.enabled`             | `false`            | Deploy MySQL subchart                                     |
-| `persistence.enabled`       | `true`             | Enable uploads and SQLite persistence                     |
-| `ingress.enabled`           | `false`            | Enable ingress                                            |
-| `backup.enabled`            | `false`            | Enable S3 backups                                         |
-| `secrets.existingSecret`    | `""`               | Use an existing secret for Strapi app secrets             |
+**Critical for production deployments** with multiple replicas:
 
-## More Information
+```yaml
+database:
+  pool:
+    min: 2                      # Minimum connections per replica
+    max: 8                      # Maximum connections per replica
+    acquireTimeoutMillis: 30000 # Connection acquisition timeout
+    idleTimeoutMillis: 30000    # Idle connection timeout
+```
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/strapi) on GitHub.
+**Calculate max connections:**
+
+```
+total_connections = replicaCount × pool.max + buffer
+```
+
+Example: 3 replicas × 8 max = 24 connections + 4 buffer = **28 total**
+
+Ensure your database `max_connections` is set accordingly.
+
+## Security & Admin Panel
+
+### Admin Panel Customization
+
+```yaml
+strapi:
+  admin:
+    # Custom admin path (security through obscurity)
+    path: /secure-admin
+    
+    # JWT token expiration
+    jwtExpiration: 7d  # 1d, 7d, 30d, etc.
+    
+    # Rate limiting (brute force protection)
+    rateLimit:
+      enabled: true
+      max: 5              # Max login attempts
+      timeWindow: 900000  # Time window (15 minutes in ms)
+    
+    # Forgotten password
+    forgotPassword:
+      enabled: true
+```
+
+### GraphQL Security
+
+```yaml
+strapi:
+  graphql:
+    playgroundEnabled: false  # Disable in production
+    introspection: false      # Disable schema introspection
+    maxDepth: 10              # Query depth limit
+    maxComplexity: 1000       # Query complexity limit
+```
+
+### API Configuration
+
+```yaml
+strapi:
+  api:
+    rest:
+      defaultLimit: 25  # Default pagination limit
+      maxLimit: 100     # Maximum pagination limit
+```
+
+## Performance Tuning
+
+### Node.js Configuration
+
+```yaml
+strapi:
+  performance:
+    # Node.js memory allocation
+    nodeOptions: "--max-old-space-size=2048"
+    
+    # Log level (fatal, error, warn, info, debug, trace)
+    logLevel: warn
+    
+    # Structured JSON logs for production
+    forceJsonLogs: true
+    
+    # Pretty print logs (development only)
+    prettyPrint: false
+```
+
+**Important:** Ensure `resources.limits.memory` accommodates `--max-old-space-size`:
+
+```yaml
+resources:
+  limits:
+    memory: 2.5Gi  # Must be > 2048MB (nodeOptions)
+```
+
+### Server Configuration
+
+```yaml
+strapi:
+  server:
+    bodyParser:
+      jsonLimit: 1mb
+      formLimit: 56kb
+      textLimit: 1mb
+    
+    compression:
+      enabled: true
+    
+    cron:
+      enabled: true
+    
+    logger:
+      level: info
+```
+
+## Backup & Restore
+
+### Automated S3 Backups
+
+```yaml
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: strapi-backups
+    prefix: production
+    createBucketIfNotExists: true
+    existingSecret: strapi-backup-s3-secret
+  
+  # Optional: Override database credentials
+  database:
+    host: postgres-replica.example.com
+    existingSecret: strapi-backup-db-secret
+```
+
+**What gets backed up:**
+
+- **SQLite mode:** PVC archive (uploads + database)
+- **PostgreSQL/MySQL mode:** SQL dump + uploads archive (if persistence enabled)
+
+### Manual Backup
+
+Trigger backup immediately:
+
+```bash
+kubectl create job --from=cronjob/strapi-backup manual-backup-$(date +%s) -n strapi
+```
+
+### Restore Process
+
+Backups are not automated. Manual restore:
+
+1. Scale down deployment: `kubectl scale deploy/strapi --replicas=0`
+2. Download backup from S3
+3. Restore uploads to PVC
+4. Restore database (import SQL dump or restore SQLite file)
+5. Scale up deployment: `kubectl scale deploy/strapi --replicas=3`
+
+## Monitoring & Observability
+
+### Health Checks
+
+The chart uses HTTP health checks on the `/_health` endpoint:
+
+```yaml
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /_health
+    port: http
+  failureThreshold: 30
+  periodSeconds: 5
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /_health
+    port: http
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /_health
+    port: http
+```
+
+### Logs
+
+View application logs:
+
+```bash
+# Follow logs
+kubectl logs -f deployment/strapi -n strapi
+
+# View recent logs
+kubectl logs --tail=100 deployment/strapi -n strapi
+
+# View logs from all replicas
+kubectl logs -l app.kubernetes.io/name=strapi -n strapi
+```
+
+### Debugging
+
+```bash
+# Check pod status
+kubectl get pods -l app.kubernetes.io/name=strapi -n strapi
+
+# Describe deployment
+kubectl describe deployment strapi -n strapi
+
+# Check events
+kubectl get events -n strapi --sort-by='.lastTimestamp'
+
+# Test database connectivity (PostgreSQL/MySQL)
+kubectl exec deployment/strapi -n strapi -- \
+  sh -c "nc -zv postgres-host 5432"
+
+# Access admin panel
+kubectl port-forward svc/strapi 1337:80 -n strapi
+# Then open: http://localhost:1337/admin
+```
+
+## Configuration Reference
+
+### Essential Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `replicaCount` | `1` | Number of replicas (requires S3/Cloudinary if > 1) |
+| `image.repository` | `vshadbolt/strapi` | Strapi application image |
+| `image.tag` | `5.40.0` | Image tag |
+| `strapi.url` | `""` | Public URL (auto-detected from ingress) |
+| `strapi.nodeEnv` | `production` | Node environment |
+| `strapi.telemetryDisabled` | `true` | Disable Strapi telemetry |
+
+### Upload Provider Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `strapi.upload.provider` | `local` | Upload provider (local, aws-s3, cloudinary) |
+| `strapi.upload.s3.enabled` | `false` | Enable S3 upload provider |
+| `strapi.upload.s3.bucket` | `""` | S3 bucket name |
+| `strapi.upload.s3.region` | `us-east-1` | S3 region |
+| `strapi.upload.s3.endpoint` | `""` | S3 endpoint (for MinIO/R2) |
+| `strapi.upload.s3.existingSecret` | `""` | Secret for S3 credentials |
+
+### Email Provider Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `strapi.email.provider` | `none` | Email provider (none, smtp, sendgrid) |
+| `strapi.email.defaultFrom` | `noreply@example.com` | Default from address |
+| `strapi.email.smtp.host` | `""` | SMTP hostname |
+| `strapi.email.smtp.port` | `587` | SMTP port |
+| `strapi.email.smtp.existingSecret` | `""` | Secret for SMTP password |
+
+### Admin & Security Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `strapi.admin.path` | `/admin` | Admin panel path |
+| `strapi.admin.jwtExpiration` | `7d` | JWT token expiration |
+| `strapi.admin.rateLimit.enabled` | `true` | Enable login rate limiting |
+| `strapi.admin.rateLimit.max` | `5` | Max login attempts |
+| `strapi.admin.rateLimit.timeWindow` | `900000` | Rate limit window (15 min) |
+
+### Database Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `database.mode` | `auto` | Database mode (auto, sqlite, external, postgresql, mysql) |
+| `database.pool.min` | `2` | Minimum connections per replica |
+| `database.pool.max` | `10` | Maximum connections per replica |
+| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart |
+| `mysql.enabled` | `false` | Deploy MySQL subchart |
+
+### Performance Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `strapi.performance.nodeOptions` | `""` | Node.js options (e.g., --max-old-space-size) |
+| `strapi.performance.logLevel` | `info` | Log level (fatal, error, warn, info, debug, trace) |
+| `strapi.performance.forceJsonLogs` | `true` | Structured JSON logs |
+
+### Backup Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `backup.enabled` | `false` | Enable scheduled backups |
+| `backup.schedule` | `0 3 * * *` | Cron schedule (daily 3 AM) |
+| `backup.s3.bucket` | `""` | S3 bucket for backups |
+| `backup.s3.existingSecret` | `""` | Secret for S3 credentials |
+
+## Common Scenarios
+
+### Scenario 1: Development Environment
+
+SQLite with local uploads:
+
+```yaml
+replicaCount: 1
+
+image:
+  repository: my-strapi
+  tag: dev
+  pullPolicy: Never
+
+database:
+  mode: sqlite
+
+strapi:
+  nodeEnv: development
+  upload:
+    provider: local
+  
+  performance:
+    logLevel: debug
+    prettyPrint: true
+    forceJsonLogs: false
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+```
+
+### Scenario 2: Staging with External Database
+
+External PostgreSQL with S3 uploads:
+
+```yaml
+replicaCount: 2
+
+image:
+  repository: ghcr.io/myorg/my-strapi
+  tag: staging
+
+database:
+  mode: external
+  external:
+    vendor: postgres
+    host: postgres-staging.example.com
+    name: strapi_staging
+    username: strapi
+    existingSecret: strapi-staging-db-secret
+  pool:
+    min: 2
+    max: 5
+
+strapi:
+  upload:
+    provider: aws-s3
+    s3:
+      enabled: true
+      bucket: strapi-staging-uploads
+      existingSecret: strapi-s3-staging-secret
+
+  email:
+    provider: smtp
+    defaultFrom: staging-cms@example.com
+    smtp:
+      host: smtp.mailtrap.io
+      existingSecret: mailtrap-secret
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: cms-staging.example.com
+```
+
+### Scenario 3: Production High Availability
+
+Multi-region with PostgreSQL replication:
+
+```yaml
+replicaCount: 3
+
+image:
+  repository: ghcr.io/myorg/my-strapi
+  tag: v1.2.3
+
+postgresql:
+  enabled: true
+  architecture: replication
+  auth:
+    existingSecret: strapi-postgresql-secret
+  primary:
+    persistence:
+      size: 50Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      size: 50Gi
+
+database:
+  pool:
+    min: 2
+    max: 8
+
+strapi:
+  url: https://cms.example.com
+  
+  upload:
+    provider: aws-s3
+    s3:
+      enabled: true
+      bucket: strapi-prod-uploads
+      region: us-east-1
+      existingSecret: strapi-s3-prod-secret
+      baseUrl: https://cdn.example.com
+  
+  email:
+    provider: smtp
+    defaultFrom: noreply@example.com
+    smtp:
+      host: smtp.sendgrid.net
+      existingSecret: sendgrid-prod-secret
+  
+  admin:
+    path: /secure-admin
+    jwtExpiration: 1d
+    rateLimit:
+      enabled: true
+      max: 3
+  
+  performance:
+    nodeOptions: "--max-old-space-size=4096"
+    logLevel: error
+    forceJsonLogs: true
+  
+  graphql:
+    playgroundEnabled: false
+    introspection: false
+
+backup:
+  enabled: true
+  schedule: "0 1 * * *"
+  s3:
+    bucket: strapi-prod-backups
+    existingSecret: strapi-backup-s3-secret
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 5Gi
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: strapi
+        topologyKey: kubernetes.io/hostname
+```
+
+## Troubleshooting
+
+### Multi-Replica Warning
+
+**Error:** `Multi-replica deployment requires S3 or Cloudinary upload provider`
+
+**Cause:** Attempting `replicaCount > 1` with `strapi.upload.provider: local`
+
+**Solution:** Configure S3 or Cloudinary upload provider, or set `replicaCount: 1`
+
+### Database Connection Errors
+
+**Error:** `too many connections`
+
+**Cause:** Insufficient database `max_connections` for replica count and pool size
+
+**Solution:**
+
+1. Calculate required connections: `replicaCount × pool.max + buffer`
+2. Increase database `max_connections`
+3. Or reduce `database.pool.max`
+
+### Upload Failures
+
+**Error:** Uploads fail in multi-replica deployment
+
+**Cause:** Using local upload provider with multiple replicas
+
+**Solution:** Configure S3 or Cloudinary upload provider
+
+### Health Check Failures
+
+**Error:** Pods repeatedly restart, health checks failing
+
+**Cause:** Application not responding on `/_health` endpoint
+
+**Solution:**
+
+1. Check application logs: `kubectl logs deployment/strapi`
+2. Verify database connectivity
+3. Increase `startupProbe.failureThreshold` for slow starts
+4. Check resource limits (CPU/memory)
+
+### Performance Issues
+
+**Error:** Out of memory errors
+
+**Cause:** `nodeOptions` memory allocation exceeds pod limits
+
+**Solution:** Ensure `resources.limits.memory` > `nodeOptions --max-old-space-size`
+
+### Email Not Working
+
+**Error:** Password reset emails not sent
+
+**Cause:** Email provider not configured
+
+**Solution:**
+
+1. Configure `strapi.email.provider` (smtp or sendgrid)
+2. Create secret with SMTP password or SendGrid API key
+3. Test email configuration in Strapi admin panel
+
+## Migration Guide
+
+### From Strapi Chart < 1.5.0
+
+**Breaking Changes in 1.5.0:**
+
+1. **Health probes changed from TCP to HTTP**
+   - Now uses `/_health` endpoint
+   - Update external monitoring if watching probe endpoints
+
+2. **Multi-replica now requires upload provider**
+   - `replicaCount > 1` enforced at render time
+   - Configure S3/Cloudinary or set `replicaCount: 1`
+
+**New Features (Opt-in):**
+
+All new features are backward compatible and opt-in:
+- S3/Cloudinary upload providers
+- Email providers
+- Database connection pooling
+- Admin security features
+- Performance tuning options
+
+**Migration Steps:**
+
+1. Review your `values.yaml`
+2. If using `replicaCount > 1`, add S3/Cloudinary configuration
+3. Optionally enable new features (email, admin security, etc.)
+4. Run `helm upgrade` with new values
+5. Verify pods start successfully
+6. Test admin panel and uploads
+
+## Additional Resources
+
+- **Chart Source:** [github.com/helmforgedev/charts/tree/main/charts/strapi](https://github.com/helmforgedev/charts/tree/main/charts/strapi)
+- **Strapi Documentation:** [docs.strapi.io](https://docs.strapi.io)
+- **Strapi Upload Providers:** [docs.strapi.io/dev-docs/plugins/upload](https://docs.strapi.io/dev-docs/plugins/upload)
+- **Strapi Email:** [docs.strapi.io/dev-docs/plugins/email](https://docs.strapi.io/dev-docs/plugins/email)
+- **Issue Tracker:** [github.com/helmforgedev/charts/issues](https://github.com/helmforgedev/charts/issues)
+
+## Support
+
+For questions, issues, or feature requests:
+
+1. Check this documentation
+2. Review [GitHub Issues](https://github.com/helmforgedev/charts/issues)
+3. Open a new issue with:
+   - Helm chart version
+   - Kubernetes version
+   - Complete error messages
+   - Relevant values.yaml configuration
