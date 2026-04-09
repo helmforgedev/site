@@ -419,6 +419,13 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
   },
+  {
+    name: 'Envoy Gateway',
+    slug: 'envoy-gateway',
+    description: 'Modern Gateway API implementation with rate limiting, cert-manager, and observability.',
+    maturity: 'beta',
+    backup: false,
+  },
 ];
 
 export const chartCount = charts.length;
