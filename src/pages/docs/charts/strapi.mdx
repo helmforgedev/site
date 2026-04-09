@@ -15,6 +15,7 @@ The HelmForge Strapi chart transforms basic Strapi deployments into production-r
 ## Key Features
 
 ### Core Capabilities
+
 - **Multi-replica deployments** — horizontal scaling with S3/Cloudinary uploads
 - **S3-compatible upload providers** — AWS S3, MinIO, Cloudflare R2, Backblaze B2
 - **Cloudinary integration** — managed media delivery and transformation
@@ -23,6 +24,7 @@ The HelmForge Strapi chart transforms basic Strapi deployments into production-r
 - **Multiple database backends** — SQLite, PostgreSQL, MySQL, or external databases
 
 ### Production Features
+
 - **Admin panel security** — custom paths, JWT expiration, rate limiting
 - **Performance tuning** — Node.js memory configuration, log levels, structured logs
 - **HTTP health checks** — application-level health validation via `/_health`
@@ -113,7 +115,7 @@ strapi:
 
   # Performance optimization
   performance:
-    nodeOptions: "--max-old-space-size=2048"
+    nodeOptions: '--max-old-space-size=2048'
     logLevel: warn
     forceJsonLogs: true
 
@@ -136,7 +138,7 @@ database:
 # Automated backups
 backup:
   enabled: true
-  schedule: "0 2 * * *"
+  schedule: '0 2 * * *'
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: mycompany-strapi-backups
@@ -148,7 +150,7 @@ resources:
     cpu: 500m
     memory: 1Gi
   limits:
-    cpu: "2"
+    cpu: '2'
     memory: 2.5Gi
 
 ingress:
@@ -183,24 +185,24 @@ strapi:
     provider: aws-s3
     s3:
       enabled: true
-      
+
       # For AWS S3 (leave endpoint empty)
       region: us-east-1
       bucket: my-strapi-uploads
-      
+
       # For MinIO/R2/Backblaze (specify endpoint)
       endpoint: https://minio.example.com
-      
+
       # Credentials (use existingSecret in production)
       existingSecret: strapi-s3-secret
       # Or inline (not recommended):
       # accessKey: AKIAIOSFODNN7EXAMPLE
       # secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-      
+
       # Optional configuration
-      prefix: uploads/  # Folder prefix
-      acl: private      # Access control
-      baseUrl: https://cdn.example.com  # CDN URL
+      prefix: uploads/ # Folder prefix
+      acl: private # Access control
+      baseUrl: https://cdn.example.com # CDN URL
 ```
 
 **Create the secret:**
@@ -266,8 +268,8 @@ strapi:
       port: 587
       username: apikey
       existingSecret: strapi-smtp-secret
-      secure: false      # Use STARTTLS
-      requireTLS: true   # Enforce TLS
+      secure: false # Use STARTTLS
+      requireTLS: true # Enforce TLS
 ```
 
 **Create the secret:**
@@ -307,7 +309,7 @@ Simple filesystem-based database for development:
 
 ```yaml
 database:
-  mode: sqlite  # or auto (default)
+  mode: sqlite # or auto (default)
   sqlite:
     directory: /opt/app/.tmp
     filename: data.db
@@ -326,11 +328,11 @@ Bundled PostgreSQL for complete Helm release:
 ```yaml
 postgresql:
   enabled: true
-  architecture: standalone  # or replication
+  architecture: standalone # or replication
   auth:
     database: strapi
     username: strapi
-    password: ""  # auto-generated if empty
+    password: '' # auto-generated if empty
     existingSecret: strapi-postgresql-secret
   primary:
     persistence:
@@ -345,11 +347,11 @@ Bundled MySQL alternative:
 ```yaml
 mysql:
   enabled: true
-  architecture: standalone  # or replication
+  architecture: standalone # or replication
   auth:
     database: strapi
     username: strapi
-    password: ""  # auto-generated if empty
+    password: '' # auto-generated if empty
     existingSecret: strapi-mysql-secret
   primary:
     persistence:
@@ -365,7 +367,7 @@ Connect to existing database:
 database:
   mode: external
   external:
-    vendor: postgres  # or mysql
+    vendor: postgres # or mysql
     host: postgres.database.svc.cluster.local
     port: 5432
     name: strapi
@@ -382,10 +384,10 @@ database:
 ```yaml
 database:
   pool:
-    min: 2                      # Minimum connections per replica
-    max: 8                      # Maximum connections per replica
+    min: 2 # Minimum connections per replica
+    max: 8 # Maximum connections per replica
     acquireTimeoutMillis: 30000 # Connection acquisition timeout
-    idleTimeoutMillis: 30000    # Idle connection timeout
+    idleTimeoutMillis: 30000 # Idle connection timeout
 ```
 
 **Calculate max connections:**
@@ -407,16 +409,16 @@ strapi:
   admin:
     # Custom admin path (security through obscurity)
     path: /secure-admin
-    
+
     # JWT token expiration
-    jwtExpiration: 7d  # 1d, 7d, 30d, etc.
-    
+    jwtExpiration: 7d # 1d, 7d, 30d, etc.
+
     # Rate limiting (brute force protection)
     rateLimit:
       enabled: true
-      max: 5              # Max login attempts
-      timeWindow: 900000  # Time window (15 minutes in ms)
-    
+      max: 5 # Max login attempts
+      timeWindow: 900000 # Time window (15 minutes in ms)
+
     # Forgotten password
     forgotPassword:
       enabled: true
@@ -427,10 +429,10 @@ strapi:
 ```yaml
 strapi:
   graphql:
-    playgroundEnabled: false  # Disable in production
-    introspection: false      # Disable schema introspection
-    maxDepth: 10              # Query depth limit
-    maxComplexity: 1000       # Query complexity limit
+    playgroundEnabled: false # Disable in production
+    introspection: false # Disable schema introspection
+    maxDepth: 10 # Query depth limit
+    maxComplexity: 1000 # Query complexity limit
 ```
 
 ### API Configuration
@@ -439,8 +441,8 @@ strapi:
 strapi:
   api:
     rest:
-      defaultLimit: 25  # Default pagination limit
-      maxLimit: 100     # Maximum pagination limit
+      defaultLimit: 25 # Default pagination limit
+      maxLimit: 100 # Maximum pagination limit
 ```
 
 ## Performance Tuning
@@ -451,14 +453,14 @@ strapi:
 strapi:
   performance:
     # Node.js memory allocation
-    nodeOptions: "--max-old-space-size=2048"
-    
+    nodeOptions: '--max-old-space-size=2048'
+
     # Log level (fatal, error, warn, info, debug, trace)
     logLevel: warn
-    
+
     # Structured JSON logs for production
     forceJsonLogs: true
-    
+
     # Pretty print logs (development only)
     prettyPrint: false
 ```
@@ -468,7 +470,7 @@ strapi:
 ```yaml
 resources:
   limits:
-    memory: 2.5Gi  # Must be > 2048MB (nodeOptions)
+    memory: 2.5Gi # Must be > 2048MB (nodeOptions)
 ```
 
 ### Server Configuration
@@ -480,13 +482,13 @@ strapi:
       jsonLimit: 1mb
       formLimit: 56kb
       textLimit: 1mb
-    
+
     compression:
       enabled: true
-    
+
     cron:
       enabled: true
-    
+
     logger:
       level: info
 ```
@@ -498,15 +500,15 @@ strapi:
 ```yaml
 backup:
   enabled: true
-  schedule: "0 2 * * *"  # Daily at 2 AM UTC
-  
+  schedule: '0 2 * * *' # Daily at 2 AM UTC
+
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: strapi-backups
     prefix: production
     createBucketIfNotExists: true
     existingSecret: strapi-backup-s3-secret
-  
+
   # Optional: Override database credentials
   database:
     host: postgres-replica.example.com
@@ -604,72 +606,72 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 
 ### Essential Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `replicaCount` | `1` | Number of replicas (requires S3/Cloudinary if > 1) |
-| `image.repository` | `vshadbolt/strapi` | Strapi application image |
-| `image.tag` | `5.40.0` | Image tag |
-| `strapi.url` | `""` | Public URL (auto-detected from ingress) |
-| `strapi.nodeEnv` | `production` | Node environment |
-| `strapi.telemetryDisabled` | `true` | Disable Strapi telemetry |
+| Key                        | Default            | Description                                        |
+| -------------------------- | ------------------ | -------------------------------------------------- |
+| `replicaCount`             | `1`                | Number of replicas (requires S3/Cloudinary if > 1) |
+| `image.repository`         | `vshadbolt/strapi` | Strapi application image                           |
+| `image.tag`                | `5.40.0`           | Image tag                                          |
+| `strapi.url`               | `""`               | Public URL (auto-detected from ingress)            |
+| `strapi.nodeEnv`           | `production`       | Node environment                                   |
+| `strapi.telemetryDisabled` | `true`             | Disable Strapi telemetry                           |
 
 ### Upload Provider Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `strapi.upload.provider` | `local` | Upload provider (local, aws-s3, cloudinary) |
-| `strapi.upload.s3.enabled` | `false` | Enable S3 upload provider |
-| `strapi.upload.s3.bucket` | `""` | S3 bucket name |
-| `strapi.upload.s3.region` | `us-east-1` | S3 region |
-| `strapi.upload.s3.endpoint` | `""` | S3 endpoint (for MinIO/R2) |
-| `strapi.upload.s3.existingSecret` | `""` | Secret for S3 credentials |
+| Key                               | Default     | Description                                 |
+| --------------------------------- | ----------- | ------------------------------------------- |
+| `strapi.upload.provider`          | `local`     | Upload provider (local, aws-s3, cloudinary) |
+| `strapi.upload.s3.enabled`        | `false`     | Enable S3 upload provider                   |
+| `strapi.upload.s3.bucket`         | `""`        | S3 bucket name                              |
+| `strapi.upload.s3.region`         | `us-east-1` | S3 region                                   |
+| `strapi.upload.s3.endpoint`       | `""`        | S3 endpoint (for MinIO/R2)                  |
+| `strapi.upload.s3.existingSecret` | `""`        | Secret for S3 credentials                   |
 
 ### Email Provider Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `strapi.email.provider` | `none` | Email provider (none, smtp, sendgrid) |
-| `strapi.email.defaultFrom` | `noreply@example.com` | Default from address |
-| `strapi.email.smtp.host` | `""` | SMTP hostname |
-| `strapi.email.smtp.port` | `587` | SMTP port |
-| `strapi.email.smtp.existingSecret` | `""` | Secret for SMTP password |
+| Key                                | Default               | Description                           |
+| ---------------------------------- | --------------------- | ------------------------------------- |
+| `strapi.email.provider`            | `none`                | Email provider (none, smtp, sendgrid) |
+| `strapi.email.defaultFrom`         | `noreply@example.com` | Default from address                  |
+| `strapi.email.smtp.host`           | `""`                  | SMTP hostname                         |
+| `strapi.email.smtp.port`           | `587`                 | SMTP port                             |
+| `strapi.email.smtp.existingSecret` | `""`                  | Secret for SMTP password              |
 
 ### Admin & Security Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `strapi.admin.path` | `/admin` | Admin panel path |
-| `strapi.admin.jwtExpiration` | `7d` | JWT token expiration |
-| `strapi.admin.rateLimit.enabled` | `true` | Enable login rate limiting |
-| `strapi.admin.rateLimit.max` | `5` | Max login attempts |
+| Key                                 | Default  | Description                |
+| ----------------------------------- | -------- | -------------------------- |
+| `strapi.admin.path`                 | `/admin` | Admin panel path           |
+| `strapi.admin.jwtExpiration`        | `7d`     | JWT token expiration       |
+| `strapi.admin.rateLimit.enabled`    | `true`   | Enable login rate limiting |
+| `strapi.admin.rateLimit.max`        | `5`      | Max login attempts         |
 | `strapi.admin.rateLimit.timeWindow` | `900000` | Rate limit window (15 min) |
 
 ### Database Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `database.mode` | `auto` | Database mode (auto, sqlite, external, postgresql, mysql) |
-| `database.pool.min` | `2` | Minimum connections per replica |
-| `database.pool.max` | `10` | Maximum connections per replica |
-| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart |
-| `mysql.enabled` | `false` | Deploy MySQL subchart |
+| Key                  | Default | Description                                               |
+| -------------------- | ------- | --------------------------------------------------------- |
+| `database.mode`      | `auto`  | Database mode (auto, sqlite, external, postgresql, mysql) |
+| `database.pool.min`  | `2`     | Minimum connections per replica                           |
+| `database.pool.max`  | `10`    | Maximum connections per replica                           |
+| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart                                |
+| `mysql.enabled`      | `false` | Deploy MySQL subchart                                     |
 
 ### Performance Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `strapi.performance.nodeOptions` | `""` | Node.js options (e.g., --max-old-space-size) |
-| `strapi.performance.logLevel` | `info` | Log level (fatal, error, warn, info, debug, trace) |
-| `strapi.performance.forceJsonLogs` | `true` | Structured JSON logs |
+| Key                                | Default | Description                                        |
+| ---------------------------------- | ------- | -------------------------------------------------- |
+| `strapi.performance.nodeOptions`   | `""`    | Node.js options (e.g., --max-old-space-size)       |
+| `strapi.performance.logLevel`      | `info`  | Log level (fatal, error, warn, info, debug, trace) |
+| `strapi.performance.forceJsonLogs` | `true`  | Structured JSON logs                               |
 
 ### Backup Values
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `backup.enabled` | `false` | Enable scheduled backups |
-| `backup.schedule` | `0 3 * * *` | Cron schedule (daily 3 AM) |
-| `backup.s3.bucket` | `""` | S3 bucket for backups |
-| `backup.s3.existingSecret` | `""` | Secret for S3 credentials |
+| Key                        | Default     | Description                |
+| -------------------------- | ----------- | -------------------------- |
+| `backup.enabled`           | `false`     | Enable scheduled backups   |
+| `backup.schedule`          | `0 3 * * *` | Cron schedule (daily 3 AM) |
+| `backup.s3.bucket`         | `""`        | S3 bucket for backups      |
+| `backup.s3.existingSecret` | `""`        | Secret for S3 credentials  |
 
 ## Common Scenarios
 
@@ -692,7 +694,7 @@ strapi:
   nodeEnv: development
   upload:
     provider: local
-  
+
   performance:
     logLevel: debug
     prettyPrint: true
@@ -784,7 +786,7 @@ database:
 
 strapi:
   url: https://cms.example.com
-  
+
   upload:
     provider: aws-s3
     s3:
@@ -793,43 +795,43 @@ strapi:
       region: us-east-1
       existingSecret: strapi-s3-prod-secret
       baseUrl: https://cdn.example.com
-  
+
   email:
     provider: smtp
     defaultFrom: noreply@example.com
     smtp:
       host: smtp.sendgrid.net
       existingSecret: sendgrid-prod-secret
-  
+
   admin:
     path: /secure-admin
     jwtExpiration: 1d
     rateLimit:
       enabled: true
       max: 3
-  
+
   performance:
-    nodeOptions: "--max-old-space-size=4096"
+    nodeOptions: '--max-old-space-size=4096'
     logLevel: error
     forceJsonLogs: true
-  
+
   graphql:
     playgroundEnabled: false
     introspection: false
 
 backup:
   enabled: true
-  schedule: "0 1 * * *"
+  schedule: '0 1 * * *'
   s3:
     bucket: strapi-prod-backups
     existingSecret: strapi-backup-s3-secret
 
 resources:
   requests:
-    cpu: "1"
+    cpu: '1'
     memory: 2Gi
   limits:
-    cpu: "4"
+    cpu: '4'
     memory: 5Gi
 
 affinity:
@@ -921,6 +923,7 @@ affinity:
 **New Features (Opt-in):**
 
 All new features are backward compatible and opt-in:
+
 - S3/Cloudinary upload providers
 - Email providers
 - Database connection pooling
