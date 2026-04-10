@@ -426,6 +426,13 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
   },
+  {
+    name: 'Elasticsearch',
+    slug: 'elasticsearch',
+    description: 'Multi-role cluster with automated backups, ILM policies, data tiers, and security by default.',
+    maturity: 'alpha',
+    backup: true,
+  },
 ];
 
 export const chartCount = charts.length;
