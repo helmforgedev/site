@@ -533,6 +533,117 @@ resources:
     memory: 3Gi
 ```
 
+## Automated Backup
+
+The chart includes an optional CronJob that creates compressed archives of your openHAB data and uploads them to any S3-compatible object storage using the MinIO client (`mc`).
+
+### How It Works
+
+The backup job runs as two containers sharing an `emptyDir` volume:
+
+1. **`backup` initContainer** (alpine) — tars selected directories and writes the archive to `/tmp`
+2. **`upload` container** (helmforge/mc) — picks up the archive and uploads it to S3
+
+Both containers run as UID/GID 9001 to match openHAB's PVC ownership.
+
+### Enabling Backup
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *' # Daily at 03:00 UTC
+
+  s3:
+    endpoint: 'https://minio.example.com'
+    bucket: 'openhab-backups'
+    prefix: 'prod'
+    accessKey: 'AKIAEXAMPLE'
+    secretKey: 'supersecretkey'
+```
+
+### Using an Existing Secret
+
+Avoid storing credentials in values by referencing a pre-created Secret:
+
+```bash
+kubectl create secret generic my-s3-creds \
+  --from-literal=access-key=AKIAEXAMPLE \
+  --from-literal=secret-key=supersecretkey \
+  -n openhab
+```
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: 'https://minio.example.com'
+    bucket: 'openhab-backups'
+    existingSecret: 'my-s3-creds'
+```
+
+### What Gets Backed Up
+
+| Directory           | Default | Description                           |
+| ------------------- | ------- | ------------------------------------- |
+| `/openhab/userdata` | ✅      | JSONDB, persistence data, rules state |
+| `/openhab/conf`     | ✅      | Items, things, sitemaps, rules files  |
+
+**Always excluded from `userdata`:** `logs/`, `tmp/`, `cache/` (ephemeral — not needed for restore).
+
+If you manage `/openhab/conf` via ConfigMaps (GitOps), you can skip it:
+
+```yaml
+backup:
+  include:
+    userdata: true
+    conf: false
+```
+
+### S3 Compatibility
+
+The uploader (`helmforge/mc`) is compatible with any S3-compatible service:
+
+| Provider            | Endpoint format                              |
+| ------------------- | -------------------------------------------- |
+| MinIO               | `https://minio.example.com`                  |
+| AWS S3              | `https://s3.amazonaws.com`                   |
+| Cloudflare R2       | `https://<account>.r2.cloudflarestorage.com` |
+| Backblaze B2        | `https://s3.<region>.backblazeb2.com`        |
+| DigitalOcean Spaces | `https://<region>.digitaloceanspaces.com`    |
+
+### Archive Naming
+
+Archives follow this pattern: `<archivePrefix>-backup-<YYYY-MM-DD-HHmmss>.tar.gz`
+
+Default: `openhab-backup-2025-01-15-030000.tar.gz`
+
+### Restore Process
+
+1. Download the archive from your S3 bucket.
+
+2. Scale down openHAB (required — it holds locks on its data):
+
+```bash
+kubectl scale statefulset my-openhab -n openhab --replicas=0
+```
+
+3. Extract via a temporary pod:
+
+```bash
+kubectl run restore --rm -it --image=alpine --restart=Never \
+  --overrides='{"spec":{"volumes":[{"name":"ud","persistentVolumeClaim":{"claimName":"my-openhab-userdata"}}],"containers":[{"name":"r","image":"alpine","command":["sh"],"stdin":true,"tty":true,"volumeMounts":[{"name":"ud","mountPath":"/openhab/userdata"}]}]}}' \
+  -- sh
+
+# Inside the pod:
+# tar -xzf /path/to/openhab-backup-<timestamp>.tar.gz -C /
+```
+
+4. Scale back to 1:
+
+```bash
+kubectl scale statefulset my-openhab -n openhab --replicas=1
+```
+
 ## Configuration Reference
 
 ### Image
@@ -616,6 +727,32 @@ resources:
 | `admin.username`       | Admin username (stored in Secret) | `admin` |
 | `admin.password`       | Admin password (stored in Secret) | `""`    |
 | `admin.existingSecret` | Use existing Secret               | `""`    |
+
+### Backup
+
+| Parameter                           | Description                                             | Default                    |
+| ----------------------------------- | ------------------------------------------------------- | -------------------------- |
+| `backup.enabled`                    | Enable automated backup CronJob                         | `false`                    |
+| `backup.schedule`                   | Cron schedule                                           | `0 3 * * *`                |
+| `backup.suspend`                    | Suspend the CronJob without deleting it                 | `false`                    |
+| `backup.concurrencyPolicy`          | CronJob concurrency policy                              | `Forbid`                   |
+| `backup.successfulJobsHistoryLimit` | Successful job history to retain                        | `3`                        |
+| `backup.failedJobsHistoryLimit`     | Failed job history to retain                            | `3`                        |
+| `backup.backoffLimit`               | Job backoff limit                                       | `1`                        |
+| `backup.archivePrefix`              | Archive filename prefix                                 | `openhab`                  |
+| `backup.include.userdata`           | Back up `/openhab/userdata`                             | `true`                     |
+| `backup.include.conf`               | Back up `/openhab/conf`                                 | `true`                     |
+| `backup.images.utility.repository`  | Backup utility image                                    | `docker.io/library/alpine` |
+| `backup.images.utility.tag`         | Backup utility tag                                      | `3.22`                     |
+| `backup.images.uploader.repository` | S3 uploader image                                       | `docker.io/helmforge/mc`   |
+| `backup.images.uploader.tag`        | S3 uploader tag                                         | `1.0.0`                    |
+| `backup.resources`                  | Resource requests/limits for backup containers          | `{}`                       |
+| `backup.s3.endpoint`                | S3-compatible endpoint URL                              | `""`                       |
+| `backup.s3.bucket`                  | Target bucket name                                      | `""`                       |
+| `backup.s3.prefix`                  | Key prefix within the bucket                            | `openhab`                  |
+| `backup.s3.accessKey`               | S3 access key                                           | `""`                       |
+| `backup.s3.secretKey`               | S3 secret key                                           | `""`                       |
+| `backup.s3.existingSecret`          | Existing Secret name (keys: `access-key`, `secret-key`) | `""`                       |
 
 ## Troubleshooting
 
