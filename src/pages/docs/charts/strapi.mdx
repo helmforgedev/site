@@ -56,15 +56,14 @@ helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 
 The chart uses **HelmForge's production-ready Strapi base image** instead of the generic Strapi image. This provides significant advantages for Kubernetes deployments:
 
-**Image:** `docker.io/helmforge/strapi-base:0.1.11`
-**Image:** `docker.io/helmforge/strapi-base:0.1.11`
+**Image:** `docker.io/helmforge/strapi-base:v0.0.3`
 
 ### Key Features
 
 - **Strapi 5.42.0** — Latest stable version with security patches
 - **All official plugins included** — Upload providers, email, database plugins pre-installed
 - **Multi-database support** — SQLite, PostgreSQL, and MySQL drivers included
-- **Health check endpoint** — HTTP `/_health` endpoint for Kubernetes probes
+- **Health check endpoint** — HTTP `/_health` endpoint returns HTTP 200 with JSON body containing status, uptime, database connectivity, and version
 - **Security hardened** — Non-root user (UID 1000), minimal attack surface
 - **Multi-architecture** — Supports linux/amd64 and linux/arm64
 - **Production optimized** — Pre-built dependencies, smaller image size
@@ -77,8 +76,7 @@ The chart uses **HelmForge's production-ready Strapi base image** instead of the
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
 ```
 
 This provides a working Strapi instance with default configuration, perfect for:
@@ -94,8 +92,7 @@ For production deployments with custom content types and configurations:
 
 ```dockerfile
 # Dockerfile
-FROM docker.io/helmforge/strapi-base:0.1.11
-FROM docker.io/helmforge/strapi-base:0.1.11
+FROM docker.io/helmforge/strapi-base:v0.0.3
 
 # Copy your Strapi project
 COPY --chown=strapi:strapi . /opt/app
@@ -121,10 +118,9 @@ image:
 | ------------------ | ------------------------------ |
 | **Registry**       | docker.io                      |
 | **Repository**     | helmforge/strapi-base          |
-| **Current Tag**    | 0.1.11                          |
-| **Current Tag**    | 0.1.11                          |
+| **Current Tag**    | v0.0.3                         |
 | **Strapi Version** | 5.42.0                         |
-| **Base Image**     | node:20-alpine                 |
+| **Base Image**     | node:22-alpine                 |
 | **User**           | strapi (UID 1000, GID 1000)    |
 | **Working Dir**    | /opt/app                       |
 | **Exposed Port**   | 1337                           |
@@ -182,8 +178,7 @@ Simplest deployment for development or testing:
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
 
 persistence:
   enabled: true
@@ -208,8 +203,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
 
 # S3 uploads enable multi-replica scaling
 strapi:
@@ -737,8 +731,7 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 | -------------------------- | ----------------------- | ----------------------------------------------------- |
 | `replicaCount`             | `1`                     | Number of replicas (requires S3/Cloudinary if > 1)    |
 | `image.repository`         | `helmforge/strapi-base` | Strapi application image (HelmForge production-ready) |
-| `image.tag`                | `0.1.11`                 | HelmForge Strapi base image version                   |
-| `image.tag`                | `0.1.11`                 | HelmForge Strapi base image version                   |
+| `image.tag`                | `v0.0.3`                 | HelmForge Strapi base image version                   |
 | `strapi.url`               | `""`                    | Public URL (auto-detected from ingress)               |
 | `strapi.nodeEnv`           | `production`            | Node environment                                      |
 | `strapi.telemetryDisabled` | `true`                  | Disable Strapi telemetry                              |
@@ -812,8 +805,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
   pullPolicy: IfNotPresent
 
 database:
@@ -848,8 +840,7 @@ replicaCount: 2
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
 
 database:
   mode: external
@@ -894,8 +885,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '0.1.11'
-  tag: '0.1.11'
+  tag: 'v0.0.3'
 
 postgresql:
   enabled: true
