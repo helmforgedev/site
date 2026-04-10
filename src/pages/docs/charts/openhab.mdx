@@ -1,0 +1,609 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: openHAB
+description: Production-ready openHAB home automation platform for Kubernetes with GitOps-friendly live configuration reload via ConfigMaps.
+---
+
+# openHAB
+
+Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using the official [`openhab/openhab`](https://hub.docker.com/r/openhab/openhab) Docker image. openHAB is an open-source home automation platform that integrates with hundreds of smart home technologies — from Zigbee and Z-Wave to MQTT, KNX, and cloud services.
+
+> **Single-instance only**: openHAB does not support horizontal scaling. This chart enforces `replicaCount: 1` and will fail fast if you attempt to set it higher, preventing accidental data corruption from concurrent writes to shared PVCs.
+
+## Key Features
+
+- **StatefulSet workload** for stable, predictable PVC attachment on every restart
+- **Three persistent volumes** (`userdata`, `conf`, `addons`) with independent sizing and storage class configuration
+- **ConfigMap live-reload** for sitemaps, things, and items — changes applied automatically within seconds, no pod restart required
+- **Correct security context** with UID/GID `9001` enforced via `podSecurityContext` and `fsGroup`
+- **Smart health probes** via `/rest/alive` endpoint with a 5-minute startup window for OSGi bundle loading
+- **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
+- **Optional Karaf SSH console** for administrative access to the OSGi runtime
+- **Fail-fast validation** with clear error messages for common misconfigurations
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install my-openhab helmforge/openhab
+```
+
+### OCI Registry
+
+```bash
+helm install my-openhab oci://ghcr.io/helmforgedev/helm/openhab --version 0.1.0
+```
+
+## Quick Start
+
+### Minimal Deployment
+
+Deploy openHAB with persistent storage and port-forward access:
+
+```bash
+helm install my-openhab helmforge/openhab
+kubectl wait --namespace default pod \
+  -l app.kubernetes.io/name=openhab \
+  --for=condition=Ready --timeout=300s
+kubectl port-forward svc/my-openhab 8080:8080
+```
+
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and complete the first-boot admin setup wizard.
+
+### Custom Timezone and Resources
+
+```yaml
+# values.yaml
+env:
+  TZ: 'Europe/Berlin'
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+```
+
+```bash
+helm install my-openhab helmforge/openhab -f values.yaml
+```
+
+## First Boot — Admin Setup
+
+openHAB does not support injecting admin credentials via environment variables. On first launch, openHAB presents a setup wizard where you create the administrator account.
+
+**Steps:**
+
+1. Wait for the pod to be Ready (may take 60-120 seconds on first boot)
+2. Navigate to the web UI (`http://localhost:8080` if using port-forward)
+3. Click **Create an administrator account**
+4. Enter username and password
+5. Complete the optional initial configuration steps
+
+Credentials are stored persistently in `/openhab/userdata/jsondb/auth.json` and survive pod restarts as long as the `userdata` PVC exists.
+
+## Persistent Storage
+
+openHAB requires three persistent directories. The chart creates a PVC for each by default.
+
+| Directory           | PVC                  | Default Size | Contents                                      |
+| ------------------- | -------------------- | ------------ | --------------------------------------------- |
+| `/openhab/userdata` | `<release>-userdata` | `5Gi`        | Runtime state, JSONDB, logs, persistence data |
+| `/openhab/conf`     | `<release>-conf`     | `1Gi`        | Items, things, rules, sitemaps, services      |
+| `/openhab/addons`   | `<release>-addons`   | `2Gi`        | Drop-in JAR bindings/addons                   |
+
+### Custom Sizes and Storage Class
+
+```yaml
+persistence:
+  userdata:
+    size: 20Gi
+    storageClass: 'fast-ssd'
+  conf:
+    size: 5Gi
+    storageClass: 'fast-ssd'
+  addons:
+    size: 10Gi
+```
+
+### Using Existing PVCs
+
+```yaml
+persistence:
+  userdata:
+    existingClaim: my-openhab-userdata
+  conf:
+    existingClaim: my-openhab-conf
+  addons:
+    existingClaim: my-openhab-addons
+```
+
+## ConfigMap Live Reload
+
+This is the key differentiator of this chart. openHAB natively monitors `/openhab/conf/` using a file watcher. Any change to `.sitemap`, `.things`, or `.items` files is applied automatically within **2-5 seconds** — no pod restart required.
+
+The chart mounts Kubernetes ConfigMaps into the conf PVC using `subPath`, so ConfigMap-managed files coexist with any existing files without overwriting them.
+
+### How It Works
+
+```
+Helm values  →  ConfigMap (K8s)  →  subPath mount  →  openHAB file watcher  →  Live reload (~2-5s)
+```
+
+### Sitemaps
+
+Sitemaps define the UI layout for openHAB's BasicUI and HABPanel:
+
+```yaml
+configMaps:
+  sitemaps:
+    enabled: true
+    files:
+      myhome.sitemap: |
+        sitemap myhome label="My Home" {
+          Frame label="Ground Floor" {
+            Switch item=Light_GF_Corridor label="Corridor Light"
+            Switch item=Light_GF_Kitchen  label="Kitchen Light"
+            Text   item=Temperature_GF    label="Temperature [%.1f °C]"
+          }
+          Frame label="Climate" {
+            Text item=Temperature_Outdoor label="Outdoor [%.1f °C]"
+            Text item=Humidity_Outdoor   label="Humidity [%d %%]"
+          }
+        }
+```
+
+### Things
+
+Things define physical devices and their channels:
+
+```yaml
+configMaps:
+  things:
+    enabled: true
+    files:
+      network.things: |
+        Thing network:pingdevice:router [
+          hostname="192.168.1.1",
+          retry=1,
+          timeout=5000,
+          refreshInterval=60000
+        ]
+      mqtt.things: |
+        Bridge mqtt:broker:mybroker [ host="mosquitto", port=1883, secure=false ] {
+          Thing mqtt:topic:mysensor "Temperature Sensor" {
+            Channels:
+              Type number : temperature [ stateTopic="home/sensor/temperature" ]
+              Type number : humidity    [ stateTopic="home/sensor/humidity" ]
+          }
+        }
+```
+
+### Items
+
+Items define logical entities visible in the UI and used in rules:
+
+```yaml
+configMaps:
+  items:
+    enabled: true
+    files:
+      lights.items: |
+        Switch Light_GF_Corridor "Corridor Light"  <light>
+        Switch Light_GF_Kitchen  "Kitchen Light"   <light>
+      climate.items: |
+        Number:Temperature Temperature_GF       "Ground Floor [%.1f %unit%]" <temperature>
+        Number:Temperature Temperature_Outdoor  "Outdoor [%.1f %unit%]"      <temperature>
+        Number:Dimensionless Humidity_Outdoor   "Humidity [%d %%]"           <humidity>
+```
+
+### Applying Changes
+
+After updating ConfigMap values, run `helm upgrade`. openHAB picks up the changes automatically:
+
+```bash
+helm upgrade my-openhab helmforge/openhab -f values.yaml
+# No restart needed — openHAB reloads configuration within seconds
+```
+
+## Ingress
+
+openHAB's `/rest/events` endpoint uses Server-Sent Events (SSE), which requires long-lived HTTP connections. When using nginx Ingress, add the following annotations for proper support:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-http-version: '1.1'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+  hosts:
+    - host: openhab.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+### With TLS (cert-manager)
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+  hosts:
+    - host: openhab.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openhab-tls
+      hosts:
+        - openhab.yourdomain.com
+```
+
+## Security
+
+### Security Context
+
+openHAB runs as UID/GID `9001` by default (enforced by the official image). The chart configures this correctly out of the box:
+
+```yaml
+podSecurityContext:
+  runAsUser: 9001
+  runAsGroup: 9001
+  fsGroup: 9001 # Ensures PVC volumes are group-writable by 9001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false # openHAB writes to internal dirs at runtime
+  capabilities:
+    drop:
+      - ALL
+```
+
+> **Why `readOnlyRootFilesystem: false`?** openHAB (OSGi/Karaf) writes to several internal directories at runtime (`/openhab/runtime/`, `/openhab/userdata/tmp/`, `/openhab/userdata/cache/`). These cannot be relocated. Mount your persistent data on the three PVCs to ensure durability across restarts.
+
+### Karaf SSH Console
+
+The Apache Karaf admin console is disabled by default. When enabled, always access it via `kubectl port-forward` — never expose port `8101` publicly:
+
+```yaml
+karaf:
+  enabled: true
+  service:
+    type: ClusterIP # Never NodePort or LoadBalancer
+    port: 8101
+```
+
+```bash
+kubectl port-forward svc/my-openhab-karaf 8101:8101
+ssh -p 8101 openhab@127.0.0.1
+# Default Karaf password: habopen
+```
+
+### Admin Credentials Secret
+
+For operational reference (documentation, tooling), you can store the admin credentials in a Kubernetes Secret:
+
+```yaml
+admin:
+  secretEnabled: true
+  username: admin
+  password: 'strongpassword' # Set via --set or external secret manager
+```
+
+> **Important**: This Secret is for reference only. It does NOT automatically configure openHAB. You still need to complete the first-boot wizard with the same credentials.
+
+Retrieve the stored password:
+
+```bash
+kubectl get secret my-openhab-admin \
+  -o jsonpath="{.data.password}" | base64 --decode
+```
+
+## Deployment Scenarios
+
+### Scenario 1: Minimal Home Lab
+
+```yaml
+# Simple single-node home deployment
+image:
+  tag: '4.2.2'
+
+env:
+  TZ: 'Europe/Berlin'
+
+persistence:
+  userdata:
+    size: 10Gi
+  conf:
+    size: 2Gi
+  addons:
+    size: 5Gi
+```
+
+### Scenario 2: GitOps-Managed Configuration
+
+Manage all openHAB configuration declaratively via Helm — ideal for teams or reproducible setups:
+
+```yaml
+env:
+  TZ: 'America/Sao_Paulo'
+
+configMaps:
+  sitemaps:
+    enabled: true
+    files:
+      default.sitemap: |
+        sitemap default label="openHAB" {
+          Frame label="Overview" {
+            Text item=gTemperature label="Temperature [%.1f °C]"
+          }
+        }
+  things:
+    enabled: true
+    files:
+      network.things: |
+        Thing network:pingdevice:gateway [ hostname="192.168.1.1" ]
+  items:
+    enabled: true
+    files:
+      home.items: |
+        Number:Temperature gTemperature "Temperature [%.1f %unit%]" <temperature>
+
+persistence:
+  userdata:
+    size: 10Gi
+  conf:
+    size: 2Gi
+```
+
+### Scenario 3: Full Production with Ingress
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-http-version: '1.1'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+  hosts:
+    - host: openhab.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openhab-tls
+      hosts:
+        - openhab.yourdomain.com
+
+admin:
+  secretEnabled: true
+  username: admin
+  password: '' # Set via: --set admin.password=<value>
+
+karaf:
+  enabled: true
+
+env:
+  TZ: 'Europe/Berlin'
+  EXTRA_JAVA_OPTS: '-Xms512m -Xmx1536m'
+
+persistence:
+  userdata:
+    size: 20Gi
+    storageClass: 'fast-ssd'
+  conf:
+    size: 5Gi
+    storageClass: 'fast-ssd'
+  addons:
+    size: 10Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+  limits:
+    cpu: 4000m
+    memory: 3Gi
+```
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Description      | Default                     |
+| ------------------ | ---------------- | --------------------------- |
+| `image.repository` | Image repository | `docker.io/openhab/openhab` |
+| `image.tag`        | Image tag        | `4.2.2`                     |
+| `image.pullPolicy` | Pull policy      | `IfNotPresent`              |
+
+### Workload
+
+| Parameter                       | Description                            | Default |
+| ------------------------------- | -------------------------------------- | ------- |
+| `replicaCount`                  | Must be `1` — clustering not supported | `1`     |
+| `podSecurityContext.runAsUser`  | UID (required by openHAB image)        | `9001`  |
+| `podSecurityContext.runAsGroup` | GID (required by openHAB image)        | `9001`  |
+| `podSecurityContext.fsGroup`    | fsGroup for PVC ownership              | `9001`  |
+
+### Service
+
+| Parameter      | Description  | Default     |
+| -------------- | ------------ | ----------- |
+| `service.type` | Service type | `ClusterIP` |
+| `service.port` | HTTP port    | `8080`      |
+
+### Persistence
+
+| Parameter                            | Description         | Default |
+| ------------------------------------ | ------------------- | ------- |
+| `persistence.userdata.enabled`       | Enable userdata PVC | `true`  |
+| `persistence.userdata.size`          | PVC size            | `5Gi`   |
+| `persistence.userdata.storageClass`  | Storage class       | `""`    |
+| `persistence.userdata.existingClaim` | Use existing PVC    | `""`    |
+| `persistence.conf.enabled`           | Enable conf PVC     | `true`  |
+| `persistence.conf.size`              | PVC size            | `1Gi`   |
+| `persistence.addons.enabled`         | Enable addons PVC   | `true`  |
+| `persistence.addons.size`            | PVC size            | `2Gi`   |
+
+### ConfigMaps
+
+| Parameter                     | Description                 | Default |
+| ----------------------------- | --------------------------- | ------- |
+| `configMaps.sitemaps.enabled` | Enable sitemaps ConfigMap   | `false` |
+| `configMaps.sitemaps.files`   | Map of `filename → content` | `{}`    |
+| `configMaps.things.enabled`   | Enable things ConfigMap     | `false` |
+| `configMaps.things.files`     | Map of `filename → content` | `{}`    |
+| `configMaps.items.enabled`    | Enable items ConfigMap      | `false` |
+| `configMaps.items.files`      | Map of `filename → content` | `{}`    |
+
+### Environment
+
+| Parameter                | Description       | Default |
+| ------------------------ | ----------------- | ------- |
+| `env.TZ`                 | Timezone          | `UTC`   |
+| `env.EXTRA_JAVA_OPTS`    | Extra JVM options | `""`    |
+| `env.OPENHAB_HTTP_PORT`  | HTTP port         | `8080`  |
+| `env.OPENHAB_HTTPS_PORT` | HTTPS port        | `8443`  |
+
+### Optional Components
+
+| Parameter              | Description                       | Default |
+| ---------------------- | --------------------------------- | ------- |
+| `karaf.enabled`        | Enable Karaf SSH console          | `false` |
+| `karaf.service.port`   | Karaf SSH port                    | `8101`  |
+| `admin.secretEnabled`  | Create admin credentials Secret   | `false` |
+| `admin.username`       | Admin username (stored in Secret) | `admin` |
+| `admin.password`       | Admin password (stored in Secret) | `""`    |
+| `admin.existingSecret` | Use existing Secret               | `""`    |
+
+## Troubleshooting
+
+### Pod stuck in Init state for several minutes
+
+This is normal on first boot. openHAB loads all OSGi bundles at startup, which takes 60-120 seconds. The chart configures a startup probe with a 5-minute window. Wait patiently before investigating.
+
+```bash
+# Check startup probe status
+kubectl get pod -l app.kubernetes.io/name=openhab \
+  -o jsonpath='{.items[0].status.containerStatuses[0].started}'
+```
+
+### CrashLoopBackOff after PVC reuse
+
+If you reused a PVC from another deployment or manually set incorrect permissions, the pod may crash because openHAB cannot write to its directories.
+
+```bash
+# Check the actual error
+kubectl logs -l app.kubernetes.io/name=openhab --previous
+
+# Fix permissions (run a temporary debug pod)
+kubectl run fix-perms --image=busybox --restart=Never \
+  --overrides='{"spec":{"volumes":[{"name":"userdata","persistentVolumeClaim":{"claimName":"my-openhab-userdata"}}],"containers":[{"name":"fix","image":"busybox","command":["chown","-R","9001:9001","/data"],"volumeMounts":[{"name":"userdata","mountPath":"/data"}]}]}}' \
+  -- chown -R 9001:9001 /data
+```
+
+### ConfigMap changes not reflected in openHAB
+
+Kubernetes syncs ConfigMaps to pods on a configurable interval (default ~60 seconds via kubelet `--sync-frequency`). The 2-5 second live-reload refers to openHAB's processing after the file appears on disk. If changes still don't appear after 2-3 minutes, check:
+
+```bash
+# Verify the file exists in the pod
+kubectl exec -l app.kubernetes.io/name=openhab -- ls /openhab/conf/sitemaps/
+
+# Check openHAB log for parsing errors
+kubectl exec -l app.kubernetes.io/name=openhab -- \
+  tail -50 /openhab/userdata/logs/openhab.log
+```
+
+### 403 Forbidden on web UI
+
+The first-boot admin setup wizard has not been completed. Navigate to the UI root and create your administrator account.
+
+### Web UI works but real-time updates are broken (HABPanel, BasicUI)
+
+The `/rest/events` SSE endpoint requires long-lived connections. If using Ingress, verify the websocket annotations are applied:
+
+```bash
+kubectl describe ingress my-openhab
+# Look for: nginx.ingress.kubernetes.io/proxy-read-timeout: 3600
+```
+
+### openHAB log shows bundle resolution errors on startup
+
+This is transient and usually resolves itself on the next start. If persistent:
+
+```bash
+# Delete the OSGi cache (safe — rebuilt automatically)
+kubectl exec -l app.kubernetes.io/name=openhab -- \
+  rm -rf /openhab/userdata/cache
+kubectl rollout restart statefulset my-openhab
+```
+
+### Karaf SSH connection refused
+
+Verify Karaf is enabled and port-forward is active:
+
+```bash
+kubectl get svc | grep karaf
+kubectl port-forward svc/my-openhab-karaf 8101:8101
+ssh -p 8101 openhab@127.0.0.1
+```
+
+### High memory usage
+
+openHAB is a Java application. Tune the JVM heap based on your workload:
+
+```yaml
+env:
+  EXTRA_JAVA_OPTS: '-Xms256m -Xmx1024m'
+
+resources:
+  requests:
+    memory: 512Mi
+  limits:
+    memory: 1536Mi # Keep limits > Xmx to avoid OOM kills
+```
+
+### Pod evicted due to storage pressure
+
+The `userdata` volume accumulates logs over time. Configure log rotation in openHAB or increase the PVC size:
+
+```yaml
+persistence:
+  userdata:
+    size: 20Gi
+```
+
+## Additional Resources
+
+- [openHAB Documentation](https://www.openhab.org/docs/)
+- [openHAB Community Forum](https://community.openhab.org/)
+- [openHAB Add-ons](https://www.openhab.org/addons/)
+- [Docker Hub — openhab/openhab](https://hub.docker.com/r/openhab/openhab)
+- [Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/openhab)
+- [Report an Issue](https://github.com/helmforgedev/charts/issues)
+
+## Related Charts
+
+- [Mosquitto](/docs/charts/mosquitto) — MQTT broker for openHAB smart home integrations
+- [MariaDB](/docs/charts/mariadb) — Database backend for openHAB JDBC persistence
