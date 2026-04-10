@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: openHAB
-description: Production-ready openHAB home automation platform for Kubernetes with GitOps-friendly live configuration reload via ConfigMaps.
+description: Production-ready openHAB home automation platform for Kubernetes with GitOps-friendly live configuration reload via ConfigMaps and Prometheus metrics support.
 ---
 
 # openHAB
@@ -17,6 +17,7 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **ConfigMap live-reload** for sitemaps, things, and items — changes applied automatically within seconds, no pod restart required
 - **Correct security context** with UID/GID `9001` enforced via `podSecurityContext` and `fsGroup`
 - **Smart health probes** via `/rest/alive` endpoint with a 5-minute startup window for OSGi bundle loading
+- **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
 - **Optional Karaf SSH console** for administrative access to the OSGi runtime
 - **Fail-fast validation** with clear error messages for common misconfigurations
@@ -211,6 +212,100 @@ helm upgrade my-openhab helmforge/openhab -f values.yaml
 # No restart needed — openHAB reloads configuration within seconds
 ```
 
+## Prometheus Metrics
+
+openHAB exposes Prometheus-format metrics via the **Metrics addon** at:
+
+```
+GET /rest/metrics/prometheus   (port 8080, no authentication required)
+```
+
+### Step 1 — Install the Metrics Addon
+
+Install the addon once via the openHAB UI:
+
+_Settings → Add-on Store → Integrations → Metrics → Install_
+
+Or via the Karaf console (if enabled):
+
+```bash
+kubectl port-forward svc/my-openhab-karaf 8101:8101
+ssh -p 8101 openhab@127.0.0.1
+# Inside Karaf:
+feature:install openhab-io-metrics
+```
+
+### Step 2 — Enable Metrics in Chart Values
+
+**Mode 1: Pod annotations** — works with any Prometheus that watches pod annotations:
+
+```yaml
+metrics:
+  enabled: true
+  podAnnotations:
+    enabled: true
+```
+
+This adds the following annotations to the pod:
+
+```yaml
+prometheus.io/scrape: 'true'
+prometheus.io/path: /rest/metrics/prometheus
+prometheus.io/port: '8080'
+```
+
+**Mode 2: ServiceMonitor** — for [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) / kube-prometheus-stack:
+
+```yaml
+metrics:
+  enabled: true
+  podAnnotations:
+    enabled: false
+  serviceMonitor:
+    enabled: true
+    interval: 60s
+    scrapeTimeout: 10s
+    # Must match your Prometheus instance's serviceMonitorSelector labels
+    additionalLabels:
+      release: prometheus
+```
+
+### Verify the Endpoint
+
+```bash
+kubectl port-forward svc/my-openhab 8080:8080
+curl -s http://localhost:8080/rest/metrics/prometheus | head -20
+# Expected: Prometheus text format with jvm_*, openhab_* metrics
+```
+
+### Metrics Exposed
+
+| Category        | Metrics                                         |
+| --------------- | ----------------------------------------------- |
+| openHAB events  | `openhab_events_total` per topic                |
+| Bundle states   | `openhab_bundle_state` (32 = active)            |
+| Thing states    | `openhab_thing_state` (online/offline)          |
+| Rule executions | `openhab_rule_runs_total`                       |
+| Threadpool      | `openhab_threadpool_*` (size, active, queue)    |
+| JVM memory      | `jvm_memory_used_bytes`, `jvm_gc_pause_seconds` |
+| JVM threads     | `jvm_threads_*`, `jvm_classes_loaded`           |
+| Process         | `process_cpu_usage`, `process_uptime_seconds`   |
+
+### Custom Relabelings (ServiceMonitor)
+
+```yaml
+metrics:
+  serviceMonitor:
+    enabled: true
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+        targetLabel: instance
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: 'jvm_.*'
+        action: keep
+```
+
 ## Ingress
 
 openHAB's `/rest/events` endpoint uses Server-Sent Events (SSE), which requires long-lived HTTP connections. When using nginx Ingress, add the following annotations for proper support:
@@ -371,7 +466,7 @@ persistence:
     size: 2Gi
 ```
 
-### Scenario 3: Full Production with Ingress
+### Scenario 3: Full Production with Ingress and Metrics
 
 ```yaml
 ingress:
@@ -402,6 +497,18 @@ admin:
 
 karaf:
   enabled: true
+
+# Prometheus Operator (kube-prometheus-stack)
+# Requires: openHAB Metrics addon installed via UI
+metrics:
+  enabled: true
+  podAnnotations:
+    enabled: false
+  serviceMonitor:
+    enabled: true
+    interval: 60s
+    additionalLabels:
+      release: prometheus
 
 env:
   TZ: 'Europe/Berlin'
@@ -476,6 +583,20 @@ resources:
 | `configMaps.items.enabled`    | Enable items ConfigMap      | `false` |
 | `configMaps.items.files`      | Map of `filename → content` | `{}`    |
 
+### Metrics
+
+| Parameter                                  | Description                           | Default           |
+| ------------------------------------------ | ------------------------------------- | ----------------- |
+| `metrics.enabled`                          | Enable Prometheus metrics             | `false`           |
+| `metrics.podAnnotations.enabled`           | Add `prometheus.io/*` pod annotations | `true`            |
+| `metrics.serviceMonitor.enabled`           | Create ServiceMonitor                 | `false`           |
+| `metrics.serviceMonitor.namespace`         | ServiceMonitor namespace              | release namespace |
+| `metrics.serviceMonitor.interval`          | Scrape interval                       | `60s`             |
+| `metrics.serviceMonitor.scrapeTimeout`     | Scrape timeout                        | `10s`             |
+| `metrics.serviceMonitor.additionalLabels`  | Extra labels on ServiceMonitor        | `{}`              |
+| `metrics.serviceMonitor.relabelings`       | Relabeling rules                      | `[]`              |
+| `metrics.serviceMonitor.metricRelabelings` | Metric relabeling rules               | `[]`              |
+
 ### Environment
 
 | Parameter                | Description       | Default |
@@ -503,28 +624,26 @@ resources:
 This is normal on first boot. openHAB loads all OSGi bundles at startup, which takes 60-120 seconds. The chart configures a startup probe with a 5-minute window. Wait patiently before investigating.
 
 ```bash
-# Check startup probe status
 kubectl get pod -l app.kubernetes.io/name=openhab \
   -o jsonpath='{.items[0].status.containerStatuses[0].started}'
 ```
 
 ### CrashLoopBackOff after PVC reuse
 
-If you reused a PVC from another deployment or manually set incorrect permissions, the pod may crash because openHAB cannot write to its directories.
+Incorrect permissions on a reused PVC will prevent openHAB from writing to its directories.
 
 ```bash
-# Check the actual error
 kubectl logs -l app.kubernetes.io/name=openhab --previous
 
-# Fix permissions (run a temporary debug pod)
+# Fix permissions via a temporary pod
 kubectl run fix-perms --image=busybox --restart=Never \
-  --overrides='{"spec":{"volumes":[{"name":"userdata","persistentVolumeClaim":{"claimName":"my-openhab-userdata"}}],"containers":[{"name":"fix","image":"busybox","command":["chown","-R","9001:9001","/data"],"volumeMounts":[{"name":"userdata","mountPath":"/data"}]}]}}' \
+  --overrides='{"spec":{"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"my-openhab-userdata"}}],"containers":[{"name":"fix","image":"busybox","command":["chown","-R","9001:9001","/data"],"volumeMounts":[{"name":"data","mountPath":"/data"}]}]}}' \
   -- chown -R 9001:9001 /data
 ```
 
-### ConfigMap changes not reflected in openHAB
+### ConfigMap changes not reflected
 
-Kubernetes syncs ConfigMaps to pods on a configurable interval (default ~60 seconds via kubelet `--sync-frequency`). The 2-5 second live-reload refers to openHAB's processing after the file appears on disk. If changes still don't appear after 2-3 minutes, check:
+Kubernetes syncs ConfigMaps to pods every ~60 seconds (kubelet `--sync-frequency`). After the file appears on disk, openHAB applies it within 2-5 seconds. If still not reflected after 2-3 minutes:
 
 ```bash
 # Verify the file exists in the pod
@@ -539,54 +658,68 @@ kubectl exec -l app.kubernetes.io/name=openhab -- \
 
 The first-boot admin setup wizard has not been completed. Navigate to the UI root and create your administrator account.
 
-### Web UI works but real-time updates are broken (HABPanel, BasicUI)
+### Web UI works but real-time updates are broken
 
-The `/rest/events` SSE endpoint requires long-lived connections. If using Ingress, verify the websocket annotations are applied:
+The `/rest/events` SSE endpoint requires long-lived connections. Verify the websocket annotations are present on your Ingress:
 
 ```bash
 kubectl describe ingress my-openhab
 # Look for: nginx.ingress.kubernetes.io/proxy-read-timeout: 3600
 ```
 
-### openHAB log shows bundle resolution errors on startup
+### Prometheus metrics endpoint returns 404
 
-This is transient and usually resolves itself on the next start. If persistent:
+The Metrics addon is not installed or not yet active. Install it via _Settings → Add-on Store → Integrations → Metrics_.
 
 ```bash
-# Delete the OSGi cache (safe — rebuilt automatically)
+# Verify the endpoint manually
+kubectl port-forward svc/my-openhab 8080:8080
+curl -s http://localhost:8080/rest/metrics/prometheus | head -5
+```
+
+### No metrics in Prometheus (annotations mode)
+
+Verify the pod has the scrape annotations:
+
+```bash
+kubectl get pod -l app.kubernetes.io/name=openhab \
+  -o jsonpath='{.items[0].metadata.annotations}' | jq .
+```
+
+### ServiceMonitor not discovered by Prometheus
+
+The `additionalLabels` on the ServiceMonitor must match the `serviceMonitorSelector` of your Prometheus instance:
+
+```bash
+kubectl get prometheus -o jsonpath='{.items[0].spec.serviceMonitorSelector}'
+# Then set matching labels in metrics.serviceMonitor.additionalLabels
+```
+
+### openHAB log shows bundle resolution errors on startup
+
+Delete the OSGi bundle cache (rebuilt automatically on next start):
+
+```bash
 kubectl exec -l app.kubernetes.io/name=openhab -- \
   rm -rf /openhab/userdata/cache
 kubectl rollout restart statefulset my-openhab
 ```
 
-### Karaf SSH connection refused
-
-Verify Karaf is enabled and port-forward is active:
-
-```bash
-kubectl get svc | grep karaf
-kubectl port-forward svc/my-openhab-karaf 8101:8101
-ssh -p 8101 openhab@127.0.0.1
-```
-
 ### High memory usage
 
-openHAB is a Java application. Tune the JVM heap based on your workload:
+Tune the JVM heap. Keep resource limits above the `-Xmx` value to avoid OOM kills:
 
 ```yaml
 env:
   EXTRA_JAVA_OPTS: '-Xms256m -Xmx1024m'
-
 resources:
-  requests:
-    memory: 512Mi
   limits:
-    memory: 1536Mi # Keep limits > Xmx to avoid OOM kills
+    memory: 1536Mi # must be > Xmx
 ```
 
 ### Pod evicted due to storage pressure
 
-The `userdata` volume accumulates logs over time. Configure log rotation in openHAB or increase the PVC size:
+The `userdata` volume accumulates logs over time. Increase the PVC size or configure log rotation:
 
 ```yaml
 persistence:
@@ -597,6 +730,7 @@ persistence:
 ## Additional Resources
 
 - [openHAB Documentation](https://www.openhab.org/docs/)
+- [openHAB Metrics Addon](https://www.openhab.org/addons/integrations/metrics/)
 - [openHAB Community Forum](https://community.openhab.org/)
 - [openHAB Add-ons](https://www.openhab.org/addons/)
 - [Docker Hub — openhab/openhab](https://hub.docker.com/r/openhab/openhab)
