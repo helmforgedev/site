@@ -433,6 +433,13 @@ export const charts: Chart[] = [
     maturity: 'alpha',
     backup: true,
   },
+  {
+    name: 'openHAB',
+    slug: 'openhab',
+    description: 'Home automation platform with GitOps-friendly live configuration reload via ConfigMaps.',
+    maturity: 'beta',
+    backup: true,
+  },
 ];
 
 export const chartCount = charts.length;
