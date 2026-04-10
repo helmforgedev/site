@@ -15,8 +15,8 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **StatefulSet workload** for stable, predictable PVC attachment on every restart
 - **Three persistent volumes** (`userdata`, `conf`, `addons`) with independent sizing and storage class configuration
 - **ConfigMap live-reload** for sitemaps, things, and items — changes applied automatically within seconds, no pod restart required
-- **Correct security context** with UID/GID `9001` enforced via `podSecurityContext` and `fsGroup`
-- **Smart health probes** via `/rest/alive` endpoint with a 5-minute startup window for OSGi bundle loading
+- **Correct security context** — `fsGroup: 9001` only; `runAsUser`/`runAsGroup` intentionally unset so the entrypoint can bootstrap user creation before dropping privileges via `gosu`
+- **Smart health probes** via `/rest/uuid` (available in openHAB 4.x, no auth required) with a 10-minute startup window for OSGi bundle loading
 - **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
 - **Optional Karaf SSH console** for administrative access to the OSGi runtime
