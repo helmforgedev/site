@@ -1,6 +1,6 @@
 ---
 title: Envoy Gateway Chart
-description: Deploy Envoy Gateway on Kubernetes with HelmForge's production-ready Helm chart featuring Gateway API examples, cert-manager integration, and comprehensive observability.
+description: Deploy Envoy Gateway v1.7.1 on Kubernetes with HelmForge's production-ready Helm chart featuring Gateway API, SecurityPolicy (JWT/OIDC/CORS), BackendTrafficPolicy, and comprehensive observability.
 ---
 
 # Envoy Gateway Chart
@@ -11,18 +11,33 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 - **Profile Presets**: Production-ready deployment configurations
   - Development profile (single replica, minimal resources)
-  - Staging profile (2 replicas, self-signed TLS)
-  - Production HA profile (DaemonSet, cert-manager, anti-affinity)
+  - Production HA profile (DaemonSet, anti-affinity)
 
 - **Gateway API Native**: First-class Gateway API support
   - Working Gateway and HTTPRoute examples
   - Automated GatewayClass creation
-  - Support for all Gateway API v1 resources
+  - Support for all Gateway API v1.2.1 resources
+  - Default `Gateway` resource (when `gateway.create: true`)
 
-- **Certificate Management**: Automated TLS with cert-manager
-  - Profile-based cert-manager integration
-  - Auto-provisioning for Gateway listeners
-  - Self-signed and production issuer support
+- **Certgen Job**: Automatic internal TLS cert generation (pre-install hook)
+  - Runs as a Helm pre-install hook
+  - Generates TLS certs for internal EG components
+
+- **SecurityPolicy**: Native JWT, OIDC, API Key, CORS authentication
+  - JWT with remote JWKS support
+  - OIDC with provider integration (Google, Auth0, etc.)
+  - CORS configuration at the Gateway or HTTPRoute level
+  - API Key authentication
+
+- **BackendTrafficPolicy**: Retries, circuit breaking, timeouts, health checks
+  - Configurable retry policies per route
+  - Circuit breaker with connection limits
+  - Active health checks
+
+- **ClientTrafficPolicy**: Connection limits, TLS version control, HTTP/2 tuning
+  - Minimum/maximum TLS version enforcement
+  - Connection limit configuration
+  - Request timeout settings
 
 - **Rate Limiting**: Distributed rate limiting with Redis
   - Optional Redis StatefulSet deployment
@@ -31,7 +46,7 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 - **Comprehensive Observability**: Production-grade monitoring
   - Prometheus ServiceMonitors for metrics
-  - PrometheusRule with 7 alert rules
+  - PrometheusRule with 6 alert rules
   - Pre-built Grafana dashboards
   - Structured access logs (JSON/text)
 
@@ -48,7 +63,7 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 - ✅ Resource limits and requests tuning per profile
 - ✅ Health checks (liveness and readiness probes)
 - ✅ Security contexts (runAsNonRoot, drop ALL capabilities)
-- ✅ Support for Deployment and DaemonSet proxy modes
+- ✅ Support for Deployment and DaemonSet proxy kinds (operator-managed)
 - ✅ Comprehensive RBAC for Gateway API and Envoy Gateway CRDs
 
 ---
@@ -72,7 +87,7 @@ helm install envoy-gateway helmforge/envoy-gateway
 ### OCI Registry
 
 ```bash
-helm install envoy-gateway oci://ghcr.io/helmforgedev/helm/envoy-gateway --version 1.0.0
+helm install envoy-gateway oci://ghcr.io/helmforgedev/helm/envoy-gateway --version 1.3.0
 ```
 
 ### Verify Installation
@@ -90,7 +105,7 @@ kubectl get gateway,httproute -A
 ### 1. Install Gateway API CRDs
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
 ```
 
 ### 2. Choose a Profile
@@ -106,26 +121,11 @@ helm install envoy-gateway helmforge/envoy-gateway \
 
 **Profile Configuration**:
 
-- 1 replica controller and proxy
+- 1 replica controller
 - Minimal resources (100m CPU, 128Mi memory)
 - No TLS (HTTP only)
 - Example Gateway and HTTPRoute created
-
-#### Staging Profile
-
-For pre-production testing with TLS:
-
-```bash
-helm install envoy-gateway helmforge/envoy-gateway \
-  --set profile=staging
-```
-
-**Profile Configuration**:
-
-- 2 replica controller and proxy
-- Medium resources (500m CPU, 512Mi memory)
-- Self-signed TLS certificates
-- cert-manager enabled
+- EG operator provisions proxy pods automatically
 
 #### Production HA Profile
 
@@ -139,9 +139,8 @@ helm install envoy-gateway helmforge/envoy-gateway \
 **Profile Configuration**:
 
 - 2 replica controller with leader election
-- Proxy as DaemonSet (one per node)
+- Proxy as DaemonSet (`proxy.kind: DaemonSet`) — EG operator provisions one proxy per node
 - Production resources (1000m CPU, 1Gi memory)
-- cert-manager with production issuer
 - Anti-affinity rules
 - PodDisruptionBudgets
 
@@ -150,18 +149,23 @@ helm install envoy-gateway helmforge/envoy-gateway \
 Wait for the Gateway to be ready:
 
 ```bash
-kubectl wait --for=condition=Programmed gateway/envoy-gateway-example -n default --timeout=300s
+kubectl wait --for=condition=Programmed gateway/envoy-gateway -n default --timeout=300s
 ```
 
 Get the Gateway IP and test:
 
 ```bash
-# For LoadBalancer service
-export GATEWAY_IP=$(kubectl get svc envoy-gateway-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+# Get the Gateway IP (EG creates the service automatically)
+export GATEWAY_IP=$(kubectl get gateway envoy-gateway -o jsonpath='{.status.addresses[0].value}')
+
+# Or find the EG-provisioned service (name is dynamic: envoy-<namespace>-<gateway-name>-<uid>)
+kubectl get svc -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway
 
 # Test the example HTTPRoute
 curl -H "Host: example.local" http://$GATEWAY_IP/
 ```
+
+> **Note**: Envoy Gateway is a Kubernetes operator. When a `Gateway` resource exists, EG automatically provisions proxy pods and creates a service with a dynamic name (`envoy-<namespace>-<gateway-name>-<uid>`). There is no manually-created `envoy-gateway-proxy` service.
 
 Expected response from the example backend (httpbin):
 
@@ -186,12 +190,11 @@ Profile presets provide opinionated, production-ready configurations for differe
 
 #### Available Profiles
 
-| Profile           | Replicas      | Proxy Mode   | Resources    | TLS          | Use Case          |
-| ----------------- | ------------- | ------------ | ------------ | ------------ | ----------------- |
-| **dev**           | 1             | Deployment   | Minimal      | No           | Local development |
-| **staging**       | 2             | Deployment   | Medium       | Self-signed  | Pre-production    |
-| **production-ha** | 2 + DaemonSet | DaemonSet    | Production   | cert-manager | Production        |
-| **custom**        | Configurable  | Configurable | Configurable | Optional     | Full control      |
+| Profile           | Replicas      | Proxy Kind   | Resources    | TLS      | Use Case          |
+| ----------------- | ------------- | ------------ | ------------ | -------- | ----------------- |
+| **dev**           | 1             | Deployment   | Minimal      | No       | Local development |
+| **production-ha** | 2 + DaemonSet | DaemonSet    | Production   | Optional | Production        |
+| **custom**        | Configurable  | Configurable | Configurable | Optional | Full control      |
 
 #### How Profiles Work
 
@@ -209,12 +212,9 @@ controller:
       cpu: 1000m
       memory: 1Gi
 proxy:
-  mode: DaemonSet # via envoy-gateway.proxy.mode helper
+  kind: DaemonSet # EG operator provisions DaemonSet proxies per node
 highAvailability:
   enabled: true
-certificates:
-  certManager:
-    enabled: true
 ```
 
 #### Switching Profiles
@@ -273,8 +273,11 @@ When `gatewayAPI.examples.enabled=true` (default):
 **HTTP Access**:
 
 ```bash
-# Get Gateway IP
-export GATEWAY_IP=$(kubectl get svc envoy-gateway-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+# Get Gateway IP (EG provisions the service automatically)
+export GATEWAY_IP=$(kubectl get gateway envoy-gateway -o jsonpath='{.status.addresses[0].value}')
+
+# Or find the EG-provisioned service by label
+kubectl get svc -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway
 
 # Test HTTP
 curl -H "Host: example.local" http://$GATEWAY_IP/
@@ -290,7 +293,9 @@ curl -k -H "Host: example.local" https://$GATEWAY_IP/
 **Port-forward** (for local development):
 
 ```bash
-kubectl port-forward svc/envoy-gateway-proxy 8080:80
+# Get the EG-provisioned service name first
+EG_SVC=$(kubectl get svc -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway -o name | head -1)
+kubectl port-forward $EG_SVC 8080:80
 curl -H "Host: example.local" http://localhost:8080/
 ```
 
@@ -321,33 +326,21 @@ helm install envoy-gateway helmforge/envoy-gateway \
 
 ### Certificate Management
 
-Envoy Gateway integrates with cert-manager for automated TLS certificate provisioning.
+#### Certgen Job (Internal TLS)
 
-#### cert-manager Integration
+The chart ships a `certgen` job that runs as a **pre-install Helm hook**. It automatically generates TLS certificates for internal Envoy Gateway components (controller ↔ envoy xDS communication). No manual setup is required.
 
-The chart automatically configures cert-manager based on the selected profile:
-
-| Profile       | cert-manager Enabled | Default Issuer |
-| ------------- | -------------------- | -------------- |
-| dev           | No                   | -              |
-| staging       | Yes                  | selfsigned     |
-| production-ha | Yes                  | selfsigned     |
-| custom        | Configurable         | Configurable   |
-
-#### Configuration Options
-
-```yaml
-certificates:
-  certManager:
-    enabled: true # Enable cert-manager integration
-    issuer: letsencrypt-prod # Issuer name
-    issuerKind: ClusterIssuer # ClusterIssuer or Issuer
-  autoProvision: false # Auto-create certificates for Gateway listeners
+```bash
+# Verify the certgen job ran successfully
+kubectl get job -l app.kubernetes.io/component=certgen
+kubectl logs -l app.kubernetes.io/component=certgen
 ```
 
-#### Using Let's Encrypt
+#### HTTPS Gateway Listeners with External cert-manager
 
-Create a ClusterIssuer for Let's Encrypt:
+For HTTPS Gateway listeners, you can use [cert-manager](https://cert-manager.io/) to provision TLS secrets independently of this chart. The `certificates.certManager` chart integration has been removed — instead, create the `Certificate` resource separately and reference the resulting secret in your Gateway listener.
+
+**Step 1 — Create a ClusterIssuer:**
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -362,21 +355,13 @@ spec:
       name: letsencrypt-prod-key
     solvers:
       - http01:
-          ingress:
-            class: envoy-gateway
+          gateway:
+            parentRefs:
+              - name: envoy-gateway
+                namespace: default
 ```
 
-Then install the chart:
-
-```bash
-helm install envoy-gateway helmforge/envoy-gateway \
-  --set profile=production-ha \
-  --set certificates.certManager.issuer=letsencrypt-prod
-```
-
-#### Manual Certificate Creation
-
-Create a certificate for your Gateway:
+**Step 2 — Create a Certificate:**
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -394,7 +379,7 @@ spec:
     - '*.api.example.com'
 ```
 
-Reference the certificate in your Gateway:
+**Step 3 — Reference the secret in your Gateway:**
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -414,29 +399,15 @@ spec:
             name: my-gateway-tls
 ```
 
-#### Troubleshooting Certificate Issues
+Or enable the HTTPS listener via chart values:
 
-Check certificate status:
-
-```bash
-# View certificate
-kubectl get certificate my-gateway-tls
-
-# Check certificate details
-kubectl describe certificate my-gateway-tls
-
-# View certificate secret
-kubectl get secret my-gateway-tls -o yaml
-
-# Check cert-manager logs
-kubectl logs -n cert-manager -l app=cert-manager
+```yaml
+gateway:
+  create: true
+  listeners:
+    https:
+      enabled: true
 ```
-
-Common issues:
-
-- **Pending state**: Check DNS configuration and ACME challenge
-- **Invalid certificate**: Verify issuer configuration and email
-- **Secret not found**: Ensure cert-manager created the secret successfully
 
 ---
 
@@ -680,8 +651,8 @@ Comprehensive monitoring with Prometheus and Grafana integration.
 
 #### Components
 
-1. **ServiceMonitors**: Scrape metrics from controller and proxy
-2. **PrometheusRule**: 7 alert rules for common issues
+1. **ServiceMonitors**: Scrape metrics from controller (proxy service name is dynamic — managed by EG operator)
+2. **PrometheusRule**: 6 alert rules for common issues
 3. **Grafana Dashboard**: Pre-built dashboard for request metrics
 4. **Access Logs**: Structured logs in JSON or text format
 
@@ -711,6 +682,7 @@ helm install envoy-gateway helmforge/envoy-gateway \
   - Request rate, latency, errors
   - Connection pool stats
   - Circuit breaker status
+  - Note: The proxy service name is dynamic (`envoy-<namespace>-<gateway-name>-<uid>`); a proxy ServiceMonitor is not included because of this dynamic naming. Use pod-level port-forward or a custom ServiceMonitor with label selectors.
 
 Access metrics:
 
@@ -719,14 +691,15 @@ Access metrics:
 kubectl port-forward svc/envoy-gateway-controller 8081:8081
 curl http://localhost:8081/metrics
 
-# Proxy metrics
-kubectl port-forward <proxy-pod> 19000:19000
+# Proxy metrics (find pod via EG label)
+PROXY_POD=$(kubectl get pod -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway -o name | head -1)
+kubectl port-forward $PROXY_POD 19000:19000
 curl http://localhost:19000/stats/prometheus
 ```
 
 #### Alert Rules
 
-The chart includes 7 PrometheusRule alerts:
+The chart includes 6 PrometheusRule alerts:
 
 | Alert                           | Threshold | Severity | Description                |
 | ------------------------------- | --------- | -------- | -------------------------- |
@@ -734,7 +707,6 @@ The chart includes 7 PrometheusRule alerts:
 | EnvoyGatewayHighLatency         | p99 >1s   | Warning  | High response latency      |
 | EnvoyGatewayCircuitBreakerOpen  | >0        | Warning  | Circuit breaker triggered  |
 | EnvoyGatewayControllerDown      | 5 min     | Critical | Controller unavailable     |
-| EnvoyGatewayProxyDown           | 2 min     | Critical | Proxy unavailable          |
 | EnvoyGatewayHighConnectionCount | >1000     | Warning  | High active connections    |
 | EnvoyGatewayRateLimitExceeded   | >10 req/s | Info     | Rate limit rejections      |
 
@@ -932,11 +904,7 @@ kubectl get rolebinding -n <namespace>
    --set security.networkPolicies=true
    ```
 
-2. **Enable TLS** with cert-manager:
-
-   ```bash
-   --set certificates.certManager.enabled=true
-   ```
+2. **Enable TLS** with an external cert-manager Certificate resource referencing your Gateway listener's `certificateRefs`.
 
 3. **Restrict service access** with Gateway allowedRoutes:
 
@@ -966,16 +934,182 @@ kubectl get rolebinding -n <namespace>
 
 ---
 
+### SecurityPolicy — Native Authentication
+
+Envoy Gateway's `SecurityPolicy` CRD provides authentication and authorization at the Gateway or HTTPRoute level — a major advantage over nginx-based controllers.
+
+#### JWT Authentication
+
+```yaml
+securityPolicy:
+  create: true
+  jwt:
+    enabled: true
+    providers:
+      - name: auth0
+        issuer: https://your-tenant.auth0.com/
+        audiences:
+          - your-api-audience
+        remoteJWKS:
+          uri: https://your-tenant.auth0.com/.well-known/jwks.json
+```
+
+#### OIDC Authentication
+
+```yaml
+securityPolicy:
+  create: true
+  oidc:
+    enabled: true
+    provider:
+      issuer: https://accounts.google.com
+    clientID: your-client-id
+    clientSecret:
+      name: oidc-secret  # kubectl create secret generic oidc-secret --from-literal=clientSecret=...
+    redirectURL: https://myapp.example.com/oauth2/callback
+    scopes:
+      - openid
+      - email
+      - profile
+```
+
+#### CORS
+
+```yaml
+securityPolicy:
+  create: true
+  cors:
+    enabled: true
+    allowOrigins:
+      - "https://app.example.com"
+    allowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowHeaders:
+      - Authorization
+      - Content-Type
+    maxAge: 86400
+```
+
+#### API Key
+
+```yaml
+securityPolicy:
+  create: true
+  apiKey:
+    enabled: true
+    credentials:
+      - name: my-api-keys   # Secret with API keys
+```
+
+---
+
+### BackendTrafficPolicy — Traffic Management
+
+Configure retries, circuit breaking, timeouts, and health checks per Gateway or HTTPRoute.
+
+#### Retries with Circuit Breaking
+
+```yaml
+backendTrafficPolicy:
+  create: true
+  retries:
+    enabled: true
+    numRetries: 3
+    perTryTimeout: "10s"
+    retryOn:
+      httpStatusCodes:
+        - 502
+        - 503
+        - 504
+      triggers:
+        - connect-failure
+        - retriable-status-codes
+  circuitBreaker:
+    enabled: true
+    maxConnections: 1024
+    maxParallelRequests: 1024
+```
+
+#### Timeouts
+
+```yaml
+backendTrafficPolicy:
+  create: true
+  timeout:
+    http:
+      requestTimeout: "30s"
+      idleTimeout: "60s"
+```
+
+#### Active Health Checks
+
+```yaml
+backendTrafficPolicy:
+  create: true
+  healthCheck:
+    active:
+      enabled: true
+      timeout: "1s"
+      interval: "3s"
+      unhealthyThreshold: 3
+      healthyThreshold: 1
+      http:
+        path: "/health"
+        expectedStatuses:
+          - 200
+```
+
+---
+
+### ClientTrafficPolicy — Listener Configuration
+
+Configure connection limits, TLS settings, and HTTP protocol options at the listener level.
+
+#### TLS Hardening
+
+```yaml
+clientTrafficPolicy:
+  create: true
+  tls:
+    minVersion: "TLSv1.3"
+    maxVersion: "TLSv1.3"
+```
+
+#### Connection Limits
+
+```yaml
+clientTrafficPolicy:
+  create: true
+  connection:
+    connectionLimit:
+      value: 10000
+```
+
+#### Timeouts
+
+```yaml
+clientTrafficPolicy:
+  create: true
+  timeout:
+    http:
+      requestReceivedTimeout: "10s"
+```
+
+---
+
 ## Configuration Reference
 
 ### Global Values
 
-| Parameter          | Description                                       | Default  |
-| ------------------ | ------------------------------------------------- | -------- |
-| `profile`          | Profile preset (dev/staging/production-ha/custom) | `custom` |
-| `nameOverride`     | Override chart name                               | `""`     |
-| `fullnameOverride` | Override full name                                | `""`     |
-| `imagePullSecrets` | Image pull secrets                                | `[]`     |
+| Parameter          | Description                                   | Default  |
+| ------------------ | --------------------------------------------- | -------- |
+| `profile`          | Profile preset (dev/production-ha/custom)     | `custom` |
+| `nameOverride`     | Override chart name                           | `""`     |
+| `fullnameOverride` | Override full name                            | `""`     |
+| `imagePullSecrets` | Image pull secrets                            | `[]`     |
 
 ### Controller Configuration
 
@@ -983,7 +1117,7 @@ kubectl get rolebinding -n <namespace>
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.0.0`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.7.1`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -995,22 +1129,19 @@ kubectl get rolebinding -n <namespace>
 
 ### Proxy Configuration
 
-| Parameter                         | Description                                | Default                      |
-| --------------------------------- | ------------------------------------------ | ---------------------------- |
-| `proxy.mode`                      | Deployment or DaemonSet                    | `Deployment`                 |
-| `proxy.replicaCount`              | Number of proxy replicas (Deployment only) | `1`                          |
-| `proxy.image.repository`          | Proxy image                                | `docker.io/envoyproxy/envoy` |
-| `proxy.image.tag`                 | Proxy image tag                            | `v1.29.0`                    |
-| `proxy.resources.requests.cpu`    | CPU request                                | `100m`                       |
-| `proxy.resources.requests.memory` | Memory request                             | `128Mi`                      |
-| `proxy.resources.limits.cpu`      | CPU limit                                  | `1000m`                      |
-| `proxy.resources.limits.memory`   | Memory limit                               | `1Gi`                        |
-| `proxy.service.type`              | Service type                               | `LoadBalancer`               |
-| `proxy.service.httpPort`          | HTTP port                                  | `80`                         |
-| `proxy.service.httpsPort`         | HTTPS port                                 | `443`                        |
-| `proxy.autoscaling.enabled`       | Enable HPA                                 | `false`                      |
-| `proxy.autoscaling.minReplicas`   | Minimum replicas                           | `2`                          |
-| `proxy.autoscaling.maxReplicas`   | Maximum replicas                           | `10`                         |
+| Parameter                         | Description                                                          | Default                               |
+| --------------------------------- | -------------------------------------------------------------------- | ------------------------------------- |
+| `proxy.kind`                      | EG proxy kind: Deployment or DaemonSet (managed by EG operator)      | `Deployment`                          |
+| `proxy.replicaCount`              | Number of proxy replicas (Deployment only)                           | `1`                                   |
+| `proxy.image.repository`          | Proxy image                                                          | `docker.io/envoyproxy/envoy`          |
+| `proxy.image.tag`                 | Proxy image tag                                                      | `distroless-v1.33.0`                  |
+| `proxy.resources.requests.cpu`    | CPU request                                                          | `100m`                                |
+| `proxy.resources.requests.memory` | Memory request                                                       | `128Mi`                               |
+| `proxy.resources.limits.cpu`      | CPU limit                                                            | `1000m`                               |
+| `proxy.resources.limits.memory`   | Memory limit                                                         | `1Gi`                                 |
+| `proxy.autoscaling.enabled`       | Enable HPA                                                           | `false`                               |
+| `proxy.autoscaling.minReplicas`   | Minimum replicas                                                     | `2`                                   |
+| `proxy.autoscaling.maxReplicas`   | Maximum replicas                                                     | `10`                                  |
 
 ### Gateway API Examples
 
@@ -1019,14 +1150,42 @@ kubectl get rolebinding -n <namespace>
 | `gatewayAPI.examples.enabled`   | Create example resources | `true`                   |
 | `gatewayAPI.examples.namespace` | Namespace for examples   | `""` (Release namespace) |
 
-### Certificate Management
+### Gateway Resource
 
-| Parameter                             | Description                 | Default         |
-| ------------------------------------- | --------------------------- | --------------- |
-| `certificates.certManager.enabled`    | Enable cert-manager         | `false`         |
-| `certificates.certManager.issuer`     | Issuer name                 | `selfsigned`    |
-| `certificates.certManager.issuerKind` | Issuer kind                 | `ClusterIssuer` |
-| `certificates.autoProvision`          | Auto-provision certificates | `false`         |
+| Parameter                          | Description                               | Default |
+| ---------------------------------- | ----------------------------------------- | ------- |
+| `gateway.create`                   | Create default Gateway resource           | `true`  |
+| `gateway.listeners.http.enabled`   | Enable HTTP listener                      | `true`  |
+| `gateway.listeners.https.enabled`  | Enable HTTPS listener                     | `false` |
+
+### Certgen Job
+
+| Parameter          | Description                  | Default  |
+| ------------------ | ---------------------------- | -------- |
+| `certgen.image.tag` | Certgen image tag           | `v1.7.1` |
+
+### SecurityPolicy
+
+| Parameter                    | Description                          | Default |
+| ---------------------------- | ------------------------------------ | ------- |
+| `securityPolicy.create`      | Create SecurityPolicy resource       | `false` |
+| `securityPolicy.jwt.enabled` | Enable JWT authentication            | `false` |
+| `securityPolicy.oidc.enabled` | Enable OIDC authentication          | `false` |
+| `securityPolicy.cors.enabled` | Enable CORS                         | `false` |
+
+### BackendTrafficPolicy
+
+| Parameter                                 | Description                    | Default |
+| ----------------------------------------- | ------------------------------ | ------- |
+| `backendTrafficPolicy.create`             | Create BackendTrafficPolicy    | `false` |
+| `backendTrafficPolicy.retries.enabled`    | Enable request retries         | `false` |
+| `backendTrafficPolicy.circuitBreaker.enabled` | Enable circuit breaker     | `false` |
+
+### ClientTrafficPolicy
+
+| Parameter                    | Description                    | Default |
+| ---------------------------- | ------------------------------ | ------- |
+| `clientTrafficPolicy.create` | Create ClientTrafficPolicy     | `false` |
 
 ### Rate Limiting
 
@@ -1035,7 +1194,7 @@ kubectl get rolebinding -n <namespace>
 | `rateLimiting.enabled`                   | Enable rate limiting              | `false`           |
 | `rateLimiting.redis.enabled`             | Deploy Redis StatefulSet          | `false`           |
 | `rateLimiting.redis.image.repository`    | Redis image                       | `docker.io/redis` |
-| `rateLimiting.redis.image.tag`           | Redis image tag                   | `7.2-alpine`      |
+| `rateLimiting.redis.image.tag`           | Redis image tag                   | `8.0.2-alpine`    |
 | `rateLimiting.redis.persistence.enabled` | Enable persistence                | `true`            |
 | `rateLimiting.redis.persistence.size`    | PVC size                          | `1Gi`             |
 | `rateLimiting.externalRedis.host`        | External Redis host               | `""`              |
@@ -1093,14 +1252,15 @@ Deploy Envoy Gateway for local testing:
 
 ```bash
 # Install Gateway API CRDs
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
 
 # Install with dev profile
 helm install envoy-gateway helmforge/envoy-gateway \
   --set profile=dev
 
-# Port-forward for local access
-kubectl port-forward svc/envoy-gateway-proxy 8080:80
+# Port-forward for local access (find EG-provisioned service first)
+EG_SVC=$(kubectl get svc -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway -o name | head -1)
+kubectl port-forward $EG_SVC 8080:80
 
 # Test
 curl -H "Host: example.local" http://localhost:8080/
@@ -1115,32 +1275,57 @@ curl -H "Host: example.local" http://localhost:8080/
 
 ---
 
-### Scenario 2: Staging with Self-Signed TLS
+### Scenario 2: HTTPS with External cert-manager
 
-Deploy for pre-production testing with TLS:
+Deploy with HTTPS using cert-manager for TLS provisioning:
 
 ```bash
 # Prerequisites: cert-manager installed
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
 
-# Install with staging profile
+# Install chart with HTTPS listener enabled
 helm install envoy-gateway helmforge/envoy-gateway \
-  --set profile=staging
+  --set gateway.listeners.https.enabled=true
+
+# Create a self-signed ClusterIssuer
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+EOF
+
+# Create a Certificate (cert-manager creates the secret)
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: envoy-gateway-tls
+  namespace: default
+spec:
+  secretName: envoy-gateway-tls
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+  dnsNames:
+    - example.local
+EOF
 
 # Wait for certificate
-kubectl wait --for=condition=Ready certificate/envoy-gateway-example-tls --timeout=300s
+kubectl wait --for=condition=Ready certificate/envoy-gateway-tls --timeout=300s
 
 # Test HTTPS
-export GATEWAY_IP=$(kubectl get svc envoy-gateway-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export GATEWAY_IP=$(kubectl get gateway envoy-gateway -o jsonpath='{.status.addresses[0].value}')
 curl -k -H "Host: example.local" https://$GATEWAY_IP/
 ```
 
 **Configuration**:
 
-- 2 replica controller and proxy
-- Medium resources
-- Self-signed TLS certificates via cert-manager
-- Suitable for integration testing
+- EG operator provisions proxy automatically
+- HTTPS listener with self-signed TLS certificate
+- cert-manager manages certificate lifecycle independently of the chart
 
 ---
 
@@ -1170,16 +1355,16 @@ EOF
 # Install with production-ha profile
 helm install envoy-gateway helmforge/envoy-gateway \
   --set profile=production-ha \
-  --set certificates.certManager.issuer=letsencrypt-prod \
+  --set gateway.listeners.https.enabled=true \
   --set gatewayAPI.examples.enabled=false
 ```
 
 **Configuration**:
 
 - 2 replica controller (leader election)
-- Proxy as DaemonSet (one per node)
+- Proxy as DaemonSet (`proxy.kind: DaemonSet`) — EG operator provisions one per node
 - Production resources (1000m CPU, 1Gi memory)
-- Let's Encrypt TLS certificates
+- Let's Encrypt TLS certificates (managed externally via cert-manager)
 - Anti-affinity for controller and proxy
 - PodDisruptionBudgets
 - No examples (production-only)
@@ -1419,40 +1604,52 @@ kubectl logs -l app.kubernetes.io/component=proxy
 
 ### TLS Certificate Issues
 
-**Symptom**: Certificate not ready or HTTPS not working
+**Symptom**: Internal EG components fail to communicate (xDS TLS errors) or HTTPS Gateway listener has no certificate
 
 **Diagnosis**:
 
 ```bash
+# Check certgen job (internal TLS)
+kubectl get job -l app.kubernetes.io/component=certgen
+kubectl logs -l app.kubernetes.io/component=certgen
+
+# Check external certificates (if using cert-manager for HTTPS listeners)
 kubectl get certificate
-kubectl describe certificate envoy-gateway-example-tls
+kubectl describe certificate envoy-gateway-tls
 kubectl get certificaterequest
 ```
 
 **Common Causes**:
 
-1. **cert-manager not installed**:
+1. **Certgen job failed**:
+
+   ```bash
+   kubectl describe job -l app.kubernetes.io/component=certgen
+   # Check for RBAC or image pull errors
+   ```
+
+2. **External cert-manager not installed** (for HTTPS Gateway listeners):
 
    ```bash
    kubectl get pods -n cert-manager
-   # If missing: install cert-manager
+   # If missing: install cert-manager separately
    ```
 
-2. **Issuer not found**:
+3. **Issuer not found**:
 
    ```bash
    kubectl get clusterissuer
    kubectl describe clusterissuer letsencrypt-prod
    ```
 
-3. **ACME challenge failed** (Let's Encrypt):
+4. **ACME challenge failed** (Let's Encrypt):
 
    ```bash
    kubectl get challenges
    kubectl describe challenge <challenge-name>
    ```
 
-4. **DNS not resolving**:
+5. **DNS not resolving**:
    ```bash
    dig example.com
    # Should point to Gateway IP
@@ -1461,15 +1658,18 @@ kubectl get certificaterequest
 **Solution**:
 
 ```bash
-# Check cert-manager logs
+# Re-run certgen (delete and reinstall chart or run job manually)
+helm upgrade --install envoy-gateway helmforge/envoy-gateway --reuse-values
+
+# Check cert-manager logs (for external HTTPS certificates)
 kubectl logs -n cert-manager -l app=cert-manager
 
 # Delete and recreate certificate
-kubectl delete certificate envoy-gateway-example-tls
+kubectl delete certificate envoy-gateway-tls
 kubectl apply -f <certificate-manifest>
 
 # Force renewal
-kubectl delete secret envoy-gateway-example-tls
+kubectl delete secret envoy-gateway-tls
 # Certificate controller will recreate
 ```
 
@@ -1583,10 +1783,9 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
   --set proxy.autoscaling.maxReplicas=10 \
   --reuse-values
 
-# Restart proxy pods
-kubectl rollout restart deployment envoy-gateway-proxy
-# Or for DaemonSet
-kubectl rollout restart daemonset envoy-gateway-proxy
+# Restart proxy pods (EG operator manages the proxy deployment/daemonset — use rollout on the EG-provisioned resource)
+PROXY_DEPLOY=$(kubectl get deployment -l gateway.envoyproxy.io/owning-gateway-name=envoy-gateway -o name | head -1)
+kubectl rollout restart $PROXY_DEPLOY
 ```
 
 ---
@@ -1728,27 +1927,33 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
 
 ## Version History
 
-### Version 1.0.0 (Current)
+### Version 1.3.0 (Current)
 
-First stable release with complete P1 (MVP) and P2 (Production) features.
+Complete architectural redesign for EG v1.7.1 with operator-managed proxy provisioning and new policy CRDs.
 
-**Included Features**:
+**Breaking Changes**:
 
-**P1 (MVP)**:
+- `proxy.mode` renamed to `proxy.kind`
+- `profile: staging` removed
+- `certificates.certManager` section removed — use external cert-manager directly
+- Proxy ServiceMonitor removed (proxy service name is dynamic, managed by EG operator)
+- Proxy Deployment/DaemonSet no longer created by the chart — EG operator provisions them when a `Gateway` resource exists
 
-- Profile presets (dev, staging, production-ha)
-- Gateway API examples (Gateway, HTTPRoute, example backend)
-- cert-manager integration
-- Comprehensive RBAC
-- ServiceAccount and GatewayClass
+**New Features**:
 
-**P2 (Production)**:
+- `certgen` pre-install job for automatic internal TLS cert generation
+- Default `Gateway` resource (`gateway.create: true`)
+- `SecurityPolicy` CRD support: JWT, OIDC, API Key, CORS
+- `BackendTrafficPolicy` CRD: retries, circuit breaking, timeouts, active health checks
+- `ClientTrafficPolicy` CRD: connection limits, TLS version control, HTTP/2 settings
 
-- Rate limiting with Redis backend
-- Distributed rate limiting with presets (API: 100 req/min, Strict: 10 req/min)
-- Observability bundle (Prometheus ServiceMonitors, PrometheusRule with 7 alerts, Grafana dashboards)
-- Security hardening (NetworkPolicies, PodSecurityStandards)
-- Access logs (JSON/text formats)
+**Versions Updated**:
+
+- EG: v1.7.1 (was v1.0.0)
+- Envoy: distroless-v1.33.0 (was v1.29.0)
+- Redis: 8.0.2-alpine (was 7.2-alpine)
+- Gateway API CRDs: v1.2.1 (was v1.0.0)
+- PrometheusRule: 6 alerts (was 7)
 
 **Deployment Options**:
 
@@ -1764,26 +1969,38 @@ helm install envoy-gateway helmforge/envoy-gateway \
   --set monitoring.enabled=true \
   --set monitoring.prometheus.prometheusRule=true \
   --set monitoring.grafana.dashboards=true \
-  --set security.networkPolicies=true
+  --set security.networkPolicies=true \
+  --set securityPolicy.create=true \
+  --set backendTrafficPolicy.create=true
 ```
 
-**Upgrade from Pre-Release**:
-
-If upgrading from a pre-release version, all new features are opt-in with no breaking changes.
+**Upgrade from 1.0.0**:
 
 ```bash
 # Update Helm repo
 helm repo update
 
-# Upgrade to 1.0.0
+# Note: proxy.mode is now proxy.kind — update your values before upgrading
 helm upgrade envoy-gateway helmforge/envoy-gateway \
-  --version 1.0.0 \
+  --version 1.3.0 \
+  --set proxy.kind=Deployment \
   --reuse-values
 
 # Verify upgrade
 kubectl get pods -l app.kubernetes.io/name=envoy-gateway
 kubectl get gateway,httproute
 ```
+
+### Version 1.0.0
+
+First stable release with complete P1 (MVP) and P2 (Production) features.
+
+- Profile presets (dev, staging, production-ha)
+- Gateway API examples (Gateway, HTTPRoute, example backend)
+- cert-manager integration
+- Rate limiting with Redis backend
+- Observability bundle (Prometheus ServiceMonitors, PrometheusRule with 7 alerts, Grafana dashboards)
+- Security hardening (NetworkPolicies, PodSecurityStandards)
 
 ---
 
@@ -1832,8 +2049,8 @@ kubectl get gateway,httproute
 
 | Field                  | Value      |
 | ---------------------- | ---------- |
-| **Chart Version**      | 1.0.0      |
-| **App Version**        | 1.0.0      |
+| **Chart Version**      | 1.3.0      |
+| **App Version**        | v1.7.1     |
 | **Kubernetes Version** | >= 1.24    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |
