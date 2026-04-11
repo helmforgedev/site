@@ -65,6 +65,7 @@ export const chartCategories: ChartCategory[] = [
     label: 'Networking & DNS',
     charts: [
       { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
+      { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'beta' },
       { label: 'DDNS Updater', href: '/docs/charts/ddns-updater', maturity: 'stable' },
       { label: 'Pi-hole', href: '/docs/charts/pihole', maturity: 'stable' },
       { label: 'AdGuard Home', href: '/docs/charts/adguard-home', maturity: 'stable' },
@@ -81,6 +82,10 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Automatisch', href: '/docs/charts/automatisch', maturity: 'stable' },
       { label: 'FastMCP Server', href: '/docs/charts/fastmcp-server', maturity: 'stable' },
     ],
+  },
+  {
+    label: 'Home Automation',
+    charts: [{ label: 'openHAB', href: '/docs/charts/openhab', maturity: 'beta' }],
   },
   {
     label: 'Monitoring & Ops',
@@ -128,6 +133,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Apache Superset', href: '/docs/charts/superset', maturity: 'stable' },
       { label: 'CKAN', href: '/docs/charts/ckan', maturity: 'stable' },
       { label: 'Apache Druid', href: '/docs/charts/druid', maturity: 'stable' },
+      { label: 'Elasticsearch', href: '/docs/charts/elasticsearch', maturity: 'alpha' },
     ],
   },
   {
