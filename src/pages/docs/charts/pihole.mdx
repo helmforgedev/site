@@ -14,9 +14,24 @@ Deploy Pi-hole DNS sinkhole on Kubernetes using the official [pihole/pihole](htt
 - **Custom DNS Records** — Local A records, CNAME records, and dnsmasq config
 - **Unbound Sidecar** — Optional recursive DNS resolver for privacy
 - **Pi-hole v6+** — Modern configuration via FTLCONF environment variables
+- **Gravity Init** — Pi-hole v6-compatible gravity database initialization
 - **Prometheus Metrics** — pihole-exporter sidecar with ServiceMonitor
 - **Ingress Support** — Configurable ingress with TLS for web admin
 - **DNSSEC Validation** — Optional DNS Security Extensions
+
+## Architecture
+
+The chart runs a single Pi-hole Deployment with persistent storage mounted at `/etc/pihole`. When `gravity.enabled` is
+true, an Alpine init container runs before Pi-hole starts and reconciles the `gravity.db` schema for Pi-hole v6. It
+creates the required `info`, group mapping, client, gravity, antigravity, view, and trigger objects, adds the v6
+`adlist.type` column when upgrading an older database, and assigns configured adlists and domain rules to the Default
+group.
+
+Optional sidecars and resources extend the base pod:
+
+- **Unbound** provides recursive DNS when `unbound.enabled` is true.
+- **pihole-exporter** exposes Prometheus metrics when `metrics.enabled` is true.
+- **Ingress** exposes the web admin service when `ingress.enabled` is true.
 
 ## Installation
 
@@ -75,21 +90,25 @@ serviceDns:
 
 ## Key Values
 
-| Key                         | Default           | Description                              |
-| --------------------------- | ----------------- | ---------------------------------------- |
-| `pihole.timezone`           | `UTC`             | Timezone for logs                        |
-| `pihole.upstreamDns`        | `8.8.8.8;8.8.4.4` | Upstream DNS servers                     |
-| `pihole.dnssec`             | `false`           | Enable DNSSEC validation                 |
-| `admin.password`            | `""`              | Admin password (auto-generated if empty) |
-| `dns.customRecords`         | `[]`              | Local DNS A records                      |
-| `dns.cnameRecords`          | `[]`              | Custom CNAME records                     |
-| `unbound.enabled`           | `false`           | Enable Unbound recursive DNS             |
-| `metrics.enabled`           | `false`           | Enable Prometheus metrics                |
-| `ingress.enabled`           | `false`           | Enable ingress for web admin             |
-| `serviceDns.type`           | `LoadBalancer`    | DNS service type                         |
-| `serviceDns.loadBalancerIP` | —                 | Fixed IP for DNS                         |
-| `persistence.enabled`       | `true`            | Enable persistent storage                |
-| `persistence.size`          | `1Gi`             | PVC size                                 |
+| Key                         | Default                   | Description                                           |
+| --------------------------- | ------------------------- | ----------------------------------------------------- |
+| `image.repository`          | `docker.io/pihole/pihole` | Official Pi-hole container image                      |
+| `image.tag`                 | `2026.04.0`               | Pi-hole Docker tag with Core v6.4.1 and FTL v6.6      |
+| `pihole.timezone`           | `UTC`                     | Timezone for logs                                     |
+| `pihole.upstreamDns`        | `8.8.8.8;8.8.4.4`         | Upstream DNS servers                                  |
+| `pihole.dnssec`             | `false`                   | Enable DNSSEC validation                              |
+| `admin.password`            | `""`                      | Admin password (auto-generated if empty)              |
+| `dns.customRecords`         | `[]`                      | Local DNS A records                                   |
+| `dns.cnameRecords`          | `[]`                      | Custom CNAME records                                  |
+| `gravity.enabled`           | `true`                    | Enable v6-compatible gravity database init            |
+| `gravity.updateOnInit`      | `true`                    | Let Pi-hole update gravity after init data is present |
+| `unbound.enabled`           | `false`                   | Enable Unbound recursive DNS                          |
+| `metrics.enabled`           | `false`                   | Enable Prometheus metrics                             |
+| `ingress.enabled`           | `false`                   | Enable ingress for web admin                          |
+| `serviceDns.type`           | `LoadBalancer`            | DNS service type                                      |
+| `serviceDns.loadBalancerIP` | —                         | Fixed IP for DNS                                      |
+| `persistence.enabled`       | `true`                    | Enable persistent storage                             |
+| `persistence.size`          | `1Gi`                     | PVC size                                              |
 
 ## More Information
 
