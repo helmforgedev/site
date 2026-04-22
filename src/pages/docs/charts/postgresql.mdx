@@ -60,7 +60,7 @@ helm install my-pg oci://ghcr.io/helmforgedev/helm/postgresql
   { id: 'standalone', label: 'Standalone' },
   { id: 'replication', label: 'Replication' },
   { id: 'backup', label: 'With Backup' },
-  { id: 'ingress', label: 'With Ingress' },
+  { id: 'tls', label: 'With TLS' },
 ]}>
 
 <div data-tab-panel="standalone">
@@ -75,8 +75,9 @@ auth:
   username: myuser
   password: 'user-password'
 
-primary:
+standalone:
   persistence:
+    enabled: true
     size: 20Gi
 
 metrics:
@@ -100,14 +101,16 @@ auth:
   password: 'user-password'
   replicationPassword: 'repl-password'
 
-primary:
-  persistence:
-    size: 20Gi
-
-readReplicas:
-  replicaCount: 2
-  persistence:
-    size: 20Gi
+replication:
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 20Gi
 ```
 
 </div>
@@ -122,53 +125,42 @@ auth:
   postgresPassword: 'my-secret-password'
   database: myapp
 
-primary:
+standalone:
   persistence:
+    enabled: true
     size: 20Gi
 
 backup:
   enabled: true
-  schedule: '0 2 * * *'
+  schedule: '0 3 * * *'
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: my-pg-backups
     accessKey: AKIAIOSFODNN7EXAMPLE
     secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-  retention:
-    days: 30
 ```
 
 </div>
 
-<div data-tab-panel="ingress">
+<div data-tab-panel="tls">
 
 ```yaml
-# values.yaml — Use with pgAdmin or a TCP ingress controller
+# values.yaml
 architecture: standalone
 
 auth:
   postgresPassword: 'my-secret-password'
   database: myapp
 
-primary:
+standalone:
   persistence:
+    enabled: true
     size: 20Gi
 
-# For pgAdmin or web-based management tools
-ingress:
+tls:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: pgadmin.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: pgadmin-tls
-      hosts:
-        - pgadmin.example.com
-  # annotations:
-  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+  existingSecret: postgresql-tls
+  sslMode: require
 ```
 
 </div>
@@ -181,24 +173,29 @@ ingress:
 | ----------------------------------- | ------- | ------------ | ------------------------------------------------------ |
 | `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication` |
 | `auth.postgresPassword`             | string  | `""`         | PostgreSQL superuser password                          |
-| `auth.database`                     | string  | `""`         | Default database to create                             |
-| `auth.username`                     | string  | `""`         | Default user to create                                 |
+| `auth.database`                     | string  | `app`        | Application database created on first bootstrap        |
+| `auth.username`                     | string  | `app`        | Application user created on first bootstrap            |
 | `auth.password`                     | string  | `""`         | Password for default user                              |
+| `auth.replicationUsername`          | string  | `replicator` | Replication user name                                  |
 | `auth.replicationPassword`          | string  | `""`         | Password for replication user (replication mode)       |
-| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                       |
-| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                          |
-| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                             |
-| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                |
-| `readReplicas.replicaCount`         | integer | `1`          | Number of read replicas                                |
-| `readReplicas.persistence.size`     | string  | `8Gi`        | Read replica PVC size                                  |
+| `standalone.persistence.size`       | string  | `8Gi`        | Standalone PVC size                                    |
+| `standalone.resourcesPreset`        | string  | `none`       | Optional standalone resource preset                    |
+| `replication.primary.persistence.size` | string | `20Gi`     | Primary PVC size in replication mode                   |
+| `replication.readReplicas.replicaCount` | integer | `2`       | Number of read replicas                                |
+| `replication.readReplicas.persistence.size` | string | `20Gi` | Read replica PVC size                                  |
 | `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                               |
-| `backup.schedule`                   | string  | `0 2 * * *`  | Cron schedule for backups                              |
+| `backup.schedule`                   | string  | `0 3 * * *`  | Cron schedule for backups                              |
 | `backup.s3.endpoint`                | string  | `""`         | S3-compatible endpoint URL                             |
 | `backup.s3.bucket`                  | string  | `""`         | S3 bucket name                                         |
 | `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                             |
 | `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                         |
 | `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                |
 | `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                  |
+
+## Operational Notes
+
+- The chart bootstraps `auth.database` for application traffic, but internal health checks, metrics, and built-in backup connect through PostgreSQL's `template1` maintenance database so they do not depend on a user-created `postgres` database.
+- `docker-entrypoint-initdb.d` scripts only run when the data directory is empty. Existing PVCs keep their current roles and databases during upgrades.
 
 ## Upgrade Notes
 
