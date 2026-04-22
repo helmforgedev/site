@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Pi-hole Chart
-description: HelmForge Pi-hole chart — DNS sinkhole with custom records, Unbound recursive DNS, and Prometheus metrics.
+description: HelmForge Pi-hole chart — DNS sinkhole with gravity management, Unbound recursive DNS, host networking, and Prometheus metrics.
 ---
 
 # Pi-hole
@@ -11,10 +11,13 @@ Deploy Pi-hole DNS sinkhole on Kubernetes using the official [pihole/pihole](htt
 ## Key Features
 
 - **Network-Wide Ad Blocking** — DNS-level filtering for all devices
+- **Gravity Management** — Helm-managed blocklists, whitelist, blacklist, and regex reconciled before startup
+- **Blocklist Presets** — One-line preset selection (`balanced`, `aggressive`, `gaming-friendly`, etc.)
+- **Gravity Auto-Update** — Second init container runs `pihole -g` after lists are reconciled so custom lists are downloaded before the pod becomes ready
 - **Custom DNS Records** — Local A records, CNAME records, and dnsmasq config
 - **Unbound Sidecar** — Optional recursive DNS resolver for privacy
 - **Pi-hole v6+** — Modern configuration via FTLCONF environment variables
-- **Gravity Init** — Pi-hole v6-compatible gravity database initialization
+- **Host Networking** — `hostNetwork` + `dnsPolicy` top-level flags for DHCP and bare-metal use cases
 - **Prometheus Metrics** — pihole-exporter sidecar with ServiceMonitor
 - **Ingress Support** — Configurable ingress with TLS for web admin
 - **DNSSEC Validation** — Optional DNS Security Extensions
@@ -22,16 +25,25 @@ Deploy Pi-hole DNS sinkhole on Kubernetes using the official [pihole/pihole](htt
 ## Architecture
 
 The chart runs a single Pi-hole Deployment with persistent storage mounted at `/etc/pihole`. When `gravity.enabled` is
-true, an Alpine init container runs before Pi-hole starts and reconciles the `gravity.db` schema for Pi-hole v6. It
-creates the required `info`, group mapping, client, gravity, antigravity, view, and trigger objects, adds the v6
-`adlist.type` column when upgrading an older database, and assigns configured adlists and domain rules to the Default
-group.
+true, the pod starts two init containers before Pi-hole:
+
+1. **gravity-init** — Alpine container that reconciles the `gravity.db` schema for Pi-hole v6. It creates the required
+   `info`, group mapping, client, gravity, antigravity, view, and trigger objects, adds the v6 `adlist.type` column when
+   upgrading an older database, and inserts all configured adlists, whitelist, blacklist, and regex rules into the
+   Default group.
+
+2. **gravity-update** (when `gravity.updateOnInit: true`) — Official Pi-hole container that runs `pihole -g` after
+   gravity-init finishes. This ensures custom blocklists are fully downloaded and processed before the main container
+   starts, eliminating the need for a manual gravity update after first deploy.
 
 Optional sidecars and resources extend the base pod:
 
 - **Unbound** provides recursive DNS when `unbound.enabled` is true.
 - **pihole-exporter** exposes Prometheus metrics when `metrics.enabled` is true.
 - **Ingress** exposes the web admin service when `ingress.enabled` is true.
+
+When `hostNetwork: true` is set, the pod uses the node's network stack directly (required for DHCP) and `dnsPolicy`
+defaults to `ClusterFirstWithHostNet` automatically.
 
 ## Installation
 
@@ -74,6 +86,25 @@ persistence:
   size: 1Gi
 ```
 
+## Blocklist Example
+
+Use a preset to activate curated blocklists, then append custom URLs:
+
+```yaml
+dns:
+  preset: "balanced"       # none | basic | balanced | aggressive | gaming-friendly
+
+  adlists:
+    - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+    - https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/hosts/multi.txt
+
+  whitelist:
+    - safesearch.google.com
+
+gravity:
+  updateOnInit: true       # run pihole -g inside an init container after lists are reconciled
+```
+
 ## Unbound Example
 
 ```yaml
@@ -88,27 +119,52 @@ serviceDns:
   loadBalancerIP: '192.168.1.53'
 ```
 
+## Host Networking / DHCP Example
+
+Required when Pi-hole serves as the DHCP server on the local network:
+
+```yaml
+hostNetwork: true          # use node network stack
+dnsPolicy: ClusterFirstWithHostNet   # optional — set automatically when hostNetwork is true
+
+dhcp:
+  enabled: true
+
+serviceDns:
+  type: ClusterIP          # DNS is exposed via host port when hostNetwork is true
+```
+
 ## Key Values
 
-| Key                         | Default                   | Description                                           |
-| --------------------------- | ------------------------- | ----------------------------------------------------- |
-| `image.repository`          | `docker.io/pihole/pihole` | Official Pi-hole container image                      |
-| `image.tag`                 | `2026.04.0`               | Pi-hole Docker tag with Core v6.4.1 and FTL v6.6      |
-| `pihole.timezone`           | `UTC`                     | Timezone for logs                                     |
-| `pihole.upstreamDns`        | `8.8.8.8;8.8.4.4`         | Upstream DNS servers                                  |
-| `pihole.dnssec`             | `false`                   | Enable DNSSEC validation                              |
-| `admin.password`            | `""`                      | Admin password (auto-generated if empty)              |
-| `dns.customRecords`         | `[]`                      | Local DNS A records                                   |
-| `dns.cnameRecords`          | `[]`                      | Custom CNAME records                                  |
-| `gravity.enabled`           | `true`                    | Enable v6-compatible gravity database init            |
-| `gravity.updateOnInit`      | `true`                    | Let Pi-hole update gravity after init data is present |
-| `unbound.enabled`           | `false`                   | Enable Unbound recursive DNS                          |
-| `metrics.enabled`           | `false`                   | Enable Prometheus metrics                             |
-| `ingress.enabled`           | `false`                   | Enable ingress for web admin                          |
-| `serviceDns.type`           | `LoadBalancer`            | DNS service type                                      |
-| `serviceDns.loadBalancerIP` | —                         | Fixed IP for DNS                                      |
-| `persistence.enabled`       | `true`                    | Enable persistent storage                             |
-| `persistence.size`          | `1Gi`                     | PVC size                                              |
+| Key                             | Default                   | Description                                                          |
+| ------------------------------- | ------------------------- | -------------------------------------------------------------------- |
+| `image.repository`              | `docker.io/pihole/pihole` | Official Pi-hole container image                                     |
+| `image.tag`                     | `2026.04.0`               | Pi-hole Docker tag (Core v6.4.1, FTL v6.6)                          |
+| `pihole.timezone`               | `UTC`                     | Timezone for logs                                                    |
+| `pihole.upstreamDns`            | `8.8.8.8;8.8.4.4`         | Upstream DNS servers (semicolon-delimited)                           |
+| `pihole.dnssec`                 | `false`                   | Enable DNSSEC validation                                             |
+| `pihole.ftl.rateLimit`          | `1000`                    | Rate-limit query count per client (0 = disabled)                     |
+| `pihole.ftl.rateLimitInterval`  | `60`                      | Rate-limit interval in seconds                                       |
+| `admin.password`                | `""`                      | Admin password (auto-generated if empty)                             |
+| `dns.preset`                    | `"none"`                  | Blocklist preset: `none`, `basic`, `balanced`, `aggressive`, `gaming-friendly` |
+| `dns.adlists`                   | `[]`                      | Custom blocklist URLs appended to the preset                         |
+| `dns.whitelist`                 | `[]`                      | Domains to whitelist                                                 |
+| `dns.blacklist`                 | `[]`                      | Domains to blacklist                                                 |
+| `dns.regex`                     | `[]`                      | Regex filters for blocking                                           |
+| `dns.customRecords`             | `[]`                      | Local DNS A records                                                  |
+| `dns.cnameRecords`              | `[]`                      | Custom CNAME records                                                 |
+| `gravity.enabled`               | `true`                    | Reconcile gravity schema and Helm-managed lists before startup       |
+| `gravity.updateOnInit`          | `true`                    | Run `pihole -g` in a second init container after lists are reconciled |
+| `gravity.updateResources`       | `{}`                      | Resource limits/requests for the gravity-update init container       |
+| `hostNetwork`                   | `false`                   | Use host network stack (required for DHCP)                           |
+| `dnsPolicy`                     | `""`                      | Pod DNS policy; auto-set to `ClusterFirstWithHostNet` when `hostNetwork: true` |
+| `unbound.enabled`               | `false`                   | Enable Unbound recursive DNS sidecar                                 |
+| `metrics.enabled`               | `false`                   | Enable Prometheus metrics via pihole-exporter sidecar                |
+| `ingress.enabled`               | `false`                   | Enable ingress for web admin                                         |
+| `serviceDns.type`               | `LoadBalancer`            | DNS service type                                                     |
+| `serviceDns.loadBalancerIP`     | —                         | Fixed IP for DNS stability                                           |
+| `persistence.enabled`           | `true`                    | Enable persistent storage                                            |
+| `persistence.size`              | `1Gi`                     | PVC size                                                             |
 
 ## More Information
 
