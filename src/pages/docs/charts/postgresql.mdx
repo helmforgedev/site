@@ -136,8 +136,8 @@ backup:
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: my-pg-backups
-    accessKey: AKIAIOSFODNN7EXAMPLE
-    secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
 ```
 
 </div>
@@ -167,35 +167,259 @@ tls:
 
 </DocsTabs>
 
-## Key Values
-
-| Key                                         | Type    | Default      | Description                                            |
-| ------------------------------------------- | ------- | ------------ | ------------------------------------------------------ |
-| `architecture`                              | string  | `standalone` | Deployment architecture: `standalone` or `replication` |
-| `auth.postgresPassword`                     | string  | `""`         | PostgreSQL superuser password                          |
-| `auth.database`                             | string  | `app`        | Application database created on first bootstrap        |
-| `auth.username`                             | string  | `app`        | Application user created on first bootstrap            |
-| `auth.password`                             | string  | `""`         | Password for default user                              |
-| `auth.replicationUsername`                  | string  | `replicator` | Replication user name                                  |
-| `auth.replicationPassword`                  | string  | `""`         | Password for replication user (replication mode)       |
-| `standalone.persistence.size`               | string  | `8Gi`        | Standalone PVC size                                    |
-| `standalone.resourcesPreset`                | string  | `none`       | Optional standalone resource preset                    |
-| `replication.primary.persistence.size`      | string  | `20Gi`       | Primary PVC size in replication mode                   |
-| `replication.readReplicas.replicaCount`     | integer | `2`          | Number of read replicas                                |
-| `replication.readReplicas.persistence.size` | string  | `20Gi`       | Read replica PVC size                                  |
-| `backup.enabled`                            | boolean | `false`      | Enable S3 backup CronJob                               |
-| `backup.schedule`                           | string  | `0 3 * * *`  | Cron schedule for backups                              |
-| `backup.s3.endpoint`                        | string  | `""`         | S3-compatible endpoint URL                             |
-| `backup.s3.bucket`                          | string  | `""`         | S3 bucket name                                         |
-| `metrics.enabled`                           | boolean | `false`      | Enable Prometheus exporter                             |
-| `metrics.serviceMonitor.enabled`            | boolean | `false`      | Create ServiceMonitor resource                         |
-| `networkPolicy.enabled`                     | boolean | `false`      | Enable network policies                                |
-| `tls.enabled`                               | boolean | `false`      | Enable TLS encryption                                  |
-
 ## Operational Notes
 
-- The chart bootstraps `auth.database` for application traffic, but internal health checks, metrics, and built-in backup connect through PostgreSQL's `template1` maintenance database so they do not depend on a user-created `postgres` database.
+- The chart keeps internal health checks, metrics, and built-in backup on PostgreSQL's standard `postgres` database.
+- If a reused PVC contains a valid data directory but is missing the default `postgres` database, the primary pod repairs that database during startup before normal readiness checks rely on it.
+- `auth.database` remains the application bootstrap database. It is created only on first initialization of a fresh data directory.
 - `docker-entrypoint-initdb.d` scripts only run when the data directory is empty. Existing PVCs keep their current roles and databases during upgrades.
+
+## Configuration Reference
+
+This reference covers the complete `values.yaml` surface for the PostgreSQL chart.
+
+### Core
+
+| Parameter          | Type   | Default         | Description                                             |
+| ------------------ | ------ | --------------- | ------------------------------------------------------- |
+| `architecture`     | string | `standalone`    | Deployment architecture: `standalone` or `replication`. |
+| `nameOverride`     | string | `""`            | Override the chart name.                                |
+| `fullnameOverride` | string | `""`            | Override the full release name.                         |
+| `commonLabels`     | object | `{}`            | Extra labels added to all rendered resources.           |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain used in generated DNS names.  |
+
+### Image
+
+| Parameter          | Type   | Default                      | Description                                         |
+| ------------------ | ------ | ---------------------------- | --------------------------------------------------- |
+| `image.repository` | string | `docker.io/library/postgres` | PostgreSQL runtime image repository.                |
+| `image.tag`        | string | `"18.3-trixie"`              | PostgreSQL runtime image tag.                       |
+| `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy for PostgreSQL containers.        |
+| `imagePullSecrets` | array  | `[]`                         | Optional image pull secrets for private registries. |
+
+### Authentication
+
+| Parameter                                   | Type   | Default                | Description                                                      |
+| ------------------------------------------- | ------ | ---------------------- | ---------------------------------------------------------------- |
+| `auth.postgresPassword`                     | string | `""`                   | PostgreSQL superuser password when not using an existing secret. |
+| `auth.database`                             | string | `app`                  | Application database created on first bootstrap.                 |
+| `auth.username`                             | string | `app`                  | Application username created on first bootstrap.                 |
+| `auth.password`                             | string | `""`                   | Application user password when not using an existing secret.     |
+| `auth.replicationUsername`                  | string | `replicator`           | Replication username used by read replicas.                      |
+| `auth.replicationPassword`                  | string | `""`                   | Replication password when not using an existing secret.          |
+| `auth.existingSecret`                       | string | `""`                   | Existing secret containing PostgreSQL passwords.                 |
+| `auth.existingSecretPostgresPasswordKey`    | string | `postgres-password`    | Secret key holding the PostgreSQL superuser password.            |
+| `auth.existingSecretUserPasswordKey`        | string | `user-password`        | Secret key holding the application user password.                |
+| `auth.existingSecretReplicationPasswordKey` | string | `replication-password` | Secret key holding the replication user password.                |
+
+### PostgreSQL Configuration
+
+| Parameter             | Type   | Default | Description                                                               |
+| --------------------- | ------ | ------- | ------------------------------------------------------------------------- |
+| `config.preset`       | string | `none`  | Optional PostgreSQL tuning preset: `none`, `small`, `medium`, or `large`. |
+| `config.postgresql`   | string | `""`    | Raw `postgresql.conf` content appended after generated settings.          |
+| `config.pgHbaEntries` | array  | `[]`    | Structured `pg_hba.conf` entries appended after generated defaults.       |
+| `config.pgHba`        | string | `""`    | Raw `pg_hba.conf` content appended after generated rules.                 |
+
+### TLS
+
+| Parameter                | Type    | Default   | Description                                                        |
+| ------------------------ | ------- | --------- | ------------------------------------------------------------------ |
+| `tls.enabled`            | boolean | `false`   | Enable TLS for PostgreSQL and internal clients.                    |
+| `tls.existingSecret`     | string  | `""`      | Existing secret containing server TLS material.                    |
+| `tls.certFilename`       | string  | `tls.crt` | Certificate filename inside the TLS secret.                        |
+| `tls.keyFilename`        | string  | `tls.key` | Private key filename inside the TLS secret.                        |
+| `tls.caFilename`         | string  | `ca.crt`  | CA certificate filename inside the TLS secret.                     |
+| `tls.sslMode`            | string  | `require` | libpq SSL mode used by internal probes, replication, and exporter. |
+| `tls.minProtocolVersion` | string  | `TLSv1.2` | Minimum accepted PostgreSQL TLS protocol version.                  |
+
+### Initialization
+
+| Parameter                  | Type   | Default | Description                                                   |
+| -------------------------- | ------ | ------- | ------------------------------------------------------------- |
+| `initdb.scripts`           | object | `{}`    | Additional scripts written into `docker-entrypoint-initdb.d`. |
+| `initdb.existingConfigMap` | string | `""`    | Existing ConfigMap mounted into `docker-entrypoint-initdb.d`. |
+
+### Standalone
+
+| Parameter                             | Type    | Default             | Description                                                |
+| ------------------------------------- | ------- | ------------------- | ---------------------------------------------------------- |
+| `standalone.resourcesPreset`          | string  | `none`              | Optional resource preset for standalone mode.              |
+| `standalone.persistence.enabled`      | boolean | `true`              | Enable a PVC for standalone mode.                          |
+| `standalone.persistence.storageClass` | string  | `""`                | StorageClass for the standalone PVC.                       |
+| `standalone.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes for the standalone PVC.                       |
+| `standalone.persistence.size`         | string  | `8Gi`               | PVC size for standalone mode.                              |
+| `standalone.resources`                | object  | `{}`                | Explicit resource requests and limits for standalone mode. |
+
+### Replication - Primary
+
+| Parameter                                      | Type    | Default             | Description                                                                                |
+| ---------------------------------------------- | ------- | ------------------- | ------------------------------------------------------------------------------------------ |
+| `replication.primary.resourcesPreset`          | string  | `none`              | Optional resource preset for the primary pod.                                              |
+| `replication.primary.persistence.enabled`      | boolean | `true`              | Enable PVCs for the primary StatefulSet.                                                   |
+| `replication.primary.persistence.storageClass` | string  | `""`                | StorageClass for primary PVCs.                                                             |
+| `replication.primary.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes for primary PVCs.                                                             |
+| `replication.primary.persistence.size`         | string  | `20Gi`              | PVC size for the primary pod.                                                              |
+| `replication.primary.resources`                | object  | `{}`                | Explicit resource requests and limits for the primary pod.                                 |
+| `replication.primary.probes.requireWritable`   | boolean | `true`              | In replication mode, require primary readiness to confirm the pod is not in recovery mode. |
+
+### Replication - Read Replicas
+
+| Parameter                                             | Type    | Default             | Description                                                                            |
+| ----------------------------------------------------- | ------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `replication.readReplicas.resourcesPreset`            | string  | `none`              | Optional resource preset for replica pods.                                             |
+| `replication.readReplicas.replicaCount`               | integer | `2`                 | Number of asynchronous read replica pods.                                              |
+| `replication.readReplicas.persistence.enabled`        | boolean | `true`              | Enable PVCs for replica StatefulSets.                                                  |
+| `replication.readReplicas.persistence.storageClass`   | string  | `""`                | StorageClass for replica PVCs.                                                         |
+| `replication.readReplicas.persistence.accessModes`    | array   | `["ReadWriteOnce"]` | Access modes for replica PVCs.                                                         |
+| `replication.readReplicas.persistence.size`           | string  | `20Gi`              | PVC size for each replica.                                                             |
+| `replication.readReplicas.resources`                  | object  | `{}`                | Explicit resource requests and limits for replica pods.                                |
+| `replication.readReplicas.probes.requireRecoveryMode` | boolean | `true`              | In replication mode, require replica readiness to confirm the pod is in recovery mode. |
+
+### Replication - WAL, PDB, and Scheduling
+
+| Parameter                                             | Type    | Default                  | Description                                                      |
+| ----------------------------------------------------- | ------- | ------------------------ | ---------------------------------------------------------------- |
+| `replication.wal.keepSize`                            | string  | `512MB`                  | WAL retention kept locally for replicas and recovery workflows.  |
+| `replication.wal.maxSenders`                          | integer | `10`                     | Maximum WAL sender processes.                                    |
+| `replication.wal.maxReplicationSlots`                 | integer | `10`                     | Maximum replication slots.                                       |
+| `replication.pdb.enabled`                             | boolean | `true`                   | Enable a PodDisruptionBudget by default in replication mode.     |
+| `replication.pdb.minAvailable`                        | integer | `1`                      | Minimum available pods for the replication PDB.                  |
+| `replication.pdb.maxUnavailable`                      | string  | `""`                     | Maximum unavailable pods for the replication PDB.                |
+| `replication.scheduling.enableDefaultPodAntiAffinity` | boolean | `true`                   | Enable opinionated anti-affinity defaults in replication mode.   |
+| `replication.scheduling.enableDefaultTopologySpread`  | boolean | `true`                   | Enable opinionated topology spread defaults in replication mode. |
+| `replication.scheduling.topologyKey`                  | string  | `kubernetes.io/hostname` | Topology key used by the default replication spread rules.       |
+
+### Service
+
+| Parameter                     | Type    | Default     | Description                                            |
+| ----------------------------- | ------- | ----------- | ------------------------------------------------------ |
+| `service.type`                | string  | `ClusterIP` | Service type for PostgreSQL client access.             |
+| `service.annotations`         | object  | `{}`        | Annotations applied to the client Service.             |
+| `service.primaryAnnotations`  | object  | `{}`        | Annotations applied to the dedicated primary Service.  |
+| `service.replicasAnnotations` | object  | `{}`        | Annotations applied to the dedicated replicas Service. |
+| `service.port`                | integer | `5432`      | PostgreSQL listener port.                              |
+| `service.metricsPort`         | integer | `9187`      | Metrics port exposed when metrics are enabled.         |
+
+### Metrics
+
+| Parameter                         | Type    | Default                                         | Description                                                    |
+| --------------------------------- | ------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false`                                         | Enable the `postgres_exporter` sidecar.                        |
+| `metrics.resourcesPreset`         | string  | `none`                                          | Optional resource preset for `postgres_exporter`.              |
+| `metrics.service.annotations`     | object  | `{}`                                            | Annotations applied to metrics Services.                       |
+| `metrics.image.repository`        | string  | `quay.io/prometheuscommunity/postgres-exporter` | Metrics sidecar image repository.                              |
+| `metrics.image.tag`               | string  | `"v0.18.0"`                                     | Metrics sidecar image tag.                                     |
+| `metrics.image.pullPolicy`        | string  | `IfNotPresent`                                  | Image pull policy for `postgres_exporter`.                     |
+| `metrics.resources`               | object  | `{}`                                            | Explicit resource requests and limits for `postgres_exporter`. |
+| `metrics.serviceMonitor.enabled`  | boolean | `false`                                         | Create a ServiceMonitor for Prometheus Operator.               |
+| `metrics.serviceMonitor.interval` | string  | `30s`                                           | Scrape interval for the ServiceMonitor.                        |
+| `metrics.serviceMonitor.labels`   | object  | `{}`                                            | Extra labels applied to the ServiceMonitor.                    |
+
+### Backup
+
+| Parameter                              | Type    | Default                      | Description                                               |
+| -------------------------------------- | ------- | ---------------------------- | --------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`                      | Enable the built-in backup CronJob.                       |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                | Backup schedule in cron format.                           |
+| `backup.suspend`                       | boolean | `false`                      | Suspend backup execution.                                 |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                     | CronJob concurrency policy.                               |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                          | Successful backup Jobs retained by the CronJob.           |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                          | Failed backup Jobs retained by the CronJob.               |
+| `backup.backoffLimit`                  | integer | `1`                          | Job backoff limit for backup execution.                   |
+| `backup.archivePrefix`                 | string  | `postgresql`                 | Prefix used in generated backup archive names.            |
+| `backup.resources`                     | object  | `{}`                         | Resources applied to backup dump and upload containers.   |
+| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`     | Uploader image repository for S3 copies.                  |
+| `backup.images.uploader.tag`           | string  | `"1.0.0"`                    | Uploader image tag.                                       |
+| `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`               | Pull policy for the uploader image.                       |
+| `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres` | PostgreSQL client image used for backup jobs.             |
+| `backup.images.postgresql.tag`         | string  | `"18.3-trixie"`              | PostgreSQL client image tag used for backup jobs.         |
+| `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`               | Pull policy for the PostgreSQL backup image.              |
+| `backup.s3.endpoint`                   | string  | `""`                         | S3-compatible endpoint URL.                               |
+| `backup.s3.bucket`                     | string  | `""`                         | Target bucket name.                                       |
+| `backup.s3.prefix`                     | string  | `postgresql`                 | Optional key prefix inside the bucket.                    |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                       | Create the bucket automatically when it does not exist.   |
+| `backup.s3.existingSecret`             | string  | `""`                         | Existing secret containing backup access and secret keys. |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                 | Secret key name for the S3 access key.                    |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                 | Secret key name for the S3 secret key.                    |
+| `backup.s3.accessKey`                  | string  | `""`                         | Inline S3 access key when not using an existing secret.   |
+| `backup.s3.secretKey`                  | string  | `""`                         | Inline S3 secret key when not using an existing secret.   |
+| `backup.database.pgDumpAllArgs`        | string  | `"--clean --if-exists"`      | Extra arguments passed to `pg_dumpall`.                   |
+
+### NetworkPolicy
+
+| Parameter                                  | Type    | Default | Description                                                       |
+| ------------------------------------------ | ------- | ------- | ----------------------------------------------------------------- |
+| `networkPolicy.enabled`                    | boolean | `false` | Create an ingress-only NetworkPolicy for PostgreSQL pods.         |
+| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow ingress from the same namespace.                            |
+| `networkPolicy.ingress.extraFrom`          | array   | `[]`    | Additional ingress `from` rules appended to the generated policy. |
+
+### Pod Disruption Budget
+
+| Parameter            | Type    | Default | Description                                                |
+| -------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `pdb.enabled`        | boolean | `false` | Enable a PodDisruptionBudget outside replication defaults. |
+| `pdb.minAvailable`   | integer | `1`     | Minimum available pods when the PDB is enabled.            |
+| `pdb.maxUnavailable` | string  | `""`    | Maximum unavailable pods when the PDB is enabled.          |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                                |
+| ---------------------------- | ------- | ------- | ------------------------------------------ |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.         |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.          |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations applied to the ServiceAccount. |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable the liveness probe.         |
+| `livenessProbe.initialDelaySeconds`  | integer | `60`    | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `20`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `6`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable the readiness probe.        |
+| `readinessProbe.initialDelaySeconds` | integer | `20`    | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `6`     | Readiness probe failure threshold. |
+| `startupProbe.enabled`               | boolean | `true`  | Enable the startup probe.          |
+| `startupProbe.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `10`    | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `60`    | Startup probe failure threshold.   |
+
+### Scheduling and Security
+
+| Parameter                                  | Type    | Default          | Description                                                             |
+| ------------------------------------------ | ------- | ---------------- | ----------------------------------------------------------------------- |
+| `podSecurityContext.fsGroup`               | integer | `999`            | Filesystem group applied to PostgreSQL pods.                            |
+| `podSecurityContext.fsGroupChangePolicy`   | string  | `OnRootMismatch` | Filesystem group change policy.                                         |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Seccomp profile applied at pod level.                                   |
+| `securityContext.runAsUser`                | integer | `999`            | Runtime UID for PostgreSQL containers.                                  |
+| `securityContext.runAsGroup`               | integer | `999`            | Runtime GID for PostgreSQL containers.                                  |
+| `securityContext.runAsNonRoot`             | boolean | `true`           | Require containers to run as non-root.                                  |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Disable privilege escalation.                                           |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `false`          | Keep the root filesystem writable for PostgreSQL runtime needs.         |
+| `securityContext.capabilities.drop`        | array   | `["ALL"]`        | Linux capabilities dropped from PostgreSQL containers.                  |
+| `podLabels`                                | object  | `{}`             | Extra labels applied to PostgreSQL pods.                                |
+| `podAnnotations`                           | object  | `{}`             | Extra annotations applied to PostgreSQL pods.                           |
+| `annotations`                              | object  | `{}`             | Extra annotations applied to chart-managed resources that support them. |
+| `nodeSelector`                             | object  | `{}`             | Node selector applied to PostgreSQL pods.                               |
+| `tolerations`                              | array   | `[]`             | Tolerations applied to PostgreSQL pods.                                 |
+| `affinity`                                 | object  | `{}`             | Explicit affinity rules.                                                |
+| `topologySpreadConstraints`                | array   | `[]`             | Explicit topology spread constraints.                                   |
+| `priorityClassName`                        | string  | `""`             | PriorityClass applied to PostgreSQL pods.                               |
+| `terminationGracePeriodSeconds`            | integer | `120`            | Termination grace period for PostgreSQL pods.                           |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                                      |
+| ------------------- | ----- | ------- | ---------------------------------------------------------------- |
+| `extraEnv`          | array | `[]`    | Extra environment variables injected into PostgreSQL containers. |
+| `extraVolumes`      | array | `[]`    | Extra volumes appended to PostgreSQL pods.                       |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts appended to PostgreSQL containers.           |
 
 ## Upgrade Notes
 
@@ -235,4 +459,7 @@ tls:
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/postgresql) on GitHub.
+- [PostgreSQL Official Website](https://www.postgresql.org)
+- [PostgreSQL Official Documentation](https://www.postgresql.org/docs/current/)
+- [PostgreSQL Docker Official Image](https://hub.docker.com/_/postgres)
+- [HelmForge PostgreSQL Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/postgresql)
