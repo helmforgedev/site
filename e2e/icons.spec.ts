@@ -11,25 +11,21 @@ test.describe('Chart Icons', () => {
     const count = await images.count();
     expect(count).toBeGreaterThan(10);
 
-    // Scroll to make lazy images visible, then check they load
+    const srcs: string[] = [];
     for (let i = 0; i < count; i++) {
       const img = images.nth(i);
-      await img.scrollIntoViewIfNeeded();
+      const src = await img.getAttribute('src');
+      if (src) srcs.push(src);
     }
-    // Wait for lazy images to load
-    await page.waitForTimeout(1000);
 
-    // Verify all images loaded via fetch (avoids lazy loading issues)
-    const failedSrcs = await page.evaluate(() => {
-      const imgs = document.querySelectorAll<HTMLImageElement>('#chart-grid-container img');
-      const failed: string[] = [];
-      imgs.forEach((img) => {
-        if (!img.complete || img.naturalWidth === 0) {
-          failed.push(img.src);
-        }
-      });
-      return failed;
-    });
+    const failedSrcs: string[] = [];
+    for (const src of srcs) {
+      const response = await page.request.get(src);
+      if (response.status() !== 200) {
+        failedSrcs.push(src);
+      }
+    }
+
     expect(failedSrcs, `Failed to load icons: ${failedSrcs.join(', ')}`).toHaveLength(0);
   });
 
@@ -53,13 +49,17 @@ test.describe('Chart Icons', () => {
 
   test('playground chart icons load', async ({ page }) => {
     await page.goto('/playground');
-    const chartList = page.locator('.playground-chart-btn');
     const images = page.locator('.playground-chart-btn img');
     const count = await images.count();
     expect(count).toBeGreaterThan(10);
 
     for (let i = 0; i < Math.min(count, 10); i++) {
       const img = images.nth(i);
+      await expect
+        .poll(async () => await img.evaluate((el: HTMLImageElement) => el.naturalWidth > 0 && el.complete), {
+          timeout: 10000,
+        })
+        .toBe(true);
       const loaded = await img.evaluate((el: HTMLImageElement) => el.naturalWidth > 0 && el.complete);
       const src = await img.getAttribute('src');
       expect(loaded, `Playground icon failed: ${src}`).toBe(true);
