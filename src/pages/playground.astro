@@ -650,6 +650,70 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  drupal: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Replica Count',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Number of Drupal replicas',
+        },
+        {
+          label: 'Database Mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'mysql', 'external', 'sqlite'],
+          description: 'Installer database path',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '8Gi',
+          description: 'PVC size for sites/',
+        },
+      ],
+    },
+    {
+      name: 'PHP',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Custom php.ini',
+          key: 'php.ini',
+          type: 'text',
+          default: '',
+          description: 'Extra PHP config content',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Host',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'drupal.example.com',
+          description: 'Primary ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
   gitea: [
     {
       name: 'General',
@@ -4181,6 +4245,38 @@ const scenarios: Record<string, { label: string; description: string; values: Re
         'resources.limits.memory': '1Gi',
         'backup.enabled': 'true',
         'backup.schedule': '0 2 * * *',
+      },
+    },
+  ],
+  drupal: [
+    {
+      label: 'Bundled MySQL',
+      description: 'Default installer path with seeded sites persistence and the MySQL subchart',
+      values: {
+        'database.mode': 'auto',
+        'mysql.enabled': 'true',
+        'persistence.size': '8Gi',
+      },
+    },
+    {
+      label: 'External Database',
+      description: 'Connect Drupal to an existing MySQL-compatible database',
+      values: {
+        'database.mode': 'external',
+        'mysql.enabled': 'false',
+        'database.external.host': 'db.example.com',
+        'database.external.name': 'drupal',
+        'database.external.username': 'drupal',
+        'persistence.size': '10Gi',
+      },
+    },
+    {
+      label: 'SQLite Evaluation',
+      description: 'Simple evaluation install with SQLite and no MySQL subchart',
+      values: {
+        'database.mode': 'sqlite',
+        'mysql.enabled': 'false',
+        'persistence.size': '4Gi',
       },
     },
   ],

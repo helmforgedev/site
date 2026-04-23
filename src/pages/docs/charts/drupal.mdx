@@ -1,0 +1,141 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Drupal Chart
+description: HelmForge Drupal chart with seeded sites persistence and installer guidance for MySQL, external databases, or SQLite.
+---
+
+# Drupal
+
+Deploy Drupal on Kubernetes using the Docker Official [drupal](https://hub.docker.com/_/drupal) image with a persistence model tailored for the installer-managed `sites/` directory.
+
+## Key Features
+
+- **Seeded `sites/` persistence** — preserves uploads and installer-generated state without masking Drupal core files from the image
+- **Installer-first workflow** — the chart prepares runtime, storage, ingress, and database connectivity, then guides setup through `NOTES.txt`
+- **Flexible database path** — bundled MySQL subchart, external MySQL-compatible database, or SQLite
+- **Ingress support** — configurable hosts, TLS, and ingress class
+- **Custom PHP settings** — mount extra `php.ini` content from values
+
+## Runtime Note
+
+This chart uses `docker.io/library/drupal`. Drupal currently does not publish its own upstream-maintained runtime container image, so HelmForge pins the Docker Official image and documents that exception explicitly.
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install drupal helmforge/drupal
+```
+
+### OCI Registry
+
+```bash
+helm install drupal oci://ghcr.io/helmforgedev/helm/drupal
+```
+
+## Install Example
+
+```yaml
+mysql:
+  enabled: true
+  auth:
+    database: drupal
+    username: drupal
+
+persistence:
+  enabled: true
+  size: 8Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: drupal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+After installation:
+
+1. Wait for Drupal and MySQL to become ready.
+2. Open the configured URL or port-forwarded service.
+3. Run the Drupal web installer.
+4. Use the database details printed by `helm get notes <release>`.
+
+## Database Modes
+
+### Bundled MySQL
+
+```yaml
+database:
+  mode: auto
+
+mysql:
+  enabled: true
+```
+
+### External Database
+
+```yaml
+database:
+  mode: external
+  external:
+    host: db.example.com
+    port: 3306
+    name: drupal
+    username: drupal
+
+mysql:
+  enabled: false
+```
+
+### SQLite
+
+```yaml
+database:
+  mode: sqlite
+
+mysql:
+  enabled: false
+```
+
+For SQLite installs, use `sites/default/files/.ht.sqlite` in the Drupal installer unless you intentionally choose another writable path.
+
+## Persistence
+
+This chart persists only `/var/www/html/sites`.
+
+That layout is intentional:
+
+- `settings.php`, uploaded files, and installer output live under `sites/`
+- Drupal core remains in the container image instead of being shadowed by a PVC
+- an init container seeds the initial `sites/` directory into the mounted volume before Drupal starts
+
+Single-replica deployments are the default recommendation. If you scale above one replica, use shared writable storage for `sites/`.
+
+## Values
+
+| Key                   | Default                          | Description                                             |
+| --------------------- | -------------------------------- | ------------------------------------------------------- |
+| `replicaCount`        | `1`                              | Number of Drupal replicas                               |
+| `image.repository`    | `docker.io/library/drupal`       | Docker Official Drupal image repository                 |
+| `image.tag`           | `11.3.8-apache-bookworm`         | Pinned Drupal image tag                                 |
+| `database.mode`       | `auto`                           | Database mode: `auto`, `external`, `mysql`, or `sqlite` |
+| `mysql.enabled`       | `true`                           | Enable the bundled MySQL subchart                       |
+| `mysql.auth.database` | `drupal`                         | Database name created by the MySQL subchart             |
+| `mysql.auth.username` | `drupal`                         | Database username created by the MySQL subchart         |
+| `persistence.enabled` | `true`                           | Enable persistence for `/var/www/html/sites`            |
+| `persistence.size`    | `8Gi`                            | Sites PVC size                                          |
+| `php.ini`             | `""`                             | Extra PHP configuration mounted as `custom.ini`         |
+| `drupal.sqlitePath`   | `sites/default/files/.ht.sqlite` | Suggested SQLite path for the web installer             |
+| `ingress.enabled`     | `false`                          | Enable ingress resources                                |
+
+## More Information
+
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/drupal)
+- [Drupal documentation](https://new.drupal.org/home)
+- [Drupal system requirements](https://www.drupal.org/docs/getting-started/system-requirements)

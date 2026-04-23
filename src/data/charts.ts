@@ -105,6 +105,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Drupal',
+    slug: 'drupal',
+    description: 'Drupal CMS with seeded sites persistence and MySQL, external DB, or SQLite installer paths.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Answer',
     slug: 'answer',
     description: 'Apache Answer Q&A platform with SQL backends and S3 backup.',
