@@ -107,9 +107,10 @@ export const charts: Chart[] = [
   {
     name: 'Drupal',
     slug: 'drupal',
-    description: 'Drupal CMS with seeded sites persistence and MySQL, external DB, or SQLite installer paths.',
-    maturity: 'beta',
-    backup: false,
+    description:
+      'Production-ready Drupal CMS with seeded sites persistence, MySQL or SQLite backups, and safe autoscaling guardrails.',
+    maturity: 'stable',
+    backup: true,
   },
   {
     name: 'Answer',

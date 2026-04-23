@@ -1,24 +1,35 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Drupal Chart
-description: HelmForge Drupal chart with seeded sites persistence and installer guidance for MySQL, external databases, or SQLite.
+description: HelmForge Drupal chart with seeded sites persistence, built-in backups, and safe horizontal scaling guidance for production.
 ---
 
 # Drupal
 
-Deploy Drupal on Kubernetes using the Docker Official [drupal](https://hub.docker.com/_/drupal) image with a persistence model tailored for the installer-managed `sites/` directory.
+Deploy Drupal on Kubernetes using the Docker Official [drupal](https://hub.docker.com/_/drupal) image with a persistence model tailored for the installer-managed `sites/` directory, plus native backup automation and safe scaling guardrails.
 
-## Key Features
+## Why This Chart Matters
 
+- **Reference CMS chart** — built to be HelmForge’s production baseline for installer-driven PHP CMS workloads
 - **Seeded `sites/` persistence** — preserves uploads and installer-generated state without masking Drupal core files from the image
+- **Built-in backup automation** — archives Drupal `sites/` plus either MySQL or SQLite to S3-compatible storage
+- **Safe horizontal scaling** — HPA is supported only when the storage and database combination is actually safe
 - **Installer-first workflow** — the chart prepares runtime, storage, ingress, and database connectivity, then guides setup through `NOTES.txt`
-- **Flexible database path** — bundled MySQL subchart, external MySQL-compatible database, or SQLite
-- **Ingress support** — configurable hosts, TLS, and ingress class
-- **Custom PHP settings** — mount extra `php.ini` content from values
 
-## Runtime Note
+## Image Decision
 
-This chart uses `docker.io/library/drupal`. Drupal currently does not publish its own upstream-maintained runtime container image, so HelmForge pins the Docker Official image and documents that exception explicitly.
+This chart uses `docker.io/library/drupal` because Drupal does not currently publish its own upstream-maintained runtime container image.
+
+HelmForge pins:
+
+- `docker.io/library/drupal:11.3.8-php8.5-apache-bookworm`
+
+That choice is intentional:
+
+- the Apache variant already includes PHP
+- the image includes the Drupal-relevant extensions such as `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `gd`, `mbstring`, `curl`, `dom`, `openssl`, and `zip`
+- Drupal 11.3 supports PHP 8.5, so the explicit PHP 8.5 tag is a better production pin than the older generic `apache-bookworm` form
+- `bookworm` keeps the Debian base explicit and conservative for production environments
 
 ## Official Product
 
@@ -44,6 +55,14 @@ helm install drupal oci://ghcr.io/helmforgedev/helm/drupal
 ## Install Example
 
 ```yaml
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: '1'
+    memory: 1Gi
+
 mysql:
   enabled: true
   auth:
@@ -110,6 +129,8 @@ mysql:
 
 For SQLite installs, use `sites/default/files/.ht.sqlite` in the Drupal installer unless you intentionally choose another writable path.
 
+SQLite is supported and backed up by the chart, but it remains a single-replica path and is not the preferred default for most production Drupal sites.
+
 ## Persistence
 
 This chart persists only `/var/www/html/sites`.
@@ -122,9 +143,69 @@ That layout is intentional:
 
 Single-replica deployments are the default recommendation. If you scale above one replica, use shared writable storage for `sites/`.
 
+## Backup Strategy
+
+When `backup.enabled=true`, the chart creates a CronJob that always captures two things:
+
+- the Drupal `sites/` tree
+- the active database
+
+Database backup behavior depends on the selected mode:
+
+- **MySQL or external MySQL-compatible database** — `mysqldump`
+- **SQLite** — a consistent SQLite snapshot created through Python’s SQLite backup API before compression
+
+### Backup Example
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://minio.example.com
+    bucket: drupal-backups
+    existingSecret: drupal-backup-s3
+```
+
+If `database.mode=external`, also provide backup credentials for the dump job:
+
+```yaml
+backup:
+  database:
+    existingSecret: drupal-backup-db
+```
+
+## Autoscaling And HPA
+
+HPA is supported, but only when the chart can guarantee safe shared state.
+
+Required for multi-replica or HPA Drupal:
+
+- `persistence.enabled=true`
+- `persistence.accessMode=ReadWriteMany`
+- a MySQL-compatible database mode
+
+If those requirements are not met, the chart fails during render instead of letting an unsafe deployment reach the cluster.
+
+### HPA Example
+
+```yaml
+persistence:
+  accessMode: ReadWriteMany
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+
+pdb:
+  enabled: true
+  minAvailable: 1
+```
+
 ## Values
 
-The chart exposes an installer-oriented surface in `values.yaml`, but it still covers runtime, storage, networking, probes, and escape hatches. The tables below summarize the full values surface shipped with the chart.
+The chart still has an installer-oriented surface, but it now covers production runtime, storage, backups, scaling, networking, probes, and escape hatches.
 
 ### Runtime And Installer Values
 
@@ -132,7 +213,7 @@ The chart exposes an installer-oriented surface in `values.yaml`, but it still c
 | ----------------------- | -------------------------------- | ----------------------------------------------- |
 | `replicaCount`          | `1`                              | Number of Drupal replicas                       |
 | `image.repository`      | `docker.io/library/drupal`       | Docker Official Drupal image repository         |
-| `image.tag`             | `11.3.8-apache-bookworm`         | Pinned Drupal image tag                         |
+| `image.tag`             | `11.3.8-php8.5-apache-bookworm`  | Pinned Drupal image tag                         |
 | `image.pullPolicy`      | `IfNotPresent`                   | Container pull policy                           |
 | `imagePullSecrets`      | `[]`                             | Optional image pull secrets                     |
 | `drupal.siteName`       | `Drupal`                         | Suggested site name shown in install guidance   |
@@ -168,6 +249,27 @@ The chart exposes an installer-oriented surface in `values.yaml`, but it still c
 | `persistence.existingClaim`                | `""`                  | Reuse an existing sites PVC                             |
 | `persistence.annotations`                  | `{}`                  | Annotations applied to the sites PVC                    |
 
+### Backup, Scaling, And Availability Values
+
+| Key                                             | Default     | Description                                      |
+| ----------------------------------------------- | ----------- | ------------------------------------------------ |
+| `backup.enabled`                                | `false`     | Enable scheduled backups                         |
+| `backup.schedule`                               | `0 3 * * *` | Cron schedule for backups                        |
+| `backup.s3.endpoint`                            | `""`        | S3-compatible endpoint                           |
+| `backup.s3.bucket`                              | `""`        | S3 target bucket                                 |
+| `backup.s3.prefix`                              | `drupal`    | Key prefix in the bucket                         |
+| `backup.s3.existingSecret`                      | `""`        | Existing secret for S3 credentials               |
+| `backup.database.host`                          | `""`        | Optional database host override for backup       |
+| `backup.database.password`                      | `""`        | Inline database password override for backup     |
+| `backup.database.existingSecret`                | `""`        | Existing secret for backup database password     |
+| `autoscaling.enabled`                           | `false`     | Enable HPA                                       |
+| `autoscaling.minReplicas`                       | `2`         | HPA minimum replicas                             |
+| `autoscaling.maxReplicas`                       | `5`         | HPA maximum replicas                             |
+| `autoscaling.targetCPUUtilizationPercentage`    | `75`        | CPU utilization target                           |
+| `autoscaling.targetMemoryUtilizationPercentage` | `80`        | Memory utilization target                        |
+| `pdb.enabled`                                   | `false`     | Create a PodDisruptionBudget                     |
+| `pdb.minAvailable`                              | `1`         | Minimum healthy pods during voluntary disruption |
+
 ### Service, Ingress, Probes, And Platform Values
 
 | Key                             | Default     | Description                                                 |
@@ -186,8 +288,11 @@ The chart exposes an installer-oriented surface in `values.yaml`, but it still c
 | `livenessProbe.path`            | `/`         | Liveness probe HTTP path                                    |
 | `readinessProbe.enabled`        | `true`      | Enable the readiness probe                                  |
 | `readinessProbe.path`           | `/`         | Readiness probe HTTP path                                   |
-| `resources`                     | `{}`        | Pod resource requests and limits                            |
-| `podSecurityContext`            | `{}`        | Pod-level security context                                  |
+| `resources.requests.cpu`        | `250m`      | Default CPU request for the Drupal container                |
+| `resources.requests.memory`     | `512Mi`     | Default memory request for the Drupal container             |
+| `resources.limits.cpu`          | `1`         | Default CPU limit for the Drupal container                  |
+| `resources.limits.memory`       | `1Gi`       | Default memory limit for the Drupal container               |
+| `podSecurityContext.fsGroup`    | `33`        | Group ownership applied to the mounted Drupal files volume  |
 | `securityContext`               | `{}`        | Container-level security context                            |
 | `serviceAccount.create`         | `false`     | Create a dedicated service account                          |
 | `serviceAccount.name`           | `""`        | Existing or custom service account name                     |

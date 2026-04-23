@@ -676,6 +676,63 @@ const chartConfigs: Record<string, ChartConfig> = {
           default: '8Gi',
           description: 'PVC size for sites/',
         },
+        {
+          label: 'Storage Access Mode',
+          key: 'persistence.accessMode',
+          type: 'select',
+          default: 'ReadWriteOnce',
+          options: ['ReadWriteOnce', 'ReadWriteMany'],
+          description: 'Use RWX before enabling multi-replica Drupal',
+        },
+      ],
+    },
+    {
+      name: 'Autoscaling',
+      collapsible: true,
+      gateField: 'autoscaling.enabled',
+      fields: [
+        {
+          label: 'Min Replicas',
+          key: 'autoscaling.minReplicas',
+          type: 'number',
+          default: '2',
+          description: 'Minimum replicas for HPA',
+        },
+        {
+          label: 'Max Replicas',
+          key: 'autoscaling.maxReplicas',
+          type: 'number',
+          default: '5',
+          description: 'Maximum replicas for HPA',
+        },
+      ],
+    },
+    {
+      name: 'Backup',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'Cron schedule for backups',
+        },
+        {
+          label: 'S3 Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: 's3.amazonaws.com',
+          description: 'S3-compatible endpoint',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'drupal-backups',
+          description: 'Bucket used for Drupal backups',
+        },
       ],
     },
     {
@@ -4251,11 +4308,29 @@ const scenarios: Record<string, { label: string; description: string; values: Re
   drupal: [
     {
       label: 'Bundled MySQL',
-      description: 'Default installer path with seeded sites persistence and the MySQL subchart',
+      description: 'Default production baseline with the MySQL subchart and seeded sites persistence',
       values: {
         'database.mode': 'auto',
         'mysql.enabled': 'true',
         'persistence.size': '8Gi',
+      },
+    },
+    {
+      label: 'Production HA',
+      description: 'RWX storage, HPA, PDB, and scheduled backups for production Drupal',
+      values: {
+        'database.mode': 'auto',
+        'mysql.enabled': 'true',
+        'persistence.accessMode': 'ReadWriteMany',
+        'persistence.size': '20Gi',
+        'autoscaling.enabled': 'true',
+        'autoscaling.minReplicas': '2',
+        'autoscaling.maxReplicas': '5',
+        'pdb.enabled': 'true',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 2 * * *',
+        'backup.s3.endpoint': 'https://minio.example.com',
+        'backup.s3.bucket': 'drupal-backups',
       },
     },
     {
@@ -4272,11 +4347,15 @@ const scenarios: Record<string, { label: string; description: string; values: Re
     },
     {
       label: 'SQLite Evaluation',
-      description: 'Simple evaluation install with SQLite and no MySQL subchart',
+      description: 'Single-replica evaluation install with SQLite and optional backup support',
       values: {
         'database.mode': 'sqlite',
         'mysql.enabled': 'false',
         'persistence.size': '4Gi',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 4 * * *',
+        'backup.s3.endpoint': 'https://minio.example.com',
+        'backup.s3.bucket': 'drupal-backups',
       },
     },
   ],
