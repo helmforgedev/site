@@ -1,0 +1,211 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Drupal Chart
+description: HelmForge Drupal chart with seeded sites persistence and installer guidance for MySQL, external databases, or SQLite.
+---
+
+# Drupal
+
+Deploy Drupal on Kubernetes using the Docker Official [drupal](https://hub.docker.com/_/drupal) image with a persistence model tailored for the installer-managed `sites/` directory.
+
+## Key Features
+
+- **Seeded `sites/` persistence** — preserves uploads and installer-generated state without masking Drupal core files from the image
+- **Installer-first workflow** — the chart prepares runtime, storage, ingress, and database connectivity, then guides setup through `NOTES.txt`
+- **Flexible database path** — bundled MySQL subchart, external MySQL-compatible database, or SQLite
+- **Ingress support** — configurable hosts, TLS, and ingress class
+- **Custom PHP settings** — mount extra `php.ini` content from values
+
+## Runtime Note
+
+This chart uses `docker.io/library/drupal`. Drupal currently does not publish its own upstream-maintained runtime container image, so HelmForge pins the Docker Official image and documents that exception explicitly.
+
+## Official Product
+
+- [Drupal official website](https://new.drupal.org/home)
+- [Drupal system requirements](https://www.drupal.org/docs/getting-started/system-requirements)
+
+## Installation
+
+### HTTPS Repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install drupal helmforge/drupal
+```
+
+### OCI Registry
+
+```bash
+helm install drupal oci://ghcr.io/helmforgedev/helm/drupal
+```
+
+## Install Example
+
+```yaml
+mysql:
+  enabled: true
+  auth:
+    database: drupal
+    username: drupal
+
+persistence:
+  enabled: true
+  size: 8Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: drupal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+After installation:
+
+1. Wait for Drupal and MySQL to become ready.
+2. Open the configured URL or port-forwarded service.
+3. Run the Drupal web installer.
+4. Use the database details printed by `helm get notes <release>`.
+
+## Database Modes
+
+### Bundled MySQL
+
+```yaml
+database:
+  mode: auto
+
+mysql:
+  enabled: true
+```
+
+### External Database
+
+```yaml
+database:
+  mode: external
+  external:
+    host: db.example.com
+    port: 3306
+    name: drupal
+    username: drupal
+
+mysql:
+  enabled: false
+```
+
+### SQLite
+
+```yaml
+database:
+  mode: sqlite
+
+mysql:
+  enabled: false
+```
+
+For SQLite installs, use `sites/default/files/.ht.sqlite` in the Drupal installer unless you intentionally choose another writable path.
+
+## Persistence
+
+This chart persists only `/var/www/html/sites`.
+
+That layout is intentional:
+
+- `settings.php`, uploaded files, and installer output live under `sites/`
+- Drupal core remains in the container image instead of being shadowed by a PVC
+- an init container seeds the initial `sites/` directory into the mounted volume before Drupal starts
+
+Single-replica deployments are the default recommendation. If you scale above one replica, use shared writable storage for `sites/`.
+
+## Values
+
+The chart exposes an installer-oriented surface in `values.yaml`, but it still covers runtime, storage, networking, probes, and escape hatches. The tables below summarize the full values surface shipped with the chart.
+
+### Runtime And Installer Values
+
+| Key                     | Default                          | Description                                     |
+| ----------------------- | -------------------------------- | ----------------------------------------------- |
+| `replicaCount`          | `1`                              | Number of Drupal replicas                       |
+| `image.repository`      | `docker.io/library/drupal`       | Docker Official Drupal image repository         |
+| `image.tag`             | `11.3.8-apache-bookworm`         | Pinned Drupal image tag                         |
+| `image.pullPolicy`      | `IfNotPresent`                   | Container pull policy                           |
+| `imagePullSecrets`      | `[]`                             | Optional image pull secrets                     |
+| `drupal.siteName`       | `Drupal`                         | Suggested site name shown in install guidance   |
+| `drupal.installProfile` | `standard`                       | Suggested Drupal install profile                |
+| `drupal.locale`         | `en`                             | Suggested locale for the installer              |
+| `drupal.sqlitePath`     | `sites/default/files/.ht.sqlite` | Suggested SQLite path for the web installer     |
+| `drupal.extraEnv`       | `[]`                             | Extra container environment variables           |
+| `php.ini`               | `""`                             | Extra PHP configuration mounted as `custom.ini` |
+
+### Database And Persistence Values
+
+| Key                                        | Default               | Description                                             |
+| ------------------------------------------ | --------------------- | ------------------------------------------------------- |
+| `database.mode`                            | `auto`                | Database mode: `auto`, `external`, `mysql`, or `sqlite` |
+| `database.external.host`                   | `""`                  | External database hostname                              |
+| `database.external.port`                   | `3306`                | External database port                                  |
+| `database.external.name`                   | `drupal`              | External database name                                  |
+| `database.external.username`               | `drupal`              | External database username                              |
+| `mysql.enabled`                            | `true`                | Enable the bundled MySQL subchart                       |
+| `mysql.architecture`                       | `standalone`          | MySQL deployment architecture                           |
+| `mysql.auth.database`                      | `drupal`              | Database name created by the MySQL subchart             |
+| `mysql.auth.username`                      | `drupal`              | Database username created by the MySQL subchart         |
+| `mysql.auth.password`                      | `""`                  | Optional application password override                  |
+| `mysql.auth.rootPassword`                  | `""`                  | Optional root password override                         |
+| `mysql.auth.existingSecret`                | `""`                  | Existing secret for MySQL passwords                     |
+| `mysql.auth.existingSecretUserPasswordKey` | `mysql-user-password` | Secret key used for the app user password               |
+| `mysql.primary.persistence.enabled`        | `true`                | Enable MySQL persistence                                |
+| `mysql.primary.persistence.size`           | `8Gi`                 | MySQL PVC size                                          |
+| `persistence.enabled`                      | `true`                | Enable persistence for `/var/www/html/sites`            |
+| `persistence.storageClass`                 | `""`                  | Explicit storage class for the sites PVC                |
+| `persistence.accessMode`                   | `ReadWriteOnce`       | Access mode for the sites PVC                           |
+| `persistence.size`                         | `8Gi`                 | Sites PVC size                                          |
+| `persistence.existingClaim`                | `""`                  | Reuse an existing sites PVC                             |
+| `persistence.annotations`                  | `{}`                  | Annotations applied to the sites PVC                    |
+
+### Service, Ingress, Probes, And Platform Values
+
+| Key                             | Default     | Description                                                 |
+| ------------------------------- | ----------- | ----------------------------------------------------------- |
+| `service.type`                  | `ClusterIP` | Drupal service type                                         |
+| `service.port`                  | `80`        | Drupal service port                                         |
+| `service.annotations`           | `{}`        | Annotations applied to the service                          |
+| `ingress.enabled`               | `false`     | Enable ingress resources                                    |
+| `ingress.ingressClassName`      | `""`        | Ingress class name                                          |
+| `ingress.annotations`           | `{}`        | Ingress annotations                                         |
+| `ingress.hosts`                 | `[]`        | Ingress host and path definitions                           |
+| `ingress.tls`                   | `[]`        | TLS secret mappings for ingress                             |
+| `startupProbe.enabled`          | `true`      | Enable the startup probe                                    |
+| `startupProbe.path`             | `/`         | Startup probe HTTP path                                     |
+| `livenessProbe.enabled`         | `true`      | Enable the liveness probe                                   |
+| `livenessProbe.path`            | `/`         | Liveness probe HTTP path                                    |
+| `readinessProbe.enabled`        | `true`      | Enable the readiness probe                                  |
+| `readinessProbe.path`           | `/`         | Readiness probe HTTP path                                   |
+| `resources`                     | `{}`        | Pod resource requests and limits                            |
+| `podSecurityContext`            | `{}`        | Pod-level security context                                  |
+| `securityContext`               | `{}`        | Container-level security context                            |
+| `serviceAccount.create`         | `false`     | Create a dedicated service account                          |
+| `serviceAccount.name`           | `""`        | Existing or custom service account name                     |
+| `serviceAccount.annotations`    | `{}`        | Service account annotations                                 |
+| `nodeSelector`                  | `{}`        | Node selector rules                                         |
+| `tolerations`                   | `[]`        | Pod tolerations                                             |
+| `affinity`                      | `{}`        | Pod affinity and anti-affinity                              |
+| `topologySpreadConstraints`     | `[]`        | Topology spread constraints                                 |
+| `priorityClassName`             | `""`        | Priority class for the pod                                  |
+| `terminationGracePeriodSeconds` | `30`        | Pod termination grace period                                |
+| `podLabels`                     | `{}`        | Extra pod labels                                            |
+| `podAnnotations`                | `{}`        | Extra pod annotations                                       |
+| `extraVolumes`                  | `[]`        | Additional volumes injected into the pod                    |
+| `extraVolumeMounts`             | `[]`        | Additional volume mounts injected into the Drupal container |
+| `extraManifests`                | `[]`        | Extra Kubernetes manifests rendered by the chart            |
+
+## More Information
+
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/drupal)
+- [Drupal documentation](https://new.drupal.org/home)
+- [Drupal system requirements](https://www.drupal.org/docs/getting-started/system-requirements)
