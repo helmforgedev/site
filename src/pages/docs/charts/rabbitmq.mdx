@@ -1,21 +1,45 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: RabbitMQ Chart
-description: HelmForge RabbitMQ chart — RabbitMQ with management UI and clustering for Kubernetes.
+description: HelmForge RabbitMQ chart — single-node and cluster architectures, quorum queues, Erlang cookie clustering, management UI ingress, Prometheus metrics, PDB, and TLS for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # RabbitMQ
 
-Production-ready RabbitMQ deployment with management UI and clustering support.
+Production-ready RabbitMQ message broker for Kubernetes. Supports single-node and multi-node cluster
+architectures, quorum queues (default), management UI with dedicated Ingress, Prometheus metrics, and
+TLS listeners.
+
+<Callout type="warning" title="Fix the Erlang cookie before scaling to a cluster">
+  The Erlang cookie (`auth.erlangCookie`) is used for node-to-node authentication. If it changes between deployments,
+  cluster nodes will refuse to connect to each other. Set an explicit value in `auth.erlangCookie` or use
+  `auth.existingSecret` — never rely on auto-generation in cluster mode.
+</Callout>
 
 ## Key Features
 
-- **Standalone and clustering** — Single instance or multi-node cluster
-- **Management UI** — Built-in web management console with ingress support
-- **Plugin support** — Configurable RabbitMQ plugins
-- **Metrics** — Prometheus exporter with ServiceMonitor
-- **Security** — Authentication, non-root containers, network policies, TLS
-- **Persistent storage** — Message persistence across restarts
+- **Two architectures** — `single-node` (Deployment) or `cluster` (StatefulSet with peer discovery)
+- **Quorum queues by default** — `queueDefaults.type: quorum` for durable, replicated HA queues
+- **Dedicated management ingress** — `management.ingress` is separate from the AMQP service
+- **Partition handling** — `pause_minority` strategy prevents split-brain in cluster mode
+- **PDB support** — optional PodDisruptionBudget to protect cluster quorum during node maintenance
+- **TLS listeners** — configurable AMQP/S and management TLS from an existing Secret
+- **Prometheus metrics** — built-in metrics plugin with optional ServiceMonitor
+
+## Port Reference
+
+| Port  | Protocol | Description                           |
+| ----- | -------- | ------------------------------------- |
+| 5672  | TCP      | AMQP (client connections)             |
+| 5671  | TCP      | AMQPS (AMQP over TLS)                 |
+| 15672 | HTTP     | Management UI                         |
+| 15671 | HTTPS    | Management UI over TLS                |
+| 15692 | HTTP     | Prometheus metrics endpoint           |
+| 4369  | TCP      | EPMD (Erlang port mapper daemon)      |
+| 25672 | TCP      | Erlang distribution (cluster traffic) |
 
 ## Installation
 
@@ -24,71 +48,371 @@ Production-ready RabbitMQ deployment with management UI and clustering support.
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-rabbit helmforge/rabbitmq
+helm install rabbitmq helmforge/rabbitmq -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-rabbit oci://ghcr.io/helmforgedev/helm/rabbitmq
+helm install rabbitmq oci://ghcr.io/helmforgedev/helm/rabbitmq -f values.yaml
 ```
 
-## Standalone Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'single-node', label: 'Single Node' },
+    { id: 'cluster', label: 'HA Cluster' },
+    { id: 'tls', label: 'With TLS' },
+    { id: 'metrics', label: 'With Prometheus' },
+  ]}
+>
+
+<div data-tab-panel="single-node">
 
 ```yaml
-# values.yaml
+# values.yaml — RabbitMQ single-node with management UI and persistence
+architecture: single-node
+
 auth:
   username: admin
-  password: 'my-secret-password'
+  existingSecret: rabbitmq-credentials
+  existingSecretPasswordKey: rabbitmq-password
 
-persistence:
-  size: 10Gi
+queueDefaults:
+  type: quorum # modern default — use classic only for legacy compatibility
+
+singleNode:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+management:
+  enabled: true
+  ingress:
+    enabled: true
+    className: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: rabbitmq.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: rabbitmq-tls
+        hosts:
+          - rabbitmq.example.com
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 500m
+```
+
+</div>
+
+<div data-tab-panel="cluster">
+
+```yaml
+# values.yaml — 3-node RabbitMQ cluster with fixed Erlang cookie and PDB
+architecture: cluster
+
+auth:
+  username: admin
+  existingSecret: rabbitmq-credentials # must contain password AND erlang cookie
+  existingSecretPasswordKey: rabbitmq-password
+  existingSecretErlangCookieKey: rabbitmq-erlang-cookie
+
+queueDefaults:
+  type: quorum
+
+cluster:
+  replicaCount: 3
+  partitionHandling: pause_minority
+  gracefulShutdown:
+    enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+
+pdb:
+  enabled: true
+  minAvailable: 2 # always maintain quorum (majority of 3)
+
+management:
+  enabled: true
+  ingress:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: rabbitmq.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: '1'
+```
+
+</div>
+
+<div data-tab-panel="tls">
+
+```yaml
+# values.yaml — RabbitMQ with TLS for AMQP and management UI
+architecture: single-node
+
+auth:
+  username: admin
+  existingSecret: rabbitmq-credentials
+
+tls:
+  enabled: true
+  existingSecret: rabbitmq-tls-secret # must contain ca.crt, tls.crt, tls.key
+  caFilename: ca.crt
+  certFilename: tls.crt
+  keyFilename: tls.key
+  verify: verify_peer
+  failIfNoPeerCert: false
+
+management:
+  enabled: true
+  ingress:
+    enabled: true
+    className: traefik
+    useTlsPort: true # route ingress to management HTTPS port (15671)
+    hosts:
+      - host: rabbitmq.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+
+singleNode:
+  persistence:
+    enabled: true
+    size: 10Gi
+```
+
+</div>
+
+<div data-tab-panel="metrics">
+
+```yaml
+# values.yaml — RabbitMQ with Prometheus metrics and ServiceMonitor
+architecture: single-node
+
+auth:
+  username: admin
+  existingSecret: rabbitmq-credentials
+
+singleNode:
+  persistence:
+    enabled: true
+    size: 10Gi
 
 metrics:
   enabled: true
   serviceMonitor:
     enabled: true
-```
+    interval: 30s
+    labels:
+      release: prometheus # match your Prometheus Operator selector label
 
-## Clustering Example
-
-```yaml
-replicaCount: 3
-
-auth:
-  username: admin
-  password: 'my-secret-password'
-  erlangCookie: 'my-erlang-cookie'
-
-persistence:
-  size: 10Gi
-
-ingress:
+management:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: rabbitmq.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: rabbitmq-tls
-      hosts:
-        - rabbitmq.example.com
 ```
 
-## Key Values
+</div>
 
-| Key                 | Default | Description                      |
-| ------------------- | ------- | -------------------------------- |
-| `replicaCount`      | `1`     | Number of RabbitMQ nodes         |
-| `auth.username`     | `admin` | Default admin username           |
-| `auth.password`     | `""`    | Admin password                   |
-| `auth.erlangCookie` | `""`    | Erlang cookie for clustering     |
-| `persistence.size`  | `8Gi`   | PVC size                         |
-| `ingress.enabled`   | `false` | Enable ingress for management UI |
-| `metrics.enabled`   | `false` | Enable Prometheus exporter       |
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default         | Description                                                             |
+| ------------------ | ------ | --------------- | ----------------------------------------------------------------------- |
+| `architecture`     | string | `single-node`   | Deployment mode: `single-node` (Deployment) or `cluster` (StatefulSet). |
+| `nameOverride`     | string | `""`            | Override the chart name.                                                |
+| `fullnameOverride` | string | `""`            | Override the full release name.                                         |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                                    |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                                              |
+
+### Image
+
+| Parameter          | Type   | Default                      | Description                          |
+| ------------------ | ------ | ---------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/library/rabbitmq` | RabbitMQ image (management variant). |
+| `image.tag`        | string | `"4.2.4-management"`         | Image tag. Includes management UI.   |
+| `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                         | Pull secrets for private registries. |
+
+### Authentication
+
+| Parameter                            | Type   | Default                  | Description                                                   |
+| ------------------------------------ | ------ | ------------------------ | ------------------------------------------------------------- |
+| `auth.username`                      | string | `user`                   | RabbitMQ admin username.                                      |
+| `auth.password`                      | string | `""`                     | Admin password. Auto-generated if empty.                      |
+| `auth.erlangCookie`                  | string | `""`                     | Erlang cookie for node-to-node auth. Auto-generated if empty. |
+| `auth.vhost`                         | string | `/`                      | Default virtual host created by RabbitMQ.                     |
+| `auth.existingSecret`                | string | `""`                     | Existing secret with username, password, and Erlang cookie.   |
+| `auth.existingSecretUsernameKey`     | string | `rabbitmq-username`      | Key for username in `existingSecret`.                         |
+| `auth.existingSecretPasswordKey`     | string | `rabbitmq-password`      | Key for password in `existingSecret`.                         |
+| `auth.existingSecretErlangCookieKey` | string | `rabbitmq-erlang-cookie` | Key for Erlang cookie in `existingSecret`.                    |
+
+### Queue Defaults
+
+| Parameter            | Type   | Default  | Description                                                                  |
+| -------------------- | ------ | -------- | ---------------------------------------------------------------------------- |
+| `queueDefaults.type` | string | `quorum` | Default queue type: `quorum` (HA, replicated) or `classic` (legacy, non-HA). |
+
+<Callout type="info" title="Quorum queues are the modern default">
+  Quorum queues use the Raft consensus algorithm for durable, replicated message storage. They replace classic mirrored
+  queues and are the recommended choice for new deployments. Classic queues are still supported for compatibility with
+  legacy applications but are not HA.
+</Callout>
+
+### Single-Node Mode
+
+| Parameter                             | Type    | Default         | Description                     |
+| ------------------------------------- | ------- | --------------- | ------------------------------- |
+| `singleNode.persistence.enabled`      | boolean | `true`          | Enable PVC for message storage. |
+| `singleNode.persistence.size`         | string  | `8Gi`           | PVC size.                       |
+| `singleNode.persistence.storageClass` | string  | `""`            | StorageClass for the PVC.       |
+| `singleNode.persistence.accessMode`   | string  | `ReadWriteOnce` | PVC access mode.                |
+
+### Cluster Mode
+
+<Callout type="danger" title="Set a fixed Erlang cookie before creating a cluster">
+  Never use auto-generated Erlang cookies in cluster mode. If a pod is replaced and the cookie changes, the new node
+  will be rejected by the existing cluster members. Store the cookie in a Kubernetes Secret and reference it via
+  `auth.existingSecret`.
+</Callout>
+
+| Parameter                          | Type    | Default          | Description                                                        |
+| ---------------------------------- | ------- | ---------------- | ------------------------------------------------------------------ |
+| `cluster.replicaCount`             | integer | `3`              | Number of RabbitMQ cluster nodes.                                  |
+| `cluster.podManagementPolicy`      | string  | `OrderedReady`   | StatefulSet pod management policy.                                 |
+| `cluster.partitionHandling`        | string  | `pause_minority` | Network partition strategy. `pause_minority` prevents split-brain. |
+| `cluster.ordinalStart`             | integer | `0`              | Starting ordinal for peer discovery.                               |
+| `cluster.seedNode`                 | string  | `""`             | Explicit seed node hostname for cluster formation.                 |
+| `cluster.gracefulShutdown.enabled` | boolean | `true`           | Execute graceful shutdown before pod termination.                  |
+| `cluster.persistence.enabled`      | boolean | `true`           | Enable PVCs for each cluster node.                                 |
+| `cluster.persistence.size`         | string  | `8Gi`            | PVC size per node.                                                 |
+| `cluster.persistence.storageClass` | string  | `""`             | StorageClass for cluster PVCs.                                     |
+
+### Management UI
+
+| Parameter                        | Type    | Default   | Description                                             |
+| -------------------------------- | ------- | --------- | ------------------------------------------------------- |
+| `management.enabled`             | boolean | `true`    | Enable the management plugin and UI (port 15672/15671). |
+| `management.ingress.enabled`     | boolean | `false`   | Enable Ingress for the management UI.                   |
+| `management.ingress.className`   | string  | `traefik` | Ingress class for the management UI.                    |
+| `management.ingress.annotations` | object  | `{}`      | Annotations for the management Ingress.                 |
+| `management.ingress.hosts`       | array   | `[]`      | Ingress host and path rules.                            |
+| `management.ingress.tls`         | array   | `[]`      | TLS configuration for the management Ingress.           |
+| `management.ingress.useTlsPort`  | boolean | `false`   | Route ingress to the TLS management port (15671).       |
+
+### TLS
+
+| Parameter                    | Type    | Default       | Description                                            |
+| ---------------------------- | ------- | ------------- | ------------------------------------------------------ |
+| `tls.enabled`                | boolean | `false`       | Enable TLS listeners for AMQP and management.          |
+| `tls.existingSecret`         | string  | `""`          | Existing secret with CA, certificate, and private key. |
+| `tls.caFilename`             | string  | `ca.crt`      | CA certificate filename inside the secret.             |
+| `tls.certFilename`           | string  | `tls.crt`     | Certificate filename inside the secret.                |
+| `tls.keyFilename`            | string  | `tls.key`     | Private key filename inside the secret.                |
+| `tls.verify`                 | string  | `verify_none` | TLS peer verification mode.                            |
+| `tls.failIfNoPeerCert`       | boolean | `false`       | Reject connections without a valid peer certificate.   |
+| `tls.disableNonTLSListeners` | boolean | `false`       | Disable plaintext AMQP listeners when TLS is enabled.  |
+
+### Plugins
+
+| Parameter       | Type  | Default | Description                                                  |
+| --------------- | ----- | ------- | ------------------------------------------------------------ |
+| `plugins.extra` | array | `[]`    | Additional RabbitMQ plugins to enable beyond chart defaults. |
+
+### Custom Configuration
+
+| Parameter               | Type   | Default | Description                                                     |
+| ----------------------- | ------ | ------- | --------------------------------------------------------------- |
+| `config.extra`          | string | `""`    | Extra `rabbitmq.conf` entries appended to the generated config. |
+| `config.advancedConfig` | string | `""`    | Raw `advanced.config` Erlang term content.                      |
+
+### PodDisruptionBudget
+
+| Parameter            | Type    | Default | Description                                                          |
+| -------------------- | ------- | ------- | -------------------------------------------------------------------- |
+| `pdb.enabled`        | boolean | `false` | Create a PodDisruptionBudget.                                        |
+| `pdb.minAvailable`   | integer | `1`     | Minimum available pods during disruptions. Set to `2` for 3-node HA. |
+| `pdb.maxUnavailable` | string  | `""`    | Maximum unavailable pods (alternative to `minAvailable`).            |
+
+### Metrics
+
+| Parameter                         | Type    | Default | Description                                        |
+| --------------------------------- | ------- | ------- | -------------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false` | Enable the Prometheus metrics plugin (port 15692). |
+| `metrics.serviceMonitor.enabled`  | boolean | `false` | Create a Prometheus Operator ServiceMonitor.       |
+| `metrics.serviceMonitor.interval` | string  | `30s`   | Metrics scrape interval.                           |
+| `metrics.serviceMonitor.labels`   | object  | `{}`    | Extra labels for the ServiceMonitor.               |
+
+### Service
+
+| Parameter                   | Type    | Default     | Description                                            |
+| --------------------------- | ------- | ----------- | ------------------------------------------------------ |
+| `service.type`              | string  | `ClusterIP` | Service type.                                          |
+| `service.amqpPort`          | integer | `5672`      | AMQP listener port.                                    |
+| `service.amqpsPort`         | integer | `5671`      | AMQPS listener port (TLS).                             |
+| `service.managementPort`    | integer | `15672`     | Management UI HTTP port.                               |
+| `service.managementTlsPort` | integer | `15671`     | Management UI HTTPS port.                              |
+| `service.epmdPort`          | integer | `4369`      | Erlang port mapper daemon port.                        |
+| `service.distPort`          | integer | `25672`     | Erlang distribution port (cluster inter-node traffic). |
+| `service.metricsPort`       | integer | `15692`     | Prometheus metrics port.                               |
+| `service.annotations`       | object  | `{}`        | Annotations for the Service.                           |
+| `service.extraPorts`        | array   | `[]`        | Extra ports added to the Service.                      |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                                                      |
+| ------------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.                                    |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.                                      |
+| `affinity`                      | object  | `{}`    | Affinity rules.                                                  |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.                                     |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.                                       |
+| `terminationGracePeriodSeconds` | integer | `120`   | Grace period. Allows in-progress message deliveries to complete. |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.                                        |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod.                                   |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraEnv`          | array | `[]`    | Extra environment variables for the container.           |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/rabbitmq) on GitHub.
+- [RabbitMQ Official Documentation](https://www.rabbitmq.com/docs)
+- [Quorum Queues Guide](https://www.rabbitmq.com/docs/quorum-queues)
+- [RabbitMQ Clustering Guide](https://www.rabbitmq.com/docs/clustering)
+- [HelmForge RabbitMQ Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/rabbitmq)
