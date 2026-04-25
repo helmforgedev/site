@@ -1,26 +1,56 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Mosquitto
-description: Helm chart for Eclipse Mosquitto on Kubernetes with standalone or federated brokers and MQTTX Web.
+title: Mosquitto Chart
+description: HelmForge Eclipse Mosquitto chart — MQTT broker for IoT with standalone or federated topology, TLS and mTLS support, authentication, ACL, WebSocket listener, and optional MQTTX Web companion UI for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Mosquitto
 
-Helm chart for deploying [Eclipse Mosquitto](https://mosquitto.org/) on Kubernetes using the official [`eclipse-mosquitto`](https://hub.docker.com/_/eclipse-mosquitto) Docker image, with support for standalone or federated broker topologies and an optional [`emqx/mqttx-web`](https://hub.docker.com/r/emqx/mqttx-web) companion UI.
+Eclipse Mosquitto MQTT broker for IoT and messaging workloads. Mosquitto handles MQTT publish/subscribe
+messaging for devices and services, supports QoS 0/1/2, retained messages, and persistent sessions.
+This chart supports standalone single-broker deployments and federated multi-broker topologies with bridge
+connections.
+
+<Callout type="danger" title="Authentication is disabled by default — broker is open">
+  With `auth.enabled: false` (the default), any MQTT client that can reach the broker service can publish and subscribe
+  to any topic without credentials. Enable `auth.enabled: true` and set credentials before exposing the broker to
+  untrusted networks.
+</Callout>
 
 ## Key Features
 
-- **Official Mosquitto image** based on `eclipse-mosquitto`
-- **Standalone mode** single broker deployment for the simplest and most predictable runtime
-- **Federated mode** multiple bridged brokers using Mosquitto bridge connections across StatefulSet peers
-- **WebSocket listener** browser-ready MQTT access on a dedicated listener
-- **MQTTX Web companion** optional web client deployment with separate scaling controls
-- **Authentication and ACL** optional username/password and ACL file generation
-- **Ingress support** configurable ingress for broker WebSocket access and the optional MQTTX Web UI
+- **MQTT TCP and WebSocket listeners** — native MQTT on port 1883, MQTT over WebSocket on port 9001
+- **TLS and mTLS** — encrypt broker traffic and authenticate devices via client certificates
+- **Authentication and ACL** — username/password and topic-level access control rules
+- **Standalone mode** — single broker, simplest deployment for most use cases
+- **Federated mode** — bridged brokers across StatefulSet peers for multi-node spread
+- **PodDisruptionBudget** — built-in disruption protection enabled by default
+- **MQTTX Web companion** — optional browser-based MQTT client for testing and debugging
+- **Connection and queue limits** — configurable caps to prevent runaway memory usage
+
+## Topology
+
+<Callout type="info" title="Federated mode uses bridges, not native clustering">
+  Federated mode connects multiple Mosquitto broker pods via Mosquitto bridge connections. Each broker maintains its own
+  independent state — subscriptions, sessions, and retained messages are local to each pod. Messages published on one
+  broker are relayed to peers via the bridge. For IoT devices that must maintain persistent sessions, use
+  `service.sessionAffinity: ClientIP` to ensure a client always reconnects to the same broker pod.
+</Callout>
+
+| Feature           | Standalone       | Federated                     |
+| ----------------- | ---------------- | ----------------------------- |
+| Broker replicas   | 1                | 2+                            |
+| Session state     | Single broker    | Per-pod (not shared)          |
+| Retained messages | Single broker    | Per-pod (not shared)          |
+| Message relay     | —                | Bridge (configurable pattern) |
+| Use case          | Most deployments | Multi-zone spread, HA         |
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,67 +58,438 @@ helm repo update
 helm install mosquitto helmforge/mosquitto
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
 helm install mosquitto oci://ghcr.io/helmforgedev/helm/mosquitto
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone' },
+    { id: 'auth', label: 'With Authentication' },
+    { id: 'tls', label: 'With TLS' },
+    { id: 'federated', label: 'Federated' },
+    { id: 'mqttxweb', label: 'With MQTTX Web' },
+  ]}
+>
+
+<div data-tab-panel="standalone">
 
 ```yaml
+# values.yaml — Mosquitto standalone broker with authentication
 architecture:
   mode: standalone
 
+auth:
+  enabled: true
+  username: mqtt
+  password: 'your-mqtt-password'
+
+acl:
+  enabled: true
+  rules: |
+    # Allow the mqtt user full access
+    user mqtt
+    topic readwrite #
+
 broker:
   replicaCount: 1
-
-service:
-  sessionAffinity: None
+  persistence:
+    enabled: true
+    size: 8Gi
 ```
 
-## Federated Example
+</div>
+
+<div data-tab-panel="auth">
 
 ```yaml
+# values.yaml — Authentication with an existing Kubernetes Secret
+architecture:
+  mode: standalone
+
+auth:
+  enabled: true
+  existingSecret: mosquitto-credentials
+  existingSecretUsernameKey: username
+  existingSecretPasswordKey: password
+
+acl:
+  enabled: true
+  rules: |
+    user mqtt
+    topic readwrite #
+    user readonly
+    topic read sensors/#
+
+broker:
+  persistence:
+    enabled: true
+    size: 8Gi
+```
+
+</div>
+
+<div data-tab-panel="tls">
+
+```yaml
+# values.yaml — MQTT over TLS (MQTTS on port 8883)
+# The TLS secret must contain tls.crt and tls.key
+architecture:
+  mode: standalone
+
+auth:
+  enabled: true
+  username: mqtt
+  password: 'your-mqtt-password'
+
+broker:
+  tls:
+    enabled: true
+    port: 8883
+    certSecretName: mosquitto-tls
+    certFile: tls.crt
+    keyFile: tls.key
+    # Optional: enable mTLS (client certificate authentication)
+    # caFile: ca.crt
+    # requireCertificate: true
+    # useIdentityAsUsername: true
+
+  persistence:
+    enabled: true
+    size: 8Gi
+
+service:
+  type: LoadBalancer
+  mqttsPort: 8883
+```
+
+</div>
+
+<div data-tab-panel="federated">
+
+```yaml
+# values.yaml — Federated Mosquitto with 3 bridged broker pods
+# Each pod bridges all topics (#) bidirectionally to its peers.
+# Use ClientIP session affinity to ensure MQTT clients reconnect to the same pod.
 architecture:
   mode: federated
 
+auth:
+  enabled: true
+  username: mqtt
+  password: 'your-mqtt-password'
+
 broker:
   replicaCount: 3
+  federation:
+    topicPattern: '#'
+    topicDirection: both
+    topicQos: 1
+  persistence:
+    enabled: true
+    size: 8Gi
+
+service:
+  sessionAffinity: ClientIP
+
+pdb:
+  enabled: true
+  minAvailable: 2
+```
+
+</div>
+
+<div data-tab-panel="mqttxweb">
+
+```yaml
+# values.yaml — Mosquitto with MQTTX Web companion UI
+# MQTTX Web connects to Mosquitto via the WebSocket listener (port 9001).
+# Expose the WebSocket listener via Ingress for browser access.
+architecture:
+  mode: standalone
+
+auth:
+  enabled: true
+  username: mqtt
+  password: 'your-mqtt-password'
+
+broker:
+  persistence:
+    enabled: true
+    size: 8Gi
+
+websocketIngress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: mqtt.example.com
+      paths:
+        - path: /mqtt
+          pathType: Prefix
+  tls:
+    - secretName: mosquitto-ws-tls
+      hosts:
+        - mqtt.example.com
 
 mqttxWeb:
   enabled: true
   replicaCount: 1
-
-service:
-  sessionAffinity: None
+  broker:
+    scheme: wss
+    host: mqtt.example.com
+    path: /mqtt
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - host: mqttx.example.com
+        paths:
+          - path: /
+            pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                                | Default      | Description                                          |
-| ---------------------------------- | ------------ | ---------------------------------------------------- |
-| `architecture.mode`                | `standalone` | Broker topology: `standalone` or `federated`         |
-| `broker.replicaCount`              | `1`          | Number of broker replicas                            |
-| `broker.listeners.mqtt`            | `1883`       | MQTT TCP listener port                               |
-| `broker.listeners.websocket`       | `9001`       | MQTT over WebSocket listener port                    |
-| `broker.federation.topicPattern`   | `#`          | Topic pattern bridged between federated brokers      |
-| `broker.federation.topicDirection` | `both`       | Bridge direction between peers                       |
-| `auth.enabled`                     | `false`      | Enable username/password authentication              |
-| `acl.enabled`                      | `false`      | Enable ACL file generation                           |
-| `service.sessionAffinity`          | `None`       | Service routing policy for client traffic            |
-| `websocketIngress.enabled`         | `false`      | Expose the broker WebSocket listener through ingress |
-| `mqttxWeb.enabled`                 | `false`      | Deploy MQTTX Web companion UI                        |
-| `mqttxWeb.replicaCount`            | `1`          | Number of MQTTX Web pods                             |
+</DocsTabs>
 
-## Topology Notes
+## Configuration Reference
 
-- `standalone` mode requires exactly one broker replica
-- `federated` mode requires at least two broker replicas
-- federated mode uses official Mosquitto bridge connections, not a native shared-state cluster
-- broker replicas do not share sessions or retained state like EMQX-style clustering
-- `mqttxWeb.replicaCount` is independent from `broker.replicaCount`
+### Core
+
+| Parameter          | Type   | Default         | Description                                            |
+| ------------------ | ------ | --------------- | ------------------------------------------------------ |
+| `nameOverride`     | string | `""`            | Override the chart name.                               |
+| `fullnameOverride` | string | `""`            | Override the full release name.                        |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
+
+### Image
+
+| Parameter          | Type   | Default                               | Description                          |
+| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/library/eclipse-mosquitto` | Mosquitto container image.           |
+| `image.tag`        | string | `"2.0.22"`                            | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
+
+### Architecture
+
+| Parameter           | Type   | Default      | Description                                                              |
+| ------------------- | ------ | ------------ | ------------------------------------------------------------------------ |
+| `architecture.mode` | string | `standalone` | Broker topology: `standalone` (1 broker) or `federated` (bridged peers). |
+
+### Broker
+
+| Parameter                    | Type    | Default | Description                                                                   |
+| ---------------------------- | ------- | ------- | ----------------------------------------------------------------------------- |
+| `broker.replicaCount`        | integer | `1`     | Number of Mosquitto broker pods.                                              |
+| `broker.extraConfig`         | string  | `""`    | Raw Mosquitto configuration lines appended to the generated `mosquitto.conf`. |
+| `broker.listeners.mqtt`      | integer | `1883`  | MQTT TCP listener port (when TLS is disabled).                                |
+| `broker.listeners.websocket` | integer | `9001`  | MQTT over WebSocket listener port.                                            |
+
+#### Multi-Replica Defaults
+
+| Parameter                                                | Type    | Default                  | Description                                                      |
+| -------------------------------------------------------- | ------- | ------------------------ | ---------------------------------------------------------------- |
+| `broker.multiReplicaDefaults.enabled`                    | boolean | `true`                   | Apply scheduling defaults automatically when `replicaCount > 1`. |
+| `broker.multiReplicaDefaults.podAntiAffinity`            | string  | `preferred`              | Pod anti-affinity: `preferred`, `required`, or `none`.           |
+| `broker.multiReplicaDefaults.topologySpread.enabled`     | boolean | `true`                   | Add a topology spread constraint for multi-replica brokers.      |
+| `broker.multiReplicaDefaults.topologySpread.topologyKey` | string  | `kubernetes.io/hostname` | Node topology key for the spread constraint.                     |
+
+#### TLS
+
+| Parameter                          | Type    | Default   | Description                                                              |
+| ---------------------------------- | ------- | --------- | ------------------------------------------------------------------------ |
+| `broker.tls.enabled`               | boolean | `false`   | Enable MQTT TLS listener (MQTTS).                                        |
+| `broker.tls.port`                  | integer | `8883`    | MQTTS listener port.                                                     |
+| `broker.tls.certSecretName`        | string  | `""`      | Existing Secret name containing the broker TLS certificate and key.      |
+| `broker.tls.certFile`              | string  | `tls.crt` | Key name in the Secret for the server certificate.                       |
+| `broker.tls.keyFile`               | string  | `tls.key` | Key name in the Secret for the server private key.                       |
+| `broker.tls.caFile`                | string  | `""`      | Key name in the Secret for the CA certificate (required for mTLS).       |
+| `broker.tls.requireCertificate`    | boolean | `false`   | Require clients to present a valid certificate (mTLS).                   |
+| `broker.tls.useIdentityAsUsername` | boolean | `false`   | Use the client certificate CN as the MQTT username when mTLS is enabled. |
+
+<Callout type="tip" title="Use mTLS for IoT device authentication">
+  For IoT deployments where devices (ESP32, Raspberry Pi) need individual identities, enable mTLS by setting
+  `broker.tls.requireCertificate: true` and `broker.tls.useIdentityAsUsername: true`. Each device gets its own client
+  certificate. The certificate CN is used as the MQTT username for ACL enforcement, removing the need for a shared
+  password across all devices.
+</Callout>
+
+#### Limits
+
+All limit values default to `0`, which means the Mosquitto broker default applies (typically unlimited).
+Set explicit limits for production deployments with many connected devices.
+
+| Parameter                           | Type    | Default | Description                                                     |
+| ----------------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `broker.limits.maxConnections`      | integer | `0`     | Maximum concurrently connected clients. `0` = unlimited.        |
+| `broker.limits.maxInflightMessages` | integer | `0`     | Maximum in-flight QoS 1/2 messages per client. `0` = unlimited. |
+| `broker.limits.maxQueuedMessages`   | integer | `0`     | Maximum queued QoS 1/2 messages per client. `0` = unlimited.    |
+| `broker.limits.maxQueuedBytes`      | integer | `0`     | Maximum queued message bytes per client. `0` = unlimited.       |
+| `broker.limits.maxPacketSize`       | integer | `0`     | Maximum MQTT packet size in bytes. `0` = unlimited.             |
+
+#### Federation
+
+| Parameter                              | Type    | Default | Description                                                 |
+| -------------------------------------- | ------- | ------- | ----------------------------------------------------------- |
+| `broker.federation.topicPattern`       | string  | `"#"`   | MQTT topic pattern bridged between broker peers.            |
+| `broker.federation.topicDirection`     | string  | `both`  | Bridge direction: `both`, `out`, or `in`.                   |
+| `broker.federation.topicQos`           | integer | `1`     | QoS for bridged messages.                                   |
+| `broker.federation.tryPrivate`         | boolean | `true`  | Advertise bridge semantics to remote peers (loop handling). |
+| `broker.federation.restartTimeoutBase` | integer | `5`     | Base seconds for bridge reconnection backoff.               |
+| `broker.federation.restartTimeoutCap`  | integer | `30`    | Maximum seconds for bridge reconnection backoff.            |
+
+#### Persistence
+
+| Parameter                         | Type    | Default         | Description                   |
+| --------------------------------- | ------- | --------------- | ----------------------------- |
+| `broker.persistence.enabled`      | boolean | `true`          | Enable PVCs for broker data.  |
+| `broker.persistence.size`         | string  | `8Gi`           | Size of each broker PVC.      |
+| `broker.persistence.storageClass` | string  | `""`            | StorageClass for broker PVCs. |
+| `broker.persistence.accessMode`   | string  | `ReadWriteOnce` | PVC access mode.              |
+
+### Authentication
+
+| Parameter                        | Type    | Default    | Description                                       |
+| -------------------------------- | ------- | ---------- | ------------------------------------------------- |
+| `auth.enabled`                   | boolean | `false`    | Enable username/password authentication.          |
+| `auth.username`                  | string  | `mqtt`     | Username stored in the generated password file.   |
+| `auth.password`                  | string  | `""`       | Password. Auto-generated if empty.                |
+| `auth.existingSecret`            | string  | `""`       | Existing Kubernetes Secret with MQTT credentials. |
+| `auth.existingSecretUsernameKey` | string  | `username` | Key in the existing secret for the username.      |
+| `auth.existingSecretPasswordKey` | string  | `password` | Key in the existing secret for the password.      |
+
+### ACL
+
+| Parameter                  | Type    | Default   | Description                                                |
+| -------------------------- | ------- | --------- | ---------------------------------------------------------- |
+| `acl.enabled`              | boolean | `false`   | Enable ACL file generation and enforcement.                |
+| `acl.rules`                | string  | `""`      | Raw Mosquitto ACL rules written to the broker's `aclfile`. |
+| `acl.existingConfigMap`    | string  | `""`      | Existing ConfigMap containing a custom `aclfile`.          |
+| `acl.existingConfigMapKey` | string  | `aclfile` | ConfigMap key name for the ACL file content.               |
+
+### Service
+
+| Parameter                       | Type    | Default     | Description                                                                   |
+| ------------------------------- | ------- | ----------- | ----------------------------------------------------------------------------- |
+| `service.type`                  | string  | `ClusterIP` | Kubernetes service type.                                                      |
+| `service.sessionAffinity`       | string  | `None`      | Session affinity. Use `ClientIP` in federated mode to maintain MQTT sessions. |
+| `service.externalTrafficPolicy` | string  | `Cluster`   | External traffic policy for NodePort/LoadBalancer.                            |
+| `service.annotations`           | object  | `{}`        | Annotations for the broker Service.                                           |
+| `service.mqttPort`              | integer | `1883`      | Override MQTT service port.                                                   |
+| `service.websocketPort`         | integer | `9001`      | Override WebSocket service port.                                              |
+| `service.mqttsPort`             | integer | `8883`      | Override MQTTS service port (when `broker.tls.enabled: true`).                |
+| `service.mqttNodePort`          | integer | `0`         | NodePort for MQTT (0 = cluster assigns).                                      |
+| `service.websocketNodePort`     | integer | `0`         | NodePort for WebSocket (0 = cluster assigns).                                 |
+| `service.mqttsNodePort`         | integer | `0`         | NodePort for MQTTS (0 = cluster assigns).                                     |
+| `service.externalIPs`           | array   | `[]`        | External IPs for the broker Service.                                          |
+
+### WebSocket Ingress
+
+| Parameter                           | Type    | Default | Description                                     |
+| ----------------------------------- | ------- | ------- | ----------------------------------------------- |
+| `websocketIngress.enabled`          | boolean | `false` | Enable Ingress for the MQTT WebSocket listener. |
+| `websocketIngress.ingressClassName` | string  | `""`    | Ingress class name. Must be set explicitly.     |
+| `websocketIngress.annotations`      | object  | `{}`    | Annotations for the WebSocket Ingress.          |
+| `websocketIngress.hosts`            | array   | `[]`    | WebSocket Ingress host and path rules.          |
+| `websocketIngress.tls`              | array   | `[]`    | TLS configuration for the WebSocket Ingress.    |
+
+### MQTTX Web
+
+| Parameter                           | Type    | Default                    | Description                                                           |
+| ----------------------------------- | ------- | -------------------------- | --------------------------------------------------------------------- |
+| `mqttxWeb.enabled`                  | boolean | `false`                    | Deploy the MQTTX Web companion browser client.                        |
+| `mqttxWeb.image.repository`         | string  | `docker.io/emqx/mqttx-web` | MQTTX Web container image.                                            |
+| `mqttxWeb.image.tag`                | string  | `""`                       | Image tag. Defaults to the upstream image default tag.                |
+| `mqttxWeb.replicaCount`             | integer | `1`                        | Number of MQTTX Web replicas (independent from broker replicas).      |
+| `mqttxWeb.service.type`             | string  | `ClusterIP`                | Service type for MQTTX Web.                                           |
+| `mqttxWeb.service.port`             | integer | `80`                       | HTTP service port for MQTTX Web.                                      |
+| `mqttxWeb.broker.scheme`            | string  | `ws`                       | WebSocket scheme for browser connections: `ws` or `wss`.              |
+| `mqttxWeb.broker.host`              | string  | `""`                       | Browser-visible broker hostname. Defaults to `websocketIngress` host. |
+| `mqttxWeb.broker.port`              | integer | `0`                        | Browser-visible port override. `0` = derive from ingress/service.     |
+| `mqttxWeb.broker.path`              | string  | `/mqtt`                    | WebSocket path used by browsers.                                      |
+| `mqttxWeb.broker.connectionName`    | string  | `Mosquitto`                | Default connection name in the MQTTX Web UI.                          |
+| `mqttxWeb.resources`                | object  | `{}`                       | Resources for MQTTX Web pods.                                         |
+| `mqttxWeb.ingress.enabled`          | boolean | `false`                    | Enable Ingress for MQTTX Web.                                         |
+| `mqttxWeb.ingress.ingressClassName` | string  | `""`                       | Ingress class name for MQTTX Web.                                     |
+| `mqttxWeb.ingress.hosts`            | array   | `[]`                       | MQTTX Web Ingress hosts.                                              |
+| `mqttxWeb.ingress.tls`              | array   | `[]`                       | MQTTX Web Ingress TLS configuration.                                  |
+
+### PodDisruptionBudget
+
+| Parameter          | Type    | Default | Description                                                         |
+| ------------------ | ------- | ------- | ------------------------------------------------------------------- |
+| `pdb.enabled`      | boolean | `true`  | Create a PodDisruptionBudget for broker pods.                       |
+| `pdb.minAvailable` | integer | `1`     | Minimum available broker pods during voluntary cluster disruptions. |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `10`    | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `20`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mosquitto)
+- [Eclipse Mosquitto Official Website](https://mosquitto.org)
+- [Eclipse Mosquitto Documentation](https://mosquitto.org/documentation/)
+- [Eclipse Mosquitto GitHub Repository](https://github.com/eclipse/mosquitto)
+- [MQTTX Web GitHub Repository](https://github.com/emqx/MQTTX)
+- [HelmForge Mosquitto Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/mosquitto)
