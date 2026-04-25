@@ -1,56 +1,85 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Homarr
-description: Helm chart for Homarr modern application dashboard on Kubernetes with SQLite, PostgreSQL, or MySQL.
+title: Homarr Chart
+description: HelmForge Homarr chart — modern application dashboard with embedded Redis, SQLite/PostgreSQL/MySQL, encryption key for integration secrets, Kubernetes workload discovery, database-aware S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Homarr
 
-Helm chart for deploying [Homarr](https://homarr.dev/) modern application dashboard on Kubernetes using the official [`ghcr.io/homarr-labs/homarr`](https://github.com/homarr-labs/homarr/pkgs/container/homarr) container image.
+Deploy [Homarr](https://homarr.dev/) on Kubernetes — a modern application dashboard with real-time
+status monitoring, Docker/Kubernetes integration, and a drag-and-drop widget editor. Connects to media
+servers (Plex, Jellyfin), \*arr apps (Sonarr, Radarr), and many other services.
+
+<Callout
+  type="danger"
+  title="encryption.existingSecret protects all integration credentials — losing the key invalidates every integration"
+>
+  Homarr uses `SECRET_ENCRYPTION_KEY` to encrypt the API keys and passwords stored for every dashboard integration
+  (Plex, Sonarr, Radarr, etc.). Without `encryption.existingSecret`, a reinstall generates a new key and **permanently
+  invalidates all saved integration credentials**. Always provide a stable `encryption.existingSecret` before the first
+  deployment.
+</Callout>
 
 ## Key Features
 
-- **Official Homarr image** from `ghcr.io/homarr-labs/homarr`
-- **Database backends** SQLite3 (default), PostgreSQL, or MySQL with auto-detection
-- **PostgreSQL and MySQL subcharts** optional bundled database deployments
-- **Encryption key management** auto-generated or existing secret for `SECRET_ENCRYPTION_KEY`
-- **Kubernetes integration** optional workload discovery via `ENABLE_KUBERNETES`
-- **External Redis** optional external Redis for multi-instance setups
-- **S3-compatible backup** database-aware CronJob (SQLite tar, pg_dump, mysqldump)
-- **Ingress support** configurable ingress with TLS
+- **Embedded Redis** — no separate Redis required (external Redis optional for multi-instance)
+- **Three database backends** — SQLite (default), PostgreSQL, MySQL with auto-detection
+- **Integration encryption** — all service credentials encrypted via `SECRET_ENCRYPTION_KEY`
+- **Kubernetes workload discovery** — optional live workload status in the dashboard
+- **Auth providers** — local credentials, LDAP, and OIDC
+- **Database-aware backup** — `tar` for SQLite (`/appdata`), `pg_dump`/`mysqldump` for SQL databases
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install homarr helmforge/homarr
+helm install homarr helmforge/homarr -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install homarr oci://ghcr.io/helmforgedev/helm/homarr
+helm install homarr oci://ghcr.io/helmforgedev/helm/homarr -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (SQLite)' },
+    { id: 'postgresql', label: 'PostgreSQL' },
+    { id: 'kubernetes', label: 'With K8s Discovery' },
+    { id: 'oidc', label: 'OIDC Auth' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Homarr with SQLite (zero database configuration)
 homarr:
-  enableKubernetes: true
+  authProviders: credentials
+  logLevel: info
 
-postgresql:
+encryption:
+  existingSecret: homarr-encryption-key # key: secret-encryption-key
+  existingSecretKey: secret-encryption-key # Generate: openssl rand -hex 32
+
+persistence:
   enabled: true
-  auth:
-    database: homarr
-    username: homarr
-    password: 'db-password'
+  size: 1Gi
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: dash.example.com
       paths:
@@ -60,63 +89,242 @@ ingress:
     - secretName: homarr-tls
       hosts:
         - dash.example.com
+```
+
+</div>
+
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — Homarr with bundled PostgreSQL
+homarr:
+  authProviders: credentials
+
+encryption:
+  existingSecret: homarr-encryption-key
+
+postgresql:
+  enabled: true
+  auth:
+    database: homarr
+    username: homarr
+    password: 'strong-db-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+persistence:
+  enabled: true
+  size: 1Gi
 
 backup:
   enabled: true
   schedule: '0 3 * * *'
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: homarr
+    bucket: homarr-backups
     existingSecret: homarr-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: dash.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                         | Default                 | Description                                              |
-| --------------------------- | ----------------------- | -------------------------------------------------------- |
-| `homarr.logLevel`           | `info`                  | Log level                                                |
-| `homarr.authProviders`      | `credentials`           | Auth providers (credentials, ldap, oidc)                 |
-| `homarr.enableKubernetes`   | `false`                 | Enable K8s workload discovery                            |
-| `encryption.key`            | `""`                    | 32-byte hex encryption key (auto-generated)              |
-| `encryption.existingSecret` | `""`                    | Existing secret with encryption key                      |
-| `database.mode`             | `auto`                  | Database mode: auto, sqlite, external, postgresql, mysql |
-| `database.sqlite.path`      | `/appdata/db/db.sqlite` | SQLite file path                                         |
-| `postgresql.enabled`        | `false`                 | Deploy PostgreSQL subchart                               |
-| `mysql.enabled`             | `false`                 | Deploy MySQL subchart                                    |
-| `redis.external`            | `false`                 | Use external Redis                                       |
-| `redis.host`                | `""`                    | External Redis host                                      |
-| `persistence.enabled`       | `true`                  | Enable persistent storage                                |
-| `persistence.size`          | `1Gi`                   | Volume size                                              |
-| `service.type`              | `ClusterIP`             | Service type                                             |
-| `service.port`              | `7575`                  | Service port                                             |
-| `ingress.enabled`           | `false`                 | Enable ingress                                           |
-| `ingress.ingressClassName`  | `""`                    | Ingress class (`traefik`, `nginx`, etc.)                 |
-| `backup.enabled`            | `false`                 | Enable S3 backup CronJob                                 |
-| `backup.schedule`           | `"0 3 * * *"`           | Backup cron schedule                                     |
-| `backup.s3.endpoint`        | `""`                    | S3-compatible endpoint URL                               |
-| `backup.s3.bucket`          | `""`                    | S3 bucket name                                           |
-| `backup.s3.existingSecret`  | `""`                    | Existing secret with S3 credentials                      |
+<div data-tab-panel="kubernetes">
 
-## Database Auto-Detection
+```yaml
+# values.yaml — Homarr with Kubernetes workload discovery enabled
+# Requires cluster RBAC access; configure serviceAccount if needed
+homarr:
+  enableKubernetes: true # live workload status in the dashboard
+  authProviders: credentials
 
-When `database.mode` is `auto` (default), the chart detects which database to use:
+encryption:
+  existingSecret: homarr-encryption-key
 
-1. If `database.external.host` is set → **external** database
-2. If `postgresql.enabled` is `true` → **PostgreSQL subchart**
-3. If `mysql.enabled` is `true` → **MySQL subchart**
-4. Otherwise → **SQLite3** (zero configuration)
+persistence:
+  enabled: true
+  size: 1Gi
 
-## Encryption Key
-
-Homarr requires a `SECRET_ENCRYPTION_KEY` for encrypting integration secrets. The chart auto-generates a 64-character hex key on first install if not provided. To set your own:
-
-```bash
-openssl rand -hex 32
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: dash.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-Then pass it via `encryption.key` or an existing secret.
+</div>
+
+<div data-tab-panel="oidc">
+
+```yaml
+# values.yaml — Homarr with OIDC authentication (e.g. Keycloak, Authelia)
+homarr:
+  authProviders: oidc # or: credentials,oidc for both
+  extraEnv:
+    - name: AUTH_OIDC_ISSUER
+      value: 'https://auth.example.com/realms/myrealm'
+    - name: AUTH_OIDC_CLIENT_ID
+      value: homarr
+    - name: AUTH_OIDC_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: homarr-oidc-credentials
+          key: client-secret
+    - name: AUTH_OIDC_CALLBACK_URL
+      value: 'https://dash.example.com/api/auth/callback/oidc'
+
+encryption:
+  existingSecret: homarr-encryption-key
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: dash.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                           |
+| ------------------ | ------- | ------- | ------------------------------------- |
+| `replicaCount`     | integer | `1`     | Pod replicas. SQLite supports 1 only. |
+| `nameOverride`     | string  | `""`    | Override the chart name.              |
+| `fullnameOverride` | string  | `""`    | Override the full release name.       |
+
+### Image
+
+| Parameter          | Type   | Default                      | Description        |
+| ------------------ | ------ | ---------------------------- | ------------------ |
+| `image.repository` | string | `ghcr.io/homarr-labs/homarr` | Homarr image.      |
+| `image.tag`        | string | `"v1.57.1"`                  | Image tag.         |
+| `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy. |
+
+### Homarr Configuration
+
+| Parameter                 | Type    | Default       | Description                                                      |
+| ------------------------- | ------- | ------------- | ---------------------------------------------------------------- |
+| `homarr.logLevel`         | string  | `info`        | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`.   |
+| `homarr.authProviders`    | string  | `credentials` | Auth providers (comma-separated): `credentials`, `ldap`, `oidc`. |
+| `homarr.enableKubernetes` | boolean | `false`       | Enable Kubernetes workload discovery (requires cluster RBAC).    |
+| `homarr.extraEnv`         | array   | `[]`          | Extra environment variables (OIDC settings, custom certs, etc.). |
+
+### Encryption Key
+
+| Parameter                      | Type   | Default                 | Description                                          |
+| ------------------------------ | ------ | ----------------------- | ---------------------------------------------------- |
+| `encryption.key`               | string | `""`                    | 32-byte hex encryption key. Auto-generated if empty. |
+| `encryption.existingSecret`    | string | `""`                    | Existing secret with the encryption key.             |
+| `encryption.existingSecretKey` | string | `secret-encryption-key` | Key for the encryption key in the existing secret.   |
+
+### Database
+
+**Auto-detection precedence** (`database.mode: auto`):
+
+| Priority | Condition                                             | Result              |
+| -------- | ----------------------------------------------------- | ------------------- |
+| 1        | `database.external.host` or `external.existingSecret` | External DB         |
+| 2        | `postgresql.enabled: true`                            | PostgreSQL subchart |
+| 3        | `mysql.enabled: true`                                 | MySQL subchart      |
+| 4        | None of the above                                     | SQLite (default)    |
+
+| Parameter                          | Type   | Default                 | Description                                                         |
+| ---------------------------------- | ------ | ----------------------- | ------------------------------------------------------------------- |
+| `database.mode`                    | string | `auto`                  | Database mode: `auto`, `sqlite`, `external`, `postgresql`, `mysql`. |
+| `database.sqlite.path`             | string | `/appdata/db/db.sqlite` | SQLite file path inside the data volume.                            |
+| `database.external.vendor`         | string | `postgres`              | External DB vendor: `postgres` or `mysql`.                          |
+| `database.external.host`           | string | `""`                    | External database hostname.                                         |
+| `database.external.existingSecret` | string | `""`                    | Existing secret with database password.                             |
+
+### Subcharts
+
+| Parameter                             | Type    | Default | Description                             |
+| ------------------------------------- | ------- | ------- | --------------------------------------- |
+| `postgresql.enabled`                  | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.password`            | string  | `""`    | Password. Auto-generated if empty.      |
+| `postgresql.primary.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
+| `mysql.enabled`                       | boolean | `false` | Deploy the bundled MySQL subchart.      |
+| `mysql.primary.persistence.size`      | string  | `8Gi`   | PVC size for MySQL.                     |
+
+### Redis
+
+<Callout type="tip" title="Homarr includes embedded Redis — no external Redis required for single-instance deployments">
+  Homarr ships with an embedded Redis process. External Redis is only needed if you are running multiple Homarr replicas
+  sharing a common cache (requires PostgreSQL or MySQL, not SQLite).
+</Callout>
+
+| Parameter                 | Type    | Default          | Description                                        |
+| ------------------------- | ------- | ---------------- | -------------------------------------------------- |
+| `redis.external`          | boolean | `false`          | Use an external Redis instead of the embedded one. |
+| `redis.host`              | string  | `""`             | External Redis hostname.                           |
+| `redis.port`              | integer | `6379`           | External Redis port.                               |
+| `redis.existingSecret`    | string  | `""`             | Existing secret with external Redis password.      |
+| `redis.existingSecretKey` | string  | `redis-password` | Key for the password in the existing secret.       |
+
+### Persistence
+
+| Parameter                   | Type    | Default | Description                                                        |
+| --------------------------- | ------- | ------- | ------------------------------------------------------------------ |
+| `persistence.enabled`       | boolean | `true`  | Enable PVC for `/appdata` (SQLite DB + dashboard config + themes). |
+| `persistence.size`          | string  | `1Gi`   | PVC size.                                                          |
+| `persistence.storageClass`  | string  | `""`    | StorageClass for the PVC.                                          |
+| `persistence.existingClaim` | string  | `""`    | Use an existing PVC.                                               |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                  |
+| -------------------------- | ------- | ----------- | ---------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.                |
+| `service.port`             | integer | `7575`      | Service port (non-standard). |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource.  |
+| `ingress.ingressClassName` | string  | `""`        | Ingress class name.          |
+| `ingress.annotations`      | object  | `{}`        | Ingress annotations.         |
+| `ingress.hosts`            | array   | `[]`        | Host and path rules.         |
+| `ingress.tls`              | array   | `[]`        | TLS configuration.           |
+
+### Backup
+
+Database-aware backup: SQLite archives the full `/appdata` directory (tar). PostgreSQL uses `pg_dump`.
+MySQL uses `mysqldump`.
+
+| Parameter                          | Type    | Default                    | Description                          |
+| ---------------------------------- | ------- | -------------------------- | ------------------------------------ |
+| `backup.enabled`                   | boolean | `false`                    | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                       |
+| `backup.archivePrefix`             | string  | `homarr`                   | Prefix for backup archive filenames. |
+| `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`                 | string  | `""`                       | Target bucket name.                  |
+| `backup.s3.existingSecret`         | string  | `""`                       | Existing secret with S3 credentials. |
+| `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.       |
+| `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra arguments for `mysqldump`.     |
+| `extraManifests`                   | array   | `[]`                       | Extra Kubernetes manifests.          |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/homarr)
+- [Homarr Official Documentation](https://homarr.dev/docs/)
+- [Homarr GitHub Repository](https://github.com/homarr-labs/homarr)
+- [HelmForge Homarr Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/homarr)
