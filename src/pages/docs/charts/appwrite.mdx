@@ -1,46 +1,100 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Appwrite
-description: Helm chart for Appwrite — self-hosted BaaS platform with MariaDB, Redis, and 20+ microservices.
+title: Appwrite Chart
+description: HelmForge Appwrite chart — self-hosted BaaS with API, Console, Realtime, 12 workers, schedulers, MariaDB, Redis, shared PVCs, mysqldump S3 backup, and path-based Traefik ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Appwrite
 
-Helm chart for deploying [Appwrite](https://appwrite.io/) on Kubernetes — a self-hosted Backend-as-a-Service (BaaS) platform providing authentication, databases, storage, functions, messaging, and a real-time API. Ships with bundled MariaDB and Redis by default.
+Deploy [Appwrite](https://appwrite.io/) on Kubernetes — a self-hosted Backend-as-a-Service (BaaS) platform
+providing authentication, databases, storage, functions, messaging, and a real-time API. Ships as a
+multi-workload chart (~20 Kubernetes Deployments) with bundled MariaDB and Redis.
+
+<Callout type="danger" title="openSslKeyV1 is the master encryption key — losing it makes encrypted data unrecoverable">
+  `appwrite.openSslKeyV1` is a 64-character hex key used to encrypt OAuth provider secrets, API keys, and sensitive
+  credentials stored in the database. If this key changes or is lost, all previously encrypted values become
+  **permanently unreadable**. Always store it in a Kubernetes Secret via `appwrite.existingSecret` and never rotate it
+  in production.
+</Callout>
 
 ## Key Features
 
-- **Full Appwrite stack** — API, Console (v7.5.7), Realtime, 12 workers, schedulers, and maintenance
-- **Bundled MariaDB** — default install includes the HelmForge MariaDB chart
-- **Bundled Redis** — default install includes the HelmForge Redis chart
-- **External services support** — connect to managed MariaDB/MySQL and Redis instead of subcharts
-- **Path-based ingress routing** — single host with path prefixes for API (`/v1`), Console, and Realtime (`/v1/realtime`)
-- **Shared PVCs** — persistent volumes for uploads, cache, and function builds shared across components
-- **appVersion 1.8.1** — tracks the latest Appwrite open-source release
+- **Full Appwrite stack** — API, Console v7.5.7, Realtime WebSocket, 12 workers, schedulers, maintenance
+- **~20 Kubernetes workloads** — each component runs independently and scales separately
+- **MariaDB + Redis** — bundled subcharts or external connections
+- **Shared PVCs** — uploads, cache, certificates, functions, builds, and sites shared across pods
+- **Root DB access required** — Appwrite needs MariaDB root credentials for schema migrations
+- **Ingress routing** — Console at `/`, API at `/v1`, Realtime WebSocket at `/v1/realtime`
+- **mysqldump backup** — scheduled CronJob to S3
+
+<Callout type="info" title="Functions execution requires openruntimes-executor (not included in alpha)">
+  The `workers.functions` and `schedulers.functions` workloads are deployed, but serverless function execution requires
+  a separate `openruntimes-executor` service that is not included in this alpha chart. The functions worker will start
+  but function invocations will fail until the executor is available.
+</Callout>
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install appwrite helmforge/appwrite
+helm install appwrite helmforge/appwrite -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install appwrite oci://ghcr.io/helmforgedev/helm/appwrite
+helm install appwrite oci://ghcr.io/helmforgedev/helm/appwrite -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'external', label: 'External MariaDB + Redis' },
+    { id: 'production', label: 'Production' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Appwrite with bundled MariaDB and Redis
 appwrite:
   domain: appwrite.example.com
-  secretKey: 'change-me-to-a-random-string'
+  # Generate: openssl rand -hex 32
+  openSslKeyV1: 'your-64-char-hex-key-here'
+
+mariadb:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+    rootPassword: 'strong-root-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: 'strong-redis-password'
+
+persistence:
+  enabled: true
+  uploads:
+    size: 20Gi
+  functions:
+    size: 10Gi
+  builds:
+    size: 10Gi
 
 ingress:
   enabled: true
@@ -50,59 +104,267 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-
-mariadb:
-  enabled: true
-
-redis:
-  enabled: true
 ```
 
-## External Database and Cache
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
-mariadb:
-  enabled: false
+# values.yaml — Appwrite with external MariaDB and Redis
+# IMPORTANT: External MariaDB needs root credentials for Appwrite schema migrations
+appwrite:
+  domain: appwrite.example.com
+  existingSecret: appwrite-master-secrets # contains openssl key + JWT secret
+  existingSecretOpenSslKey: appwrite-openssl-key
+  existingSecretJwtKey: appwrite-jwt-secret
 
-redis:
+mariadb:
   enabled: false
 
 database:
+  mode: external
   external:
-    host: mariadb.example.internal
+    host: mariadb.database.svc.cluster.local
     port: 3306
     name: appwrite
-    existingSecret: appwrite-db
+    rootUser: root
+    existingSecret: appwrite-mariadb-root # needs ROOT password for migrations
+    existingSecretPasswordKey: mariadb-root-password
+
+redis:
+  enabled: false
 
 cache:
+  mode: external
   external:
-    host: redis.example.internal
+    host: redis.cache.svc.cluster.local
     port: 6379
-    existingSecret: appwrite-redis
+    existingSecret: appwrite-redis-credentials
+    existingSecretPasswordKey: redis-password
+
+persistence:
+  enabled: true
+  uploads:
+    size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: appwrite.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                            | Default | Description                             |
-| ------------------------------ | ------- | --------------------------------------- |
-| `appwrite.domain`              | `""`    | Public domain for the Appwrite instance |
-| `appwrite.secretKey`           | `""`    | Encryption key for Appwrite secrets     |
-| `mariadb.enabled`              | `true`  | Deploy bundled MariaDB                  |
-| `redis.enabled`                | `true`  | Deploy bundled Redis                    |
-| `database.external.host`       | `""`    | External MariaDB/MySQL host             |
-| `cache.external.host`          | `""`    | External Redis host                     |
-| `ingress.enabled`              | `false` | Enable ingress exposure                 |
-| `persistence.uploads.size`     | `10Gi`  | Uploads PVC size                        |
-| `persistence.cache.size`       | `5Gi`   | Cache PVC size                          |
-| `workers.deletes.replicaCount` | `1`     | Replicas for each worker type           |
+<div data-tab-panel="production">
 
-## Operational Notes
+```yaml
+# values.yaml — Production Appwrite with SMTP, HTTPS, and backup
+appwrite:
+  domain: appwrite.example.com
+  existingSecret: appwrite-master-secrets
+  smtp:
+    host: smtp.mailgun.org
+    port: '587'
+    secure: tls
+    username: postmaster@example.com
+    existingSecret: appwrite-smtp-credentials
+    existingSecretPasswordKey: smtp-password
 
-- this alpha chart deploys approximately 20 Kubernetes workloads — use minimal worker replicas for initial testing
-- the Console is served at the root path, the API at `/v1`, and Realtime at `/v1/realtime`
-- default installs use bundled MariaDB and Redis via HelmForge subcharts
-- all worker pods share the same Appwrite image with different entrypoint commands
+mariadb:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+    rootPassword: 'strong-root-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 50Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: 'strong-redis-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 4Gi
+
+persistence:
+  enabled: true
+  uploads:
+    size: 50Gi
+  functions:
+    size: 20Gi
+  builds:
+    size: 20Gi
+  sites:
+    size: 20Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: appwrite-backups
+    existingSecret: appwrite-s3-backup-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: appwrite.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: appwrite-tls
+      hosts:
+        - appwrite.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Images
+
+| Parameter                  | Type   | Default                       | Description            |
+| -------------------------- | ------ | ----------------------------- | ---------------------- |
+| `image.repository`         | string | `docker.io/appwrite/appwrite` | Appwrite server image. |
+| `image.tag`                | string | `"1.8.1"`                     | Appwrite image tag.    |
+| `console.image.repository` | string | `docker.io/appwrite/console`  | Console image.         |
+| `console.image.tag`        | string | `"7.5.7"`                     | Console image tag.     |
+
+### Appwrite Configuration
+
+| Parameter                           | Type    | Default                | Description                                                            |
+| ----------------------------------- | ------- | ---------------------- | ---------------------------------------------------------------------- |
+| `appwrite.domain`                   | string  | `""`                   | Public domain. Auto-detected from Ingress if empty.                    |
+| `appwrite.openSslKeyV1`             | string  | `""`                   | 64-char hex encryption key. Auto-generated if empty. **Never rotate.** |
+| `appwrite.existingSecret`           | string  | `""`                   | Existing secret with the OpenSSL key and JWT secret.                   |
+| `appwrite.existingSecretOpenSslKey` | string  | `appwrite-openssl-key` | Key for the OpenSSL encryption key in the existing secret.             |
+| `appwrite.existingSecretJwtKey`     | string  | `appwrite-jwt-secret`  | Key for the JWT secret in the existing secret.                         |
+| `appwrite.locale`                   | string  | `en`                   | Appwrite locale (ISO 639-1).                                           |
+| `appwrite.usageStats`               | string  | `enabled`              | Usage statistics collection.                                           |
+| `appwrite.graphql`                  | string  | `enabled`              | GraphQL API.                                                           |
+| `appwrite.storage.limit`            | integer | `30000000`             | Maximum file upload size in bytes (default 30 MB).                     |
+| `appwrite.functions.timeout`        | integer | `900`                  | Maximum function execution timeout in seconds.                         |
+| `appwrite.extraEnv`                 | array   | `[]`                   | Extra environment variables applied to all Appwrite pods.              |
+
+### SMTP
+
+| Parameter                                 | Type   | Default         | Description                                  |
+| ----------------------------------------- | ------ | --------------- | -------------------------------------------- |
+| `appwrite.smtp.host`                      | string | `""`            | SMTP server hostname.                        |
+| `appwrite.smtp.port`                      | string | `""`            | SMTP server port.                            |
+| `appwrite.smtp.secure`                    | string | `""`            | SMTP security mode (`tls`, `ssl`, or empty). |
+| `appwrite.smtp.username`                  | string | `""`            | SMTP username.                               |
+| `appwrite.smtp.existingSecret`            | string | `""`            | Existing secret with SMTP password.          |
+| `appwrite.smtp.existingSecretPasswordKey` | string | `smtp-password` | Key for the SMTP password.                   |
+
+### Services
+
+Each service can be scaled independently:
+
+| Component | Parameter               | Default | Description                         |
+| --------- | ----------------------- | ------- | ----------------------------------- |
+| API       | `api.replicaCount`      | `1`     | API server replicas.                |
+| Realtime  | `realtime.replicaCount` | `1`     | Realtime WebSocket server replicas. |
+
+### Workers
+
+12 workers, each enabled by default at `replicaCount: 1`:
+
+| Worker           | Key                      | Description                     |
+| ---------------- | ------------------------ | ------------------------------- |
+| `audits`         | `workers.audits`         | Audit log processing.           |
+| `webhooks`       | `workers.webhooks`       | Outbound webhook delivery.      |
+| `deletes`        | `workers.deletes`        | Soft-delete cleanup.            |
+| `databases`      | `workers.databases`      | Database event processing.      |
+| `builds`         | `workers.builds`         | Function build jobs.            |
+| `certificates`   | `workers.certificates`   | SSL certificate management.     |
+| `functions`      | `workers.functions`      | Function invocation worker.     |
+| `mails`          | `workers.mails`          | Email delivery.                 |
+| `messaging`      | `workers.messaging`      | SMS/push notification delivery. |
+| `migrations`     | `workers.migrations`     | Data migration worker.          |
+| `statsResources` | `workers.statsResources` | Resource usage statistics.      |
+| `statsUsage`     | `workers.statsUsage`     | API usage statistics.           |
+
+Each worker accepts `enabled`, `replicaCount`, and `resources` fields.
+
+### Database
+
+<Callout type="warning" title="External MariaDB requires root credentials for schema migrations">
+  Appwrite runs its own schema migrations on startup using MariaDB root access. Unlike typical applications, providing
+  only an app-level user is not sufficient. Supply the root password via `database.external.existingSecret`.
+</Callout>
+
+| Parameter                                     | Type   | Default                 | Description                                       |
+| --------------------------------------------- | ------ | ----------------------- | ------------------------------------------------- |
+| `database.mode`                               | string | `auto`                  | Database mode: `auto` or `external`.              |
+| `database.external.host`                      | string | `""`                    | External MariaDB hostname.                        |
+| `database.external.rootUser`                  | string | `root`                  | Root username for schema migrations.              |
+| `database.external.existingSecret`            | string | `""`                    | Existing secret with root password.               |
+| `database.external.existingSecretPasswordKey` | string | `mariadb-root-password` | Key for the root password in the existing secret. |
+
+### Persistence
+
+All PVCs are shared across workers and the API. If `api.replicaCount > 1`, the storage class
+must support `ReadWriteMany`.
+
+| Parameter                       | Type    | Default           | Description                                           |
+| ------------------------------- | ------- | ----------------- | ----------------------------------------------------- |
+| `persistence.enabled`           | boolean | `true`            | Create shared PVCs for all Appwrite data.             |
+| `persistence.storageClass`      | string  | `""`              | StorageClass. Use RWX class for multi-replica setups. |
+| `persistence.accessModes`       | array   | `[ReadWriteOnce]` | PVC access modes.                                     |
+| `persistence.uploads.size`      | string  | `10Gi`            | Uploads storage.                                      |
+| `persistence.cache.size`        | string  | `2Gi`             | Cache storage.                                        |
+| `persistence.certificates.size` | string  | `1Gi`             | SSL certificate storage.                              |
+| `persistence.functions.size`    | string  | `5Gi`             | Function code storage.                                |
+| `persistence.builds.size`       | string  | `5Gi`             | Function build storage.                               |
+| `persistence.sites.size`        | string  | `5Gi`             | Sites/hosting storage.                                |
+
+### Backup
+
+| Parameter                       | Type    | Default                                      | Description                             |
+| ------------------------------- | ------- | -------------------------------------------- | --------------------------------------- |
+| `backup.enabled`                | boolean | `false`                                      | Enable scheduled `mysqldump` S3 backup. |
+| `backup.schedule`               | string  | `"0 3 * * *"`                                | Cron schedule.                          |
+| `backup.s3.endpoint`            | string  | `""`                                         | S3-compatible endpoint URL.             |
+| `backup.s3.bucket`              | string  | `""`                                         | Target bucket name.                     |
+| `backup.s3.existingSecret`      | string  | `""`                                         | Existing secret with S3 credentials.    |
+| `backup.database.mysqldumpArgs` | string  | `--single-transaction --routines --triggers` | Extra mysqldump arguments.              |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                    |
+| -------------------------- | ------- | --------- | ---------------------------------------------- |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                    |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                            |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress.                   |
+| `ingress.hosts`            | array   | —         | Host and path rules. Console: `/`, API: `/v1`. |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.                             |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/appwrite)
+- [Appwrite Official Documentation](https://appwrite.io/docs)
+- [Appwrite GitHub Repository](https://github.com/appwrite/appwrite)
+- [HelmForge Appwrite Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/appwrite)
