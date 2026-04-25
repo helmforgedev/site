@@ -93,7 +93,7 @@ ingress:
 
 | Key                        | Default   | Description                                       |
 | -------------------------- | --------- | ------------------------------------------------- |
-| `domain`                   | `""`      | Public URL for Vaultwarden                        |
+| `domain`                   | `""`      | Public URL for Vaultwarden (required for 1.33+)   |
 | `admin.enabled`            | `false`   | Enable admin panel                                |
 | `admin.token`              | `""`      | Admin panel access token                          |
 | `database.type`            | `sqlite`  | Database backend: `sqlite`, `postgresql`, `mysql` |
@@ -102,6 +102,24 @@ ingress:
 | `ingress.enabled`          | `false`   | Enable ingress                                    |
 | `ingress.ingressClassName` | `traefik` | Ingress class                                     |
 | `signups.enabled`          | `true`    | Allow new user registrations                      |
+
+## Domain Configuration
+
+The `domain` value sets the public URL that Vaultwarden uses for WebSocket connections, attachment URLs, and email links.
+
+**Vaultwarden 1.33 and later require `domain` to be set to a valid URL.** Leaving it empty causes a startup crash with:
+
+```
+ERROR: `DOMAIN` cannot be a relative URL without a base
+```
+
+Always configure `domain` with your public URL:
+
+```yaml
+domain: 'https://vault.example.com'
+```
+
+The chart omits the `DOMAIN` environment variable entirely when `domain` is empty, which prevents the validation crash. However, certain features (WebSocket, attachments, email links) will not work correctly without a properly configured domain.
 
 ## More Information
 
