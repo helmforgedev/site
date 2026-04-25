@@ -1,21 +1,28 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Countly Chart
-description: HelmForge Countly chart for product analytics with event tracking, crash reporting, and MongoDB backend.
+description: HelmForge Countly chart — product analytics with event tracking, crash reporting, push notifications, A/B testing, and 41+ plugins on MongoDB for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Countly
 
-Deploy [Countly](https://count.ly/) on Kubernetes — a product analytics platform with event tracking, crash reporting, push notifications, A/B testing, and 41+ plugins.
+Product analytics platform for mobile, web, and desktop applications. Countly provides event tracking,
+crash reporting, push notifications, A/B testing, funnel analysis, and a plugin system with 41+ optional
+modules — all backed by a MongoDB database.
 
 ## Key Features
 
-- **Full analytics stack** — event tracking, crash reporting, push notifications, A/B testing
+- **Event and session tracking** — capture user actions across mobile, web, and desktop
+- **Crash reporting** — collect and analyze application errors
+- **Push notifications** — send targeted messages via the built-in notification service
+- **A/B testing and funnels** — experiment and analyze user conversion flows
+- **Plugin system** — 41+ configurable feature plugins
+- **Dual-port architecture** — separate API (3001) and Dashboard (6001) endpoints
 - **MongoDB backend** — bundled subchart or external connection
-- **Dual ports** — separate API (3001) and Dashboard (6001) endpoints
-- **Plugin system** — configurable plugin list for feature selection
-- **Scalable workers** — configurable API worker processes
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **S3 backup** — scheduled `mongodump` CronJob to S3-compatible storage
 
 ## Installation
 
@@ -33,14 +40,42 @@ helm install countly helmforge/countly -f values.yaml
 helm install countly oci://ghcr.io/helmforgedev/helm/countly -f values.yaml
 ```
 
-## Basic Example
+## Architecture: Dual Ports
+
+<Callout type="info" title="API and Dashboard run on separate ports in the same container">
+  Countly exposes two endpoints from a single container pod:
+  - **Port 3001 (API)** — receives analytics events from your application SDKs. Mobile apps, websites, and desktop clients send data here.
+  - **Port 6001 (Dashboard)** — the web UI for viewing analytics, configuring apps, and managing users.
+
+The Ingress typically exposes only the Dashboard (port 6001) for internal access. If your SDKs run
+outside the cluster, you must also expose port 3001 externally — either via a separate Ingress or a
+LoadBalancer Service.
+
+</Callout>
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production (TLS + Backup)' },
+    { id: 'external-db', label: 'External MongoDB' },
+    { id: 'sdk-expose', label: 'SDK API Exposed' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Countly with bundled MongoDB, dashboard only exposed
 countly:
   apiWorkers: 4
+  timezone: UTC
 
 mongodb:
   enabled: true
+  auth:
+    rootPassword: 'mongo-root-password'
 
 ingress:
   enabled: true
@@ -52,37 +87,289 @@ ingress:
           pathType: Prefix
 ```
 
-## External MongoDB
+</div>
+
+<div data-tab-panel="production">
 
 ```yaml
+# values.yaml — Production Countly with TLS and daily MongoDB backup
+countly:
+  apiWorkers: 4
+  timezone: America/Sao_Paulo
+
+mongodb:
+  enabled: true
+  auth:
+    rootPassword: 'mongo-root-password'
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-countly-backups
+    prefix: countly
+    existingSecret: countly-s3-credentials
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: countly.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: countly-tls
+      hosts:
+        - countly.example.com
+```
+
+</div>
+
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — Countly with external managed MongoDB
+externalMongodb:
+  enabled: true
+  existingSecret: countly-mongodb-uri
+  existingSecretUriKey: mongodb-uri
+
 mongodb:
   enabled: false
 
-externalMongodb:
+countly:
+  apiWorkers: 4
+
+ingress:
   enabled: true
-  uri: 'mongodb://user:pass@mongo.example.internal:27017/countly'
+  ingressClassName: traefik
+  hosts:
+    - host: countly.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                       | Default | Description                         |
-| ------------------------- | ------- | ----------------------------------- |
-| `countly.apiPort`         | `3001`  | API port                            |
-| `countly.dashboardPort`   | `6001`  | Dashboard port                      |
-| `countly.apiWorkers`      | `4`     | API worker processes                |
-| `countly.plugins`         | `""`    | Plugins to enable (comma-separated) |
-| `mongodb.enabled`         | `true`  | Enable bundled MongoDB              |
-| `externalMongodb.enabled` | `false` | Use external MongoDB                |
-| `externalMongodb.uri`     | `""`    | External MongoDB URI                |
-| `service.port`            | `80`    | Dashboard service port              |
-| `service.apiPort`         | `3001`  | API service port                    |
+<div data-tab-panel="sdk-expose">
 
-## Operational Notes
+```yaml
+# values.yaml — Expose both Dashboard (6001) and SDK API (3001) externally
+# When application SDKs run outside the cluster, port 3001 must be reachable.
+countly:
+  apiWorkers: 4
 
-- MongoDB only — no PostgreSQL support
-- single instance per MongoDB database
-- dashboard and API run in the same container on separate ports
+mongodb:
+  enabled: true
+  auth:
+    rootPassword: 'mongo-root-password'
+
+# Dashboard ingress
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: countly.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: countly-tls
+      hosts:
+        - countly.example.com
+
+# Expose SDK API as a LoadBalancer service via extraManifests
+extraManifests:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: countly-api
+    spec:
+      type: LoadBalancer
+      selector:
+        app.kubernetes.io/name: countly
+      ports:
+        - name: api
+          port: 3001
+          targetPort: 3001
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                            | Description                          |
+| ------------------ | ------ | ---------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/countly/countly-server` | Countly container image.             |
+| `image.tag`        | string | `"25.03.41"`                       | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                     | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                               | Pull secrets for private registries. |
+
+### Countly Configuration
+
+| Parameter               | Type    | Default | Description                                                                    |
+| ----------------------- | ------- | ------- | ------------------------------------------------------------------------------ |
+| `countly.apiPort`       | integer | `3001`  | Internal API port for SDK event ingestion.                                     |
+| `countly.dashboardPort` | integer | `6001`  | Internal Dashboard port for the web UI.                                        |
+| `countly.apiWorkers`    | integer | `4`     | Number of API worker processes. Reduce to `1`–`2` for low-traffic instances.   |
+| `countly.timezone`      | string  | `UTC`   | Server timezone. Affects how events and sessions are grouped in the dashboard. |
+| `countly.plugins`       | string  | `""`    | Comma-separated plugin list. Empty string uses Countly defaults.               |
+| `countly.extraEnv`      | array   | `[]`    | Extra environment variables for advanced configuration.                        |
+
+### Database — External MongoDB
+
+Used when `mongodb.enabled: false`.
+
+| Parameter                              | Type    | Default       | Description                                           |
+| -------------------------------------- | ------- | ------------- | ----------------------------------------------------- |
+| `externalMongodb.enabled`              | boolean | `false`       | Use external MongoDB instead of the bundled subchart. |
+| `externalMongodb.uri`                  | string  | `""`          | MongoDB connection URI.                               |
+| `externalMongodb.existingSecret`       | string  | `""`          | Existing secret containing the MongoDB URI.           |
+| `externalMongodb.existingSecretUriKey` | string  | `mongodb-uri` | Key inside the existing secret for the URI.           |
+
+### Database — MongoDB Subchart
+
+| Parameter                   | Type    | Default      | Description                                     |
+| --------------------------- | ------- | ------------ | ----------------------------------------------- |
+| `mongodb.enabled`           | boolean | `true`       | Deploy the bundled MongoDB subchart.            |
+| `mongodb.architecture`      | string  | `standalone` | MongoDB architecture.                           |
+| `mongodb.auth.enabled`      | boolean | `true`       | Enable MongoDB authentication.                  |
+| `mongodb.auth.rootUser`     | string  | `root`       | MongoDB root username.                          |
+| `mongodb.auth.rootPassword` | string  | `""`         | MongoDB root password. Auto-generated if empty. |
+
+### Backup
+
+| Parameter                              | Type    | Default                        | Description                                                  |
+| -------------------------------------- | ------- | ------------------------------ | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                        | Enable scheduled MongoDB S3 backup CronJob.                  |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                  | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                        | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                       | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                            | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                            | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                            | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `countly`                      | Prefix for backup archive filenames.                         |
+| `backup.images.mongodb`                | string  | `docker.io/library/mongo:8.0`  | Image for `mongodump`.                                       |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0` | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                           | Resources for backup containers.                             |
+| `backup.database.uri`                  | string  | `""`                           | Override MongoDB URI for backup (uses app URI if empty).     |
+| `backup.database.mongodumpArgs`        | string  | `""`                           | Extra arguments passed to `mongodump`.                       |
+| `backup.s3.endpoint`                   | string  | `""`                           | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                           | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `countly`                      | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                         | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                           | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                   | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                   | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                           | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                           | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                            |
+| --------------------- | ------- | ----------- | -------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.               |
+| `service.port`        | integer | `80`        | Dashboard service port (maps to 6001). |
+| `service.apiPort`     | integer | `3001`      | SDK API service port.                  |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.           |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource for the Dashboard.    |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `20`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/countly) on GitHub.
+- [Countly Official Website](https://count.ly)
+- [Countly Documentation](https://support.count.ly/hc/en-us)
+- [Countly GitHub Repository](https://github.com/Countly/countly-server)
+- [HelmForge Countly Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/countly)
