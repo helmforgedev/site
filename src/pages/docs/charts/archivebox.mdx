@@ -1,21 +1,32 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: ArchiveBox Chart
-description: HelmForge ArchiveBox chart for self-hosted web archiving with Chromium headless, multi-format capture, and persistent storage.
+description: HelmForge ArchiveBox chart — self-hosted web archiving platform with multi-format capture (HTML, PDF, screenshot, WARC), Chromium headless rendering, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # ArchiveBox
 
-Deploy [ArchiveBox](https://archivebox.io/) on Kubernetes — a self-hosted web archiving platform that captures websites in multiple formats (HTML, PDF, PNG, WARC, media) using Chromium headless rendering.
+Self-hosted web archiving platform. ArchiveBox captures websites in multiple formats simultaneously — HTML,
+PDF, screenshot, WARC, media extraction, git clone — using a built-in Chromium headless browser. All archived
+content and the SQLite database are stored on a single large persistent volume.
+
+<Callout type="warning" title="Single instance only — no horizontal scaling">
+  ArchiveBox uses SQLite as its database. SQLite allows only a single writer at a time. Running multiple replicas will
+  cause database corruption. Keep `replicaCount` at 1.
+</Callout>
 
 ## Key Features
 
-- **Multi-format archiving** — HTML, PDF, screenshot, WARC, media extraction, git clone
-- **Chromium headless** — full browser rendering with /dev/shm memory-backed tmpfs
-- **SQLite database** — embedded storage, no external database needed
-- **Persistent storage** — PVC for archived content and database
-- **Admin credentials** — managed via Kubernetes Secret with auto-generation
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Multi-format archiving** — HTML, PDF, screenshot, WARC, media, git clone in one pass
+- **Chromium headless** — full JavaScript rendering with `/dev/shm` tmpfs for stability
+- **Three search backends** — ripgrep (default), sqlite, or Sonic for full-text search
+- **Access control** — configurable public/private access for index, snapshots, and adding links
+- **Non-root by default** — runs as UID 911 out of the box
+- **S3 backup** — full `/data` directory backup (SQLite + all archived files) to S3-compatible storage
+- **Persistent storage** — single large PVC for all archived content and database
 
 ## Installation
 
@@ -33,12 +44,59 @@ helm install archivebox helmforge/archivebox -f values.yaml
 helm install archivebox oci://ghcr.io/helmforgedev/helm/archivebox -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'private', label: 'Private (No Public Access)' },
+    { id: 'resources', label: 'With Resource Limits' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Basic ArchiveBox with Traefik ingress
 archivebox:
   adminUsername: admin
   adminPassword: 'my-secure-password'
+
+persistence:
+  enabled: true
+  size: 100Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: archive.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: archivebox-tls
+      hosts:
+        - archive.example.com
+```
+
+</div>
+
+<div data-tab-panel="private">
+
+```yaml
+# values.yaml — Private instance (no public access)
+# Recommended for internet-facing deployments
+archivebox:
+  adminUsername: admin
+  adminPassword: 'my-secure-password'
+  allowedHosts: 'archive.example.com'
+  publicIndex: 'False'
+  publicSnapshots: 'False'
+  publicAddLinks: 'False'
 
 persistence:
   enabled: true
@@ -54,27 +112,274 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                              | Default   | Description                            |
-| -------------------------------- | --------- | -------------------------------------- |
-| `archivebox.port`                | `8000`    | Application port                       |
-| `archivebox.adminUsername`       | `admin`   | Admin username                         |
-| `archivebox.adminPassword`       | `""`      | Auto-generated if empty                |
-| `archivebox.searchBackendEngine` | `ripgrep` | Search engine (ripgrep, sqlite, sonic) |
-| `archivebox.mediaMaxSize`        | `750m`    | Max media download size                |
-| `archivebox.timeout`             | `60`      | URL archiving timeout in seconds       |
-| `persistence.enabled`            | `true`    | Enable /data persistence               |
-| `persistence.size`               | `50Gi`    | PVC size for archives                  |
-| `ingress.enabled`                | `false`   | Enable ingress                         |
+<div data-tab-panel="resources">
 
-## Operational Notes
+```yaml
+# values.yaml — Production setup with explicit resource limits
+# Chromium requires at least 2Gi RAM to archive pages reliably
+archivebox:
+  adminUsername: admin
+  adminPassword: 'my-secure-password'
+  timeout: '120'
+  mediaMaxSize: '1g'
 
-- single instance only — SQLite is single-writer, no horizontal scaling
-- storage-heavy deployment — plan 50–100GB+ PVC depending on archive volume
-- requires minimum 2Gi RAM for Chromium headless rendering
-- `/dev/shm` tmpfs is mounted automatically for Chromium stability
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+persistence:
+  enabled: true
+  size: 200Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: archive.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily S3 backup of the full /data directory
+# Backup includes both the SQLite database and all archived files.
+archivebox:
+  adminUsername: admin
+  adminPassword: 'my-secure-password'
+
+persistence:
+  enabled: true
+  size: 100Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-archivebox-backups
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: archive.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                           | Description                          |
+| ------------------ | ------ | --------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/archivebox/archivebox` | ArchiveBox container image.          |
+| `image.tag`        | string | `"0.7.3"`                         | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries. |
+
+### ArchiveBox Configuration
+
+| Parameter                              | Type    | Default          | Description                                                          |
+| -------------------------------------- | ------- | ---------------- | -------------------------------------------------------------------- |
+| `archivebox.port`                      | integer | `8000`           | Internal HTTP port.                                                  |
+| `archivebox.adminUsername`             | string  | `admin`          | Admin account username, created on first run.                        |
+| `archivebox.adminPassword`             | string  | `""`             | Admin account password. Auto-generated if empty.                     |
+| `archivebox.existingSecret`            | string  | `""`             | Existing Kubernetes Secret containing admin credentials.             |
+| `archivebox.existingSecretUsernameKey` | string  | `admin-username` | Key in the existing secret for the admin username.                   |
+| `archivebox.existingSecretPasswordKey` | string  | `admin-password` | Key in the existing secret for the admin password.                   |
+| `archivebox.allowedHosts`              | string  | `"*"`            | Comma-separated allowed hostnames. Set to your domain in production. |
+| `archivebox.publicIndex`               | string  | `"True"`         | Allow unauthenticated access to the archive index page.              |
+| `archivebox.publicSnapshots`           | string  | `"True"`         | Allow unauthenticated access to archived snapshots.                  |
+| `archivebox.publicAddLinks`            | string  | `"False"`        | Allow unauthenticated users to submit URLs for archiving.            |
+| `archivebox.searchBackendEngine`       | string  | `ripgrep`        | Search backend: `ripgrep` (default), `sqlite`, or `sonic`.           |
+| `archivebox.mediaMaxSize`              | string  | `"750m"`         | Maximum size for media downloads (e.g. `750m`, `1g`).                |
+| `archivebox.timeout`                   | string  | `"60"`           | Timeout per URL archiving job, in seconds.                           |
+| `archivebox.timezone`                  | string  | `UTC`            | Timezone for scheduled tasks and timestamps.                         |
+| `archivebox.extraEnv`                  | array   | `[]`             | Extra environment variables for advanced configuration.              |
+
+<Callout type="danger" title="Restrict public access before exposing to the internet">
+  By default, `publicIndex` and `publicSnapshots` are both `"True"`. Anyone who reaches your ArchiveBox URL can browse
+  your entire archive and view all captured pages. For internet-facing deployments, set both to `"False"` and restrict
+  `allowedHosts` to your exact domain.
+</Callout>
+
+<Callout type="info" title="Search backend trade-offs">
+  - **ripgrep** (default) — fast grep-based full-text search, no extra dependencies, searches HTML files directly -
+  **sqlite** — uses SQLite FTS5, no extra setup, slower on large archives - **sonic** — fastest on large archives,
+  requires a separate Sonic server deployed alongside ArchiveBox
+</Callout>
+
+### Persistence
+
+The PVC stores the entire `/data` directory: SQLite database, all archived files (HTML, PDFs, screenshots, WARCs,
+media), and ArchiveBox configuration. Size it generously — archived pages with media can consume gigabytes quickly.
+
+| Parameter                   | Type    | Default             | Description                                                 |
+| --------------------------- | ------- | ------------------- | ----------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (database + all archived content). |
+| `persistence.size`          | string  | `50Gi`              | PVC size. Plan for 100GB+ for active archiving.             |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                   |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                           |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                |
+
+<Callout type="warning" title="NFS storage may require fsGroup configuration">
+  ArchiveBox runs as UID/GID 911 by default (`podSecurityContext.fsGroup: 911`). Some NFS provisioners ignore `fsGroup`
+  and may cause permission errors on the `/data` directory. If using NFS, configure your provisioner to support fsGroup
+  or override `podSecurityContext` and `securityContext` accordingly.
+</Callout>
+
+### Backup
+
+The S3 backup archives the full `/data` directory — including the SQLite database and all archived files. This is a
+complete backup of the entire ArchiveBox dataset, unlike other charts where only media files are backed up.
+
+| Parameter                              | Type    | Default                         | Description                                                  |
+| -------------------------------------- | ------- | ------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                         | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                   | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                         | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                        | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                             | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                             | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                             | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `archivebox`                    | Prefix for backup archive filenames.                         |
+| `backup.images.tar`                    | string  | `docker.io/library/alpine:3.22` | Image used for `tar` archive.                                |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`  | Image used for S3 upload.                                    |
+| `backup.resources`                     | object  | `{}`                            | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                            | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                            | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `archivebox`                    | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                          | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                            | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                    | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                    | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                            | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                            | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+Probes use the `/health/` endpoint.
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+ArchiveBox uses Chromium internally to render pages. The Chromium process requires at least **2 GB RAM** to
+function reliably. Without memory limits, the container may be OOMKilled during archiving of JavaScript-heavy
+pages.
+
+| Parameter            | Type   | Default                                                   | Description                                                  |
+| -------------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------ |
+| `resources`          | object | `{}`                                                      | CPU and memory requests and limits. Recommended: 2–4 Gi RAM. |
+| `podSecurityContext` | object | `{ fsGroup: 911 }`                                        | Pod-level security context.                                  |
+| `securityContext`    | object | `{ runAsUser: 911, runAsGroup: 911, runAsNonRoot: true }` | Container-level security context.                            |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Pod OOMKilled during archiving">
+  Archiving JavaScript-heavy or media-rich pages triggers full Chromium rendering. Without explicit `resources` limits,
+  the container may be OOMKilled. Set at least `memory: 2Gi` in `resources.requests` and `memory: 4Gi` in
+  `resources.limits`. Monitor memory usage during peak archiving.
+</Callout>
+
+<Callout type="tip" title="Archiving times out on slow or complex pages">
+  The default `archivebox.timeout` is 60 seconds. Pages with slow external resources or heavy JavaScript may time out
+  before the snapshot is complete. Increase `timeout` to `120` or `180` for more reliable archiving of complex pages.
+</Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/archivebox) on GitHub.
+- [ArchiveBox Official Website](https://archivebox.io)
+- [ArchiveBox Documentation](https://github.com/ArchiveBox/ArchiveBox/wiki)
+- [ArchiveBox GitHub Repository](https://github.com/ArchiveBox/ArchiveBox)
+- [HelmForge ArchiveBox Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/archivebox)
