@@ -1,21 +1,40 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Middleware Chart
-description: HelmForge Middleware chart for DORA metrics platform with PostgreSQL, Redis, and engineering performance tracking.
+description: HelmForge Middleware chart — open-source DORA metrics platform measuring Deployment Frequency, Lead Time, MTTR, and Change Failure Rate with PostgreSQL, Redis, and API key persistence for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Middleware
 
-Deploy [Middleware](https://www.middlewarehq.com/) on Kubernetes — an open-source DORA metrics platform that measures Deployment Frequency, Lead Time, MTTR, and Change Failure Rate for engineering teams.
+Deploy [Middleware](https://www.middlewarehq.com/) on Kubernetes — an open-source DORA metrics platform
+that measures Deployment Frequency, Lead Time for Changes, MTTR, and Change Failure Rate for engineering
+teams. Connects to GitHub, Jira, PagerDuty, and CI/CD pipelines to aggregate data automatically.
+
+<Callout type="warning" title="Persistence is required — losing /app/keys breaks all integrations">
+  Middleware stores generated API keys for all configured integrations (GitHub, Jira, PagerDuty, etc.) in `/app/keys`.
+  If the PVC is lost or `persistence.enabled: false`, all integration credentials are destroyed and must be reconfigured
+  manually. Always use `persistence.enabled: true` in production.
+</Callout>
 
 ## Key Features
 
 - **All four DORA metrics** — Deployment Frequency, Lead Time for Changes, MTTR, Change Failure Rate
-- **All-in-one container** — frontend, analytics, and sync server in a single image
+- **Single all-in-one container** — frontend (Next.js), analytics API, and sync server in one image
+- **Three internal services** — frontend on port 3333, analytics on 9696, sync on 9697
 - **PostgreSQL + Redis** — bundled subcharts or external connections
-- **CI/CD integrations** — tracks metrics from your existing pipelines
-- **Persistent storage** — API keys and configuration stored in PVC
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **API key persistence** — integration credentials stored in PVC at `/app/keys`
+- **Timezone-aware** — configurable timezone for accurate DORA metric windows
+
+## Architecture Note
+
+<Callout type="info" title="Single instance only — no horizontal scaling">
+  Middleware runs all three services (frontend, analytics, sync) in a single pod. It cannot be horizontally scaled. Plan
+  for at least **4 GB RAM** for development and **16 GB RAM** for production workloads processing large git histories
+  and pipeline data. The startup probe allows up to 2.5 minutes for the container to initialize all internal services.
+</Callout>
 
 ## Installation
 
@@ -33,14 +52,37 @@ helm install middleware helmforge/middleware -f values.yaml
 helm install middleware oci://ghcr.io/helmforgedev/helm/middleware -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (Bundled DB)' },
+    { id: 'external', label: 'External PostgreSQL + Redis' },
+    { id: 'production', label: 'Production' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Middleware with bundled PostgreSQL and Redis subcharts
 postgresql:
   enabled: true
+  auth:
+    database: mhq-oss
+    username: middleware
+    password: 'set-a-strong-password'
 
 redis:
   enabled: true
+  architecture: standalone
+
+middleware:
+  timezone: America/Sao_Paulo # affects DORA metric time windows
+
+persistence:
+  enabled: true
+  size: 1Gi
 
 ingress:
   enabled: true
@@ -52,9 +94,12 @@ ingress:
           pathType: Prefix
 ```
 
-## External Database and Cache
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
+# values.yaml — Middleware with external PostgreSQL and Redis
 postgresql:
   enabled: false
 
@@ -63,39 +108,239 @@ redis:
 
 externalDatabase:
   enabled: true
-  host: postgres.example.internal
+  host: postgres.database.svc.cluster.local
   port: 5432
-  name: middleware
-  username: middleware
-  existingSecret: middleware-db
+  name: mhq-oss # default DB name — must match what you create on the server
+  user: middleware
+  existingSecret: middleware-db-credentials
+  existingSecretPasswordKey: user-password
 
 externalRedis:
   enabled: true
-  host: redis.example.internal
+  host: redis.cache.svc.cluster.local
   port: 6379
+
+middleware:
+  timezone: UTC
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: middleware.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                        | Default | Description                  |
-| -------------------------- | ------- | ---------------------------- |
-| `middleware.frontendPort`  | `3333`  | Frontend port                |
-| `middleware.analyticsPort` | `9696`  | Analytics API port           |
-| `middleware.syncPort`      | `9697`  | Sync server port             |
-| `middleware.environment`   | `prod`  | Environment                  |
-| `postgresql.enabled`       | `true`  | Enable bundled PostgreSQL    |
-| `redis.enabled`            | `true`  | Enable bundled Redis         |
-| `externalDatabase.enabled` | `false` | Use external database        |
-| `externalRedis.enabled`    | `false` | Use external Redis           |
-| `persistence.enabled`      | `true`  | Enable /app/keys persistence |
-| `persistence.size`         | `1Gi`   | PVC size                     |
+<div data-tab-panel="production">
 
-## Operational Notes
+```yaml
+# values.yaml — Production Middleware with resources and TLS
+postgresql:
+  enabled: true
+  auth:
+    database: mhq-oss
+    username: middleware
+    password: 'strong-db-password'
 
-- single instance only — no horizontal scaling
-- resource-heavy — 16GB RAM recommended for production workloads
-- all three ports (frontend, analytics, sync) are exposed via the same pod
+redis:
+  enabled: true
+  architecture: standalone
+
+middleware:
+  timezone: UTC
+  environment: prod
+  extraEnv:
+    - name: NEXT_PUBLIC_APP_URL
+      value: 'https://middleware.example.com'
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 500m
+  limits:
+    memory: 8Gi # 16GB recommended for large orgs with long git histories
+    cpu: '4'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: middleware.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: middleware-tls
+      hosts:
+        - middleware.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                              | Description                          |
+| ------------------ | ------ | ------------------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/middlewareeng/middleware` | Middleware container image.          |
+| `image.tag`        | string | `"0.3.1"`                            | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                       | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                                 | Pull secrets for private registries. |
+
+### Middleware Configuration
+
+| Parameter                         | Type    | Default   | Description                                                                              |
+| --------------------------------- | ------- | --------- | ---------------------------------------------------------------------------------------- |
+| `middleware.frontendPort`         | integer | `3333`    | Frontend (Next.js) listen port inside the container.                                     |
+| `middleware.analyticsPort`        | integer | `9696`    | Analytics API listen port inside the container.                                          |
+| `middleware.syncPort`             | integer | `9697`    | Sync server listen port inside the container.                                            |
+| `middleware.environment`          | string  | `prod`    | Application environment.                                                                 |
+| `middleware.timezone`             | string  | `UTC`     | Timezone for DORA metric time windows. Use IANA format (e.g. `America/Sao_Paulo`).       |
+| `middleware.internalDbEnabled`    | string  | `"false"` | Controls the internal DB built into the image. Set to `"false"` when using subcharts.    |
+| `middleware.internalRedisEnabled` | string  | `"false"` | Controls the internal Redis built into the image. Set to `"false"` when using subcharts. |
+| `middleware.extraEnv`             | array   | `[]`      | Extra environment variables for the container.                                           |
+
+<Callout type="tip" title="Set timezone to match your team's working hours">
+  Middleware uses the timezone to calculate DORA metric windows (e.g. business hours for Deployment Frequency). If left
+  at `UTC` and your team works in `America/Sao_Paulo`, deployment windows will shift by 3 hours, skewing the metrics.
+</Callout>
+
+### External Database
+
+Used when `postgresql.enabled: false`.
+
+| Parameter                                    | Type    | Default         | Description                                              |
+| -------------------------------------------- | ------- | --------------- | -------------------------------------------------------- |
+| `externalDatabase.enabled`                   | boolean | `false`         | Use an external PostgreSQL instead of the subchart.      |
+| `externalDatabase.host`                      | string  | `""`            | External PostgreSQL hostname.                            |
+| `externalDatabase.port`                      | integer | `5432`          | External PostgreSQL port.                                |
+| `externalDatabase.name`                      | string  | `mhq-oss`       | Database name. Must match what you create on the server. |
+| `externalDatabase.user`                      | string  | `middleware`    | Database username.                                       |
+| `externalDatabase.password`                  | string  | `""`            | Database password (prefer `existingSecret`).             |
+| `externalDatabase.existingSecret`            | string  | `""`            | Existing secret with database credentials.               |
+| `externalDatabase.existingSecretPasswordKey` | string  | `user-password` | Key inside the existing secret for the password.         |
+
+### External Redis
+
+Used when `redis.enabled: false`.
+
+| Parameter               | Type    | Default | Description                                |
+| ----------------------- | ------- | ------- | ------------------------------------------ |
+| `externalRedis.enabled` | boolean | `false` | Use an external Redis instead of subchart. |
+| `externalRedis.host`    | string  | `""`    | External Redis hostname.                   |
+| `externalRedis.port`    | integer | `6379`  | External Redis port.                       |
+
+### Persistence
+
+| Parameter                   | Type    | Default           | Description                                                 |
+| --------------------------- | ------- | ----------------- | ----------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`            | Enable PVC for `/app/keys` (API keys for all integrations). |
+| `persistence.size`          | string  | `1Gi`             | PVC size. Integration keys are small — 1Gi is sufficient.   |
+| `persistence.storageClass`  | string  | `""`              | StorageClass for the PVC.                                   |
+| `persistence.accessModes`   | array   | `[ReadWriteOnce]` | PVC access modes.                                           |
+| `persistence.existingClaim` | string  | `""`              | Use an existing PVC.                                        |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                                   |
+| --------------------- | ------- | ----------- | --------------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Service type.                                 |
+| `service.port`        | integer | `80`        | Service port. Routes to the frontend on 3333. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.                  |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.                               |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                                               |
+| ------------------------------------ | ------- | ------- | --------------------------------------------------------- |
+| `probes.startup.enabled`             | boolean | `true`  | Enable startup probe.                                     |
+| `probes.startup.initialDelaySeconds` | integer | `30`    | Initial delay before first startup check.                 |
+| `probes.startup.periodSeconds`       | integer | `5`     | Startup probe period.                                     |
+| `probes.startup.failureThreshold`    | integer | `30`    | Max failures (30 × 5s = 2.5 min total startup tolerance). |
+| `probes.liveness.enabled`            | boolean | `true`  | Enable liveness probe.                                    |
+| `probes.liveness.periodSeconds`      | integer | `15`    | Liveness probe period.                                    |
+| `probes.liveness.failureThreshold`   | integer | `3`     | Liveness probe failure threshold.                         |
+| `probes.readiness.enabled`           | boolean | `true`  | Enable readiness probe.                                   |
+| `probes.readiness.periodSeconds`     | integer | `10`    | Readiness probe period.                                   |
+| `probes.readiness.failureThreshold`  | integer | `3`     | Readiness probe failure threshold.                        |
+
+### Subcharts
+
+| Parameter                  | Type    | Default      | Description                                 |
+| -------------------------- | ------- | ------------ | ------------------------------------------- |
+| `postgresql.enabled`       | boolean | `true`       | Deploy bundled PostgreSQL subchart.         |
+| `postgresql.auth.database` | string  | `mhq-oss`    | Database name for Middleware.               |
+| `postgresql.auth.username` | string  | `middleware` | Database username.                          |
+| `postgresql.auth.password` | string  | `""`         | Database password. Auto-generated if empty. |
+| `redis.enabled`            | boolean | `true`       | Deploy bundled Redis subchart.              |
+| `redis.architecture`       | string  | `standalone` | Redis architecture.                         |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/middleware) on GitHub.
+- [Middleware Official Website](https://www.middlewarehq.com/)
+- [Middleware GitHub Repository](https://github.com/middlewarehq/middleware)
+- [DORA Metrics Explained](https://dora.dev/guides/dora-metrics-four-keys/)
+- [HelmForge Middleware Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/middleware)
