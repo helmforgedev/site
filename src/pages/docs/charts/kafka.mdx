@@ -1,21 +1,34 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Kafka Chart
-description: HelmForge Kafka chart for Apache Kafka KRaft single-broker and production-oriented cluster deployments.
+description: HelmForge Apache Kafka chart — KRaft-only (no ZooKeeper), single-broker and cluster topologies with combined mode, JMX metrics, PodDisruptionBudget, and Prometheus ServiceMonitor for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Kafka
 
-Deploy Apache Kafka on Kubernetes using the official `apache/kafka:4.2.0` image with a KRaft-only design. The chart intentionally supports a simple `single-broker` path for development and a production-oriented `cluster` path with dedicated controllers and brokers.
+Apache Kafka distributed event streaming platform. This chart uses the official `apache/kafka` image with
+a KRaft-only design — no ZooKeeper required. It supports a `single-broker` topology for development and a
+`cluster` topology for production-oriented workloads with dedicated or combined controller and broker roles.
+
+<Callout type="info" title="KRaft only — ZooKeeper is not used or supported">
+  This chart runs Kafka in KRaft mode (Kafka 4.x+). There is no ZooKeeper deployment, dependency, or compatibility mode.
+  Migrations from ZooKeeper-based deployments require a separate KRaft migration process outside the scope of this
+  chart.
+</Callout>
 
 ## Key Features
 
-- **Latest stable Kafka** — pinned to the latest stable upstream Kafka release
-- **KRaft only** — no ZooKeeper mode in this chart
-- **Two clear topologies** — `single-broker` for simple environments and `cluster` for production-oriented deployments
-- **Persistent storage** — supported for single-broker, controllers, and brokers
-- **Stable broker DNS** — advertised listeners use StatefulSet pod DNS names inside the cluster
-- **Optional metrics** — JMX exporter javaagent with optional ServiceMonitor
+- **KRaft-only** — no ZooKeeper, using Apache Kafka's native consensus protocol
+- **Single-broker mode** — one-pod topology for development and CI environments
+- **Cluster mode** — dedicated controller and broker StatefulSets for production
+- **Combined mode** — `brokers.replicaCount: 0` makes controllers also act as brokers (3-node HA without 6 pods)
+- **Stable broker DNS** — advertised listeners use StatefulSet pod DNS names
+- **JMX metrics** — optional Prometheus-compatible metrics via JMX exporter javaagent
+- **ServiceMonitor** — Prometheus Operator integration for metrics collection
+- **PodDisruptionBudget** — optional disruption protection for cluster mode
 
 ## Installation
 
@@ -33,20 +46,148 @@ helm install kafka helmforge/kafka -f values.yaml
 helm install kafka oci://ghcr.io/helmforgedev/helm/kafka -f values.yaml
 ```
 
-## Single-Broker Example
+## Topologies
+
+| Mode                               | Pods                                | Use Case                         |
+| ---------------------------------- | ----------------------------------- | -------------------------------- |
+| `single-broker`                    | 1                                   | Development, CI, local testing   |
+| `cluster` (separate)               | 3 controllers + 3 brokers = 6       | Production, full fault isolation |
+| `cluster` (combined, `brokers: 0`) | 3 controllers acting as brokers = 3 | HA on limited nodes              |
+
+<Callout type="tip" title="Combined mode: 3-node HA with half the pods">
+  Setting `cluster.brokers.replicaCount: 0` enables combined mode where each controller pod also runs as a broker
+  (`process.roles=broker,controller`). This provides full fault tolerance with only 3 pods instead of 6 — ideal for
+  small clusters where you need HA but not the resource overhead of dedicated controller and broker StatefulSets.
+</Callout>
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'single', label: 'Single Broker' },
+    { id: 'cluster', label: 'Cluster (Dedicated)' },
+    { id: 'combined', label: 'Cluster (Combined)' },
+    { id: 'metrics', label: 'With Metrics' },
+  ]}
+>
+
+<div data-tab-panel="single">
 
 ```yaml
+# values.yaml — Single broker for development or lightweight use cases
 architecture: single-broker
+
+config:
+  autoCreateTopicsEnabled: true # convenient for development
+  logRetentionHours: 72
 
 singleBroker:
   persistence:
-    size: 8Gi
+    size: 10Gi
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
 ```
 
-## Cluster Example
+</div>
+
+<div data-tab-panel="cluster">
 
 ```yaml
+# values.yaml — 3 controller + 3 broker cluster for production
+# Requires a stable KRaft Cluster ID — store it in a Secret before first deploy.
 architecture: cluster
+
+kraft:
+  existingSecret: kafka-kraft-secret # contains kafka-cluster-id
+
+config:
+  numPartitions: 3
+  autoCreateTopicsEnabled: false
+  logRetentionHours: 168 # 7 days
+
+cluster:
+  minInSyncReplicas: 2
+  controllers:
+    replicaCount: 3
+    persistence:
+      size: 8Gi
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+  brokers:
+    replicaCount: 3
+    persistence:
+      size: 50Gi
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 2000m
+
+pdb:
+  enabled: true
+  minAvailable: 2
+```
+
+</div>
+
+<div data-tab-panel="combined">
+
+```yaml
+# values.yaml — 3-node combined mode (broker + controller on same pod)
+# Each pod runs process.roles=broker,controller. Client service routes to controller pods.
+architecture: cluster
+
+kraft:
+  existingSecret: kafka-kraft-secret
+
+config:
+  numPartitions: 3
+  autoCreateTopicsEnabled: false
+  logRetentionHours: 168
+
+cluster:
+  minInSyncReplicas: 2
+  controllers:
+    replicaCount: 3
+    persistence:
+      size: 30Gi # combines metadata + log storage
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 2000m
+  brokers:
+    replicaCount: 0 # 0 = combined mode, no separate broker StatefulSet
+
+pdb:
+  enabled: true
+  minAvailable: 2
+```
+
+</div>
+
+<div data-tab-panel="metrics">
+
+```yaml
+# values.yaml — Kafka cluster with Prometheus metrics
+architecture: cluster
+
+kraft:
+  existingSecret: kafka-kraft-secret
 
 cluster:
   minInSyncReplicas: 2
@@ -59,32 +200,186 @@ cluster:
     persistence:
       size: 50Gi
 
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true # requires Prometheus Operator
+    interval: 30s
+    labels:
+      prometheus: kube-prometheus
+
 pdb:
   enabled: true
+  minAvailable: 2
 ```
 
-## Key Values
+</div>
 
-| Key                                | Default         | Description                                                        |
-| ---------------------------------- | --------------- | ------------------------------------------------------------------ |
-| `architecture`                     | `single-broker` | `single-broker` or `cluster`                                       |
-| `image.repository`                 | `apache/kafka`  | Kafka image repository                                             |
-| `image.tag`                        | `4.2.0`         | Kafka image tag                                                    |
-| `kraft.existingSecret`             | `""`            | Existing secret with KRaft cluster ID and controller directory IDs |
-| `listeners.client.port`            | `9092`          | Kafka client port                                                  |
-| `listeners.controller.port`        | `9093`          | KRaft controller port                                              |
-| `cluster.controllers.replicaCount` | `3`             | Dedicated controller replicas                                      |
-| `cluster.brokers.replicaCount`     | `3`             | Dedicated broker replicas                                          |
-| `cluster.minInSyncReplicas`        | `2`             | Recommended minimum ISR for cluster mode                           |
-| `metrics.enabled`                  | `false`         | Enable JMX exporter metrics                                        |
+</DocsTabs>
 
-## Validation Guidance
+## Configuration Reference
 
-- use `single-broker` for development and CI, not as the production baseline
-- use `cluster` for production-oriented workloads with dedicated controllers and brokers
-- validate topic creation, producer, and consumer flows before promotion
-- plan external listeners, TLS, and auth as explicit follow-up work if your environment needs them
+### Core
+
+| Parameter          | Type   | Default         | Description                                            |
+| ------------------ | ------ | --------------- | ------------------------------------------------------ |
+| `architecture`     | string | `single-broker` | Broker topology: `single-broker` or `cluster`.         |
+| `nameOverride`     | string | `""`            | Override the chart name.                               |
+| `fullnameOverride` | string | `""`            | Override the full release name.                        |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
+
+### Image
+
+| Parameter          | Type   | Default                  | Description                          |
+| ------------------ | ------ | ------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/apache/kafka` | Kafka container image.               |
+| `image.tag`        | string | `"4.2.0"`                | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
+
+### KRaft Metadata
+
+| Parameter                                         | Type   | Default            | Description                                                                               |
+| ------------------------------------------------- | ------ | ------------------ | ----------------------------------------------------------------------------------------- |
+| `kraft.existingSecret`                            | string | `""`               | Existing secret with KRaft Cluster ID (and controller directory IDs).                     |
+| `kraft.existingSecretClusterIdKey`                | string | `kafka-cluster-id` | Key in the existing secret for the Cluster ID.                                            |
+| `kraft.existingSecretControllerDirectoryIdPrefix` | string | `controller`       | Prefix for controller directory ID keys in the secret (e.g. `controller-0-directory-id`). |
+| `kraft.clusterId`                                 | string | `""`               | Explicit Cluster ID used when `kraft.existingSecret` is not set.                          |
+
+<Callout type="danger" title="Fix the KRaft Cluster ID in production — do not let it regenerate">
+  If the Cluster ID changes between deployments (e.g. during a Helm upgrade or reinstall), brokers with existing data
+  from the previous Cluster ID will refuse to start. Always store the Cluster ID in a Kubernetes Secret
+  (`kraft.existingSecret`) before the first deploy in production, and never delete that Secret while broker data
+  persists on PVCs.
+</Callout>
+
+### Listeners
+
+| Parameter                    | Type    | Default | Description                                       |
+| ---------------------------- | ------- | ------- | ------------------------------------------------- |
+| `listeners.client.port`      | integer | `9092`  | Client listener port for producers and consumers. |
+| `listeners.controller.port`  | integer | `9093`  | KRaft controller listener port.                   |
+| `listeners.interBroker.port` | integer | `9094`  | Inter-broker listener port (cluster mode only).   |
+
+### Service
+
+| Parameter             | Type   | Default     | Description                          |
+| --------------------- | ------ | ----------- | ------------------------------------ |
+| `service.type`        | string | `ClusterIP` | Client bootstrap service type.       |
+| `service.annotations` | object | `{}`        | Annotations for the client Service.  |
+| `service.labels`      | object | `{}`        | Extra labels for the client Service. |
+
+### Configuration
+
+| Parameter                        | Type    | Default      | Description                                                                        |
+| -------------------------------- | ------- | ------------ | ---------------------------------------------------------------------------------- |
+| `config.numPartitions`           | integer | `3`          | Default number of partitions per topic.                                            |
+| `config.autoCreateTopicsEnabled` | boolean | `false`      | Allow brokers to create topics automatically on first produce.                     |
+| `config.deleteTopicEnabled`      | boolean | `true`       | Allow topic deletion via the admin API.                                            |
+| `config.logRetentionHours`       | integer | `168`        | Default log retention period (7 days). Controls PVC growth for high-volume topics. |
+| `config.logSegmentBytes`         | integer | `1073741824` | Log segment size per partition (1 GB). Affects cleanup and compaction frequency.   |
+| `config.common`                  | string  | `""`         | Extra configuration appended to every generated `server.properties`.               |
+| `config.singleBroker`            | string  | `""`         | Extra configuration appended in single-broker mode only.                           |
+| `config.controller`              | string  | `""`         | Extra configuration appended only to controller pods in cluster mode.              |
+| `config.broker`                  | string  | `""`         | Extra configuration appended only to broker pods in cluster mode.                  |
+
+<Callout type="tip" title="autoCreateTopicsEnabled is false by default">
+  Producers publishing to a non-existent topic will receive a `UNKNOWN_TOPIC_OR_PARTITION` error. Create topics
+  explicitly before use, or set `config.autoCreateTopicsEnabled: true` in development environments. Keeping it `false`
+  in production prevents accidental topic sprawl.
+</Callout>
+
+### Single-Broker Topology
+
+| Parameter                               | Type    | Default             | Description                                |
+| --------------------------------------- | ------- | ------------------- | ------------------------------------------ |
+| `singleBroker.persistence.enabled`      | boolean | `true`              | Enable PVC for single-broker data.         |
+| `singleBroker.persistence.size`         | string  | `8Gi`               | PVC size for single-broker.                |
+| `singleBroker.persistence.storageClass` | string  | `""`                | StorageClass for single-broker PVC.        |
+| `singleBroker.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes.                              |
+| `singleBroker.resources`                | object  | `{}`                | Resources for the single-broker container. |
+
+### Cluster Topology
+
+| Parameter                                 | Type    | Default | Description                                                                              |
+| ----------------------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------- |
+| `cluster.minInSyncReplicas`               | integer | `2`     | Minimum in-sync replicas for internal topics.                                            |
+| `cluster.controllers.replicaCount`        | integer | `3`     | Number of dedicated controller pods.                                                     |
+| `cluster.controllers.persistence.enabled` | boolean | `true`  | Enable PVCs for controllers.                                                             |
+| `cluster.controllers.persistence.size`    | string  | `8Gi`   | PVC size per controller.                                                                 |
+| `cluster.controllers.resources`           | object  | `{}`    | Resources for controller containers.                                                     |
+| `cluster.brokers.replicaCount`            | integer | `3`     | Number of broker pods. Set to `0` for combined mode (brokers co-located on controllers). |
+| `cluster.brokers.persistence.enabled`     | boolean | `true`  | Enable PVCs for brokers.                                                                 |
+| `cluster.brokers.persistence.size`        | string  | `20Gi`  | PVC size per broker.                                                                     |
+| `cluster.brokers.resources`               | object  | `{}`    | Resources for broker containers.                                                         |
+
+### PodDisruptionBudget
+
+| Parameter          | Type    | Default | Description                                              |
+| ------------------ | ------- | ------- | -------------------------------------------------------- |
+| `pdb.enabled`      | boolean | `false` | Create PodDisruptionBudgets for controllers and brokers. |
+| `pdb.minAvailable` | integer | `1`     | Minimum available pods during voluntary disruptions.     |
+
+### Metrics
+
+| Parameter                         | Type    | Default                          | Description                                           |
+| --------------------------------- | ------- | -------------------------------- | ----------------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false`                          | Enable JMX exporter javaagent for Prometheus metrics. |
+| `metrics.image.repository`        | string  | `docker.io/bitnami/jmx-exporter` | JMX exporter init image repository.                   |
+| `metrics.image.tag`               | string  | `"1.5.0"`                        | JMX exporter image tag.                               |
+| `metrics.port`                    | integer | `5556`                           | Port exposed by the JMX exporter javaagent.           |
+| `metrics.serviceMonitor.enabled`  | boolean | `false`                          | Create Prometheus Operator ServiceMonitor resources.  |
+| `metrics.serviceMonitor.interval` | string  | `30s`                            | Metrics scrape interval.                              |
+| `metrics.serviceMonitor.labels`   | object  | `{}`                             | Labels added to the ServiceMonitor.                   |
+
+### Security and Resources
+
+Kafka runs as a non-root user (`UID 1000`) with read-write access to log directories. The `fsGroup: 1000`
+ensures PVC data directories are writable by the Kafka process.
+
+| Parameter                                  | Type    | Default | Description                          |
+| ------------------------------------------ | ------- | ------- | ------------------------------------ |
+| `podSecurityContext.fsGroup`               | integer | `1000`  | Filesystem group for the pod.        |
+| `securityContext.runAsUser`                | integer | `1000`  | UID for the Kafka container process. |
+| `securityContext.runAsGroup`               | integer | `1000`  | GID for the Kafka container process. |
+| `securityContext.runAsNonRoot`             | boolean | `true`  | Enforce non-root execution.          |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false` | Disallow privilege escalation.       |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                                                                  |
+| ------------------------------- | ------- | ------- | ---------------------------------------------------------------------------- |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.                                                |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.                                                  |
+| `affinity`                      | object  | `{}`    | Affinity rules.                                                              |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.                                                 |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.                                                   |
+| `terminationGracePeriodSeconds` | integer | `120`   | Termination grace period. Kafka needs time to drain producers and consumers. |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.                                                    |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod.                                               |
+
+### Extra
+
+| Parameter             | Type  | Default | Description                                              |
+| --------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraEnv`            | array | `[]`    | Extra environment variables for Kafka containers.        |
+| `extraInitContainers` | array | `[]`    | Extra init containers.                                   |
+| `extraVolumes`        | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts`   | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`      | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/kafka) on GitHub.
+- [Apache Kafka Official Website](https://kafka.apache.org)
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [KRaft Mode Overview](https://kafka.apache.org/documentation/#kraft)
+- [HelmForge Kafka Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/kafka)
