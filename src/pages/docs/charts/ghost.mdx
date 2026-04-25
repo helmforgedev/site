@@ -1,21 +1,27 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Ghost Chart
-description: HelmForge Ghost chart — modern publishing platform with MySQL backend and S3 content backup.
+description: HelmForge Ghost chart — modern publishing platform for blogs, newsletters, and memberships with MySQL backend, content persistence, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Ghost
 
-Deploy Ghost on Kubernetes using the official [ghost](https://hub.docker.com/_/ghost) container image. Ghost is a powerful open-source publishing platform for blogs, newsletters, and memberships with a modern editor and headless CMS API.
+Modern open-source publishing platform for blogs, newsletters, and memberships. Ghost provides a polished writing
+editor, a built-in membership and subscription system, email newsletter delivery, and a headless CMS API — all
+backed by MySQL.
 
 ## Key Features
 
-- **MySQL Backend** — bundled MySQL subchart or external database support
-- **Content Persistence** — persistent volume for images, media, and uploaded files
-- **S3 Backup** — scheduled content backups to S3-compatible object storage
-- **Headless CMS API** — Content API and Admin API for headless usage
-- **Memberships & Newsletters** — built-in subscription and email newsletter support
-- **Ingress Support** — configurable ingress with TLS for the publishing frontend
+- **Modern editor** — clean, distraction-free writing experience with Markdown and rich cards
+- **Memberships and newsletters** — built-in subscription tiers and email newsletter delivery
+- **Headless CMS API** — Content API and Admin API for frontend frameworks and integrations
+- **MySQL backend** — bundled subchart or external MySQL database
+- **Content persistence** — PVC-backed content directory for images, media, and uploaded files
+- **S3 content backup** — scheduled archive of the Ghost content directory to S3-compatible storage
+- **Ingress support** — TLS via cert-manager with configurable ingress class
 
 ## Installation
 
@@ -33,15 +39,28 @@ helm install ghost helmforge/ghost
 helm install ghost oci://ghcr.io/helmforgedev/helm/ghost
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'external-db', label: 'External MySQL' },
+    { id: 'email', label: 'With Email (SMTP)' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Ghost with bundled MySQL (default)
 ghost:
   url: 'https://blog.example.com'
 
 mysql:
   enabled: true
+  auth:
+    password: 'mysql-password'
 
 persistence:
   enabled: true
@@ -57,19 +76,318 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default     | Description                         |
-| --------------------- | ----------- | ----------------------------------- |
-| `ghost.url`           | `""`        | Public URL of the Ghost instance    |
-| `mysql.enabled`       | `true`      | Enable bundled MySQL subchart       |
-| `persistence.enabled` | `true`      | Enable content persistence          |
-| `persistence.size`    | `10Gi`      | PVC size for content                |
-| `backup.enabled`      | `false`     | Enable scheduled S3 content backups |
-| `backup.schedule`     | `0 3 * * *` | Cron schedule for backups           |
-| `ingress.enabled`     | `false`     | Enable ingress                      |
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — Ghost with an existing MySQL instance
+ghost:
+  url: 'https://blog.example.com'
+
+mysql:
+  enabled: false
+
+database:
+  external:
+    host: mysql.database.svc
+    port: '3306'
+    name: ghost
+    username: ghost
+    password: 'db-password'
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: blog.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="email">
+
+```yaml
+# values.yaml — Ghost with SMTP for newsletter delivery
+ghost:
+  url: 'https://blog.example.com'
+  extraEnv:
+    - name: mail__transport
+      value: SMTP
+    - name: mail__options__host
+      value: smtp.example.com
+    - name: mail__options__port
+      value: '587'
+    - name: mail__options__auth__user
+      value: ghost@example.com
+    - name: mail__options__auth__pass
+      valueFrom:
+        secretKeyRef:
+          name: ghost-smtp-secret
+          key: password
+    - name: mail__from
+      value: '"My Blog" <ghost@example.com>'
+
+mysql:
+  enabled: true
+  auth:
+    password: 'mysql-password'
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: blog.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily backup of Ghost content directory to S3
+# NOTE: The backup archives the content PVC (images, media, themes).
+#       MySQL data is NOT included — back up the database separately.
+ghost:
+  url: 'https://blog.example.com'
+
+mysql:
+  enabled: true
+  auth:
+    password: 'mysql-password'
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-ghost-backups
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                   | Description                          |
+| ------------------ | ------ | ------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/library/ghost` | Ghost container image.               |
+| `image.tag`        | string | `"6.25.1"`                | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                      | Pull secrets for private registries. |
+
+### Ghost Configuration
+
+| Parameter        | Type   | Default | Description                                                                |
+| ---------------- | ------ | ------- | -------------------------------------------------------------------------- |
+| `ghost.url`      | string | `""`    | Public URL of the Ghost instance (e.g. `https://blog.example.com`).        |
+| `ghost.extraEnv` | array  | `[]`    | Extra environment variables for SMTP, integrations, and advanced settings. |
+
+<Callout type="warning" title="ghost.url must match your actual public URL">
+  Ghost uses `ghost.url` to generate all links: newsletter emails, canonical URLs, webhook payloads, and API responses.
+  If this value does not match the URL your visitors use, email links will be broken, SEO canonical tags will be wrong,
+  and the Admin UI may fail to redirect correctly.
+</Callout>
+
+<Callout type="info" title="Ghost requires MySQL — PostgreSQL is not supported">
+  Ghost only supports MySQL (or MariaDB) as its database engine. This chart does not support PostgreSQL. Use the bundled
+  MySQL subchart or provide an external MySQL instance via `database.external`.
+</Callout>
+
+<Callout type="tip" title="Configure SMTP to enable newsletter delivery">
+  Ghost starts without SMTP configured, but newsletter sending and member invitation emails will fail silently.
+  Configure SMTP via `ghost.extraEnv` using the `mail__*` environment variable convention shown in the "With Email
+  (SMTP)" example above.
+</Callout>
+
+### Database — Embedded Subchart
+
+| Parameter             | Type    | Default      | Description                                  |
+| --------------------- | ------- | ------------ | -------------------------------------------- |
+| `mysql.enabled`       | boolean | `true`       | Deploy a bundled MySQL subchart for Ghost.   |
+| `mysql.architecture`  | string  | `standalone` | MySQL deployment architecture.               |
+| `mysql.auth.database` | string  | `ghost`      | Database name created by the subchart.       |
+| `mysql.auth.username` | string  | `ghost`      | Database username created by the subchart.   |
+| `mysql.auth.password` | string  | `""`         | Database password (auto-generated if empty). |
+
+### Database — External
+
+| Parameter                                     | Type   | Default    | Description                                                      |
+| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| `database.external.host`                      | string | `""`       | External MySQL hostname or IP.                                   |
+| `database.external.port`                      | string | `"3306"`   | External MySQL port.                                             |
+| `database.external.name`                      | string | `ghost`    | Database name on the external server.                            |
+| `database.external.username`                  | string | `ghost`    | Username for the external database.                              |
+| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
+| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+
+### Content Persistence
+
+| Parameter                   | Type    | Default             | Description                                                        |
+| --------------------------- | ------- | ------------------- | ------------------------------------------------------------------ |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/lib/ghost/content` (images, media, themes). |
+| `persistence.size`          | string  | `10Gi`              | PVC size.                                                          |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                          |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                  |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                       |
+
+### Backup
+
+<Callout type="warning" title="S3 backup covers content files only — not the MySQL database">
+  The S3 backup CronJob archives the Ghost content directory (`/var/lib/ghost/content`) — uploaded images, media files,
+  and custom themes. It does **not** back up the MySQL database, which contains posts, members, settings, and newsletter
+  data. Configure a separate MySQL backup strategy (e.g. the HelmForge MySQL chart backup feature) to protect the full
+  Ghost dataset.
+</Callout>
+
+| Parameter                              | Type    | Default                          | Description                                                  |
+| -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                          | Enable scheduled S3 content backup CronJob.                  |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                              | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                              | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                              | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `ghost`                          | Prefix for backup archive filenames.                         |
+| `backup.images.backup`                 | string  | `docker.io/library/busybox:1.37` | Image used for `tar` archive.                                |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image used for S3 upload.                                    |
+| `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `ghost`                          | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                             | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the application is ready.
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Newsletter emails not sending">
+  Ghost starts successfully without SMTP configured, but no emails will be delivered. If member invitations, newsletter
+  sends, or password reset emails are missing, configure the `mail__*` environment variables via `ghost.extraEnv`. Check
+  the Ghost logs (`kubectl logs`) for SMTP connection errors.
+</Callout>
+
+<Callout type="tip" title="Access the Admin panel">
+  The Ghost Admin panel is available at `https://blog.example.com/ghost/`. On first deployment, Ghost presents a setup
+  wizard to create the admin account and configure the publication name and description.
+</Callout>
 
 ## More Information
 
-- [Ghost documentation](https://ghost.org/docs)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/ghost)
+- [Ghost Official Website](https://ghost.org)
+- [Ghost Documentation](https://ghost.org/docs)
+- [Ghost GitHub Repository](https://github.com/TryGhost/Ghost)
+- [HelmForge Ghost Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/ghost)
