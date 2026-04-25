@@ -1,22 +1,33 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Open WebUI
-description: HelmForge Open WebUI chart for self-hosted AI chat with Ollama/OpenAI, RAG, PostgreSQL, Redis, and S3 backup.
+title: Open WebUI Chart
+description: HelmForge Open WebUI chart — self-hosted AI chat with Ollama and OpenAI-compatible backends, SQLite or PostgreSQL, Redis for multi-instance WebSocket coordination, RAG document uploads, pg_dump S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Open WebUI
 
-Deploy [Open WebUI](https://docs.openwebui.com/) on Kubernetes — a self-hosted AI chat platform with Ollama and OpenAI-compatible backend support, RAG pipelines, multi-model conversations, and an extensible plugin system.
+Deploy [Open WebUI](https://docs.openwebui.com/) on Kubernetes — a self-hosted AI chat platform with
+Ollama and OpenAI-compatible backend support, retrieval-augmented generation (RAG), multi-model
+conversations, and an extensible plugin system.
+
+<Callout type="warning" title="SQLite is single-instance only — Redis is required for multi-replica deployments">
+  The default configuration uses SQLite stored in the `/app/backend/data` PVC. With SQLite, only
+  one pod can safely write to the database — setting `replicaCount > 1` may cause data corruption.
+  Switch to PostgreSQL and enable Redis for horizontal scaling. Redis coordinates WebSocket sessions
+  across pods; without it, users may be disconnected when requests route to different replicas.
+</Callout>
 
 ## Key Features
 
-- **Ollama integration** — connect to local or remote Ollama instances for open-source LLMs
-- **OpenAI-compatible API** — works with OpenAI, Azure, Anthropic proxies, LiteLLM, and more
-- **SQLite or PostgreSQL** — embedded SQLite for simple installs, PostgreSQL subchart for production
+- **Ollama + OpenAI-compatible APIs** — configure both simultaneously for model switching
+- **SQLite or PostgreSQL** — zero-config SQLite for personal use, PostgreSQL for production
 - **Redis WebSocket coordination** — required for multi-instance deployments
-- **RAG pipelines** — retrieval-augmented generation with document uploads
-- **S3 backup** — scheduled PostgreSQL backup to S3-compatible storage
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **RAG pipelines** — document uploads stored in `/app/backend/data`
+- **URL-based secrets** — database and Redis accept full connection URLs via `existingSecret`
+- **OpenAI key in existing secret** — avoid inline API keys in values files
 
 ## Installation
 
@@ -25,20 +36,39 @@ Deploy [Open WebUI](https://docs.openwebui.com/) on Kubernetes — a self-hosted
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install open-webui helmforge/open-webui
+helm install open-webui helmforge/open-webui -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install open-webui oci://ghcr.io/helmforgedev/helm/open-webui
+helm install open-webui oci://ghcr.io/helmforgedev/helm/open-webui -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'ollama', label: 'Ollama (SQLite)' },
+    { id: 'openai', label: 'OpenAI + PostgreSQL' },
+    { id: 'multi-instance', label: 'Multi-Instance (HA)' },
+    { id: 'full', label: 'Full Production' },
+  ]}
+>
+
+<div data-tab-panel="ollama">
 
 ```yaml
+# values.yaml — Open WebUI with local Ollama, SQLite (single instance)
 openWebui:
-  ollamaBaseUrl: http://ollama.default.svc:11434
+  ollamaBaseUrl: 'http://ollama.ollama.svc.cluster.local:11434'
+  doNotTrack: true
+  existingSecret: open-webui-secret # key: secret-key (signs JWT sessions)
+  existingSecretKey: secret-key
+
+persistence:
+  enabled: true
+  size: 20Gi # covers SQLite DB + RAG document uploads
 
 ingress:
   enabled: true
@@ -50,60 +80,272 @@ ingress:
           pathType: Prefix
 ```
 
-## Production Example
+</div>
+
+<div data-tab-panel="openai">
 
 ```yaml
+# values.yaml — Open WebUI with OpenAI API and PostgreSQL
+openWebui:
+  openaiBaseUrl: 'https://api.openai.com/v1'
+  openaiExistingSecret: openai-credentials # key: openai-api-key
+  openaiExistingSecretKey: openai-api-key
+  existingSecret: open-webui-secret
+  doNotTrack: true
+
 postgresql:
   enabled: true
-
-redis:
-  enabled: true
-
-openWebui:
-  ollamaBaseUrl: http://ollama.default.svc:11434
-  openaiBaseUrl: https://api.openai.com/v1
-  openaiExistingSecret: openai-credentials
+  auth:
+    database: openwebui
+    username: openwebui
+    password: 'strong-db-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
 
 persistence:
-  size: 20Gi
+  enabled: true
+  size: 20Gi # RAG uploads (no SQLite when PostgreSQL is active)
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: chat.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - hosts:
+    - secretName: open-webui-tls
+      hosts:
         - chat.example.com
-      secretName: open-webui-tls
 ```
 
-## Key Values
+</div>
 
-| Key                       | Default | Description                           |
-| ------------------------- | ------- | ------------------------------------- |
-| `openWebui.port`          | `8080`  | Application port                      |
-| `openWebui.ollamaBaseUrl` | `""`    | Ollama backend URL                    |
-| `openWebui.openaiBaseUrl` | `""`    | OpenAI-compatible API base URL        |
-| `openWebui.doNotTrack`    | `true`  | Disable telemetry                     |
-| `database.mode`           | `auto`  | Database mode: auto, sqlite, external |
-| `postgresql.enabled`      | `false` | Deploy PostgreSQL subchart            |
-| `redis.enabled`           | `false` | Deploy Redis subchart                 |
-| `persistence.enabled`     | `true`  | Persist /app/backend/data             |
-| `persistence.size`        | `10Gi`  | PVC size                              |
-| `ingress.enabled`         | `false` | Enable ingress                        |
-| `backup.enabled`          | `false` | Enable S3 backup CronJob              |
+<div data-tab-panel="multi-instance">
 
-## Operational Notes
+```yaml
+# values.yaml — Open WebUI HA: PostgreSQL + Redis (required for WebSocket HA)
+replicaCount: 3
 
-- SQLite mode is single-instance only — no horizontal scaling
-- PostgreSQL mode supports multiple replicas with Redis for WebSocket coordination
-- the chart auto-generates a session secret key if not provided
-- telemetry is disabled by default (`DO_NOT_TRACK=true`)
+openWebui:
+  ollamaBaseUrl: 'http://ollama.ollama.svc.cluster.local:11434'
+  existingSecret: open-webui-secret
+
+postgresql:
+  enabled: true
+  auth:
+    database: openwebui
+    username: openwebui
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: 'strong-redis-password'
+  # Redis is for WebSocket coordination only — persistence not needed
+  master:
+    persistence:
+      enabled: false
+
+persistence:
+  enabled: true
+  size: 20Gi
+  # Must use ReadWriteMany (NFS/Longhorn RWX) for multiple replicas
+  accessModes:
+    - ReadWriteMany
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: chat.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="full">
+
+```yaml
+# values.yaml — Full production with external PostgreSQL+Redis, backup, TLS
+openWebui:
+  ollamaBaseUrl: 'http://ollama.ollama.svc.cluster.local:11434'
+  openaiBaseUrl: 'https://api.openai.com/v1'
+  openaiExistingSecret: openai-credentials
+  existingSecret: open-webui-secret
+  doNotTrack: true
+
+postgresql:
+  enabled: false
+
+database:
+  mode: external
+  existingSecret: open-webui-db-url # key: database-url
+  existingSecretKey: database-url # value: postgresql://user:pass@host:5432/openwebui
+
+redisConfig:
+  mode: external
+  existingSecret: open-webui-redis-url # key: redis-url
+  existingSecretKey: redis-url # value: redis://:password@host:6379/0
+
+redis:
+  enabled: false
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: open-webui-backups
+    existingSecret: open-webui-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: chat.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: open-webui-tls
+      hosts:
+        - chat.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                                                  |
+| ------------------ | ------- | ------- | ------------------------------------------------------------ |
+| `replicaCount`     | integer | `1`     | Pod replicas. Requires PostgreSQL + Redis + RWX PVC for > 1. |
+| `nameOverride`     | string  | `""`    | Override the chart name.                                     |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                              |
+
+### Image
+
+| Parameter          | Type   | Default                         | Description        |
+| ------------------ | ------ | ------------------------------- | ------------------ |
+| `image.repository` | string | `ghcr.io/open-webui/open-webui` | Open WebUI image.  |
+| `image.tag`        | string | `"v0.8.12"`                     | Image tag.         |
+| `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy. |
+
+### Open WebUI Configuration
+
+| Parameter                           | Type    | Default          | Description                                                                             |
+| ----------------------------------- | ------- | ---------------- | --------------------------------------------------------------------------------------- |
+| `openWebui.port`                    | integer | `8080`           | Container listen port.                                                                  |
+| `openWebui.secretKey`               | string  | `""`             | JWT session signing key. Auto-generated if empty. Changing it invalidates all sessions. |
+| `openWebui.existingSecret`          | string  | `""`             | Existing secret with the session key.                                                   |
+| `openWebui.existingSecretKey`       | string  | `secret-key`     | Key for the session secret in the existing secret.                                      |
+| `openWebui.ollamaBaseUrl`           | string  | `""`             | Ollama backend URL (e.g. `http://ollama:11434`).                                        |
+| `openWebui.openaiBaseUrl`           | string  | `""`             | OpenAI-compatible API base URL.                                                         |
+| `openWebui.openaiApiKey`            | string  | `""`             | Inline OpenAI API key. **Prefer `openaiExistingSecret` in production.**                 |
+| `openWebui.openaiExistingSecret`    | string  | `""`             | Existing secret with the OpenAI API key.                                                |
+| `openWebui.openaiExistingSecretKey` | string  | `openai-api-key` | Key for the API key in the existing secret.                                             |
+| `openWebui.doNotTrack`              | boolean | `true`           | Disable telemetry (`DO_NOT_TRACK=true`).                                                |
+| `openWebui.extraEnv`                | array   | `[]`             | Extra environment variables for the container.                                          |
+
+### Database
+
+| Parameter                    | Type   | Default        | Description                                                                       |
+| ---------------------------- | ------ | -------------- | --------------------------------------------------------------------------------- |
+| `database.mode`              | string | `auto`         | Mode: `auto` (PostgreSQL if subchart enabled, else SQLite), `sqlite`, `external`. |
+| `database.url`               | string | `""`           | Full PostgreSQL connection URL for external mode.                                 |
+| `database.existingSecret`    | string | `""`           | Existing secret containing the full database URL.                                 |
+| `database.existingSecretKey` | string | `database-url` | Key for the database URL in the existing secret.                                  |
+
+### Redis
+
+| Parameter                       | Type   | Default     | Description                                                 |
+| ------------------------------- | ------ | ----------- | ----------------------------------------------------------- |
+| `redisConfig.mode`              | string | `auto`      | Mode: `auto` (subchart if enabled), `external`, `disabled`. |
+| `redisConfig.url`               | string | `""`        | Full Redis connection URL for external mode.                |
+| `redisConfig.existingSecret`    | string | `""`        | Existing secret containing the full Redis URL.              |
+| `redisConfig.existingSecretKey` | string | `redis-url` | Key for the Redis URL in the existing secret.               |
+
+### Persistence
+
+| Parameter                   | Type    | Default           | Description                                                           |
+| --------------------------- | ------- | ----------------- | --------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`            | Enable PVC for `/app/backend/data` (SQLite DB + RAG uploads).         |
+| `persistence.size`          | string  | `10Gi`            | PVC size. Increase based on RAG document volume.                      |
+| `persistence.storageClass`  | string  | `""`              | StorageClass for the PVC.                                             |
+| `persistence.accessModes`   | array   | `[ReadWriteOnce]` | Access modes. Set to `[ReadWriteMany]` for multi-replica deployments. |
+| `persistence.existingClaim` | string  | `""`              | Use an existing PVC.                                                  |
+
+### Subcharts
+
+| Parameter                             | Type    | Default     | Description                                            |
+| ------------------------------------- | ------- | ----------- | ------------------------------------------------------ |
+| `postgresql.enabled`                  | boolean | `false`     | Deploy the bundled PostgreSQL subchart.                |
+| `postgresql.auth.database`            | string  | `openwebui` | Database name.                                         |
+| `postgresql.auth.password`            | string  | `""`        | Password. Auto-generated if empty.                     |
+| `postgresql.primary.persistence.size` | string  | `8Gi`       | PVC size for PostgreSQL.                               |
+| `redis.enabled`                       | boolean | `false`     | Deploy the bundled Redis subchart.                     |
+| `redis.auth.enabled`                  | boolean | `true`      | Enable Redis authentication.                           |
+| `redis.master.persistence.enabled`    | boolean | `false`     | Disable Redis persistence (session coordination only). |
+
+### Backup
+
+<Callout type="warning" title="Backup covers PostgreSQL only — RAG uploads in /app/backend/data are not included">
+  The backup CronJob runs `pg_dump` on the PostgreSQL database. RAG document uploads stored in the `/app/backend/data`
+  PVC are **not included**. Back up the uploads PVC separately using Velero, NFS snapshots, or a storage provider
+  snapshot.
+</Callout>
+
+| Parameter                    | Type    | Default       | Description                           |
+| ---------------------------- | ------- | ------------- | ------------------------------------- |
+| `backup.enabled`             | boolean | `false`       | Enable scheduled `pg_dump` S3 backup. |
+| `backup.schedule`            | string  | `"0 3 * * *"` | Cron schedule.                        |
+| `backup.archivePrefix`       | string  | `open-webui`  | Prefix for backup archive filenames.  |
+| `backup.s3.endpoint`         | string  | `""`          | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`           | string  | `""`          | Target bucket name.                   |
+| `backup.s3.existingSecret`   | string  | `""`          | Existing secret with S3 credentials.  |
+| `backup.database.pgDumpArgs` | string  | `""`          | Extra arguments for `pg_dump`.        |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                 |
+| -------------------------- | ------- | ----------- | --------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.               |
+| `service.port`             | integer | `80`        | Service port.               |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
+| `ingress.ingressClassName` | string  | `traefik`   | Ingress class name.         |
+| `ingress.annotations`      | object  | `{}`        | Ingress annotations.        |
+| `ingress.hosts`            | array   | `[]`        | Host and path rules.        |
+| `ingress.tls`              | array   | `[]`        | TLS configuration.          |
+
+### Probes and Resources
+
+| Parameter                  | Type    | Default | Description                     |
+| -------------------------- | ------- | ------- | ------------------------------- |
+| `probes.startup.enabled`   | boolean | `true`  | Startup probe on `/health`.     |
+| `probes.liveness.enabled`  | boolean | `true`  | Liveness probe on `/health`.    |
+| `probes.readiness.enabled` | boolean | `true`  | Readiness probe on `/health`.   |
+| `resources`                | object  | `{}`    | CPU and memory requests/limits. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/open-webui) on GitHub.
+- [Open WebUI Official Documentation](https://docs.openwebui.com/)
+- [Open WebUI GitHub Repository](https://github.com/open-webui/open-webui)
+- [HelmForge Open WebUI Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/open-webui)
