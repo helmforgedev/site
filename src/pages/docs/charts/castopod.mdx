@@ -1,21 +1,30 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Castopod Chart
-description: HelmForge Castopod chart — open-source podcast hosting with MariaDB and optional Redis cache.
+description: HelmForge Castopod chart — open-source podcast hosting platform with RSS feed generation, Fediverse integration, MariaDB backend, optional Redis cache, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Castopod
 
-Deploy Castopod on Kubernetes using the official [castopod/castopod](https://hub.docker.com/r/castopod/castopod) container image. Castopod is an open-source podcast hosting platform with built-in analytics, Fediverse integration, and RSS feed generation.
+Open-source podcast hosting platform. Castopod manages your episodes, generates RSS feeds for distribution to
+Apple Podcasts, Spotify, and other directories, tracks anonymous listener analytics, and federates with the
+Fediverse via ActivityPub. All media and metadata are stored on a MariaDB database backed by a persistent volume
+for uploads.
 
 ## Key Features
 
-- **MariaDB Backend** — bundled MariaDB subchart or external database support
-- **Redis Cache** — optional Redis subchart for improved performance
-- **RSS Feed** — automatic podcast RSS feed generation
-- **Analytics** — built-in podcast analytics with hashed listener tracking
-- **Fediverse Integration** — ActivityPub support for social interactions
-- **Persistence** — persistent storage for uploads, cache, and session data
+- **RSS feed generation** — automatic, standards-compliant podcast feeds for all directories
+- **Built-in analytics** — privacy-respecting listener tracking with hashed IDs
+- **Fediverse integration** — ActivityPub support for social interactions and episode sharing
+- **MariaDB backend** — bundled subchart or external database
+- **Optional Redis cache** — subchart for improved query and session caching
+- **Persistent storage** — PVC for uploaded audio files, images, and writable data
+- **S3 backup** — scheduled archive of the writable directory to S3-compatible storage
+- **FrankenPHP runtime** — high-performance PHP server built into the official image
+- **CDN support** — configurable separate media base URL for audio file delivery
 
 ## Installation
 
@@ -33,22 +42,72 @@ helm install castopod helmforge/castopod
 helm install castopod oci://ghcr.io/helmforgedev/helm/castopod
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'with-redis', label: 'With Redis' },
+    { id: 'cdn', label: 'With CDN' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Castopod with bundled MariaDB (default)
 castopod:
   baseURL: 'https://podcast.example.com'
 
 mariadb:
   enabled: true
-
-redis:
-  enabled: true
+  auth:
+    password: 'mariadb-password'
 
 persistence:
   enabled: true
-  size: 10Gi
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: podcast.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: castopod-tls
+      hosts:
+        - podcast.example.com
+```
+
+</div>
+
+<div data-tab-panel="with-redis">
+
+```yaml
+# values.yaml — Castopod with MariaDB and Redis for caching
+castopod:
+  baseURL: 'https://podcast.example.com'
+
+mariadb:
+  enabled: true
+  auth:
+    password: 'mariadb-password'
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+
+persistence:
+  enabled: true
+  size: 20Gi
 
 ingress:
   enabled: true
@@ -60,19 +119,287 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default | Description                     |
-| --------------------- | ------- | ------------------------------- |
-| `castopod.baseURL`    | `""`    | Public base URL (required)      |
-| `castopod.port`       | `8080`  | Application port (FrankenPHP)   |
-| `mariadb.enabled`     | `true`  | Enable bundled MariaDB subchart |
-| `redis.enabled`       | `false` | Enable bundled Redis subchart   |
-| `persistence.enabled` | `true`  | Enable persistent storage       |
-| `persistence.size`    | `10Gi`  | PVC size                        |
-| `ingress.enabled`     | `false` | Enable ingress                  |
+<div data-tab-panel="cdn">
+
+```yaml
+# values.yaml — Castopod with media served from a CDN
+# Audio files are stored in the PVC but served via CDN URL
+castopod:
+  baseURL: 'https://podcast.example.com'
+  extraEnv:
+    - name: CP_MEDIA_BASE_URL
+      value: 'https://cdn.example.com/castopod'
+
+mariadb:
+  enabled: true
+  auth:
+    password: 'mariadb-password'
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: podcast.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily backup of Castopod writable directory to S3
+# NOTE: Backup covers uploaded media and files only.
+#       Back up the MariaDB database separately.
+castopod:
+  baseURL: 'https://podcast.example.com'
+
+mariadb:
+  enabled: true
+  auth:
+    password: 'mariadb-password'
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-castopod-backups
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description                          |
+| ------------------ | ------ | ----------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/castopod/castopod` | Castopod container image.            |
+| `image.tag`        | string | `"1.15.5"`                    | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+
+### Castopod Configuration
+
+| Parameter           | Type    | Default | Description                                                                    |
+| ------------------- | ------- | ------- | ------------------------------------------------------------------------------ |
+| `castopod.baseURL`  | string  | `""`    | Public base URL of the Castopod instance (e.g. `https://podcast.example.com`). |
+| `castopod.port`     | integer | `8080`  | Internal HTTP port (FrankenPHP).                                               |
+| `castopod.extraEnv` | array   | `[]`    | Extra environment variables for CDN configuration and advanced settings.       |
+
+<Callout type="warning" title="baseURL is required and affects all RSS feeds">
+  All episode audio URLs, podcast RSS feed links, and API responses are built using `castopod.baseURL`. If this value is
+  incorrect, podcast directories (Apple Podcasts, Spotify, etc.) will be unable to download episodes from your instance.
+  Always set the exact public URL including `https://` and without a trailing slash.
+</Callout>
+
+### Analytics
+
+| Parameter                     | Type   | Default          | Description                                                        |
+| ----------------------------- | ------ | ---------------- | ------------------------------------------------------------------ |
+| `analytics.salt`              | string | `""`             | Salt for hashing listener IDs. Auto-generated (64 chars) if empty. |
+| `analytics.existingSecret`    | string | `""`             | Existing Kubernetes Secret containing the analytics salt.          |
+| `analytics.existingSecretKey` | string | `analytics-salt` | Key inside the existing secret holding the salt value.             |
+
+<Callout type="info" title="Persist the analytics salt for consistent reporting">
+  The analytics salt is used to hash listener IP addresses into anonymous IDs. If the salt changes (e.g. pod restart
+  without a persistent value), historical listener data becomes inconsistent — the same listener appears as multiple
+  distinct users across time periods. Set `analytics.salt` explicitly or use `analytics.existingSecret`.
+</Callout>
+
+### Database — Embedded Subchart
+
+| Parameter               | Type    | Default      | Description                                     |
+| ----------------------- | ------- | ------------ | ----------------------------------------------- |
+| `mariadb.enabled`       | boolean | `true`       | Deploy a bundled MariaDB subchart for Castopod. |
+| `mariadb.architecture`  | string  | `standalone` | MariaDB deployment architecture.                |
+| `mariadb.auth.database` | string  | `castopod`   | Database name created by the subchart.          |
+| `mariadb.auth.username` | string  | `castopod`   | Database username created by the subchart.      |
+| `mariadb.auth.password` | string  | `""`         | Database password (auto-generated if empty).    |
+
+### Database — External
+
+| Parameter                                     | Type   | Default    | Description                                                      |
+| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| `database.external.host`                      | string | `""`       | External MariaDB hostname or IP.                                 |
+| `database.external.port`                      | string | `"3306"`   | External MariaDB port.                                           |
+| `database.external.name`                      | string | `castopod` | Database name on the external server.                            |
+| `database.external.username`                  | string | `castopod` | Username for the external database.                              |
+| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
+| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+
+### Cache — Redis Subchart
+
+| Parameter            | Type    | Default      | Description                                  |
+| -------------------- | ------- | ------------ | -------------------------------------------- |
+| `redis.enabled`      | boolean | `false`      | Deploy a bundled Redis subchart for caching. |
+| `redis.architecture` | string  | `standalone` | Redis deployment architecture.               |
+| `redis.auth.enabled` | boolean | `false`      | Enable Redis authentication.                 |
+
+### Persistence
+
+The PVC stores the `/var/www/html/writable` directory, which contains uploaded audio files, episode images,
+generated thumbnails, cache, session data, and logs.
+
+| Parameter                   | Type    | Default         | Description                                             |
+| --------------------------- | ------- | --------------- | ------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`          | Enable a PVC for `/var/www/html/writable`.              |
+| `persistence.size`          | string  | `10Gi`          | PVC size. Increase based on expected audio file volume. |
+| `persistence.storageClass`  | string  | `""`            | StorageClass for the PVC.                               |
+| `persistence.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                        |
+| `persistence.existingClaim` | string  | `""`            | Use an existing PVC instead of creating one.            |
+| `persistence.annotations`   | object  | `{}`            | Annotations for the PVC.                                |
+
+### Backup
+
+<Callout type="warning" title="S3 backup covers the writable directory only — not MariaDB">
+  The S3 backup CronJob archives the Castopod writable directory (uploaded audio files, images, and cache). It does
+  **not** back up the MariaDB database, which contains episode metadata, podcast definitions, user accounts, and
+  analytics data. Configure a separate MariaDB backup strategy (e.g. the HelmForge MariaDB chart backup feature) to
+  protect the full Castopod dataset.
+</Callout>
+
+| Parameter                              | Type    | Default                          | Description                                                  |
+| -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                          | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                              | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                              | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                              | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `castopod`                       | Prefix for backup archive filenames.                         |
+| `backup.images.archiver`               | string  | `docker.io/library/busybox:1.37` | Image used for `tar` archive.                                |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image used for S3 upload.                                    |
+| `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `castopod`                       | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                             | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Episodes not playing in podcast apps after URL change">
+  If you change `castopod.baseURL` after publishing episodes, all RSS feed URLs will change and existing subscribers may
+  lose access until their podcast app refreshes the feed. Plan your URL carefully before the first publish. If you must
+  change it, use a 301 redirect from the old URL to the new one.
+</Callout>
+
+<Callout type="tip" title="Complete the setup wizard before publishing">
+  After the first deployment, open `https://podcast.example.com/cp-install` to complete the Castopod installation
+  wizard. This creates the admin account and configures the initial podcast settings. The setup wizard is only available
+  until the first admin is created.
+</Callout>
 
 ## More Information
 
-- [Castopod documentation](https://docs.castopod.org)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/castopod)
+- [Castopod Official Website](https://castopod.org)
+- [Castopod Documentation](https://docs.castopod.org)
+- [Castopod GitHub Repository](https://github.com/castopod/castopod)
+- [HelmForge Castopod Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/castopod)
