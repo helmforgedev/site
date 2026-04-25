@@ -1,33 +1,103 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Strava Statistics
-description: HelmForge Strava Statistics chart for self-hosted fitness dashboard with Strava OAuth.
+title: Strava Statistics Chart
+description: HelmForge Strava Statistics chart — self-hosted fitness dashboard for Strava athletes with SQLite storage, OAuth integration, and detailed activity visualizations for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Strava Statistics
 
-Deploy [Statistics for Strava](https://github.com/robiningelbrecht/strava-statistics) on Kubernetes — a self-hosted fitness dashboard that visualizes your Strava activity data with detailed charts and statistics.
+Self-hosted fitness dashboard for [Statistics for Strava](https://github.com/robiningelbrecht/strava-statistics).
+Pulls your complete activity history from the Strava API using OAuth and presents it as a rich, personal dashboard
+with heatmaps, pace charts, gear tracking, and year-over-year comparisons — all stored locally in SQLite, with no
+external database required.
+
+<Callout type="info" title="Personal dashboard — single athlete">
+  Statistics for Strava is designed for a single Strava athlete account. All three Strava credentials (`clientId`,
+  `clientSecret`, `refreshToken`) are required before the application will start syncing.
+</Callout>
 
 ## Key Features
 
-- **Strava OAuth** — automated data sync from your Strava account
-- **SQLite database** — embedded storage, no external database needed
-- **Persistent storage** — PVC for activity data and database
+- **Complete activity history** — imports all past and future Strava activities automatically
+- **Rich visualizations** — heatmaps, pace/HR charts, segment leaderboards, gear tracking
+- **SQLite storage** — embedded database, no external database dependency
+- **OAuth integration** — syncs with a single Strava athlete account via OAuth2
+- **Persistent storage** — PVC-backed data directory for SQLite database and cached files
 - **Ingress support** — TLS via cert-manager with configurable ingress class
 
+## Strava OAuth Setup
+
+Before deploying, you need a Strava API application and a refresh token. Follow these steps:
+
+**1. Create a Strava API Application**
+
+1. Go to [strava.com/settings/api](https://www.strava.com/settings/api)
+2. Fill in the application name, category, and website
+3. Set **Authorization Callback Domain** to your deployment hostname (e.g. `strava.example.com`)
+4. Note your **Client ID** and **Client Secret**
+
+**2. Obtain a Refresh Token**
+
+Replace `<YOUR_CLIENT_ID>` and authorize in your browser:
+
+```
+https://www.strava.com/oauth/authorize?client_id=<YOUR_CLIENT_ID>&response_type=code&redirect_uri=http://localhost/callback&scope=read,activity:read_all
+```
+
+After authorization, exchange the code for tokens:
+
+```bash
+curl -X POST https://www.strava.com/api/v3/oauth/token \
+  -d client_id=<YOUR_CLIENT_ID> \
+  -d client_secret=<YOUR_CLIENT_SECRET> \
+  -d code=<AUTHORIZATION_CODE> \
+  -d grant_type=authorization_code
+```
+
+The response contains `refresh_token` — use this value for `strava.refreshToken`.
+
 ## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install strava-statistics helmforge/strava-statistics
+```
+
+**OCI registry:**
 
 ```bash
 helm install strava-statistics oci://ghcr.io/helmforgedev/helm/strava-statistics
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'existing-secret', label: 'With Existing Secret' },
+    { id: 'tls', label: 'With TLS' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-stravaStatistics:
-  clientId: 'your-strava-client-id'
+# values.yaml — Strava Statistics with inline credentials
+strava:
+  clientId: '12345'
   clientSecret: 'your-strava-client-secret'
   refreshToken: 'your-strava-refresh-token'
+  timezone: America/Sao_Paulo
+
+persistence:
+  enabled: true
+  size: 5Gi
 
 ingress:
   enabled: true
@@ -39,15 +109,229 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                             | Default | Description                |
-| ------------------------------- | ------- | -------------------------- |
-| `stravaStatistics.clientId`     | `""`    | Strava OAuth client ID     |
-| `stravaStatistics.clientSecret` | `""`    | Strava OAuth client secret |
-| `persistence.enabled`           | `true`  | Enable data persistence    |
-| `ingress.enabled`               | `false` | Enable ingress             |
+<div data-tab-panel="existing-secret">
+
+```yaml
+# values.yaml — Strava credentials stored in a Kubernetes Secret
+# kubectl create secret generic strava-credentials \
+#   --from-literal=client-id=12345 \
+#   --from-literal=client-secret=your-secret \
+#   --from-literal=refresh-token=your-token
+strava:
+  timezone: America/Sao_Paulo
+  existingSecret: strava-credentials
+  existingSecretClientIdKey: client-id
+  existingSecretClientSecretKey: client-secret
+  existingSecretRefreshTokenKey: refresh-token
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: strava.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="tls">
+
+```yaml
+# values.yaml — Strava Statistics with TLS via cert-manager
+strava:
+  clientId: '12345'
+  clientSecret: 'your-strava-client-secret'
+  refreshToken: 'your-strava-refresh-token'
+  timezone: America/Sao_Paulo
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: strava.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: strava-statistics-tls
+      hosts:
+        - strava.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                                        | Description                          |
+| ------------------ | ------ | ---------------------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/robiningelbrecht/strava-statistics` | Container image.                     |
+| `image.tag`        | string | `"v4.7.5"`                                     | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                                           | Pull secrets for private registries. |
+
+### Strava Configuration
+
+| Parameter                              | Type    | Default         | Description                                                    |
+| -------------------------------------- | ------- | --------------- | -------------------------------------------------------------- |
+| `strava.port`                          | integer | `8080`          | Internal HTTP port for the container.                          |
+| `strava.clientId`                      | string  | `""`            | Strava OAuth application Client ID.                            |
+| `strava.clientSecret`                  | string  | `""`            | Strava OAuth application Client Secret.                        |
+| `strava.refreshToken`                  | string  | `""`            | Strava OAuth Refresh Token for the athlete account.            |
+| `strava.existingSecret`                | string  | `""`            | Existing Kubernetes Secret containing Strava credentials.      |
+| `strava.existingSecretClientIdKey`     | string  | `client-id`     | Key in the existing secret for the Client ID.                  |
+| `strava.existingSecretClientSecretKey` | string  | `client-secret` | Key in the existing secret for the Client Secret.              |
+| `strava.existingSecretRefreshTokenKey` | string  | `refresh-token` | Key in the existing secret for the Refresh Token.              |
+| `strava.timezone`                      | string  | `UTC`           | Timezone for activity time display (e.g. `America/Sao_Paulo`). |
+| `strava.extraEnv`                      | array   | `[]`            | Extra environment variables injected into the container.       |
+
+<Callout type="danger" title="All three Strava credentials are required">
+  The application will not start without `strava.clientId`, `strava.clientSecret`, and `strava.refreshToken`. Do not
+  deploy without completing the [Strava OAuth Setup](#strava-oauth-setup) steps above.
+</Callout>
+
+<Callout type="warning" title="Store credentials in a Kubernetes Secret">
+  Avoid setting `clientId`, `clientSecret`, and `refreshToken` as plain-text values in your values file if it is
+  committed to a repository. Use `strava.existingSecret` to reference a pre-created Kubernetes Secret instead.
+</Callout>
+
+<Callout type="tip" title="Set your local timezone">
+  Activity start times are displayed in the configured timezone. Set `strava.timezone` to your local timezone (e.g.
+  `America/Sao_Paulo`, `Europe/London`, `Asia/Tokyo`) so workout times match your local clock.
+</Callout>
+
+### Persistence
+
+| Parameter                   | Type    | Default             | Description                                                  |
+| --------------------------- | ------- | ------------------- | ------------------------------------------------------------ |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (SQLite database and cached files). |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                                    |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                    |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                            |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                 |
+
+<Callout type="warning" title="SQLite data lives on the PVC — back it up separately">
+  Unlike other charts, there is no built-in S3 backup CronJob. The SQLite database and all downloaded activity data are
+  stored in the PVC. Use your storage provider's snapshot functionality or a Velero-based backup policy to protect this
+  data.
+</Callout>
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Dashboard empty — invalid or expired refresh token">
+  If the dashboard shows no activities after deployment, verify your Strava refresh token is valid. Refresh tokens from
+  the authorization flow are long-lived but can be revoked from the Strava application settings. Re-run the OAuth flow
+  to obtain a new token and update your values.
+</Callout>
+
+<Callout type="tip" title="Initial sync takes time for large histories">
+  On first deployment, the application imports your entire Strava activity history. For athletes with hundreds or
+  thousands of activities, this can take several minutes. The dashboard will be empty or partial until the sync
+  completes.
+</Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/strava-statistics) on GitHub.
+- [Statistics for Strava GitHub Repository](https://github.com/robiningelbrecht/strava-statistics)
+- [Strava Developers Portal](https://developers.strava.com)
+- [HelmForge Strava Statistics Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/strava-statistics)
