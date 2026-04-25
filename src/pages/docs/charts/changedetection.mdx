@@ -1,21 +1,43 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: changedetection.io Chart
-description: HelmForge changedetection.io chart — website change monitoring with optional headless browser sidecar.
+description: HelmForge changedetection.io chart — website change monitoring with CSS/XPath selectors, optional Playwright/Chromium sidecar for JavaScript-rendered pages, and notification support for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # changedetection.io
 
-Deploy changedetection.io on Kubernetes using the official [dgtlmoon/changedetection.io](https://github.com/dgtlmoon/changedetection.io) container image. Monitor websites for changes with support for CSS/XPath selectors, visual comparisons, and notifications via email, webhooks, and more.
+Website change monitoring platform. changedetection.io watches any URL for content changes, compares page
+snapshots, and sends alerts via email, webhooks, Slack, Telegram, and 80+ other notification services.
+Supports CSS and XPath selectors to target specific page elements for precise change detection.
+
+## Architecture
+
+changedetection.io runs in two modes depending on whether the browser sidecar is enabled:
+
+| Mode                          | Fetch Method          | JavaScript        | Best For                                         |
+| ----------------------------- | --------------------- | ----------------- | ------------------------------------------------ |
+| **Without browser** (default) | Python `requests`     | ❌ Not executed   | Static pages, RSS, APIs, plain HTML              |
+| **With browser**              | Playwright + Chromium | ✅ Full rendering | SPAs, React/Vue apps, dynamically loaded content |
+
+<Callout type="warning" title="Choose your fetch mode before deploying">
+  The decision to enable `browser.enabled` is the most important configuration choice for this chart. Without the
+  browser sidecar, changedetection.io cannot detect changes on JavaScript-rendered pages (single-page applications,
+  lazy-loaded content, price tracking on modern e-commerce sites). With the browser enabled, memory requirements
+  increase significantly — each Playwright worker holds a Chromium instance in memory.
+</Callout>
 
 ## Key Features
 
-- **Website Monitoring** — detect changes on any web page with configurable check intervals
-- **CSS/XPath Selectors** — target specific page elements for precise change detection
-- **Browser Sidecar** — optional Playwright/Chromium sidecar for JavaScript-rendered pages
-- **Notifications** — email, webhook, Slack, Telegram, and many more notification channels
-- **REST API** — programmatic access to watches and change history
-- **Persistence** — SQLite database and page snapshots stored on persistent volume
+- **Plain HTTP monitoring** — fast, lightweight fetch for static pages and APIs
+- **Playwright browser sidecar** — full JavaScript rendering via `browserless/chromium`
+- **CSS and XPath selectors** — target specific elements for precise change detection
+- **Visual diff** — side-by-side content comparison
+- **80+ notification channels** — email, webhooks, Slack, Telegram, Gotify, and more
+- **REST API** — programmatic management of watches and history
+- **Persistent storage** — SQLite database and all page snapshots on a persistent volume
 
 ## Installation
 
@@ -33,19 +55,63 @@ helm install changedetection helmforge/changedetection
 helm install changedetection oci://ghcr.io/helmforgedev/helm/changedetection
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (No Browser)' },
+    { id: 'browser', label: 'With Browser Sidecar' },
+    { id: 'browser-resources', label: 'Browser + Resource Limits' },
+    { id: 'throttled', label: 'Throttled (Many Watches)' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — changedetection.io without browser sidecar
+# Use for: static pages, RSS feeds, plain HTML sites, APIs
 changedetection:
   baseUrl: 'https://changes.example.com'
+  timezone: 'America/Sao_Paulo'
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: changes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: changedetection-tls
+      hosts:
+        - changes.example.com
+```
+
+</div>
+
+<div data-tab-panel="browser">
+
+```yaml
+# values.yaml — changedetection.io with Playwright/Chromium browser sidecar
+# Use for: SPAs, React/Vue apps, JavaScript-rendered pages, modern e-commerce
+changedetection:
+  baseUrl: 'https://changes.example.com'
+  fetchWorkers: 4 # Reduce workers to limit concurrent Chromium instances
 
 browser:
   enabled: true
 
 persistence:
   enabled: true
-  size: 10Gi
+  size: 20Gi # Increase storage for browser-rendered snapshots
 
 ingress:
   enabled: true
@@ -57,18 +123,239 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                            | Default | Description                        |
-| ------------------------------ | ------- | ---------------------------------- |
-| `changedetection.baseUrl`      | `""`    | Public base URL of the instance    |
-| `changedetection.fetchWorkers` | `10`    | Number of concurrent fetch workers |
-| `browser.enabled`              | `false` | Enable Playwright browser sidecar  |
-| `persistence.enabled`          | `true`  | Enable persistent storage          |
-| `persistence.size`             | `10Gi`  | PVC size                           |
-| `ingress.enabled`              | `false` | Enable ingress                     |
+<div data-tab-panel="browser-resources">
+
+```yaml
+# values.yaml — Browser mode with explicit resource limits
+# Chromium per-instance uses ~300-500MB RAM.
+# With fetchWorkers: 4, plan for ~2GB RAM for the browser container.
+changedetection:
+  baseUrl: 'https://changes.example.com'
+  fetchWorkers: 4
+
+browser:
+  enabled: true
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 250m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: changes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="throttled">
+
+```yaml
+# values.yaml — Throttled configuration for many watches
+# minimumSecondsRecheckTime prevents hammering monitored sites
+changedetection:
+  baseUrl: 'https://changes.example.com'
+  fetchWorkers: 5
+  minimumSecondsRecheckTime: '300' # At least 5 minutes between rechecks per watch
+
+persistence:
+  enabled: true
+  size: 50Gi # Larger PVC for many snapshots over time
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: changes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                               | Description                          |
+| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
+| `image.repository` | string | `ghcr.io/dgtlmoon/changedetection.io` | changedetection.io container image.  |
+| `image.tag`        | string | `"0.54.7"`                            | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
+
+### changedetection.io Configuration
+
+| Parameter                                   | Type    | Default | Description                                                                |
+| ------------------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `changedetection.port`                      | integer | `5000`  | Internal HTTP port.                                                        |
+| `changedetection.baseUrl`                   | string  | `""`    | Public URL of the instance. Used in notification links.                    |
+| `changedetection.fetchWorkers`              | integer | `10`    | Number of concurrent fetch workers. Reduce when using the browser sidecar. |
+| `changedetection.minimumSecondsRecheckTime` | string  | `""`    | Minimum interval between rechecks in seconds. Empty means no minimum.      |
+| `changedetection.timezone`                  | string  | `""`    | Container timezone for scheduling and display.                             |
+| `changedetection.extraEnv`                  | array   | `[]`    | Extra environment variables for advanced configuration.                    |
+
+<Callout type="tip" title="Reduce fetchWorkers when enabling the browser sidecar">
+  The default `fetchWorkers: 10` means up to 10 concurrent Chromium instances when `browser.enabled: true`. Each
+  Chromium instance consumes 300–500 MB of RAM. For most deployments, `fetchWorkers: 4` or `fetchWorkers: 5` provides a
+  good balance between parallelism and memory usage. Set `browser.resources.limits.memory` accordingly.
+</Callout>
+
+<Callout type="info" title="Set baseUrl for clickable notification links">
+  Notification messages sent by changedetection.io include a link back to the watch diff view. If `baseUrl` is empty,
+  these links will not work. Set it to the public URL of your instance (e.g. `https://changes.example.com`).
+</Callout>
+
+### Browser Sidecar
+
+The browser sidecar runs `browserless/chromium` in the same pod and provides Playwright-based rendering for
+JavaScript-heavy pages. changedetection.io automatically routes requests through the browser when it is enabled.
+
+| Parameter                  | Type    | Default                        | Description                                                                |
+| -------------------------- | ------- | ------------------------------ | -------------------------------------------------------------------------- |
+| `browser.enabled`          | boolean | `false`                        | Enable the Playwright/Chromium sidecar container.                          |
+| `browser.image.repository` | string  | `ghcr.io/browserless/chromium` | Browser sidecar container image.                                           |
+| `browser.image.tag`        | string  | `"v2.46.0"`                    | Browser image tag.                                                         |
+| `browser.image.pullPolicy` | string  | `IfNotPresent`                 | Browser image pull policy.                                                 |
+| `browser.resources`        | object  | `{}`                           | Resource requests and limits for the browser container. Set memory limits. |
+
+<Callout type="danger" title="Browser sidecar without memory limits can OOMKill the pod">
+  Without `browser.resources.limits.memory`, the Chromium sidecar has no memory ceiling. Pages with heavy JavaScript or
+  memory leaks can cause the pod to be OOMKilled. Always set `browser.resources.limits.memory` when enabling the browser
+  sidecar. Start with `2Gi` and monitor actual usage.
+</Callout>
+
+### Persistence
+
+changedetection.io stores its SQLite database and all page snapshots (HTML content captured on each change) in
+`/datastore`. Snapshot volume grows over time based on the number of watches and their history retention.
+
+| Parameter                   | Type    | Default             | Description                                                           |
+| --------------------------- | ------- | ------------------- | --------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/datastore` (SQLite database + all page snapshots). |
+| `persistence.size`          | string  | `10Gi`              | PVC size. Increase based on number of watches and history retention.  |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                             |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                     |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                          |
+
+<Callout type="warning" title="No built-in S3 backup — protect the PVC manually">
+  Unlike other HelmForge charts, changedetection.io does not include a built-in S3 backup CronJob. The PVC contains both
+  the SQLite database and all captured page snapshots. Implement an external backup strategy (e.g. Velero volume
+  snapshots, NFS snapshots, or a custom CronJob) to protect this data.
+</Callout>
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+`resources` applies to the main changedetection.io container only. Set `browser.resources` separately for the
+Chromium sidecar when `browser.enabled: true`.
+
+| Parameter            | Type   | Default | Description                                          |
+| -------------------- | ------ | ------- | ---------------------------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory for the changedetection.io container. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.                          |
+| `securityContext`    | object | `{}`    | Container-level security context.                    |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-- [changedetection.io documentation](https://changedetection.io)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/changedetection)
+- [changedetection.io Official Website](https://changedetection.io)
+- [changedetection.io GitHub Repository](https://github.com/dgtlmoon/changedetection.io)
+- [HelmForge changedetection.io Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/changedetection)
