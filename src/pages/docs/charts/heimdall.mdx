@@ -1,24 +1,30 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Heimdall
-description: Helm chart for Heimdall application dashboard on Kubernetes with S3 backup.
+title: Heimdall Chart
+description: HelmForge Heimdall chart — application dashboard for organizing and launching self-hosted services, with LinuxServer.io image, persistent SQLite storage, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Heimdall
 
-Helm chart for deploying [Heimdall](https://heimdall.site/) application dashboard on Kubernetes using the [`linuxserver/heimdall`](https://hub.docker.com/r/linuxserver/heimdall) Docker image.
+Application dashboard for organizing and launching self-hosted services. Heimdall provides a clean, customizable
+homepage where you can pin any web application as a tile, complete with icons, colors, and live status indicators.
+All configuration is stored in a SQLite database on a persistent volume — no external database required.
 
 ## Key Features
 
-- **LinuxServer.io image** based on `linuxserver/heimdall`
-- **Persistent storage** SQLite database and settings in `/config`
-- **S3-compatible backup** CronJob that archives `/config` and uploads to any S3 endpoint
-- **PUID/PGID** file ownership control
-- **Ingress support** configurable ingress with TLS
+- **Application tiles** — pin any URL as an app tile with custom icons and colors
+- **Enhanced apps** — native integrations for popular self-hosted apps (stats, health)
+- **LinuxServer.io image** — PUID/PGID file ownership control for PVC compatibility
+- **Persistent storage** — SQLite database and all configuration in `/config`
+- **S3 backup** — scheduled archive of the full `/config` directory to S3-compatible storage
+- **Ingress support** — configurable TLS via cert-manager
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -26,17 +32,34 @@ helm repo update
 helm install heimdall helmforge/heimdall
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
 helm install heimdall oci://ghcr.io/helmforgedev/helm/heimdall
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'production', label: 'Production (TLS)' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Heimdall with Traefik ingress
 heimdall:
-  timezone: 'America/New_York'
+  timezone: 'America/Sao_Paulo'
+  puid: 1000
+  pgid: 1000
+
+persistence:
+  enabled: true
+  size: 1Gi
 
 ingress:
   enabled: true
@@ -46,39 +69,267 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: heimdall-tls
-      hosts:
-        - dashboard.example.com
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Heimdall with daily S3 backup
+# Backup covers the full /config directory including SQLite database and all tiles
+heimdall:
+  timezone: 'America/Sao_Paulo'
+
+persistence:
+  enabled: true
+  size: 1Gi
 
 backup:
   enabled: true
   schedule: '0 3 * * *'
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-backups
+    bucket: my-heimdall-backups
     prefix: heimdall
     existingSecret: heimdall-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: dashboard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                        | Default       | Description                              |
-| -------------------------- | ------------- | ---------------------------------------- |
-| `heimdall.puid`            | `1000`        | User ID for file permissions             |
-| `heimdall.pgid`            | `1000`        | Group ID for file permissions            |
-| `heimdall.timezone`        | `"UTC"`       | Timezone                                 |
-| `persistence.enabled`      | `true`        | Enable persistent storage for /config    |
-| `persistence.size`         | `1Gi`         | Volume size                              |
-| `backup.enabled`           | `false`       | Enable S3 backup CronJob                 |
-| `backup.schedule`          | `"0 3 * * *"` | Cron schedule                            |
-| `backup.s3.endpoint`       | `""`          | S3-compatible endpoint URL               |
-| `backup.s3.bucket`         | `""`          | S3 bucket name                           |
-| `backup.s3.existingSecret` | `""`          | Existing secret with S3 credentials      |
-| `service.type`             | `ClusterIP`   | Service type                             |
-| `ingress.enabled`          | `false`       | Enable ingress                           |
-| `ingress.ingressClassName` | `""`          | Ingress class (`traefik`, `nginx`, etc.) |
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Production Heimdall with TLS and backup
+heimdall:
+  timezone: 'America/Sao_Paulo'
+  puid: 1000
+  pgid: 1000
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-heimdall-backups
+    existingSecret: heimdall-s3-credentials
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: dashboard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: heimdall-tls
+      hosts:
+        - dashboard.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                          | Description                          |
+| ------------------ | ------ | -------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/linuxserver/heimdall` | Heimdall container image.            |
+| `image.tag`        | string | `"2.7.6"`                        | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                   | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                             | Pull secrets for private registries. |
+
+### Heimdall Configuration
+
+| Parameter           | Type    | Default | Description                                                             |
+| ------------------- | ------- | ------- | ----------------------------------------------------------------------- |
+| `heimdall.puid`     | integer | `1000`  | User ID used by the container process for file ownership in `/config`.  |
+| `heimdall.pgid`     | integer | `1000`  | Group ID used by the container process for file ownership in `/config`. |
+| `heimdall.timezone` | string  | `UTC`   | Container timezone for display purposes.                                |
+| `heimdall.extraEnv` | array   | `[]`    | Extra environment variables for advanced configuration.                 |
+
+<Callout type="warning" title="PUID/PGID must match the PVC file ownership">
+  The LinuxServer.io image runs as the user and group defined by `heimdall.puid` and `heimdall.pgid`. If the PVC is
+  created with a different owner (e.g. root, UID 0), the container will fail to write to `/config` and the application
+  will not start correctly. The default `1000:1000` works with most dynamic provisioners. If you encounter permission
+  errors in logs, verify the PVC ownership and adjust `puid`/`pgid` accordingly.
+</Callout>
+
+### Persistence
+
+Heimdall stores all configuration, application tiles, and the SQLite database in the `/config` directory.
+
+| Parameter                   | Type    | Default         | Description                                                       |
+| --------------------------- | ------- | --------------- | ----------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`          | Enable a PVC for `/config` (SQLite database and all tile config). |
+| `persistence.size`          | string  | `1Gi`           | PVC size.                                                         |
+| `persistence.storageClass`  | string  | `""`            | StorageClass for the PVC.                                         |
+| `persistence.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                                  |
+| `persistence.existingClaim` | string  | `""`            | Use an existing PVC instead of creating one.                      |
+| `persistence.annotations`   | object  | `{}`            | Annotations for the PVC.                                          |
+
+### Backup
+
+The S3 backup CronJob archives the full `/config` directory, which includes the SQLite database, all configured
+application tiles, custom icons, and settings. This is a complete backup of the Heimdall instance.
+
+| Parameter                              | Type    | Default                         | Description                                                  |
+| -------------------------------------- | ------- | ------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                         | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                   | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                         | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                        | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                             | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                             | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                             | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `heimdall`                      | Prefix for backup archive filenames.                         |
+| `backup.images.archiver`               | string  | `docker.io/library/alpine:3.22` | Image used for `tar` archive.                                |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`  | Image used for S3 upload.                                    |
+| `backup.resources`                     | object  | `{}`                            | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                            | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                            | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `heimdall`                      | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                          | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                            | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                    | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                    | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                            | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                            | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+<Callout type="info" title="ingressClassName must be set explicitly">
+  Unlike most HelmForge charts, `ingress.ingressClassName` defaults to an empty string. You must set it explicitly to
+  your cluster's ingress controller (e.g. `traefik`, `nginx`) for the Ingress resource to be picked up.
+</Callout>
+
+| Parameter                  | Type    | Default | Description                                      |
+| -------------------------- | ------- | ------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false` | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `""`    | Ingress class name. Must be set explicitly.      |
+| `ingress.annotations`      | object  | `{}`    | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`    | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+Probes use the `/` root path.
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `12`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `20`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="All dashboard tiles lost after pod restart without persistence">
+  All configured application tiles, icons, and settings are stored in the SQLite database inside `/config`. If
+  `persistence.enabled` is `false` or the PVC is not correctly bound, the entire dashboard configuration is lost when
+  the pod restarts. Always verify `persistence.enabled: true` and that the PVC is in `Bound` state before configuring
+  your dashboard.
+</Callout>
+
+<Callout type="tip" title="Enhanced app integrations require API tokens">
+  Heimdall supports enhanced tiles for apps like Sonarr, Radarr, Pi-hole, and others that display live statistics. These
+  require an API token or key configured in the tile settings within the Heimdall UI. Check the [Heimdall supported apps
+  list](https://heimdall.site/#applications) for available integrations.
+</Callout>
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/heimdall)
+- [Heimdall Official Website](https://heimdall.site)
+- [Heimdall GitHub Repository](https://github.com/linuxserver/Heimdall)
+- [LinuxServer.io Image Documentation](https://docs.linuxserver.io/images/docker-heimdall)
+- [HelmForge Heimdall Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/heimdall)
