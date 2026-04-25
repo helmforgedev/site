@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Liwan Chart
-description: HelmForge Liwan chart — ultra-lightweight, privacy-first web analytics with embedded DuckDB for Kubernetes.
+description: HelmForge Liwan chart — ultra-lightweight, privacy-first web analytics with embedded DuckDB, GeoIP enrichment, and cookie-free tracking for Kubernetes.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -10,17 +10,18 @@ import Callout from '../../../components/Callout.astro';
 # Liwan
 
 Ultra-lightweight, privacy-first web analytics with embedded DuckDB storage. Liwan runs as a single binary with
-minimal resource requirements and no external database dependency — all analytics data lives in a local DuckDB file
-on a persistent volume.
+minimal resource requirements and no external database dependency. All analytics data — including GeoIP
+location enrichment — lives in a local DuckDB file on a persistent volume.
 
 ## Key Features
 
 - **Single binary** — no external database, no sidecar, minimal footprint
 - **Privacy-first** — no cookies, no cross-site tracking, GDPR-compliant by design
 - **DuckDB storage** — columnar analytics engine embedded in the binary
-- **GeoIP enrichment** — optional IP-to-location lookup stored alongside DuckDB data
+- **GeoIP enrichment** — automatic IP-to-location lookup stored alongside DuckDB data
+- **Cookie-free tracking** — JavaScript snippet embeddable on any site
 - **Ingress support** — TLS via cert-manager with configurable ingress class
-- **Persistent storage** — PVC-backed `/data` directory for DuckDB and GeoIP files
+- **Non-root by default** — `runAsNonRoot: true` and `fsGroup: 1000` preconfigured
 
 ## Installation
 
@@ -38,35 +39,32 @@ helm install liwan helmforge/liwan
 helm install liwan oci://ghcr.io/helmforgedev/helm/liwan
 ```
 
+## Tracking Script Integration
+
+After deploying Liwan and creating a site in the UI, embed the tracking snippet on your website. Replace
+`analytics.example.com` with your actual Liwan instance URL and `my-site` with your site slug:
+
+```html
+<script defer src="https://analytics.example.com/script.js" data-site-name="my-site"></script>
+```
+
+The script is cookie-free and GDPR-compliant. No consent banner is required under most EU interpretations
+when using Liwan's privacy-preserving tracking model.
+
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'basic', label: 'Basic' },
-    { id: 'ingress', label: 'With Ingress' },
-    { id: 'tls', label: 'With TLS' },
-    { id: 'resources', label: 'With Resources' },
+    { id: 'production', label: 'Production (TLS)' },
+    { id: 'geoip', label: 'GeoIP + Resources' },
+    { id: 'minimal', label: 'Minimal (No TLS)' },
   ]}
 >
 
-<div data-tab-panel="basic">
+<div data-tab-panel="production">
 
 ```yaml
-# values.yaml
-liwan:
-  baseUrl: 'https://analytics.example.com'
-
-persistence:
-  enabled: true
-  size: 5Gi
-```
-
-</div>
-
-<div data-tab-panel="ingress">
-
-```yaml
-# values.yaml
+# values.yaml — Production Liwan with TLS and resource limits
 liwan:
   baseUrl: 'https://analytics.example.com'
 
@@ -74,28 +72,13 @@ persistence:
   enabled: true
   size: 5Gi
 
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: analytics.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-```
-
-</div>
-
-<div data-tab-panel="tls">
-
-```yaml
-# values.yaml
-liwan:
-  baseUrl: 'https://analytics.example.com'
-
-persistence:
-  enabled: true
-  size: 5Gi
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 25m
+  limits:
+    memory: 256Mi
+    cpu: 250m
 
 ingress:
   enabled: true
@@ -115,16 +98,18 @@ ingress:
 
 </div>
 
-<div data-tab-panel="resources">
+<div data-tab-panel="geoip">
 
 ```yaml
-# values.yaml
+# values.yaml — Liwan with GeoIP enrichment and explicit resource limits
+# GeoIP data is automatically downloaded to /data on first startup.
+# A larger PVC is recommended when GeoIP enrichment is active.
 liwan:
   baseUrl: 'https://analytics.example.com'
 
 persistence:
   enabled: true
-  size: 10Gi
+  size: 5Gi # GeoIP database adds ~100MB to the DuckDB data directory
   storageClass: fast-ssd
 
 resources:
@@ -134,6 +119,35 @@ resources:
   limits:
     memory: 512Mi
     cpu: 500m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: analytics.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: liwan-tls
+      hosts:
+        - analytics.example.com
+```
+
+</div>
+
+<div data-tab-panel="minimal">
+
+```yaml
+# values.yaml — Minimal Liwan, internal access only (no Ingress)
+liwan:
+  baseUrl: 'http://liwan.analytics.svc.cluster.local'
+
+persistence:
+  enabled: true
+  size: 2Gi
 ```
 
 </div>
@@ -161,26 +175,30 @@ resources:
 
 ### Liwan Configuration
 
-| Parameter        | Type    | Default | Description                                    |
-| ---------------- | ------- | ------- | ---------------------------------------------- |
-| `liwan.port`     | integer | `9042`  | Application HTTP port inside the container.    |
-| `liwan.baseUrl`  | string  | `""`    | Public base URL of the Liwan instance.         |
-| `liwan.extraEnv` | array   | `[]`    | Extra environment variables for the container. |
+| Parameter        | Type    | Default | Description                                                                   |
+| ---------------- | ------- | ------- | ----------------------------------------------------------------------------- |
+| `liwan.port`     | integer | `9042`  | Application HTTP port inside the container.                                   |
+| `liwan.baseUrl`  | string  | `""`    | Public base URL of the Liwan instance (e.g. `https://analytics.example.com`). |
+| `liwan.extraEnv` | array   | `[]`    | Extra environment variables for advanced configuration.                       |
 
-<Callout type="info" title="baseUrl is required for link generation">
-  Set `liwan.baseUrl` to your public URL (for example `https://analytics.example.com`). Without it, Liwan may generate
-  incorrect self-referencing links in the UI.
+<Callout type="warning" title="baseUrl is required for correct tracking script URLs">
+  Set `liwan.baseUrl` to your public URL. Without it, the JavaScript tracking snippet URL generated by Liwan will be
+  incorrect, causing the tracker to fail on embedded sites. This is the most common reason for a Liwan deployment that
+  appears to work but collects no data.
 </Callout>
 
 ### Persistence
 
-| Parameter                   | Type    | Default             | Description                                  |
-| --------------------------- | ------- | ------------------- | -------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (DuckDB + GeoIP).   |
-| `persistence.size`          | string  | `2Gi`               | PVC size.                                    |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
+Liwan stores both the DuckDB analytics database and the GeoIP enrichment database in the `/data` directory.
+GeoIP data is downloaded automatically on first startup and adds approximately 100 MB to the volume.
+
+| Parameter                   | Type    | Default             | Description                                              |
+| --------------------------- | ------- | ------------------- | -------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (DuckDB database + GeoIP data). |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                                |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                        |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.             |
 
 ### Service
 
@@ -222,13 +240,16 @@ resources:
 
 ### Resources and Security
 
+Liwan ships with a non-root security context preconfigured. The `fsGroup: 1000` ensures the DuckDB and GeoIP
+files in `/data` are writable by the container user without requiring privileged access.
+
 | Parameter                      | Type    | Default | Description                         |
 | ------------------------------ | ------- | ------- | ----------------------------------- |
 | `resources`                    | object  | `{}`    | CPU and memory requests and limits. |
 | `podSecurityContext.fsGroup`   | integer | `1000`  | Filesystem group for the pod.       |
-| `securityContext.runAsUser`    | integer | `1000`  | UID for the container.              |
-| `securityContext.runAsGroup`   | integer | `1000`  | GID for the container.              |
-| `securityContext.runAsNonRoot` | boolean | `true`  | Require non-root execution.         |
+| `securityContext.runAsUser`    | integer | `1000`  | UID for the container process.      |
+| `securityContext.runAsGroup`   | integer | `1000`  | GID for the container process.      |
+| `securityContext.runAsNonRoot` | boolean | `true`  | Enforce non-root execution.         |
 
 ### Service Account
 
@@ -261,14 +282,15 @@ resources:
 
 ## Common Issues
 
-<Callout type="danger" title="Data loss on persistence.enabled: false">
-  If `persistence.enabled` is set to `false`, all analytics data stored in DuckDB is lost when the pod restarts. Always
-  enable persistence in production.
+<Callout type="danger" title="All analytics data lost when persistence.enabled: false">
+  If `persistence.enabled` is `false`, all DuckDB data — including historical analytics and GeoIP files — is lost when
+  the pod restarts. Always enable persistence in production.
 </Callout>
 
 <Callout type="tip" title="Right-size your PVC from the start">
-  DuckDB compresses analytics data efficiently. For most small-to-medium sites, `2Gi` is sufficient for years of data.
-  PVC resize requires a StorageClass with `allowVolumeExpansion: true`.
+  DuckDB compresses analytics data efficiently. For most small-to-medium sites, `2Gi` is sufficient for years of
+  analytics. Add ~100 MB for the GeoIP database. PVC resize requires a StorageClass with `allowVolumeExpansion: true`.
+  Start at `5Gi` for peace of mind.
 </Callout>
 
 ## More Information
