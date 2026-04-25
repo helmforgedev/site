@@ -1,21 +1,32 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: DDNS Updater Chart
-description: HelmForge DDNS Updater chart — dynamic DNS for 50+ providers with web UI and persistent history.
+description: HelmForge DDNS Updater chart — dynamic DNS for 50+ providers including Cloudflare, Route53, DuckDNS, and Namecheap with web UI, update history persistence, and existingSecret support for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # DDNS Updater
 
-Deploy [ddns-updater](https://github.com/qdm12/ddns-updater) on Kubernetes using the official [qmcgaw/ddns-updater](https://hub.docker.com/r/qmcgaw/ddns-updater) Docker image. Keep DNS A/AAAA records updated across 50+ providers with a responsive web UI.
+Deploy [ddns-updater](https://github.com/qdm12/ddns-updater) on Kubernetes. Keeps DNS A/AAAA records
+updated across 50+ providers (Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more) with
+a responsive web dashboard and persistent update history.
+
+<Callout type="warning" title="config.settings embeds credentials in Helm values — prefer existingSecret">
+  Inline `config.settings` entries (with `token`, `password`, or API keys) are stored in a Kubernetes Secret created by
+  the chart. However, they are visible in Helm release history via `helm get values`. For production, pre-create a
+  Secret containing a `config.json` file and reference it with `config.existingSecret`.
+</Callout>
 
 ## Key Features
 
 - **50+ DNS providers** — Cloudflare, Route53, DuckDNS, Namecheap, GoDaddy, Hetzner, and more
-- **Web UI** — responsive dashboard for monitoring update status
-- **Multi-provider** — manage records across different providers in a single deployment
-- **Persistent history** — update history stored in a PVC
-- **Existing secrets** — bring your own Secret for credentials
-- **Ingress support** — expose the web UI with TLS
+- **Web UI** — responsive dashboard at port 8000 for monitoring update status and history
+- **Multi-record support** — manage records from different providers in a single deployment
+- **Persistent history** — `updates.json` stored in a PVC survives pod restarts
+- **existingSecret** — bring your own `config.json` Secret for GitOps and production use
+- **Configurable IP detection** — HTTP, DNS, or combined public IP fetching strategies
 
 ## Installation
 
@@ -33,67 +44,272 @@ helm install ddns-updater helmforge/ddns-updater -f values.yaml
 helm install ddns-updater oci://ghcr.io/helmforgedev/helm/ddns-updater -f values.yaml
 ```
 
-## Basic Example (Cloudflare)
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'cloudflare', label: 'Cloudflare' },
+    { id: 'multi-provider', label: 'Multi-Provider' },
+    { id: 'existing-secret', label: 'existingSecret (Production)' },
+    { id: 'with-ingress', label: 'With Ingress' },
+  ]}
+>
+
+<div data-tab-panel="cloudflare">
 
 ```yaml
-# values.yaml
+# values.yaml — Single Cloudflare record
+# Tokens are stored in a chart-managed Secret — consider existingSecret for production.
 config:
   settings:
     - provider: cloudflare
       zone_identifier: 'your-zone-id'
       domain: 'example.com'
-      host: '@'
+      host: '@' # '@' for root domain, or subdomain like 'home'
       ttl: 300
       token: 'your-cloudflare-api-token'
       proxied: false
-      ip_version: 'ipv4'
+      ip_version: ipv4
+
+ddns:
+  period: 5m
+
+persistence:
+  enabled: true
+  size: 256Mi
 ```
 
-Access the web UI with `kubectl port-forward svc/<release>-ddns-updater 8000:80`.
+</div>
 
-## Multi-Provider Example
+<div data-tab-panel="multi-provider">
 
 ```yaml
+# values.yaml — Multiple records across different providers
 config:
   settings:
     - provider: cloudflare
       zone_identifier: 'cf-zone-id'
       domain: 'example.com'
       host: '@'
-      token: 'cf-token'
+      token: 'cf-api-token'
       proxied: true
+
     - provider: duckdns
       domain: 'myhost.duckdns.org'
-      token: 'duck-token'
+      token: 'duckdns-token'
+
     - provider: namecheap
       domain: 'example.org'
       host: 'home'
-      password: 'ddns-password'
+      password: 'namecheap-ddns-password'
+
+ddns:
+  period: 5m
+  updateCooldownPeriod: 5m # prevents flapping when IP changes rapidly
+
+persistence:
+  enabled: true
+  size: 256Mi
 ```
 
-## External Secret
+</div>
+
+<div data-tab-panel="existing-secret">
 
 ```yaml
+# values.yaml — GitOps-safe: load config.json from a pre-existing Secret
+# Create the secret manually:
+#   kubectl create secret generic ddns-config \
+#     --from-file=config.json=./config.json
+#
+# config.json format:
+# {
+#   "settings": [
+#     {
+#       "provider": "cloudflare",
+#       "zone_identifier": "zone-id",
+#       "domain": "example.com",
+#       "host": "@",
+#       "token": "api-token",
+#       "proxied": false,
+#       "ip_version": "ipv4"
+#     }
+#   ]
+# }
+
 config:
   existingSecret: ddns-config
   existingSecretKey: config.json
+
+ddns:
+  period: 5m
+
+persistence:
+  enabled: true
+  size: 256Mi
 ```
 
-## Key Values
+</div>
 
-| Key                     | Default | Description                               |
-| ----------------------- | ------- | ----------------------------------------- |
-| `config.settings`       | `[]`    | DNS records to update (provider-specific) |
-| `config.existingSecret` | `""`    | Existing secret with config.json          |
-| `ddns.period`           | `5m`    | Check interval                            |
-| `ddns.httpTimeout`      | `10s`   | HTTP timeout                              |
-| `ddns.publicIpFetchers` | `all`   | IP detection method                       |
-| `ddns.logLevel`         | `info`  | Log level                                 |
-| `ddns.port`             | `8000`  | Web UI container port                     |
-| `persistence.enabled`   | `true`  | Persist update history                    |
-| `persistence.size`      | `256Mi` | PVC size                                  |
-| `ingress.enabled`       | `false` | Enable ingress for web UI                 |
+<div data-tab-panel="with-ingress">
+
+```yaml
+# values.yaml — Web UI exposed via Ingress with TLS
+# The web UI runs on port 8000 in the container (mapped to 80 on the Service).
+config:
+  existingSecret: ddns-config
+  existingSecretKey: config.json
+
+ddns:
+  period: 5m
+  rootUrl: / # set to '/ddns' if behind a reverse proxy on a subpath
+
+persistence:
+  enabled: true
+  size: 256Mi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: ddns.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: ddns-tls
+      hosts:
+        - ddns.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                         | Description                          |
+| ------------------ | ------ | ------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/qmcgaw/ddns-updater` | DDNS Updater container image.        |
+| `image.tag`        | string | `"v2.9.0"`                      | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
+
+### DDNS Configuration
+
+| Parameter                  | Type   | Default       | Description                                                                 |
+| -------------------------- | ------ | ------------- | --------------------------------------------------------------------------- |
+| `config.settings`          | array  | `[]`          | Inline DNS records to update. Each entry requires provider-specific fields. |
+| `config.existingSecret`    | string | `""`          | Existing Secret containing a `config.json` file.                            |
+| `config.existingSecretKey` | string | `config.json` | Key inside the existing secret for the config file.                         |
+
+<Callout type="tip" title="config.json is JSON, not YAML">
+  The `config.existingSecret` must contain a JSON file. The `config.settings` entries in `values.yaml` are YAML but are
+  converted to JSON by the chart when creating the internal Secret. When using `existingSecret`, create a valid JSON
+  file following the [ddns-updater settings
+  format](https://github.com/qdm12/ddns-updater?tab=readme-ov-file#configuration).
+</Callout>
+
+### Application Options
+
+| Parameter                   | Type    | Default | Description                                                                            |
+| --------------------------- | ------- | ------- | -------------------------------------------------------------------------------------- |
+| `ddns.period`               | string  | `5m`    | Interval between IP checks and DNS updates.                                            |
+| `ddns.httpTimeout`          | string  | `10s`   | HTTP timeout for IP detection and DNS provider API calls.                              |
+| `ddns.publicIpFetchers`     | string  | `all`   | Public IP detection method: `all`, `http`, or `dns`.                                   |
+| `ddns.updateCooldownPeriod` | string  | `5m`    | Minimum time between updates per record. Prevents flapping on rapid IP change.         |
+| `ddns.logLevel`             | string  | `info`  | Log verbosity: `debug`, `info`, `warning`, or `error`.                                 |
+| `ddns.port`                 | integer | `8000`  | Web UI container listen port.                                                          |
+| `ddns.rootUrl`              | string  | `/`     | Root URL path for the web UI. Change when hosting behind a reverse proxy at a subpath. |
+| `ddns.extraEnv`             | array   | `[]`    | Extra environment variables for the container.                                         |
+
+### Persistence
+
+| Parameter                   | Type    | Default           | Description                                                |
+| --------------------------- | ------- | ----------------- | ---------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`            | Enable PVC for `updates.json` (update history and status). |
+| `persistence.size`          | string  | `256Mi`           | PVC size. Tiny — update history is a small JSON file.      |
+| `persistence.storageClass`  | string  | `""`              | StorageClass for the PVC.                                  |
+| `persistence.accessModes`   | array   | `[ReadWriteOnce]` | PVC access modes.                                          |
+| `persistence.existingClaim` | string  | `""`              | Use an existing PVC.                                       |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                            |
+| --------------------- | ------- | ----------- | -------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.               |
+| `service.port`        | integer | `80`        | Service port (maps to container 8000). |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.           |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource for the web UI.       |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.                               |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`             | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds` | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`       | integer | `5`     | Startup probe period.              |
+| `probes.startup.failureThreshold`    | integer | `12`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`            | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.periodSeconds`      | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.failureThreshold`   | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`           | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.periodSeconds`     | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.failureThreshold`  | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/ddns-updater) on GitHub.
+- [ddns-updater GitHub Repository](https://github.com/qdm12/ddns-updater)
+- [Supported Providers](https://github.com/qdm12/ddns-updater?tab=readme-ov-file#providers)
+- [Configuration Reference](https://github.com/qdm12/ddns-updater?tab=readme-ov-file#configuration)
+- [HelmForge DDNS Updater Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/ddns-updater)
