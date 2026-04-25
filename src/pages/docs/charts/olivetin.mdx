@@ -1,20 +1,32 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: OliveTin Chart
-description: HelmForge OliveTin chart — browser-based UI for predefined shell commands and system actions.
+description: HelmForge OliveTin chart — browser-based UI for running predefined shell commands safely on Kubernetes, with Prometheus metrics and ConfigMap-based action definitions.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # OliveTin
 
-Deploy OliveTin on Kubernetes using the official [jamesread/olivetin](https://hub.docker.com/r/jamesread/olivetin) container image. OliveTin provides a clean web interface for running predefined shell commands, making it easy to give safe access to common system actions.
+Browser-based interface for running predefined shell commands on Kubernetes. OliveTin lets you expose safe,
+well-defined system actions — restart a service, trigger a backup, run a diagnostic — as clickable buttons in a
+clean web UI, without giving users direct shell access.
+
+<Callout type="danger" title="Do not expose OliveTin to the public internet without authentication">
+  OliveTin executes shell commands on the server. Without authentication, anyone who can reach the URL can run all
+  configured actions. Deploy behind an auth proxy (Authelia, Authentik, Traefik ForwardAuth) or restrict access to a
+  trusted network or VPN.
+</Callout>
 
 ## Key Features
 
-- **ConfigMap-Based Actions** — define shell commands in YAML, mounted as a ConfigMap
-- **Web UI** — clean, responsive browser interface for triggering actions
-- **Prometheus Metrics** — optional metrics scraping with ServiceMonitor support
-- **Customizable** — action titles, icons, and confirmation prompts
-- **Lightweight** — minimal resource footprint with no external dependencies
+- **ConfigMap-based actions** — define shell commands in YAML, mounted as a ConfigMap
+- **No external dependencies** — no database, no state, stateless by design
+- **Prometheus metrics** — optional scraping with ServiceMonitor support
+- **Confirmation prompts** — require user confirmation before running destructive commands
+- **Icon and title customization** — human-friendly labels for each action
+- **Lightweight** — minimal resource footprint
 
 ## Installation
 
@@ -32,39 +44,319 @@ helm install olivetin helmforge/olivetin
 helm install olivetin oci://ghcr.io/helmforgedev/helm/olivetin
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'actions', label: 'Rich Actions' },
+    { id: 'metrics', label: 'With Metrics' },
+    { id: 'auth-proxy', label: 'With Auth Proxy' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Minimal setup with a few example actions
 config: |
   actions:
     - title: "Ping Google"
       shell: "ping -c 1 google.com"
+      icon: "ping"
+
     - title: "Show Disk Usage"
       shell: "df -h"
+      icon: "disk"
+
+    - title: "Show Memory"
+      shell: "free -h"
+      icon: "memory"
 
 ingress:
   enabled: true
   ingressClassName: traefik
   hosts:
-    - host: olivetin.example.com
+    - host: olivetin.internal.example.com
       paths:
         - path: /
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                              | Default       | Description                                   |
-| -------------------------------- | ------------- | --------------------------------------------- |
-| `config`                         | _(see below)_ | OliveTin YAML configuration block             |
-| `olivetin.port`                  | `1337`        | Application port                              |
-| `metrics.enabled`                | `false`       | Enable Prometheus metrics                     |
-| `metrics.serviceMonitor.enabled` | `false`       | Create ServiceMonitor for Prometheus Operator |
-| `persistence.enabled`            | `false`       | Enable persistence for custom data            |
-| `ingress.enabled`                | `false`       | Enable ingress                                |
+<div data-tab-panel="actions">
+
+```yaml
+# values.yaml — Advanced action definitions with confirmation, timeouts, and arguments
+config: |
+  actions:
+    - title: "Restart nginx"
+      shell: "kubectl rollout restart deployment/nginx -n web"
+      icon: "restart"
+      confirmBeforeStart: true
+      timeout: 30
+
+    - title: "Trigger Backup"
+      shell: "kubectl create job backup-manual --from=cronjob/database-backup -n database"
+      icon: "backup"
+      confirmBeforeStart: true
+      timeout: 60
+
+    - title: "Get Pod Logs"
+      shell: "kubectl logs -n {{ namespace }} {{ pod }} --tail=100"
+      icon: "logs"
+      arguments:
+        - name: namespace
+          title: "Namespace"
+          default: default
+        - name: pod
+          title: "Pod name"
+
+    - title: "Scale Deployment"
+      shell: "kubectl scale deployment {{ deployment }} --replicas={{ replicas }} -n {{ namespace }}"
+      icon: "scale"
+      confirmBeforeStart: true
+      arguments:
+        - name: namespace
+          title: "Namespace"
+          default: default
+        - name: deployment
+          title: "Deployment"
+        - name: replicas
+          title: "Replica count"
+          default: "1"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: olivetin.internal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="metrics">
+
+```yaml
+# values.yaml — OliveTin with Prometheus metrics and ServiceMonitor
+config: |
+  actions:
+    - title: "Ping Google"
+      shell: "ping -c 1 google.com"
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: olivetin.internal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="auth-proxy">
+
+```yaml
+# values.yaml — OliveTin behind Traefik ForwardAuth (Authelia example)
+config: |
+  actions:
+    - title: "Ping Google"
+      shell: "ping -c 1 google.com"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: auth-authelia-forwardauth@kubernetescrd
+  hosts:
+    - host: olivetin.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: olivetin-tls
+      hosts:
+        - olivetin.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                        | Description                          |
+| ------------------ | ------ | ------------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/jamesread/olivetin` | OliveTin container image.            |
+| `image.tag`        | string | `"3000.11.3"`                  | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
+
+### OliveTin Configuration
+
+| Parameter           | Type    | Default                 | Description                                                   |
+| ------------------- | ------- | ----------------------- | ------------------------------------------------------------- |
+| `olivetin.port`     | integer | `1337`                  | Internal HTTP port for the OliveTin container.                |
+| `olivetin.extraEnv` | array   | `[]`                    | Extra environment variables injected into the container.      |
+| `config`            | string  | _(default ping action)_ | OliveTin YAML configuration mounted at `/config/config.yaml`. |
+
+<Callout type="info" title="config is mounted as a ConfigMap">
+  The entire `config` block is stored in a Kubernetes ConfigMap and mounted at `/config/config.yaml`. Any change to
+  `config` during a Helm upgrade will trigger a pod restart to pick up the new configuration. Keep action definitions in
+  version control alongside your values files.
+</Callout>
+
+The `config` block supports the full OliveTin configuration schema. Key action options:
+
+| Action Field         | Description                                                            |
+| -------------------- | ---------------------------------------------------------------------- |
+| `title`              | Display name shown on the button in the web UI.                        |
+| `shell`              | Shell command to execute.                                              |
+| `icon`               | Button icon name (uses OliveTin's built-in icon set).                  |
+| `confirmBeforeStart` | Show a confirmation dialog before executing (default: `false`).        |
+| `timeout`            | Execution timeout in seconds (default: `3`).                           |
+| `arguments`          | List of user-provided arguments interpolated into `shell` via `{{ }}`. |
+
+See the [full OliveTin configuration reference](https://docs.olivetin.app/config.html) for all available options.
+
+### Metrics
+
+| Parameter                              | Type    | Default | Description                                           |
+| -------------------------------------- | ------- | ------- | ----------------------------------------------------- |
+| `metrics.enabled`                      | boolean | `false` | Enable Prometheus metrics scraping annotations.       |
+| `metrics.serviceMonitor.enabled`       | boolean | `false` | Create a ServiceMonitor for Prometheus Operator.      |
+| `metrics.serviceMonitor.namespace`     | string  | `""`    | Namespace for the ServiceMonitor (defaults to chart). |
+| `metrics.serviceMonitor.labels`        | object  | `{}`    | Extra labels applied to the ServiceMonitor.           |
+| `metrics.serviceMonitor.interval`      | string  | `30s`   | Prometheus scrape interval.                           |
+| `metrics.serviceMonitor.scrapeTimeout` | string  | `10s`   | Prometheus scrape timeout.                            |
+
+### Persistence
+
+OliveTin is stateless — the `config` lives in a ConfigMap, and action logs are ephemeral. Persistence is optional
+and only needed if your actions produce output files that must survive pod restarts.
+
+| Parameter                   | Type    | Default             | Description                                   |
+| --------------------------- | ------- | ------------------- | --------------------------------------------- |
+| `persistence.enabled`       | boolean | `false`             | Enable a PVC for custom data or output files. |
+| `persistence.size`          | string  | `1Gi`               | PVC size.                                     |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                     |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                             |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.  |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                          |
+| -------------------------- | ------- | --------- | ---------------------------------------------------- |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                          |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                                  |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. ForwardAuth, TLS). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                         |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).           |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="warning" title="Actions timing out unexpectedly">
+  The default action timeout in OliveTin is 3 seconds. Long-running commands (kubectl rollouts, database backups) will
+  appear to succeed in the UI but be killed silently. Set `timeout` explicitly in each action that needs more time.
+</Callout>
+
+<Callout type="tip" title="Run kubectl commands from OliveTin">
+  To run `kubectl` commands, the OliveTin pod needs cluster access. Create a ServiceAccount with appropriate RBAC
+  permissions and set `serviceAccount.create: true` with `serviceAccount.annotations` pointing to the account. Mount the
+  kubeconfig or rely on in-cluster config.
+</Callout>
 
 ## More Information
 
-- [OliveTin documentation](https://docs.olivetin.app)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/olivetin)
+- [OliveTin Official Website](https://www.olivetin.app)
+- [OliveTin Documentation](https://docs.olivetin.app)
+- [OliveTin GitHub Repository](https://github.com/jamesread/OliveTin)
+- [HelmForge OliveTin Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/olivetin)
