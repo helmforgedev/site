@@ -1,21 +1,33 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Komga Chart
-description: HelmForge Komga chart — media server for comics and manga with OPDS, SQLite persistence, and S3 backup.
+description: HelmForge Komga chart — comics and manga media server with OPDS, dual PVC for config and library, JVM tuning via javaToolOptions, SQLite S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Komga
 
-Deploy Komga on Kubernetes using the official [gotson/komga](https://hub.docker.com/r/gotson/komga) Docker image. A media server for comics, mangas, BDs, magazines, and eBooks with OPDS support and a modern web reader.
+Deploy [Komga](https://komga.org/) on Kubernetes using the official `gotson/komga` Docker image.
+A media server for comics, mangas, BDs, magazines, and eBooks with a modern web reader, OPDS support,
+and native apps for iOS and Android.
+
+<Callout type="danger" title="Both PVCs are required — losing /config destroys your library metadata">
+  Komga uses **two separate PVCs**: `/config` for the SQLite database and application state (library index, reading
+  progress, collections, user data) and `/data` for the physical comic/manga files. Losing `/config` destroys all
+  library metadata, reading lists, and user accounts. The `/data` PVC holds the raw files and can be restored from your
+  source collection. Always back up `/config`.
+</Callout>
 
 ## Key Features
 
-- **SQLite Database** — zero database configuration, persistent via PVC
-- **Dual Persistent Volumes** — separate PVCs for config and library data
-- **Java Memory Tuning** — configurable JVM heap via `JAVA_TOOL_OPTIONS`
-- **Timezone Support** — configurable via `TZ` environment variable
-- **Scheduled Backups** — config/database tar archive with S3 upload
-- **Ingress Support** — TLS with cert-manager
+- **No database server** — SQLite stored in `/config` PVC, zero external dependencies
+- **Dual PVC architecture** — `/config` (metadata) and `/data` (library files) are separate
+- **OPDS support** — works with Kybook, Chunky, Moon+ Reader, and other OPDS clients
+- **JVM tuning** — configurable JVM flags via `javaToolOptions` (`-Xmx`, GC options)
+- **S3 backup** — consistent SQLite export via Alpine backup job (covers `/config` only)
+- **Session timeout** — configurable for long-lived mobile client sessions
 
 ## Installation
 
@@ -24,41 +36,43 @@ Deploy Komga on Kubernetes using the official [gotson/komga](https://hub.docker.
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install komga helmforge/komga
+helm install komga helmforge/komga -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install komga oci://ghcr.io/helmforgedev/helm/komga
+helm install komga oci://ghcr.io/helmforgedev/helm/komga -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production' },
+    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'nfs-library', label: 'NFS Library' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
-persistence:
-  config:
-    enabled: true
-    size: 2Gi
-  data:
-    enabled: true
-    size: 100Gi
-```
-
-## Production Example
-
-```yaml
+# values.yaml — Komga basic setup with dual PVC
 komga:
-  timezone: 'America/Sao_Paulo'
-  javaMemory: '-Xmx2g'
-  sessionTimeout: '7d'
+  timezone: UTC
+  sessionTimeout: '7d' # increase for mobile clients (default 30m is too short)
+  javaToolOptions: '-Xmx1g' # limit JVM heap; use javaToolOptions (javaMemory is deprecated)
 
 persistence:
   config:
-    size: 5Gi
+    enabled: true
+    size: 2Gi # SQLite database, thumbnails, app config
+
   data:
-    size: 500Gi
+    enabled: true
+    size: 100Gi # comic/manga file storage
 
 ingress:
   enabled: true
@@ -68,37 +82,241 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Production Komga with TLS and tuning
+komga:
+  timezone: America/Sao_Paulo
+  sessionTimeout: '7d'
+  javaToolOptions: '-Xms512m -Xmx2g -XX:+UseG1GC'
+
+persistence:
+  config:
+    enabled: true
+    size: 5Gi
+    storageClass: longhorn
+
+  data:
+    enabled: true
+    size: 500Gi
+    storageClass: longhorn
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: '2'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: komga.example.com
+      paths:
+        - path: /
+          pathType: Prefix
   tls:
     - secretName: komga-tls
       hosts:
         - komga.example.com
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Komga with daily S3 backup of /config (SQLite + metadata)
+# NOTE: The backup covers /config only (database and thumbnails).
+# Comic/manga files in /data must be backed up separately.
+komga:
+  timezone: UTC
+  javaToolOptions: '-Xmx2g'
+
+persistence:
+  config:
+    enabled: true
+    size: 5Gi
+  data:
+    enabled: true
+    size: 500Gi
 
 backup:
   enabled: true
-  schedule: '0 3 * * *'
+  schedule: '0 2 * * *'
+  archivePrefix: komga
+  includeLogs: true # include /config/logs in the archive
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: komga
+    bucket: my-komga-backups
     existingSecret: komga-s3-credentials
+    existingSecretAccessKeyKey: access-key
+    existingSecretSecretKeyKey: secret-key
 ```
 
-## Key Values
+</div>
 
-| Key                          | Default | Description                     |
-| ---------------------------- | ------- | ------------------------------- |
-| `komga.port`                 | `25600` | Container port                  |
-| `komga.contextPath`          | `/`     | Base URL path for reverse proxy |
-| `komga.sessionTimeout`       | `30m`   | Session timeout                 |
-| `komga.timezone`             | `UTC`   | Timezone                        |
-| `komga.javaMemory`           | `""`    | JVM options (e.g. `-Xmx2g`)     |
-| `persistence.config.enabled` | `true`  | Persist /config (database)      |
-| `persistence.config.size`    | `2Gi`   | Config PVC size                 |
-| `persistence.data.enabled`   | `true`  | Persist /data (libraries)       |
-| `persistence.data.size`      | `50Gi`  | Data PVC size                   |
-| `ingress.enabled`            | `false` | Enable ingress                  |
-| `backup.enabled`             | `false` | Enable S3 backups               |
+<div data-tab-panel="nfs-library">
+
+```yaml
+# values.yaml — Komga with NFS-mounted library (data from existing NFS PVC)
+komga:
+  timezone: UTC
+  sessionTimeout: '7d'
+  javaToolOptions: '-Xmx2g'
+
+persistence:
+  config:
+    enabled: true
+    size: 5Gi
+
+  data:
+    enabled: false # don't create a new PVC for data
+    existingClaim: nfs-komga-library # bind to pre-existing NFS PVC
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: komga.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                  | Description                          |
+| ------------------ | ------ | ------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/gotson/komga` | Komga container image.               |
+| `image.tag`        | string | `"1.24.1"`               | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
+
+### Komga Configuration
+
+| Parameter               | Type    | Default | Description                                                                    |
+| ----------------------- | ------- | ------- | ------------------------------------------------------------------------------ |
+| `komga.port`            | integer | `25600` | Container listen port (non-standard).                                          |
+| `komga.contextPath`     | string  | `/`     | Base URL path for reverse proxy subpath hosting (e.g. `/komga`).               |
+| `komga.sessionTimeout`  | string  | `30m`   | Session timeout. Increase to `7d` for mobile clients to avoid frequent logins. |
+| `komga.timezone`        | string  | `UTC`   | Timezone for the container (IANA format, e.g. `America/Sao_Paulo`).            |
+| `komga.javaToolOptions` | string  | `""`    | JVM options passed via `JAVA_TOOL_OPTIONS` (e.g. `-Xmx2g -XX:+UseG1GC`).       |
+| `komga.javaMemory`      | string  | `""`    | **Deprecated.** Use `komga.javaToolOptions` instead.                           |
+| `komga.extraEnv`        | array   | `[]`    | Extra environment variables for the container.                                 |
+
+<Callout type="tip" title="Use javaToolOptions instead of javaMemory">
+  `komga.javaMemory` is deprecated. Use `komga.javaToolOptions` which accepts any JVM flag: `-Xmx2g`, `-Xms512m -Xmx2g`,
+  `-XX:+UseG1GC`, etc. For most home lab deployments, `-Xmx1g` is sufficient; increase to `-Xmx2g` for large libraries
+  with thumbnails enabled.
+</Callout>
+
+### Persistence
+
+| Parameter                          | Type    | Default         | Description                                                  |
+| ---------------------------------- | ------- | --------------- | ------------------------------------------------------------ |
+| `persistence.config.enabled`       | boolean | `true`          | Enable PVC for `/config` (SQLite DB, thumbnails, app state). |
+| `persistence.config.size`          | string  | `2Gi`           | Config PVC size. Increase if thumbnail cache grows large.    |
+| `persistence.config.storageClass`  | string  | `""`            | StorageClass for the config PVC.                             |
+| `persistence.config.accessMode`    | string  | `ReadWriteOnce` | Config PVC access mode.                                      |
+| `persistence.config.existingClaim` | string  | `""`            | Use an existing PVC for `/config`.                           |
+| `persistence.data.enabled`         | boolean | `true`          | Enable PVC for `/data` (comic/manga library files).          |
+| `persistence.data.size`            | string  | `50Gi`          | Data PVC size. Size according to your library.               |
+| `persistence.data.storageClass`    | string  | `""`            | StorageClass for the data PVC.                               |
+| `persistence.data.accessMode`      | string  | `ReadWriteOnce` | Data PVC access mode.                                        |
+| `persistence.data.existingClaim`   | string  | `""`            | Use an existing PVC for `/data` (e.g. NFS PVC).              |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                                   |
+| --------------------- | ------- | ----------- | --------------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Service type.                                 |
+| `service.port`        | integer | `80`        | Service port. Mapped to container port 25600. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.                  |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Host and path rules.                             |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.                               |
+
+### Backup
+
+<Callout type="warning" title="Backup covers /config only — not the library files in /data">
+  The backup CronJob archives `/config` (SQLite database, thumbnails, logs). The `/data` directory containing your comic
+  and manga files is **not included**. Back up the `/data` PVC separately using Velero, NFS snapshots, or your storage
+  provider's snapshot mechanism.
+</Callout>
+
+| Parameter                              | Type    | Default       | Description                                          |
+| -------------------------------------- | ------- | ------------- | ---------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.                  |
+| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                       |
+| `backup.archivePrefix`                 | string  | `komga`       | Prefix for backup archive filenames.                 |
+| `backup.includeLogs`                   | boolean | `true`        | Include the `/config/logs` directory in the archive. |
+| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                          |
+| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                  |
+| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                 |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                           |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                           |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                      |
+| ------------------------------------ | ------- | ------- | -------------------------------- |
+| `probes.startup.enabled`             | boolean | `true`  | Enable startup probe.            |
+| `probes.startup.initialDelaySeconds` | integer | `15`    | Startup probe initial delay.     |
+| `probes.startup.failureThreshold`    | integer | `30`    | Startup probe failure threshold. |
+| `probes.liveness.enabled`            | boolean | `true`  | Enable liveness probe.           |
+| `probes.readiness.enabled`           | boolean | `true`  | Enable readiness probe.          |
+
+### Resources and Scheduling
+
+| Parameter                       | Type    | Default | Description                     |
+| ------------------------------- | ------- | ------- | ------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/komga) on GitHub.
+- [Komga Official Documentation](https://komga.org/)
+- [Komga GitHub Repository](https://github.com/gotson/komga)
+- [OPDS Client List](https://komga.org/docs/guides/opds)
+- [HelmForge Komga Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/komga)
