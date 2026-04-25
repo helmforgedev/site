@@ -1,32 +1,72 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Wallabag
-description: HelmForge Wallabag chart for self-hosted read-it-later with PostgreSQL and Redis.
+title: Wallabag Chart
+description: HelmForge Wallabag chart — self-hosted read-it-later with full-text article extraction, PostgreSQL backend, optional Redis caching, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Wallabag
 
-Deploy [Wallabag](https://wallabag.org/) on Kubernetes — a self-hosted read-it-later application for saving and organizing web articles with full-text search, tagging, and offline reading.
+Self-hosted read-it-later application. Wallabag saves articles from the web by extracting their full text and
+storing them in your own PostgreSQL database. Read your saved articles offline across any device, organize them
+with tags, annotations, and reading lists, and share them with configurable access controls.
 
 ## Key Features
 
-- **Article archiving** — save articles from the web with full-text extraction
+- **Full-text extraction** — saves the complete article content, not just a link
+- **Multi-device access** — web UI, mobile apps, browser extensions, and e-reader exports
+- **Tag and annotation system** — organize articles with tags, highlights, and notes
 - **PostgreSQL backend** — bundled subchart or external database
-- **Optional Redis** — session caching and performance optimization
-- **S3 backup** — scheduled PostgreSQL backup to S3-compatible storage
+- **Optional Redis caching** — subchart or external Redis for session and query caching
+- **Persistent storage** — PVC-backed data directory for extracted images and local cache
+- **S3 backup** — scheduled `pg_dump` of the Wallabag database to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
 
 ## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install wallabag helmforge/wallabag
+```
+
+**OCI registry:**
 
 ```bash
 helm install wallabag oci://ghcr.io/helmforgedev/helm/wallabag
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'with-redis', label: 'With Redis' },
+    { id: 'external-db', label: 'External PostgreSQL' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Wallabag with bundled PostgreSQL (default)
+wallabag:
+  domainName: 'https://wallabag.example.com'
+  secret: 'a-random-symfony-app-secret-here'
+
 postgresql:
   enabled: true
+  auth:
+    password: 'postgres-password'
+
+persistence:
+  enabled: true
+  size: 5Gi
 
 ingress:
   enabled: true
@@ -38,15 +78,337 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                  | Default | Description                |
-| -------------------- | ------- | -------------------------- |
-| `postgresql.enabled` | `true`  | Deploy PostgreSQL subchart |
-| `redis.enabled`      | `false` | Deploy Redis subchart      |
-| `ingress.enabled`    | `false` | Enable ingress             |
-| `backup.enabled`     | `false` | Enable S3 backup CronJob   |
+<div data-tab-panel="with-redis">
+
+```yaml
+# values.yaml — Wallabag with PostgreSQL and Redis for caching
+wallabag:
+  domainName: 'https://wallabag.example.com'
+  secret: 'a-random-symfony-app-secret-here'
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'redis-password'
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: wallabag.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — Wallabag with external PostgreSQL and Redis
+wallabag:
+  domainName: 'https://wallabag.example.com'
+  secret: 'a-random-symfony-app-secret-here'
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgresql.database.svc
+    port: '5432'
+    name: wallabag
+    username: wallabag
+    password: 'db-password'
+
+redis:
+  enabled: false
+
+externalRedis:
+  host: redis.cache.svc
+  port: '6379'
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: wallabag.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily backup of the Wallabag database to S3
+wallabag:
+  domainName: 'https://wallabag.example.com'
+  secret: 'a-random-symfony-app-secret-here'
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-wallabag-backups
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
+
+persistence:
+  enabled: true
+  size: 5Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description                          |
+| ------------------ | ------ | ----------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/wallabag/wallabag` | Wallabag container image.            |
+| `image.tag`        | string | `"2.6.14"`                    | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+
+### Wallabag Configuration
+
+| Parameter                    | Type    | Default                          | Description                                                            |
+| ---------------------------- | ------- | -------------------------------- | ---------------------------------------------------------------------- |
+| `wallabag.port`              | integer | `80`                             | Internal HTTP port for the Wallabag container.                         |
+| `wallabag.domainName`        | string  | `"https://wallabag.example.com"` | Public URL of the Wallabag instance. Must be changed before deploying. |
+| `wallabag.secret`            | string  | `""`                             | Symfony APP_SECRET for cookie signing and CSRF protection.             |
+| `wallabag.existingSecret`    | string  | `""`                             | Existing Kubernetes Secret containing the Symfony secret.              |
+| `wallabag.existingSecretKey` | string  | `symfony-secret`                 | Key inside the existing secret holding the secret value.               |
+| `wallabag.registration`      | boolean | `false`                          | Allow new user registrations. Disabled by default for security.        |
+| `wallabag.extraEnv`          | array   | `[]`                             | Extra environment variables injected into the Wallabag container.      |
+
+<Callout type="warning" title="Change domainName before deploying">
+  The default `wallabag.domainName` is `https://wallabag.example.com`. Wallabag uses this value to generate internal
+  links for article sharing, e-reader exports, and API responses. Deploy with your actual public URL or internal links
+  will be broken.
+</Callout>
+
+<Callout type="danger" title="Always set wallabag.secret explicitly">
+  If `wallabag.secret` is empty, the chart auto-generates a Symfony APP_SECRET. If the pod is recreated without a
+  persistent secret, **all user sessions are invalidated** and CSRF tokens become invalid. Always set an explicit secret
+  or use `wallabag.existingSecret`.
+</Callout>
+
+<Callout type="info" title="User registration is disabled by default">
+  `wallabag.registration: false` is the chart default. After the initial deploy, create your admin account via the
+  Wallabag setup wizard at `/install`. Enable `registration: true` only if you want public self-service sign-ups.
+</Callout>
+
+### Database — Embedded Subchart
+
+| Parameter                  | Type    | Default      | Description                                        |
+| -------------------------- | ------- | ------------ | -------------------------------------------------- |
+| `postgresql.enabled`       | boolean | `true`       | Deploy a bundled PostgreSQL subchart for Wallabag. |
+| `postgresql.architecture`  | string  | `standalone` | PostgreSQL deployment architecture.                |
+| `postgresql.auth.database` | string  | `wallabag`   | Database name created by the subchart.             |
+| `postgresql.auth.username` | string  | `wallabag`   | Database username created by the subchart.         |
+| `postgresql.auth.password` | string  | `""`         | Database password (auto-generated if empty).       |
+
+### Database — External
+
+| Parameter                                     | Type   | Default    | Description                                                      |
+| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| `database.external.host`                      | string | `""`       | External PostgreSQL hostname or IP.                              |
+| `database.external.port`                      | string | `"5432"`   | External PostgreSQL port.                                        |
+| `database.external.name`                      | string | `wallabag` | Database name on the external server.                            |
+| `database.external.username`                  | string | `wallabag` | Username for the external database.                              |
+| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
+| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+
+### Cache — Redis Subchart
+
+| Parameter             | Type    | Default      | Description                                                    |
+| --------------------- | ------- | ------------ | -------------------------------------------------------------- |
+| `redis.enabled`       | boolean | `false`      | Deploy a bundled Redis subchart for session and query caching. |
+| `redis.architecture`  | string  | `standalone` | Redis deployment architecture.                                 |
+| `redis.auth.password` | string  | `""`         | Redis password (auto-generated if empty).                      |
+
+### Cache — External Redis
+
+| Parameter            | Type   | Default | Description                    |
+| -------------------- | ------ | ------- | ------------------------------ |
+| `externalRedis.host` | string | `""`    | External Redis hostname or IP. |
+| `externalRedis.port` | string | `6379`  | External Redis port.           |
+
+### Persistence
+
+| Parameter                   | Type    | Default             | Description                                  |
+| --------------------------- | ------- | ------------------- | -------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/www/wallabag/data`.   |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                    |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `10`    | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Backup
+
+The backup CronJob runs `pg_dump` against the Wallabag PostgreSQL database and uploads the archive to S3. This
+protects all saved articles, tags, annotations, and user accounts.
+
+| Parameter                                   | Type    | Default                                | Description                                                        |
+| ------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------ |
+| `backup.enabled`                            | boolean | `false`                                | Enable scheduled S3 backup CronJob.                                |
+| `backup.schedule`                           | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                         |
+| `backup.suspend`                            | boolean | `false`                                | Suspend the CronJob without deleting it.                           |
+| `backup.concurrencyPolicy`                  | string  | `Forbid`                               | CronJob concurrency policy.                                        |
+| `backup.successfulJobsHistoryLimit`         | integer | `3`                                    | Number of successful Job records to keep.                          |
+| `backup.failedJobsHistoryLimit`             | integer | `3`                                    | Number of failed Job records to keep.                              |
+| `backup.backoffLimit`                       | integer | `1`                                    | Job retry limit.                                                   |
+| `backup.archivePrefix`                      | string  | `wallabag`                             | Prefix for backup archive filenames.                               |
+| `backup.images.postgresql`                  | string  | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                                          |
+| `backup.images.uploader`                    | string  | `docker.io/helmforge/mc:1.0.0`         | Image used for S3 upload.                                          |
+| `backup.resources`                          | object  | `{}`                                   | Resources for backup containers.                                   |
+| `backup.s3.endpoint`                        | string  | `""`                                   | S3-compatible endpoint URL.                                        |
+| `backup.s3.bucket`                          | string  | `""`                                   | Target bucket name.                                                |
+| `backup.s3.prefix`                          | string  | `wallabag`                             | Key prefix within the bucket.                                      |
+| `backup.s3.createBucketIfNotExists`         | boolean | `true`                                 | Create the bucket automatically if it does not exist.              |
+| `backup.s3.existingSecret`                  | string  | `""`                                   | Existing secret containing S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey`      | string  | `access-key`                           | Key in the existing secret for the S3 access key.                  |
+| `backup.s3.existingSecretSecretKeyKey`      | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.                  |
+| `backup.s3.accessKey`                       | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set).       |
+| `backup.s3.secretKey`                       | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set).       |
+| `backup.database.host`                      | string  | `""`                                   | Override database host for backup (uses app credentials if empty). |
+| `backup.database.port`                      | string  | `""`                                   | Override database port for backup.                                 |
+| `backup.database.name`                      | string  | `""`                                   | Override database name for backup.                                 |
+| `backup.database.username`                  | string  | `""`                                   | Override database username for backup.                             |
+| `backup.database.password`                  | string  | `""`                                   | Override database password for backup.                             |
+| `backup.database.existingSecret`            | string  | `""`                                   | Existing secret containing backup database credentials.            |
+| `backup.database.existingSecretPasswordKey` | string  | `password`                             | Key in the existing secret for the backup database password.       |
+| `backup.database.postgresDumpArgs`          | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Articles not loading — domainName mismatch">
+  If articles fail to load or share links are broken, verify that `wallabag.domainName` matches the exact public URL you
+  are using to access Wallabag, including the `https://` prefix and without a trailing slash. A mismatch causes Wallabag
+  to generate internal links pointing to the wrong host.
+</Callout>
+
+<Callout type="tip" title="Enable Redis for better performance under load">
+  Redis is optional but recommended for multi-user setups. With Redis enabled, Wallabag offloads session storage and
+  query result caching, reducing database load and improving response times for concurrent users.
+</Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/wallabag) on GitHub.
+- [Wallabag Official Website](https://wallabag.org)
+- [Wallabag Documentation](https://doc.wallabag.org)
+- [Wallabag GitHub Repository](https://github.com/wallabag/wallabag)
+- [HelmForge Wallabag Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/wallabag)
