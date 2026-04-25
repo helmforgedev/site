@@ -1,27 +1,37 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Minecraft Chart
-description: HelmForge Minecraft chart — Java Edition server with Vanilla, Paper, Forge, Fabric, GeyserMC cross-play, and S3 backup.
+description: HelmForge Minecraft Java Edition chart — Vanilla, Paper, Forge, Fabric, GeyserMC Bedrock cross-play, Aikar GC flags, RCON-backed S3 backup, and Prometheus metrics via mc-monitor for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Minecraft
 
-Deploy Minecraft Java Edition servers on Kubernetes using the [itzg/minecraft-server](https://docker-minecraft-server.readthedocs.io/) container image. Supports multiple server types, cross-play, modding, monitoring, and scheduled backups.
+Minecraft Java Edition server on Kubernetes using the [itzg/minecraft-server](https://docker-minecraft-server.readthedocs.io/)
+container image. Supports multiple server types (Vanilla, Paper, Forge, Fabric, Quilt), GeyserMC Bedrock
+cross-play, mod and plugin management, Aikar-optimized JVM flags, and RCON-backed S3 backups.
+
+<Callout type="warning" title="LoadBalancer service by default — configure for bare-metal clusters">
+  The chart defaults to `service.type: LoadBalancer` to expose the game port (25565) directly to players.
+  On bare-metal clusters without a cloud LoadBalancer provider (e.g. K3s without MetalLB), this Service
+  will remain in `<pending>` state. Use `service.type: NodePort` with a static `nodePort`, or install
+  MetalLB first.
+</Callout>
 
 ## Key Features
 
-- **Multiple Server Types** — Vanilla, Paper, Spigot, Forge, Fabric, Quilt
-- **GeyserMC Cross-Play** — Allow Bedrock clients (mobile, console) to join Java servers
-- **Authentication** — Online/offline mode, whitelist, operators
-- **RCON** — Remote console with auto-generated password
-- **Scheduled Backups** — CronJob-based backup to S3-compatible storage
-- **Prometheus Monitoring** — mc-monitor sidecar with ServiceMonitor
-- **Mod/Plugin Support** — Modrinth, CurseForge, Spiget, direct URLs
-- **Optimized JVM** — Aikar's GC flags for production workloads
+- **Multiple server types** — Vanilla, Paper, Spigot, Bukkit, Forge, Fabric, Quilt, CurseForge, Modrinth
+- **GeyserMC cross-play** — Bedrock clients (mobile, console, Windows) join Java servers on UDP 19132
+- **Aikar GC flags** — optimized garbage collection for smooth server performance
+- **RCON-backed backup** — `save-all` + `save-off` via RCON before archiving world data to S3
+- **Mod/plugin management** — Modrinth, CurseForge, Spiget, and direct URL downloads
+- **Resource packs** — configure server-side resource packs with SHA-1 verification
+- **Prometheus metrics** — mc-monitor sidecar with optional ServiceMonitor
+- **Java version pinning** — `image.tag: java25` for Minecraft 1.21.5+, `java21` for older
 
 ## Installation
-
-**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -35,78 +45,469 @@ helm install minecraft helmforge/minecraft --set server.eula=true
 helm install minecraft oci://ghcr.io/helmforgedev/helm/minecraft --set server.eula=true
 ```
 
-## Basic Example
+## Java Version Compatibility
+
+| Minecraft Version | Required Java | `image.tag`        |
+| ----------------- | ------------- | ------------------ |
+| 1.21.5+           | Java 25       | `java25` (default) |
+| 1.20.x – 1.21.4   | Java 21       | `java21`           |
+| 1.17.x – 1.19.x   | Java 17       | `java17`           |
+
+The chart defaults to `java25`, which is required for Minecraft 1.21.5+. Pin `image.tag` to the Java
+version that matches your Minecraft release.
+
+## Server Type Reference
+
+| Type              | Use Case                                                     |
+| ----------------- | ------------------------------------------------------------ |
+| `VANILLA`         | Official Mojang server, no mods or plugins                   |
+| `PAPER`           | High-performance fork with plugin API, required for GeyserMC |
+| `SPIGOT`          | Plugin server with Bukkit API                                |
+| `FORGE`           | Java mod loader (Forge mods)                                 |
+| `FABRIC`          | Lightweight mod loader (Fabric mods)                         |
+| `QUILT`           | Fork of Fabric with enhanced mod compatibility               |
+| `MODRINTH`        | Modrinth modpack server                                      |
+| `AUTO_CURSEFORGE` | CurseForge modpack server (requires `mods.curseforgeApiKey`) |
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'vanilla', label: 'Vanilla' },
+    { id: 'paper', label: 'Paper (Prod)' },
+    { id: 'crossplay', label: 'GeyserMC Cross-Play' },
+    { id: 'modded', label: 'Modded (Forge)' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="vanilla">
 
 ```yaml
-# values.yaml
+# values.yaml — Vanilla Minecraft server
 server:
   eula: true
-  type: PAPER
-  motd: 'My Minecraft Server'
+  type: VANILLA
+  version: '1.21.4' # pin version in production — never use LATEST
+  motd: 'My Server'
   maxPlayers: 20
+  difficulty: normal
 
 jvm:
   memory: 2G
-  useAikarFlags: true
+  useAikarFlags: true # always recommended for production
 
 auth:
   onlineMode: true
   whitelist: 'player1,player2'
-  ops: 'player1'
+  ops: 'admin1'
 
 persistence:
   enabled: true
   size: 20Gi
+
+service:
+  type: LoadBalancer # requires MetalLB or cloud provider on bare-metal
+
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 500m
+  limits:
+    memory: 3Gi
+    cpu: '2'
 ```
 
-## Cross-Play Example
+</div>
+
+<div data-tab-panel="paper">
 
 ```yaml
+# values.yaml — Paper production server with RCON and optimized JVM
 server:
   eula: true
   type: PAPER
+  version: '1.21.4'
+  motd: 'Production Server'
+  maxPlayers: 50
+  viewDistance: 8
+  simulationDistance: 6
+
+jvm:
+  memory: 4G
+  useAikarFlags: true
+
+auth:
+  onlineMode: true
+  enforceWhitelist: true
+  whitelist: 'player1,player2'
+  ops: 'admin1'
+
+rcon:
+  enabled: true
+  existingSecret: minecraft-rcon
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+service:
+  type: LoadBalancer
+
+resources:
+  requests:
+    memory: 4Gi
+    cpu: '1'
+  limits:
+    memory: 6Gi
+    cpu: '4'
+```
+
+</div>
+
+<div data-tab-panel="crossplay">
+
+```yaml
+# values.yaml — Paper + GeyserMC for Bedrock cross-play
+# Bedrock clients connect on UDP port 19132.
+# GeyserMC only works with server.type: PAPER (or SPIGOT).
+server:
+  eula: true
+  type: PAPER
+  version: '1.21.4'
+  maxPlayers: 30
+
+jvm:
+  memory: 3G
+  useAikarFlags: true
+
+auth:
+  onlineMode: true # false required if using Floodgate for Bedrock auth
 
 geyser:
   enabled: true
   port: 19132
 
 mods:
+  # Download GeyserMC and Floodgate from Modrinth
   modrinthProjects: 'geyser,floodgate'
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+service:
+  type: LoadBalancer
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default   | Description                                        |
-| --------------------- | --------- | -------------------------------------------------- |
-| `image.tag`           | `java25`  | Java base image tag (see compatibility note below) |
-| `server.eula`         | `true`    | Accept the Minecraft EULA (required)               |
-| `server.type`         | `VANILLA` | Server type (VANILLA, PAPER, FORGE, FABRIC, etc.)  |
-| `server.version`      | `LATEST`  | Minecraft version                                  |
-| `server.maxPlayers`   | `20`      | Maximum concurrent players                         |
-| `jvm.memory`          | `1G`      | JVM heap allocation                                |
-| `jvm.useAikarFlags`   | `false`   | Aikar's optimized GC flags                         |
-| `auth.onlineMode`     | `true`    | Mojang online authentication                       |
-| `auth.whitelist`      | `""`      | Whitelisted players                                |
-| `geyser.enabled`      | `false`   | Enable GeyserMC cross-play                         |
-| `rcon.enabled`        | `true`    | Enable RCON remote console                         |
-| `metrics.enabled`     | `false`   | Enable Prometheus metrics                          |
-| `backup.enabled`      | `false`   | Enable S3 backups                                  |
-| `persistence.enabled` | `true`    | Enable persistent storage                          |
-| `persistence.size`    | `10Gi`    | PVC size                                           |
-
-## Java Version Compatibility
-
-The chart defaults to `image.tag: java25`, which is required for **Minecraft 1.21.5 and later**. Minecraft 1.21.5+ uses class file version 69.0, which requires Java 25.
-
-If you are running an older Minecraft version, you can pin to an earlier Java image:
+<div data-tab-panel="modded">
 
 ```yaml
+# values.yaml — Forge modded server with mod downloads
+# Forge modpacks require more memory and longer startup time.
+server:
+  eula: true
+  type: FORGE
+  version: '1.20.1'
+
 image:
-  tag: java21 # for Minecraft 1.20.x and earlier
+  tag: java17 # Forge 1.20.x requires Java 17
+
+jvm:
+  memory: 6G
+  useAikarFlags: true
+
+mods:
+  # Download mods from Modrinth by slug
+  modrinthProjects: 'create,jei,waystones'
+
+persistence:
+  enabled: true
+  size: 30Gi
+
+service:
+  type: LoadBalancer
+
+# Increase startup probe for heavy modpacks (default 5 min may not be enough)
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  failureThreshold: 40 # 10 minutes total
 ```
 
-Available tags follow the `java<version>` convention from the [itzg/minecraft-server](https://docker-minecraft-server.readthedocs.io/) image.
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Paper server with daily S3 backup
+# Backup uses RCON: save-all → save-off → tar archive → upload to S3 → save-on
+server:
+  eula: true
+  type: PAPER
+  version: '1.21.4'
+
+jvm:
+  memory: 4G
+  useAikarFlags: true
+
+rcon:
+  enabled: true
+  existingSecret: minecraft-rcon
+
+backup:
+  enabled: true
+  schedule: '0 4 * * *'
+  excludes: '*.jar cache logs' # skip re-downloadable files to reduce size
+  s3:
+    endpoint: https://minio.example.com
+    bucket: minecraft-backups
+    prefix: my-server
+    existingSecret: minecraft-s3-credentials
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+service:
+  type: LoadBalancer
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                           | Description                                                         |
+| ------------------ | ------ | --------------------------------- | ------------------------------------------------------------------- |
+| `image.repository` | string | `docker.io/itzg/minecraft-server` | Minecraft server container image.                                   |
+| `image.tag`        | string | `"java25"`                        | Java base image tag. Use `java21` for Minecraft 1.20.x and earlier. |
+| `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                                                  |
+| `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries.                                |
+
+### Server Configuration
+
+| Parameter                   | Type    | Default                                   | Description                                                                 |
+| --------------------------- | ------- | ----------------------------------------- | --------------------------------------------------------------------------- |
+| `server.eula`               | boolean | `true`                                    | Accept the Minecraft EULA. Required.                                        |
+| `server.type`               | string  | `VANILLA`                                 | Server type: VANILLA, PAPER, SPIGOT, FORGE, FABRIC, QUILT, etc.             |
+| `server.version`            | string  | `LATEST`                                  | Minecraft version. Pin to a specific version in production (e.g. `1.21.4`). |
+| `server.motd`               | string  | `A Minecraft Server powered by HelmForge` | Server list message of the day.                                             |
+| `server.difficulty`         | string  | `normal`                                  | Game difficulty: `peaceful`, `easy`, `normal`, `hard`.                      |
+| `server.gameMode`           | string  | `survival`                                | Default game mode: `survival`, `creative`, `adventure`, `spectator`.        |
+| `server.maxPlayers`         | integer | `20`                                      | Maximum concurrent players.                                                 |
+| `server.viewDistance`       | integer | `10`                                      | View distance in chunks. Lower values improve server performance.           |
+| `server.simulationDistance` | integer | `10`                                      | Simulation distance in chunks.                                              |
+| `server.seed`               | string  | `""`                                      | World seed. Empty = random.                                                 |
+| `server.worldSaveName`      | string  | `world`                                   | World directory name under `/data`.                                         |
+| `server.levelType`          | string  | `DEFAULT`                                 | World type: DEFAULT, FLAT, LARGEBIOMES, AMPLIFIED.                          |
+| `server.pvp`                | boolean | `true`                                    | Enable player vs player combat.                                             |
+| `server.allowNether`        | boolean | `true`                                    | Enable the Nether dimension.                                                |
+| `server.allowFlight`        | boolean | `false`                                   | Allow flight. Required for some mods.                                       |
+| `server.enableCommandBlock` | boolean | `false`                                   | Enable command blocks.                                                      |
+| `server.forceGameMode`      | boolean | `false`                                   | Force players into the default game mode on join.                           |
+| `server.hardcore`           | boolean | `false`                                   | Hardcore mode (permanent player death).                                     |
+| `server.spawnProtection`    | integer | `16`                                      | Spawn protection radius in blocks. `0` to disable.                          |
+| `server.port`               | integer | `25565`                                   | Java Edition game port.                                                     |
+| `server.extraProperties`    | object  | `{}`                                      | Extra `server.properties` entries as key-value pairs.                       |
+| `server.extraEnv`           | array   | `[]`                                      | Extra environment variables for the server container.                       |
+
+<Callout type="tip" title="Pin server.version in production">
+  `server.version: LATEST` is convenient for development but dangerous in production. A Minecraft version update can
+  break plugins, mods, and datapacks — and restarting the pod may automatically upgrade the server. Pin to a specific
+  version (e.g. `1.21.4`) and upgrade intentionally.
+</Callout>
+
+### JVM / Performance
+
+| Parameter           | Type    | Default | Description                                                             |
+| ------------------- | ------- | ------- | ----------------------------------------------------------------------- |
+| `jvm.memory`        | string  | `1G`    | JVM heap allocation. Sets both `-Xms` and `-Xmx`.                       |
+| `jvm.initMemory`    | string  | `""`    | Override initial heap size independently.                               |
+| `jvm.maxMemory`     | string  | `""`    | Override maximum heap size independently.                               |
+| `jvm.useAikarFlags` | boolean | `false` | Enable Aikar's optimized GC flags. Strongly recommended for production. |
+| `jvm.jvmOpts`       | string  | `""`    | Additional JVM options.                                                 |
+| `jvm.xxOpts`        | string  | `""`    | Additional `-XX:` JVM options.                                          |
+
+<Callout type="tip" title="Enable Aikar's GC flags for smoother performance">
+  Setting `jvm.useAikarFlags: true` applies garbage collection flags specifically tuned for Minecraft server workloads.
+  They reduce GC pause spikes (which cause lag spikes for players). This is widely recommended by the Minecraft server
+  community for any production deployment.
+</Callout>
+
+### Authentication and Access Control
+
+| Parameter               | Type    | Default | Description                                                             |
+| ----------------------- | ------- | ------- | ----------------------------------------------------------------------- |
+| `auth.onlineMode`       | boolean | `true`  | Mojang online authentication. Set to `false` for proxy or offline mode. |
+| `auth.whitelist`        | string  | `""`    | Comma-separated player names or UUIDs for the whitelist.                |
+| `auth.enforceWhitelist` | boolean | `false` | Kick non-whitelisted players immediately when the whitelist is updated. |
+| `auth.ops`              | string  | `""`    | Comma-separated operator (admin) player names or UUIDs.                 |
+
+### GeyserMC Cross-Play
+
+<Callout type="warning" title="GeyserMC requires server.type: PAPER or compatible plugin server">
+  GeyserMC is a Paper/Spigot plugin — it cannot run on VANILLA or FORGE servers. Bedrock clients connect on UDP port
+  19132. You also need the `Floodgate` plugin to allow Bedrock players to join without a Java Edition account if
+  `auth.onlineMode: true`.
+</Callout>
+
+| Parameter        | Type    | Default | Description                             |
+| ---------------- | ------- | ------- | --------------------------------------- |
+| `geyser.enabled` | boolean | `false` | Enable GeyserMC for Bedrock cross-play. |
+| `geyser.port`    | integer | `19132` | UDP port for Bedrock clients.           |
+
+### RCON
+
+| Parameter                | Type    | Default         | Description                                       |
+| ------------------------ | ------- | --------------- | ------------------------------------------------- |
+| `rcon.enabled`           | boolean | `true`          | Enable RCON remote console.                       |
+| `rcon.port`              | integer | `25575`         | RCON port.                                        |
+| `rcon.password`          | string  | `""`            | RCON password. Auto-generated if empty.           |
+| `rcon.existingSecret`    | string  | `""`            | Existing secret containing the RCON password.     |
+| `rcon.existingSecretKey` | string  | `rcon-password` | Key inside the existing secret.                   |
+| `rcon.serviceEnabled`    | boolean | `false`         | Expose RCON as a separate Service.                |
+| `rcon.serviceType`       | string  | `ClusterIP`     | RCON service type. Keep `ClusterIP` for security. |
+
+### Persistence
+
+| Parameter                   | Type    | Default         | Description                                  |
+| --------------------------- | ------- | --------------- | -------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`          | Enable persistent storage for `/data`.       |
+| `persistence.storageClass`  | string  | `""`            | StorageClass for the PVC.                    |
+| `persistence.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                             |
+| `persistence.size`          | string  | `10Gi`          | PVC size. Grows with worlds, mods, and logs. |
+| `persistence.existingClaim` | string  | `""`            | Use an existing PVC.                         |
+| `persistence.annotations`   | object  | `{}`            | Annotations for the PVC.                     |
+
+### Service
+
+| Parameter             | Type    | Default        | Description                                                      |
+| --------------------- | ------- | -------------- | ---------------------------------------------------------------- |
+| `service.type`        | string  | `LoadBalancer` | Game service type. Use `NodePort` on bare-metal without MetalLB. |
+| `service.port`        | integer | `25565`        | Game service port.                                               |
+| `service.nodePort`    | string  | `""`           | Static node port when `service.type: NodePort`.                  |
+| `service.annotations` | object  | `{}`           | Annotations for the Service.                                     |
+
+### Mods and Plugins
+
+| Parameter                 | Type   | Default | Description                                                      |
+| ------------------------- | ------ | ------- | ---------------------------------------------------------------- |
+| `mods.modrinthProjects`   | string | `""`    | Modrinth project slugs or IDs to download (comma-separated).     |
+| `mods.curseforgeApiKey`   | string | `""`    | CurseForge API key. Required for any CurseForge downloads.       |
+| `mods.autoCurseforgeSlug` | string | `""`    | CurseForge modpack slug when `server.type: AUTO_CURSEFORGE`.     |
+| `mods.spigetResources`    | string | `""`    | Spiget resource IDs for Bukkit/Spigot plugins (comma-separated). |
+| `mods.downloadUrls`       | string | `""`    | Newline-separated direct URLs to download plugins or mods.       |
+
+### Resource Pack
+
+| Parameter              | Type    | Default | Description                                               |
+| ---------------------- | ------- | ------- | --------------------------------------------------------- |
+| `resourcePack.url`     | string  | `""`    | URL to a server-side resource pack.                       |
+| `resourcePack.sha1`    | string  | `""`    | SHA-1 hash of the resource pack for client verification.  |
+| `resourcePack.enforce` | boolean | `false` | Force clients to accept the resource pack before joining. |
+
+### Backup
+
+The backup CronJob uses RCON to run `save-all` and `save-off` before archiving, then `save-on` after
+upload — ensuring the world is in a consistent state before the backup is taken.
+
+| Parameter                              | Type    | Default                        | Description                                                  |
+| -------------------------------------- | ------- | ------------------------------ | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                        | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 4 * * *"`                  | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                        | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                       | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                            | Successful job records to keep.                              |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                            | Failed job records to keep.                                  |
+| `backup.backoffLimit`                  | integer | `1`                            | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `minecraft`                    | Prefix for backup archive filenames.                         |
+| `backup.excludes`                      | string  | `"*.jar cache logs"`           | Space-separated patterns excluded from the archive.          |
+| `backup.images.worker`                 | string  | `itzg/minecraft-server:java25` | Image for RCON and tar operations.                           |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0` | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                           | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                           | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                           | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `minecraft`                    | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                         | Create the bucket if it does not exist.                      |
+| `backup.s3.existingSecret`             | string  | `""`                           | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                   | Key for S3 access key.                                       |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                   | Key for S3 secret key.                                       |
+| `backup.s3.accessKey`                  | string  | `""`                           | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                           | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Metrics (mc-monitor)
+
+| Parameter                         | Type    | Default                     | Description                                       |
+| --------------------------------- | ------- | --------------------------- | ------------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false`                     | Enable Prometheus metrics via mc-monitor sidecar. |
+| `metrics.image.repository`        | string  | `docker.io/itzg/mc-monitor` | mc-monitor image.                                 |
+| `metrics.image.tag`               | string  | `0.16.1`                    | mc-monitor image tag.                             |
+| `metrics.port`                    | integer | `8080`                      | Prometheus metrics port.                          |
+| `metrics.serviceMonitor.enabled`  | boolean | `false`                     | Create a Prometheus Operator ServiceMonitor.      |
+| `metrics.serviceMonitor.interval` | string  | `30s`                       | Metrics scrape interval.                          |
+| `metrics.serviceMonitor.labels`   | object  | `{}`                        | Extra labels for the ServiceMonitor.              |
+
+### Probes
+
+| Parameter                          | Type    | Default | Description                                                           |
+| ---------------------------------- | ------- | ------- | --------------------------------------------------------------------- |
+| `startupProbe.enabled`             | boolean | `true`  | Enable startup probe. Allows up to 5 minutes for the server to start. |
+| `startupProbe.initialDelaySeconds` | integer | `30`    | Startup probe initial delay.                                          |
+| `startupProbe.periodSeconds`       | integer | `10`    | Startup probe period.                                                 |
+| `startupProbe.timeoutSeconds`      | integer | `5`     | Startup probe timeout.                                                |
+| `startupProbe.failureThreshold`    | integer | `30`    | Failures before restart. Increase for heavy modpacks.                 |
+| `livenessProbe.enabled`            | boolean | `true`  | Enable liveness probe.                                                |
+| `readinessProbe.enabled`           | boolean | `true`  | Enable readiness probe.                                               |
+
+### Resources and Security
+
+| Parameter                       | Type    | Default | Description                                                                |
+| ------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests and limits.                                        |
+| `podSecurityContext.fsGroup`    | integer | `1000`  | Filesystem group for the pod.                                              |
+| `securityContext.runAsUser`     | integer | `1000`  | UID for the server process.                                                |
+| `securityContext.runAsGroup`    | integer | `1000`  | GID for the server process.                                                |
+| `terminationGracePeriodSeconds` | integer | `120`   | Grace period for shutdown. Allows `save-all` to complete before pod exits. |
+
+### Scheduling
+
+| Parameter                   | Type   | Default | Description                    |
+| --------------------------- | ------ | ------- | ------------------------------ |
+| `nodeSelector`              | object | `{}`    | Node selector for scheduling.  |
+| `tolerations`               | array  | `[]`    | Tolerations for scheduling.    |
+| `affinity`                  | object | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints` | array  | `[]`    | Topology spread constraints.   |
+| `priorityClassName`         | string | `""`    | PriorityClass for the pod.     |
+| `podLabels`                 | object | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`            | object | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/minecraft) on GitHub.
+- [itzg/minecraft-server Documentation](https://docker-minecraft-server.readthedocs.io/)
+- [PaperMC Documentation](https://docs.papermc.io/)
+- [GeyserMC Documentation](https://wiki.geysermc.org/)
+- [Aikar's Flags Reference](https://aikar.co/mcflags.html)
+- [HelmForge Minecraft Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/minecraft)
