@@ -1,23 +1,34 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: n8n Chart
-description: HelmForge n8n chart — workflow automation with SQLite, PostgreSQL, or MySQL, Redis queue mode, and S3 backup.
+description: HelmForge n8n chart — workflow automation with SQLite (zero-config), PostgreSQL, or MySQL, Redis queue mode with dedicated workers, encryption key protection, database-aware S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # n8n
 
-Deploy n8n on Kubernetes using the official [n8nio/n8n](https://hub.docker.com/r/n8nio/n8n) Docker image. Supports SQLite (default), PostgreSQL, MySQL, Redis-backed queue mode with dedicated workers, and scheduled backups.
+Deploy [n8n](https://n8n.io/) on Kubernetes — a workflow automation platform with a visual editor,
+200+ integrations, and code nodes. Supports SQLite (zero-configuration default), PostgreSQL, and MySQL,
+with Redis-backed queue mode for horizontal scaling of workflow executions.
+
+<Callout
+  type="danger"
+  title="encryptionKey protects all stored credentials — losing it invalidates every workflow connection"
+>
+  `n8n.encryptionKey` encrypts OAuth tokens, API keys, and passwords stored in workflow credentials. If the key changes
+  (including during reinstall with a new auto-generated key), **all saved credentials in all workflows become
+  permanently unreadable**. Always persist it via `encryptionKey.existingSecret` and never rotate it in production.
+</Callout>
 
 ## Key Features
 
-- **SQLite by Default** — zero database configuration needed
-- **PostgreSQL Subchart** — bundled via HelmForge dependency
-- **MySQL Subchart** — bundled via HelmForge dependency
-- **External Database** — connect to existing PostgreSQL or MySQL
-- **Queue Mode** — Redis-backed horizontal scaling with worker Deployments
-- **Encryption Key** — auto-generated and preserved across upgrades
-- **Scheduled Backups** — database-aware CronJob with S3 upload
-- **Ingress Support** — TLS with cert-manager
+- **Three database backends** — SQLite (default), PostgreSQL, MySQL
+- **Queue mode** — Redis-backed horizontal scaling with separate worker Deployments
+- **Encryption key protection** — all workflow credentials encrypted at rest
+- **Webhook URL required** — must match the external-facing URL for triggers to work
+- **Database-aware backup** — `tar` for SQLite, `pg_dump` for PostgreSQL, `mysqldump` for MySQL
 
 ## Installation
 
@@ -26,19 +37,123 @@ Deploy n8n on Kubernetes using the official [n8nio/n8n](https://hub.docker.com/r
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install n8n helmforge/n8n
+helm install n8n helmforge/n8n -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install n8n oci://ghcr.io/helmforgedev/helm/n8n
+helm install n8n oci://ghcr.io/helmforgedev/helm/n8n -f values.yaml
 ```
 
-## Basic Example (SQLite)
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite (Default)' },
+    { id: 'postgresql', label: 'PostgreSQL' },
+    { id: 'queue', label: 'Queue Mode (HA)' },
+    { id: 'external', label: 'External DB + Backup' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
-# values.yaml
+# values.yaml — n8n with SQLite (zero database configuration)
+n8n:
+  webhookUrl: 'https://n8n.example.com' # required for webhook triggers
+
+encryptionKey:
+  existingSecret: n8n-master-secret # key: encryption-key (never rotate)
+  existingSecretKey: encryption-key
+
+persistence:
+  enabled: true
+  size: 10Gi # SQLite DB + installed custom nodes
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: n8n.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - n8n.example.com
+```
+
+</div>
+
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — n8n with bundled PostgreSQL
+n8n:
+  webhookUrl: 'https://n8n.example.com'
+  logLevel: info
+
+encryptionKey:
+  existingSecret: n8n-master-secret
+
+postgresql:
+  enabled: true
+  auth:
+    database: n8n
+    username: n8n
+    password: 'strong-db-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+persistence:
+  enabled: true
+  size: 5Gi # custom nodes (no SQLite when PostgreSQL is active)
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: n8n.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="queue">
+
+```yaml
+# values.yaml — n8n in queue mode with 3 workers
+# Queue mode separates the main pod (editor + triggers) from worker pods (executions)
+n8n:
+  webhookUrl: 'https://n8n.example.com'
+
+encryptionKey:
+  existingSecret: n8n-master-secret
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+queue:
+  enabled: true
+  workers: 3 # creates 3 separate worker Deployment pods
+  concurrency: 10 # workflows executed simultaneously per worker
+
 persistence:
   enabled: true
   size: 5Gi
@@ -51,71 +166,168 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: n8n-tls
-      hosts:
-        - n8n.example.com
 ```
 
-## PostgreSQL Example
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
-postgresql:
-  enabled: true
-  auth:
-    database: n8n
-    username: n8n
-    password: 'strong-password'
-
+# values.yaml — n8n with external PostgreSQL and daily backup
 n8n:
   webhookUrl: 'https://n8n.example.com'
-```
 
-## Queue Mode Example
+encryptionKey:
+  existingSecret: n8n-master-secret
 
-```yaml
-queue:
-  enabled: true
-  workers: 3
-  concurrency: 10
+postgresql:
+  enabled: false
 
-redis:
-  enabled: true
-  auth:
-    password: 'redis-secret'
-```
-
-## External Database Example
-
-```yaml
 database:
+  mode: external
   external:
     vendor: postgres
-    host: db.example.com
+    host: postgres.database.svc.cluster.local
     name: n8n
     username: n8n
     existingSecret: n8n-db-credentials
+    existingSecretPasswordKey: database-password
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: n8n-backups
+    existingSecret: n8n-s3-credentials
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default | Description                                               |
-| --------------------- | ------- | --------------------------------------------------------- |
-| `n8n.encryptionKey`   | `""`    | Encryption key (auto-generated if empty)                  |
-| `n8n.webhookUrl`      | `""`    | External webhook URL (auto-detected from ingress)         |
-| `n8n.logLevel`        | `info`  | Log level (silent, error, warn, info, debug, verbose)     |
-| `queue.enabled`       | `false` | Enable Redis-backed queue mode                            |
-| `queue.workers`       | `2`     | Number of worker replicas                                 |
-| `queue.concurrency`   | `10`    | Jobs per worker                                           |
-| `database.mode`       | `auto`  | Database mode (auto, sqlite, external, postgresql, mysql) |
-| `postgresql.enabled`  | `false` | Deploy PostgreSQL subchart                                |
-| `mysql.enabled`       | `false` | Deploy MySQL subchart                                     |
-| `redis.enabled`       | `false` | Deploy Redis subchart                                     |
-| `persistence.enabled` | `true`  | Enable persistent storage                                 |
-| `persistence.size`    | `5Gi`   | PVC size                                                  |
-| `ingress.enabled`     | `false` | Enable ingress                                            |
-| `backup.enabled`      | `false` | Enable S3 backups                                         |
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default               | Description          |
+| ------------------ | ------ | --------------------- | -------------------- |
+| `image.repository` | string | `docker.io/n8nio/n8n` | n8n container image. |
+| `image.tag`        | string | `"2.12.3"`            | Image tag.           |
+| `image.pullPolicy` | string | `IfNotPresent`        | Image pull policy.   |
+
+### n8n Configuration
+
+| Parameter           | Type   | Default   | Description                                                                       |
+| ------------------- | ------ | --------- | --------------------------------------------------------------------------------- |
+| `n8n.encryptionKey` | string | `""`      | Credential encryption key. Auto-generated if empty. **Use existingSecret.**       |
+| `n8n.webhookUrl`    | string | `""`      | Full external URL for webhook triggers. Required for all webhook nodes.           |
+| `n8n.editorBaseUrl` | string | `""`      | Editor base URL. Auto-detected from Ingress if empty.                             |
+| `n8n.logLevel`      | string | `info`    | Log level: `silent`, `error`, `warn`, `info`, `debug`, `verbose`.                 |
+| `n8n.logOutput`     | string | `console` | Log output destination: `console` or `file`.                                      |
+| `n8n.extraEnv`      | array  | `[]`      | Extra environment variables (e.g. `GENERIC_TIMEZONE`, `N8N_DIAGNOSTICS_ENABLED`). |
+
+### Encryption Key
+
+| Parameter                         | Type   | Default          | Description                                        |
+| --------------------------------- | ------ | ---------------- | -------------------------------------------------- |
+| `encryptionKey.existingSecret`    | string | `""`             | Existing secret containing the encryption key.     |
+| `encryptionKey.existingSecretKey` | string | `encryption-key` | Key for the encryption key in the existing secret. |
+
+### Queue Mode
+
+| Parameter                       | Type    | Default | Description                                                              |
+| ------------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
+| `queue.enabled`                 | boolean | `false` | Enable Redis-backed queue mode (main pod + separate worker Deployments). |
+| `queue.workers`                 | integer | `1`     | Number of worker replica Deployments.                                    |
+| `queue.concurrency`             | integer | `10`    | Simultaneous workflow executions per worker.                             |
+| `queue.resources`               | object  | `{}`    | CPU and memory requests/limits for worker pods.                          |
+| `queue.external.host`           | string  | `""`    | External Redis host (alternative to subchart).                           |
+| `queue.external.existingSecret` | string  | `""`    | Existing secret for external Redis password.                             |
+
+### Database
+
+**Auto-detection precedence** (`database.mode: auto`):
+
+| Priority | Condition                                             | Result              |
+| -------- | ----------------------------------------------------- | ------------------- |
+| 1        | `database.external.host` or `external.existingSecret` | External DB         |
+| 2        | `postgresql.enabled: true`                            | PostgreSQL subchart |
+| 3        | `mysql.enabled: true`                                 | MySQL subchart      |
+| 4        | None of the above                                     | SQLite (default)    |
+
+| Parameter                                     | Type   | Default                           | Description                                                         |
+| --------------------------------------------- | ------ | --------------------------------- | ------------------------------------------------------------------- |
+| `database.mode`                               | string | `auto`                            | Database mode: `auto`, `sqlite`, `external`, `postgresql`, `mysql`. |
+| `database.sqlite.file`                        | string | `/home/node/.n8n/database.sqlite` | SQLite file path inside the data volume.                            |
+| `database.external.vendor`                    | string | `postgres`                        | External DB vendor: `postgres` or `mysql`.                          |
+| `database.external.host`                      | string | `""`                              | External database hostname.                                         |
+| `database.external.existingSecret`            | string | `""`                              | Existing secret with database password.                             |
+| `database.external.existingSecretPasswordKey` | string | `database-password`               | Key for the password.                                               |
+
+### Subcharts
+
+| Parameter                             | Type    | Default | Description                             |
+| ------------------------------------- | ------- | ------- | --------------------------------------- |
+| `postgresql.enabled`                  | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.password`            | string  | `""`    | Password. Auto-generated if empty.      |
+| `postgresql.primary.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
+| `mysql.enabled`                       | boolean | `false` | Deploy the bundled MySQL subchart.      |
+| `mysql.primary.persistence.size`      | string  | `8Gi`   | PVC size for MySQL.                     |
+| `redis.enabled`                       | boolean | `false` | Deploy the bundled Redis subchart.      |
+| `redis.primary.persistence.size`      | string  | `1Gi`   | PVC size for Redis.                     |
+
+### Persistence
+
+| Parameter                   | Type    | Default | Description                                                  |
+| --------------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `persistence.enabled`       | boolean | `true`  | Enable PVC for `/home/node/.n8n` (SQLite DB + custom nodes). |
+| `persistence.size`          | string  | `5Gi`   | PVC size.                                                    |
+| `persistence.storageClass`  | string  | `""`    | StorageClass for the PVC.                                    |
+| `persistence.existingClaim` | string  | `""`    | Use an existing PVC.                                         |
+
+### Backup
+
+Backup mode is automatically selected based on the active database vendor.
+
+| Parameter                          | Type    | Default                    | Description                          |
+| ---------------------------------- | ------- | -------------------------- | ------------------------------------ |
+| `backup.enabled`                   | boolean | `false`                    | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                       |
+| `backup.archivePrefix`             | string  | `n8n`                      | Prefix for backup archive filenames. |
+| `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`                 | string  | `""`                       | Target bucket name.                  |
+| `backup.s3.existingSecret`         | string  | `""`                       | Existing secret with S3 credentials. |
+| `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.       |
+| `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra arguments for `mysqldump`.     |
+
+### Service, Ingress, Probes
+
+| Parameter                  | Type    | Default     | Description                     |
+| -------------------------- | ------- | ----------- | ------------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.                   |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource.     |
+| `ingress.ingressClassName` | string  | `""`        | Ingress class name.             |
+| `startupProbe.enabled`     | boolean | `true`      | Startup probe on `/healthz`.    |
+| `livenessProbe.enabled`    | boolean | `true`      | Liveness probe on `/healthz`.   |
+| `readinessProbe.enabled`   | boolean | `true`      | Readiness probe on `/healthz`.  |
+| `resources`                | object  | `{}`        | CPU and memory requests/limits. |
+| `extraManifests`           | array   | `[]`        | Extra Kubernetes manifests.     |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/n8n) on GitHub.
+- [n8n Official Documentation](https://docs.n8n.io/)
+- [n8n GitHub Repository](https://github.com/n8n-io/n8n)
+- [HelmForge n8n Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/n8n)
