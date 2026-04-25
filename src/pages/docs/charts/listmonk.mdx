@@ -1,26 +1,37 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Listmonk
-description: Helm chart for Listmonk on Kubernetes with bundled PostgreSQL, persistent uploads, S3 backup, and SMTP configuration.
+title: Listmonk Chart
+description: HelmForge Listmonk chart — self-hosted newsletter and mailing list manager with PostgreSQL backend, persistent uploads storage, S3 backup, and idempotent database bootstrap for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Listmonk
 
-Helm chart for deploying [Listmonk](https://listmonk.app/) on Kubernetes — a self-hosted newsletter and mailing list manager with bundled PostgreSQL, persistent uploads storage, and optional S3 backup.
+Self-hosted newsletter and mailing list manager. Listmonk handles subscriber management, list segmentation,
+campaign creation, email template rendering, and delivery tracking. It requires PostgreSQL and an external
+SMTP provider to send emails.
+
+<Callout type="warning" title="SMTP must be configured before sending any emails">
+  Listmonk does not ship with an SMTP server. After the first login, navigate to **Settings → SMTP** and configure your
+  email provider (Postmark, AWS SES, Mailgun, or any SMTP relay). Without SMTP configuration, the application is fully
+  functional but cannot send any campaigns or transactional emails.
+</Callout>
 
 ## Key Features
 
-- **Official Listmonk image** based on `listmonk/listmonk`
-- **Bundled PostgreSQL** default install includes the HelmForge PostgreSQL chart
-- **External database support** managed PostgreSQL can be used instead of the subchart
-- **Persistent uploads** configurable PVC for media and attachment storage
-- **S3 backup** optional CronJob for PostgreSQL dumps to S3-compatible storage
-- **Idempotent bootstrap** init container runs `--install --idempotent --yes` and `--upgrade --yes` on every start
-- **pgcrypto extension** automatically provisioned via PostgreSQL init scripts
+- **Subscriber and list management** — import, segment, and manage subscriber lists
+- **Campaign management** — HTML and plain-text email campaigns with template support
+- **Transactional emails** — API-driven transactional message delivery
+- **PostgreSQL backend** — bundled subchart or external database with `pgcrypto` auto-provisioned
+- **Persistent uploads storage** — media and attachment files on a dedicated PVC
+- **Idempotent bootstrap** — init container applies schema migrations on every pod start
+- **S3 backup** — scheduled PostgreSQL `pg_dump` to S3-compatible storage
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,18 +39,44 @@ helm repo update
 helm install listmonk helmforge/listmonk
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
 helm install listmonk oci://ghcr.io/helmforgedev/helm/listmonk
 ```
 
-## Basic Example
+After the first pod starts, access the Listmonk admin UI via port-forward and complete the setup wizard
+to set the admin password and configure SMTP:
+
+```bash
+kubectl port-forward svc/<release>-listmonk 9000:80
+# Open http://localhost:9000
+```
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production (TLS + Backup)' },
+    { id: 'external-db', label: 'External PostgreSQL' },
+    { id: 'smtp-env', label: 'SMTP via Environment' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-listmonk:
-  adminUser: admin
-  adminPassword: changeme
+# values.yaml — Listmonk with bundled PostgreSQL
+# After deploying, configure SMTP in the admin UI: Settings → SMTP
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+storage:
+  enabled: true
+  size: 5Gi
 
 ingress:
   enabled: true
@@ -51,54 +88,329 @@ ingress:
           pathType: Prefix
 ```
 
-## External Database
+</div>
+
+<div data-tab-panel="production">
 
 ```yaml
-database:
-  mode: external
-  external:
-    host: postgres.example.internal
-    name: listmonk
-    username: listmonk
-    existingSecret: listmonk-db
-
+# values.yaml — Production Listmonk with TLS and daily PostgreSQL backup
+# Backup covers the PostgreSQL database only. Uploads PVC is not included.
 postgresql:
-  enabled: false
-```
+  enabled: true
+  auth:
+    password: 'postgres-password'
 
-## With S3 Backup
+storage:
+  enabled: true
+  size: 10Gi
 
-```yaml
 backup:
   enabled: true
   schedule: '0 3 * * *'
   s3:
-    endpoint: https://minio.example.internal
-    bucket: listmonk-backups
-    existingSecret: listmonk-s3
+    endpoint: https://s3.amazonaws.com
+    bucket: my-listmonk-backups
+    prefix: listmonk
+    existingSecret: listmonk-s3-credentials
+
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: listmonk.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: listmonk-tls
+      hosts:
+        - listmonk.example.com
 ```
 
-## Key Values
+</div>
 
-| Key                      | Default     | Description                                     |
-| ------------------------ | ----------- | ----------------------------------------------- |
-| `replicaCount`           | `1`         | Number of Listmonk application pods             |
-| `listmonk.adminUser`     | `""`        | Admin username created on first install         |
-| `listmonk.adminPassword` | `""`        | Admin password (auto-generated if empty)        |
-| `database.mode`          | `auto`      | Database mode: `auto`, `external`, `postgresql` |
-| `postgresql.enabled`     | `true`      | Deploy bundled PostgreSQL                       |
-| `storage.enabled`        | `true`      | Enable persistent uploads storage               |
-| `storage.size`           | `5Gi`       | Uploads PVC size                                |
-| `backup.enabled`         | `false`     | Enable S3 backup CronJob                        |
-| `backup.schedule`        | `0 3 * * *` | Backup cron schedule                            |
-| `ingress.enabled`        | `false`     | Enable ingress exposure                         |
+<div data-tab-panel="external-db">
 
-## Operational Notes
+```yaml
+# values.yaml — Listmonk with external managed PostgreSQL
+# The external PostgreSQL database must have the pgcrypto extension available.
+database:
+  mode: external
+  external:
+    host: postgresql.database.svc.cluster.local
+    port: 5432
+    name: listmonk
+    username: listmonk
+    existingSecret: listmonk-db-credentials
+    existingSecretPasswordKey: database-password
+    sslMode: require
 
-- SMTP configuration is done through the Listmonk admin UI after first install
-- The init container ensures the database schema is created and migrated on every pod start
-- PostgreSQL requires the `pgcrypto` extension, which the chart provisions automatically via init scripts
+postgresql:
+  enabled: false
+
+storage:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: listmonk.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="smtp-env">
+
+```yaml
+# values.yaml — Configure SMTP via environment variables (bypasses UI)
+# Listmonk reads SMTP config from environment when set.
+# Refer to Listmonk environment variable documentation for all available keys.
+listmonk:
+  extraEnv:
+    - name: LISTMONK_smtp__host
+      value: 'smtp.postmarkapp.com'
+    - name: LISTMONK_smtp__port
+      value: '587'
+    - name: LISTMONK_smtp__auth_protocol
+      value: 'login'
+    - name: LISTMONK_smtp__username
+      valueFrom:
+        secretKeyRef:
+          name: listmonk-smtp
+          key: username
+    - name: LISTMONK_smtp__password
+      valueFrom:
+        secretKeyRef:
+          name: listmonk-smtp
+          key: password
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+storage:
+  enabled: true
+  size: 5Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                                                           |
+| ------------------ | ------- | ------- | --------------------------------------------------------------------- |
+| `nameOverride`     | string  | `""`    | Override the chart name.                                              |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                                       |
+| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                                  |
+| `replicaCount`     | integer | `1`     | Number of Listmonk replicas. Keep at 1 to avoid scheduling conflicts. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description                          |
+| ------------------ | ------ | ----------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/listmonk/listmonk` | Listmonk container image.            |
+| `image.tag`        | string | `"v6.1.0"`                    | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+
+### Listmonk Configuration
+
+| Parameter           | Type  | Default | Description                                                                      |
+| ------------------- | ----- | ------- | -------------------------------------------------------------------------------- |
+| `listmonk.extraEnv` | array | `[]`    | Extra environment variables. Use for SMTP, admin credentials, and feature flags. |
+
+<Callout type="tip" title="Configure SMTP via environment variables for GitOps workflows">
+  The Listmonk UI stores SMTP configuration in the PostgreSQL database. For GitOps or automated deployments, set SMTP
+  settings via `listmonk.extraEnv` using the `LISTMONK_smtp__*` environment variable naming convention. Environment
+  variables take precedence over database-stored settings.
+</Callout>
+
+### Database
+
+| Parameter                                     | Type    | Default             | Description                                                   |
+| --------------------------------------------- | ------- | ------------------- | ------------------------------------------------------------- |
+| `database.mode`                               | string  | `auto`              | Database mode: `auto`, `external`, or `postgresql`.           |
+| `database.external.host`                      | string  | `""`                | External PostgreSQL hostname.                                 |
+| `database.external.port`                      | integer | `5432`              | External PostgreSQL port.                                     |
+| `database.external.name`                      | string  | `listmonk`          | Database name on the external server.                         |
+| `database.external.username`                  | string  | `listmonk`          | Username for the external database.                           |
+| `database.external.password`                  | string  | `""`                | Password for the external database (prefer `existingSecret`). |
+| `database.external.sslMode`                   | string  | `disable`           | PostgreSQL SSL mode for external connections.                 |
+| `database.external.existingSecret`            | string  | `""`                | Existing secret containing the database password.             |
+| `database.external.existingSecretPasswordKey` | string  | `database-password` | Key inside the existing secret for the password.              |
+
+<Callout type="info" title="database.mode: auto selects the right backend automatically">
+  With `database.mode: auto` (the default), the chart uses the bundled PostgreSQL subchart when `postgresql.enabled:
+  true`, and falls back to the `external` configuration otherwise. Set `database.mode` explicitly to `external` or
+  `postgresql` when you need deterministic behavior in production.
+</Callout>
+
+### Database — Embedded Subchart
+
+The bundled PostgreSQL subchart automatically provisions the `pgcrypto` extension and the required grants via
+init SQL scripts. This extension is mandatory for Listmonk — deployments against external databases must ensure
+`pgcrypto` is available.
+
+| Parameter                                   | Type    | Default      | Description                                             |
+| ------------------------------------------- | ------- | ------------ | ------------------------------------------------------- |
+| `postgresql.enabled`                        | boolean | `true`       | Deploy the bundled PostgreSQL subchart.                 |
+| `postgresql.architecture`                   | string  | `standalone` | PostgreSQL architecture.                                |
+| `postgresql.auth.database`                  | string  | `listmonk`   | Database name created by the subchart.                  |
+| `postgresql.auth.username`                  | string  | `listmonk`   | Database user created by the subchart.                  |
+| `postgresql.auth.password`                  | string  | `""`         | Database password. Auto-generated if empty.             |
+| `postgresql.auth.postgresPassword`          | string  | `""`         | PostgreSQL superuser password. Auto-generated if empty. |
+| `postgresql.standalone.persistence.enabled` | boolean | `true`       | Enable persistence for PostgreSQL data.                 |
+| `postgresql.standalone.persistence.size`    | string  | `8Gi`        | PVC size for PostgreSQL data.                           |
+
+### Uploads Storage
+
+| Parameter               | Type    | Default         | Description                                                |
+| ----------------------- | ------- | --------------- | ---------------------------------------------------------- |
+| `storage.enabled`       | boolean | `true`          | Enable a dedicated PVC for uploaded media and attachments. |
+| `storage.size`          | string  | `5Gi`           | Uploads PVC size.                                          |
+| `storage.storageClass`  | string  | `""`            | StorageClass for the uploads PVC.                          |
+| `storage.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                           |
+| `storage.existingClaim` | string  | `""`            | Use an existing PVC for uploads.                           |
+| `storage.annotations`   | object  | `{}`            | Annotations for the uploads PVC.                           |
+
+<Callout type="warning" title="S3 backup covers PostgreSQL only — uploads PVC is not included">
+  The built-in S3 backup CronJob runs `pg_dump` against the PostgreSQL database. Uploaded media, images, and attachments
+  stored in the uploads PVC (`storage.*`) are **not** included in this backup. Implement a separate backup strategy
+  (e.g. Velero volume snapshot or NFS-level backup) for the uploads PVC.
+</Callout>
+
+### Backup
+
+| Parameter                              | Type    | Default                                | Description                                                  |
+| -------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                                | Enable scheduled PostgreSQL S3 backup CronJob.               |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                                | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                               | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                    | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                    | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                                    | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `listmonk`                             | Prefix for backup archive filenames.                         |
+| `backup.images.postgresql`             | string  | `docker.io/library/postgres:17-alpine` | Image for `pg_dump`.                                         |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`         | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                                   | Resources for backup containers.                             |
+| `backup.database.pgDumpArgs`           | string  | `""`                                   | Extra arguments passed to `pg_dump`.                         |
+| `backup.s3.endpoint`                   | string  | `""`                                   | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                                   | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `listmonk`                             | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                 | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                                   | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                           | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default | Description                                      |
+| -------------------------- | ------- | ------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false` | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `""`    | Ingress class name. Must be set explicitly.      |
+| `ingress.annotations`      | object  | `{}`    | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`    | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `30`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `3`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Email Deliverability
+
+<Callout type="tip" title="Configure SPF, DKIM, and DMARC before sending campaigns">
+  Listmonk is responsible for campaign delivery, but email deliverability depends on DNS records configured on the
+  sending domain. Before sending any campaign, ensure your sending domain has valid **SPF**, **DKIM**, and **DMARC**
+  records. Without them, emails from large campaigns are likely to land in spam folders or be rejected entirely by
+  recipients' mail servers.
+</Callout>
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/listmonk)
+- [Listmonk Official Website](https://listmonk.app)
+- [Listmonk Documentation](https://listmonk.app/docs)
+- [Listmonk GitHub Repository](https://github.com/knadh/listmonk)
+- [HelmForge Listmonk Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/listmonk)
