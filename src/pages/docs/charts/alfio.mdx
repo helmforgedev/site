@@ -1,21 +1,32 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: alf.io Chart
-description: HelmForge alf.io chart — open-source event management and ticketing with PostgreSQL.
+description: HelmForge alf.io chart — open-source event ticketing and management platform with Spring Boot, PostgreSQL backend, payment gateway integration, and QR code check-in for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # alf.io
 
-Deploy alf.io on Kubernetes using the official [alfio/alf.io](https://hub.docker.com/r/alfio/alf.io) container image. alf.io is an open-source event management and ticketing system built with Spring Boot, supporting event creation, ticket sales, check-in, and attendee management.
+Open-source event management and ticketing platform. alf.io handles event creation, ticket category management,
+online ticket sales, payment gateway integration, attendee management, and QR code-based check-in. Built with
+Spring Boot and PostgreSQL.
+
+<Callout type="danger" title="Change profiles to spring-boot for production">
+  The default `alfio.profiles` value is `dev`. The `dev` Spring profile enables development-mode settings including
+  verbose logging and relaxed security checks. Always set `alfio.profiles: spring-boot` for any non-development
+  deployment before going live.
+</Callout>
 
 ## Key Features
 
-- **PostgreSQL Backend** — bundled PostgreSQL subchart or external database support
-- **Spring Boot** — production-ready Java application with configurable profiles
-- **Event Management** — create and manage events, ticket categories, and promotions
-- **Ticket Sales** — online ticket purchasing with payment gateway integration
-- **Check-In** — QR code-based attendee check-in system
-- **Ingress Support** — configurable ingress with TLS
+- **Event management** — create events, ticket categories, discount codes, and promotions
+- **Online ticket sales** — payment gateway integration (Stripe, PayPal, and others)
+- **QR code check-in** — mobile check-in app with offline support
+- **Attendee management** — registration forms, custom fields, and export
+- **PostgreSQL backend** — bundled subchart or external database
+- **Spring Boot** — production-ready Java application
 
 ## Installation
 
@@ -33,16 +44,74 @@ helm install alfio helmforge/alfio
 helm install alfio oci://ghcr.io/helmforgedev/helm/alfio
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'production', label: 'Production' },
+    { id: 'external-db', label: 'External PostgreSQL' },
+    { id: 'payments', label: 'With Payment Gateway' },
+  ]}
+>
+
+<div data-tab-panel="production">
 
 ```yaml
-# values.yaml
+# values.yaml — Production alf.io with PostgreSQL and TLS
 alfio:
   baseUrl: 'https://tickets.example.com'
-  profiles: 'dev'
+  profiles: 'spring-boot'
 
 postgresql:
   enabled: true
+  auth:
+    password: 'postgres-password'
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: tickets.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: alfio-tls
+      hosts:
+        - tickets.example.com
+```
+
+</div>
+
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — alf.io with external PostgreSQL
+alfio:
+  baseUrl: 'https://tickets.example.com'
+  profiles: 'spring-boot'
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgresql.database.svc
+    port: '5432'
+    name: alfio
+    username: alfio
+    existingSecret: alfio-db-secret
+    existingSecretPasswordKey: password
 
 ingress:
   enabled: true
@@ -54,17 +123,216 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                  | Default | Description                          |
-| -------------------- | ------- | ------------------------------------ |
-| `alfio.baseUrl`      | `""`    | Public URL of the alf.io instance    |
-| `alfio.profiles`     | `dev`   | Spring profiles (dev or spring-boot) |
-| `postgresql.enabled` | `true`  | Enable bundled PostgreSQL subchart   |
-| `service.port`       | `80`    | HTTP service port                    |
-| `ingress.enabled`    | `false` | Enable ingress                       |
+<div data-tab-panel="payments">
+
+```yaml
+# values.yaml — alf.io with Stripe payment integration
+alfio:
+  baseUrl: 'https://tickets.example.com'
+  profiles: 'spring-boot'
+  extraEnv:
+    # Stripe integration
+    - name: STRIPE_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: alfio-payments
+          key: stripe-secret-key
+    - name: STRIPE_PUBLIC_KEY
+      valueFrom:
+        secretKeyRef:
+          name: alfio-payments
+          key: stripe-public-key
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: tickets.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: alfio-tls
+      hosts:
+        - tickets.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                  | Description                          |
+| ------------------ | ------ | ------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/alfio/alf.io` | alf.io container image.              |
+| `image.tag`        | string | `"2.0-M5-2509-1"`        | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
+
+### alf.io Configuration
+
+| Parameter        | Type   | Default | Description                                                                  |
+| ---------------- | ------ | ------- | ---------------------------------------------------------------------------- |
+| `alfio.baseUrl`  | string | `""`    | Public URL of the alf.io instance (e.g. `https://tickets.example.com`).      |
+| `alfio.profiles` | string | `dev`   | Spring profiles to activate. Use `spring-boot` for production.               |
+| `alfio.extraEnv` | array  | `[]`    | Extra environment variables for payment gateways and advanced configuration. |
+
+<Callout type="warning" title="baseUrl affects QR codes on issued tickets">
+  alf.io embeds `baseUrl` in the QR codes printed on tickets. If this value is incorrect, attendees who have already
+  received their tickets will have QR codes that point to the wrong URL. Set the correct public URL before selling any
+  tickets.
+</Callout>
+
+<Callout type="tip" title="Spring Boot JVM memory requirements">
+  alf.io is a Spring Boot Java application. Without `resources.limits.memory`, the JVM may consume all available node
+  memory. Set at least `512Mi` for requests and `1Gi` for limits. The JVM respects container memory limits via
+  `-XX:MaxRAMPercentage`.
+</Callout>
+
+### Database — Embedded Subchart
+
+| Parameter                  | Type    | Default      | Description                                      |
+| -------------------------- | ------- | ------------ | ------------------------------------------------ |
+| `postgresql.enabled`       | boolean | `true`       | Deploy a bundled PostgreSQL subchart for alf.io. |
+| `postgresql.architecture`  | string  | `standalone` | PostgreSQL deployment architecture.              |
+| `postgresql.auth.database` | string  | `alfio`      | Database name created by the subchart.           |
+| `postgresql.auth.username` | string  | `alfio`      | Database username created by the subchart.       |
+| `postgresql.auth.password` | string  | `""`         | Database password (auto-generated if empty).     |
+
+### Database — External
+
+| Parameter                                     | Type   | Default    | Description                                                      |
+| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| `database.external.host`                      | string | `""`       | External PostgreSQL hostname or IP.                              |
+| `database.external.port`                      | string | `"5432"`   | External PostgreSQL port.                                        |
+| `database.external.name`                      | string | `alfio`    | Database name on the external server.                            |
+| `database.external.username`                  | string | `alfio`    | Username for the external database.                              |
+| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
+| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                              |
+| -------------------------- | ------- | --------- | -------------------------------------------------------- |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                              |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                                      |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager for TLS). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                             |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).               |
+
+### Probes
+
+Probes use the `/healthz` endpoint.
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                                        |
+| -------------------- | ------ | ------- | -------------------------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. Min 512Mi RAM. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.                        |
+| `securityContext`    | object | `{}`    | Container-level security context.                  |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Application using dev profile in production">
+  If `alfio.profiles` is left as `dev` in production, the application logs excessively, may expose stack traces in error
+  responses, and can have relaxed security settings. Always set `alfio.profiles: spring-boot` before any event goes live
+  or any tickets are sold.
+</Callout>
+
+<Callout type="tip" title="Enable HTTPS before processing payments">
+  alf.io integrates with payment gateways that require HTTPS for webhooks and redirects. Ensure TLS is configured in the
+  Ingress (via cert-manager or equivalent) and that `baseUrl` starts with `https://` before configuring any payment
+  gateway credentials.
+</Callout>
 
 ## More Information
 
-- [alf.io documentation](https://alf.io/docs)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/alfio)
+- [alf.io Official Website](https://alf.io)
+- [alf.io Documentation](https://alf.io/docs)
+- [alf.io GitHub Repository](https://github.com/alfio-event/alf.io)
+- [HelmForge alf.io Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/alfio)
