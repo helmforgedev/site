@@ -1,62 +1,84 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Gitea
-description: Helm chart for Gitea self-hosted Git service on Kubernetes with SQLite, PostgreSQL, or MySQL.
+title: Gitea Chart
+description: HelmForge Gitea chart — self-hosted Git service with rootless image, HTTP and SSH dual-service, SQLite/PostgreSQL/MySQL, admin bootstrap Job, GITEA__ env-based configuration, database-aware S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Gitea
 
-Helm chart for deploying [Gitea](https://gitea.io/) self-hosted Git service on Kubernetes using the official [`gitea/gitea`](https://hub.docker.com/r/gitea/gitea) rootless Docker image.
+Deploy [Gitea](https://gitea.io/) on Kubernetes — a lightweight self-hosted Git service with a full
+web UI, issue tracking, CI/CD (Gitea Actions), package registry, and SSH access. The chart uses the
+official **rootless** image (UID 1000) for improved security.
+
+<Callout type="warning" title="gitea.rootUrl is required — wrong value breaks all clone URLs and webhooks">
+  Gitea uses `gitea.rootUrl` to construct all clone URLs, webhook callback addresses, and OAuth redirect URIs. If this
+  value is wrong or missing, users will see incorrect clone URLs and webhooks will fail silently. Always set it to the
+  full public URL (e.g. `https://git.example.com/`).
+</Callout>
 
 ## Key Features
 
-- **Official rootless image** based on `gitea/gitea:<version>-rootless` (UID 1000)
-- **Database backends** SQLite3 (default), PostgreSQL, or MySQL with auto-detection
-- **PostgreSQL and MySQL subcharts** optional bundled database deployments
-- **HTTP + SSH services** separate services for web UI and Git SSH access
-- **Admin user creation** optional post-install Job to bootstrap an admin account
-- **S3-compatible backup** database-aware CronJob (SQLite tar, pg_dump, mysqldump)
-- **Ingress support** configurable ingress with TLS for HTTP access
+- **Rootless official image** — runs as UID 1000 for improved pod security
+- **Dual service** — separate HTTP (3000) and SSH (2222) services
+- **Three database backends** — SQLite (default), PostgreSQL, MySQL with auto-detection
+- **Admin bootstrap Job** — optional first-run Job to create the admin user
+- **`GITEA__` env configuration** — all `app.ini` keys configurable via environment variables
+- **Database-aware backup** — `tar` for SQLite, `pg_dump`/`mysqldump` for SQL databases
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install gitea helmforge/gitea
+helm install gitea helmforge/gitea -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install gitea oci://ghcr.io/helmforgedev/helm/gitea
+helm install gitea oci://ghcr.io/helmforgedev/helm/gitea -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite (Default)' },
+    { id: 'postgresql', label: 'PostgreSQL' },
+    { id: 'ssh', label: 'SSH via NodePort' },
+    { id: 'external', label: 'External DB + Backup' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
+# values.yaml — Gitea with SQLite (zero database configuration)
 gitea:
-  rootUrl: https://git.example.com/
+  rootUrl: 'https://git.example.com/' # required; wrong value breaks all clone URLs
   sshDomain: git.example.com
-  disableRegistration: true
+  sshPort: 2222
+  disableRegistration: true # private instance
+  requireSignIn: true # require login to view any page
 
 admin:
-  username: gitea_admin
-  password: 'change-me-now'
-  email: admin@example.com
+  existingSecret: gitea-admin-credentials
+  # secret keys: admin-username, admin-password, admin-email
 
-postgresql:
+persistence:
   enabled: true
-  auth:
-    database: gitea
-    username: gitea
-    password: 'db-password'
+  size: 50Gi # repositories + LFS objects + config + SQLite
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: git.example.com
       paths:
@@ -66,58 +88,301 @@ ingress:
     - secretName: gitea-tls
       hosts:
         - git.example.com
+```
+
+</div>
+
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — Gitea with bundled PostgreSQL (recommended for production)
+gitea:
+  rootUrl: 'https://git.example.com/'
+  sshDomain: git.example.com
+  disableRegistration: true
+  requireSignIn: true
+
+admin:
+  existingSecret: gitea-admin-credentials
+
+postgresql:
+  enabled: true
+  auth:
+    database: gitea
+    username: gitea
+    password: 'strong-db-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+persistence:
+  enabled: true
+  size: 100Gi # repositories + LFS objects (no SQLite with PostgreSQL active)
 
 backup:
   enabled: true
   schedule: '0 3 * * *'
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: gitea
+    bucket: gitea-backups
+    existingSecret: gitea-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: git.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="ssh">
+
+```yaml
+# values.yaml — Gitea with SSH exposed via NodePort for external Git access
+gitea:
+  rootUrl: 'https://git.example.com/'
+  sshDomain: k8s-node.example.com # public hostname or IP of the Kubernetes node
+  sshPort: 30022 # must match service.ssh.nodePort
+
+admin:
+  existingSecret: gitea-admin-credentials
+
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+  ssh:
+    enabled: true
+    type: NodePort
+    port: 2222
+    nodePort: 30022 # expose SSH on node port 30022
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+persistence:
+  enabled: true
+  size: 100Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: git.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+# values.yaml — Gitea with external PostgreSQL and SMTP via GITEA__ env
+gitea:
+  rootUrl: 'https://git.example.com/'
+  sshDomain: git.example.com
+  disableRegistration: true
+  requireSignIn: true
+  extraEnv:
+    - name: GITEA__mailer__ENABLED
+      value: 'true'
+    - name: GITEA__mailer__FROM
+      value: 'gitea@example.com'
+    - name: GITEA__mailer__SMTP_ADDR
+      value: smtp.example.com
+    - name: GITEA__mailer__SMTP_PORT
+      value: '587'
+    - name: GITEA__mailer__USER
+      valueFrom:
+        secretKeyRef:
+          name: gitea-smtp-credentials
+          key: username
+    - name: GITEA__mailer__PASSWD
+      valueFrom:
+        secretKeyRef:
+          name: gitea-smtp-credentials
+          key: password
+
+admin:
+  existingSecret: gitea-admin-credentials
+
+database:
+  mode: external
+  external:
+    vendor: postgres
+    host: postgres.database.svc.cluster.local
+    name: gitea
+    username: gitea
+    existingSecret: gitea-db-credentials
+    existingSecretPasswordKey: database-password
+
+persistence:
+  enabled: true
+  size: 100Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: gitea-backups
     existingSecret: gitea-s3-credentials
 ```
 
-## Key Values
+</div>
 
-| Key                         | Default                          | Description                                              |
-| --------------------------- | -------------------------------- | -------------------------------------------------------- |
-| `gitea.appName`             | `"Gitea: Git with a cup of tea"` | Application display name                                 |
-| `gitea.runMode`             | `prod`                           | Run mode (dev, prod, test)                               |
-| `gitea.rootUrl`             | `""`                             | Root URL for links and clone URLs                        |
-| `gitea.sshDomain`           | `""`                             | SSH domain in clone URLs                                 |
-| `gitea.sshPort`             | `2222`                           | SSH listen port                                          |
-| `gitea.lfsEnabled`          | `true`                           | Enable Git LFS                                           |
-| `gitea.disableRegistration` | `false`                          | Disable self-registration                                |
-| `admin.username`            | `""`                             | Admin username (triggers admin creation Job)             |
-| `admin.existingSecret`      | `""`                             | Existing secret with admin credentials                   |
-| `database.mode`             | `auto`                           | Database mode: auto, sqlite, external, postgresql, mysql |
-| `postgresql.enabled`        | `false`                          | Deploy PostgreSQL subchart                               |
-| `mysql.enabled`             | `false`                          | Deploy MySQL subchart                                    |
-| `persistence.enabled`       | `true`                           | Enable persistent storage for /var/lib/gitea             |
-| `persistence.size`          | `10Gi`                           | Volume size                                              |
-| `service.http.type`         | `ClusterIP`                      | HTTP service type                                        |
-| `service.http.port`         | `3000`                           | HTTP service port                                        |
-| `service.ssh.enabled`       | `true`                           | Enable SSH service                                       |
-| `service.ssh.type`          | `ClusterIP`                      | SSH service type                                         |
-| `service.ssh.port`          | `2222`                           | SSH service port                                         |
-| `service.ssh.nodePort`      | `""`                             | SSH NodePort (when type is NodePort)                     |
-| `ingress.enabled`           | `false`                          | Enable ingress                                           |
-| `ingress.ingressClassName`  | `""`                             | Ingress class (`traefik`, `nginx`, etc.)                 |
-| `backup.enabled`            | `false`                          | Enable S3 backup CronJob                                 |
-| `backup.schedule`           | `"0 3 * * *"`                    | Backup cron schedule                                     |
-| `backup.s3.endpoint`        | `""`                             | S3-compatible endpoint URL                               |
-| `backup.s3.bucket`          | `""`                             | S3 bucket name                                           |
-| `backup.s3.existingSecret`  | `""`                             | Existing secret with S3 credentials                      |
+</DocsTabs>
 
-## Database Auto-Detection
+## Configuration Reference
 
-When `database.mode` is `auto` (default), the chart detects which database to use:
+### Core
 
-1. If `database.external.host` is set → **external** database
-2. If `postgresql.enabled` is `true` → **PostgreSQL subchart**
-3. If `mysql.enabled` is `true` → **MySQL subchart**
-4. Otherwise → **SQLite3** (zero configuration)
+| Parameter          | Type    | Default | Description                           |
+| ------------------ | ------- | ------- | ------------------------------------- |
+| `replicaCount`     | integer | `1`     | Pod replicas. SQLite supports 1 only. |
+| `nameOverride`     | string  | `""`    | Override the chart name.              |
+| `fullnameOverride` | string  | `""`    | Override the full release name.       |
+
+### Image
+
+| Parameter          | Type   | Default                 | Description                    |
+| ------------------ | ------ | ----------------------- | ------------------------------ |
+| `image.repository` | string | `docker.io/gitea/gitea` | Gitea image.                   |
+| `image.tag`        | string | `"1.25.5-rootless"`     | Rootless image tag (UID 1000). |
+
+### Gitea Configuration
+
+| Parameter                   | Type    | Default        | Description                                                                |
+| --------------------------- | ------- | -------------- | -------------------------------------------------------------------------- |
+| `gitea.appName`             | string  | `"Gitea: ..."` | Application display name.                                                  |
+| `gitea.runMode`             | string  | `prod`         | Run mode: `dev`, `prod`, `test`.                                           |
+| `gitea.rootUrl`             | string  | `""`           | **Required.** Full public URL (e.g. `https://git.example.com/`).           |
+| `gitea.sshDomain`           | string  | `""`           | SSH domain shown in clone URLs. Defaults to Ingress host.                  |
+| `gitea.sshPort`             | integer | `2222`         | SSH listen port (rootless image default).                                  |
+| `gitea.lfsEnabled`          | boolean | `true`         | Enable Git Large File Storage.                                             |
+| `gitea.disableRegistration` | boolean | `false`        | Disable user self-registration. Set `true` for private instances.          |
+| `gitea.requireSignIn`       | boolean | `false`        | Require login to view any page.                                            |
+| `gitea.extraEnv`            | array   | `[]`           | Extra env vars in `GITEA__SECTION__KEY` format for full `app.ini` control. |
+
+<Callout type="info" title="Configure any app.ini setting via GITEA__SECTION__KEY environment variables">
+  Gitea supports overriding any `app.ini` configuration key via environment variables using the
+  pattern `GITEA__<SECTION>__<KEY>`. For example, to enable SMTP:
+
+```
+GITEA__mailer__ENABLED=true
+GITEA__mailer__SMTP_ADDR=smtp.example.com
+```
+
+Pass these via `gitea.extraEnv` or `gitea.existingSecret` for sensitive values.
+
+</Callout>
+
+### Admin User
+
+| Parameter              | Type   | Default | Description                                                               |
+| ---------------------- | ------ | ------- | ------------------------------------------------------------------------- |
+| `admin.username`       | string | `""`    | Admin username. Triggers post-install Job to create user if set.          |
+| `admin.password`       | string | `""`    | Admin password. Ignored when `existingSecret` is set.                     |
+| `admin.email`          | string | `""`    | Admin email address.                                                      |
+| `admin.existingSecret` | string | `""`    | Existing secret. Keys: `admin-username`, `admin-password`, `admin-email`. |
+
+### Database
+
+**Auto-detection precedence** (`database.mode: auto`):
+
+| Priority | Condition                                             | Result              |
+| -------- | ----------------------------------------------------- | ------------------- |
+| 1        | `database.external.host` or `external.existingSecret` | External DB         |
+| 2        | `postgresql.enabled: true`                            | PostgreSQL subchart |
+| 3        | `mysql.enabled: true`                                 | MySQL subchart      |
+| 4        | None of the above                                     | SQLite (default)    |
+
+| Parameter                          | Type   | Default                        | Description                                                |
+| ---------------------------------- | ------ | ------------------------------ | ---------------------------------------------------------- |
+| `database.mode`                    | string | `auto`                         | Mode: `auto`, `sqlite`, `external`, `postgresql`, `mysql`. |
+| `database.sqlite.file`             | string | `/var/lib/gitea/data/gitea.db` | SQLite file path inside the data volume.                   |
+| `database.external.vendor`         | string | `postgres`                     | External DB vendor: `postgres` or `mysql`.                 |
+| `database.external.host`           | string | `""`                           | External database hostname.                                |
+| `database.external.existingSecret` | string | `""`                           | Existing secret with database password.                    |
+
+### Subcharts
+
+| Parameter                             | Type    | Default | Description                             |
+| ------------------------------------- | ------- | ------- | --------------------------------------- |
+| `postgresql.enabled`                  | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.password`            | string  | `""`    | Password. Auto-generated if empty.      |
+| `postgresql.primary.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
+| `mysql.enabled`                       | boolean | `false` | Deploy the bundled MySQL subchart.      |
+| `mysql.primary.persistence.size`      | string  | `8Gi`   | PVC size for MySQL.                     |
+
+### Persistence
+
+| Parameter                   | Type    | Default | Description                                                          |
+| --------------------------- | ------- | ------- | -------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`  | Enable PVC for `/var/lib/gitea` (repositories, LFS, config, SQLite). |
+| `persistence.size`          | string  | `10Gi`  | PVC size. Size based on repository count and LFS usage.              |
+| `persistence.storageClass`  | string  | `""`    | StorageClass for the PVC.                                            |
+| `persistence.existingClaim` | string  | `""`    | Use an existing PVC.                                                 |
+
+### Service
+
+| Parameter              | Type    | Default     | Description                                                 |
+| ---------------------- | ------- | ----------- | ----------------------------------------------------------- |
+| `service.http.type`    | string  | `ClusterIP` | HTTP service type.                                          |
+| `service.http.port`    | integer | `3000`      | HTTP service port.                                          |
+| `service.ssh.enabled`  | boolean | `true`      | Enable a separate SSH service.                              |
+| `service.ssh.type`     | string  | `ClusterIP` | SSH service type (`ClusterIP`, `NodePort`, `LoadBalancer`). |
+| `service.ssh.port`     | integer | `2222`      | SSH service port.                                           |
+| `service.ssh.nodePort` | string  | `""`        | NodePort for SSH (only when `type: NodePort`).              |
+
+### Ingress and Probes
+
+| Parameter                  | Type    | Default | Description                         |
+| -------------------------- | ------- | ------- | ----------------------------------- |
+| `ingress.enabled`          | boolean | `false` | Enable an Ingress for HTTP traffic. |
+| `ingress.ingressClassName` | string  | `""`    | Ingress class name.                 |
+| `startupProbe.enabled`     | boolean | `true`  | Startup probe on `/api/healthz`.    |
+| `livenessProbe.enabled`    | boolean | `true`  | Liveness probe on `/api/healthz`.   |
+| `readinessProbe.enabled`   | boolean | `true`  | Readiness probe on `/api/healthz`.  |
+| `resources`                | object  | `{}`    | CPU and memory requests/limits.     |
+| `extraManifests`           | array   | `[]`    | Extra Kubernetes manifests.         |
+
+### Backup
+
+Database-aware backup: SQLite archives `/var/lib/gitea` (repositories + LFS + SQLite). PostgreSQL
+uses `pg_dump`. MySQL uses `mysqldump`.
+
+<Callout
+  type="warning"
+  title="Backup covers the database only for PostgreSQL/MySQL — Git repositories reside in the PVC"
+>
+  When using PostgreSQL or MySQL, the backup CronJob only captures the database via `pg_dump` or `mysqldump`. Git
+  repository data and LFS objects stored in the `/var/lib/gitea` PVC are **not included**. Back up the PVC separately
+  using Velero, NFS snapshots, or storage provider snapshots. SQLite mode uses `tar` to archive the full
+  `/var/lib/gitea`, covering repositories and the database.
+</Callout>
+
+| Parameter                          | Type    | Default                    | Description                          |
+| ---------------------------------- | ------- | -------------------------- | ------------------------------------ |
+| `backup.enabled`                   | boolean | `false`                    | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                       |
+| `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`                 | string  | `""`                       | Target bucket name.                  |
+| `backup.s3.existingSecret`         | string  | `""`                       | Existing secret with S3 credentials. |
+| `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.       |
+| `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra `mysqldump` arguments.         |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/gitea)
+- [Gitea Official Documentation](https://docs.gitea.com/)
+- [Gitea GitHub Repository](https://github.com/go-gitea/gitea)
+- [HelmForge Gitea Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/gitea)
