@@ -1,20 +1,40 @@
 ---
 import SearchModal from '../components/SearchModal.astro';
+import { chartCount } from '../data/charts';
 
 interface Props {
   title: string;
   description: string;
   image?: string;
   url?: string;
+  ogType?: 'website' | 'article';
 }
 
-const { title, description, image = '/og-default.png', url = Astro.url.href } = Astro.props;
+const { title, description, image = '/og-default.png', url = Astro.url.href, ogType } = Astro.props;
 
 const siteName = 'HelmForge';
 const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
 
+// Detect page type from path
+const pathname = Astro.url.pathname;
+const pathSegments = pathname.split('/').filter(Boolean);
+const isHomepage = pathname === '/' || pathname === '';
+const isChartPage = pathSegments[0] === 'docs' && pathSegments[1] === 'charts' && !!pathSegments[2];
+const isBlogPost = pathSegments[0] === 'blog' && !!pathSegments[1];
+const chartSlug = isChartPage ? pathSegments[2] : null;
+const chartDisplay = chartSlug ? chartSlug.replace(/-/g, ' ') : null;
+
+// Determine og:type
+const resolvedOgType = ogType ?? (isBlogPost ? 'article' : 'website');
+
+// Smart auto-keywords: chart pages get specific install/deploy keywords
+const autoKeywords = chartDisplay
+  ? `${chartDisplay} helm chart, install ${chartDisplay} kubernetes, ${chartDisplay} kubernetes deployment, ${chartDisplay} k8s helm, kubernetes ${chartDisplay}, ${chartDisplay} self-hosted kubernetes, helm chart ${chartDisplay} production, bitnami alternative ${chartDisplay}`
+  : isHomepage
+  ? `helm charts kubernetes, production helm charts, bitnami alternative, open source helm charts, kubernetes application deployment, self-hosted kubernetes, helm chart repository, ${chartCount}+ helm charts`
+  : `helm chart, kubernetes, open source, bitnami alternative, production ready, ${title.toLowerCase().replace(/[|]/g, ',').split(',').map((s) => s.trim()).filter(Boolean).join(', ')}`;
+
 // Build breadcrumb from URL path
-const pathSegments = Astro.url.pathname.split('/').filter(Boolean);
 const breadcrumbItems = [{ name: 'Home', url: 'https://helmforge.dev/' }];
 let accumulated = '';
 for (const seg of pathSegments) {
@@ -32,6 +52,23 @@ const breadcrumbJsonLd = {
     item: item.url,
   })),
 };
+
+// WebSite + SiteLinksSearchBox JSON-LD (homepage only)
+const websiteJsonLd = isHomepage ? {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'HelmForge',
+  url: 'https://helmforge.dev',
+  description: `Production-ready Helm charts for Kubernetes. ${chartCount}+ open-source charts, MIT licensed, built-in S3 backup — the free alternative to Bitnami.`,
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: 'https://helmforge.dev/docs/charts/{search_term_string}',
+    },
+    'query-input': 'required name=search_term_string',
+  },
+} : null;
 ---
 
 <!doctype html>
@@ -55,16 +92,7 @@ const breadcrumbJsonLd = {
     <!-- Primary Meta -->
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <meta
-      name="keywords"
-      content={`helm chart, kubernetes, open source, bitnami alternative, production ready, ${title
-        .toLowerCase()
-        .replace(/[|]/g, ',')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .join(', ')}`}
-    />
+    <meta name="keywords" content={autoKeywords} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -74,7 +102,7 @@ const breadcrumbJsonLd = {
     <link rel="alternate" type="application/rss+xml" title="HelmForge Charts" href="/rss.xml" />
 
     <!-- Open Graph -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={resolvedOgType} />
     <meta property="og:url" content={url} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -138,6 +166,9 @@ const breadcrumbJsonLd = {
         },
       })}
     />
+
+    <!-- WebSite + SiteLinksSearchBox JSON-LD (homepage only) -->
+    {websiteJsonLd && <script type="application/ld+json" set:html={JSON.stringify(websiteJsonLd)} />}
 
     <!-- BreadcrumbList JSON-LD -->
     {pathSegments.length > 0 && <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />}

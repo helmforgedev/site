@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import { sidebarNav, chartCategories, allPages } from '../data/navigation';
+import { chartCount } from '../data/charts';
 
 interface Props {
   title: string;
@@ -56,12 +57,47 @@ function isActive(href: string): boolean {
   const target = href.replace(/\/$/, '');
   return clean === target;
 }
+
+// TechArticle JSON-LD for individual chart pages
+const isChartPage = currentPath.includes('/docs/charts/') && currentPath.split('/').length >= 4 && !currentPath.endsWith('/charts');
+const chartSlugLd = isChartPage ? currentPath.split('/').pop() : null;
+const chartDisplayLd = chartSlugLd ? chartSlugLd.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+
+const techArticleJsonLd = isChartPage ? {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: title,
+  description: description,
+  url: `https://helmforge.dev${currentPath}`,
+  inLanguage: 'en',
+  publisher: {
+    '@type': 'Organization',
+    name: 'HelmForge',
+    url: 'https://helmforge.dev',
+    logo: 'https://helmforge.dev/helmforge-logo-horizontal.svg',
+  },
+  about: {
+    '@type': 'SoftwareApplication',
+    name: chartDisplayLd,
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Kubernetes',
+    url: `https://helmforge.dev${currentPath}`,
+  },
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'HelmForge',
+    url: 'https://helmforge.dev',
+    description: `${chartCount}+ production-ready Helm charts for Kubernetes`,
+  },
+} : null;
 ---
 
 <BaseLayout title={title} description={description}>
   <Header />
 
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
+
+  {techArticleJsonLd && <script type="application/ld+json" set:html={JSON.stringify(techArticleJsonLd)} />}
 
   <Container class="py-6 sm:py-8">
     <!-- Mobile sidebar toggle -->

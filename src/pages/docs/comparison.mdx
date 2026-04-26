@@ -1,8 +1,10 @@
 ---
 layout: ../../layouts/DocsLayout.astro
-title: HelmForge vs Other Charts
-description: How HelmForge compares to Bitnami and generic community Helm charts — images, licensing, backup, and more.
+title: HelmForge vs Bitnami — Open-Source Helm Chart Alternative
+description: HelmForge is the MIT-licensed Bitnami alternative for Kubernetes. Official upstream images, built-in S3 backup, pinned tags, and zero vendor lock-in. Full feature comparison with Bitnami and generic community charts.
 ---
+
+import { chartCount, backupCount } from '../../data/charts';
 
 # HelmForge vs Other Charts
 
@@ -290,7 +292,7 @@ This page compares HelmForge against two common alternatives: **Bitnami** (the l
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>{' '}
-              33 charts (growing)
+              {chartCount} charts (growing)
             </span>
           </td>
           <td class="px-5 py-3.5 text-text-muted leading-relaxed !border-0">100+ charts</td>
@@ -341,7 +343,7 @@ Generic community charts have no consistent licensing. Some are MIT, some are un
 
 ## Built-in S3 Backup
 
-Most Helm charts leave backup to the operator. HelmForge takes a different approach: **17+ charts include built-in S3-compatible backup**.
+Most Helm charts leave backup to the operator. HelmForge takes a different approach: **{backupCount}+ charts include built-in S3-compatible backup**.
 
 Each backup-capable chart creates an optional CronJob that:
 
@@ -444,3 +446,75 @@ helm verify <chart-name>-<version>.tgz --keyring pgp-public-key.asc
 - You need a very specific or niche application
 - You want a minimal starting point to customize heavily
 - The specific community chart is well-maintained and fits your needs
+
+---
+
+## Migrating from Bitnami to HelmForge
+
+If you are already using Bitnami charts and want to migrate to HelmForge, the general process is straightforward:
+
+### 1. Backup your data first
+
+Always back up before migrating:
+
+```bash
+# PostgreSQL example
+kubectl exec -it <pod-name> -- pg_dumpall -U postgres > backup.sql
+```
+
+### 2. Note your current values
+
+```bash
+helm get values <your-release-name> > current-values.yaml
+```
+
+### 3. Add the HelmForge repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+```
+
+### 4. Install the HelmForge equivalent
+
+HelmForge charts use product-oriented values instead of Bitnami's Kubernetes-centric keys. Translate your key settings:
+
+```yaml
+# Bitnami PostgreSQL
+auth:
+  postgresPassword: "mypassword"
+  username: "myuser"
+  password: "mypassword"
+  database: "mydb"
+primary:
+  persistence:
+    size: 10Gi
+```
+
+```yaml
+# HelmForge PostgreSQL — same intent, cleaner structure
+auth:
+  postgresPassword: "mypassword"
+  username: "myuser"
+  password: "mypassword"
+  database: "mydb"
+primary:
+  persistence:
+    size: 10Gi
+```
+
+For most database charts, the top-level `auth` and `persistence` keys are compatible or very similar.
+
+### 5. Restore your data
+
+```bash
+kubectl exec -it <new-pod-name> -- psql -U postgres < backup.sql
+```
+
+### 6. Uninstall the Bitnami release
+
+```bash
+helm uninstall <old-bitnami-release-name>
+```
+
+> **Tip:** Use `helm diff` (helm-diff plugin) to compare rendered templates before committing to the migration.

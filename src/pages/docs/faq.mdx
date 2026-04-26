@@ -1,10 +1,99 @@
 ---
 layout: ../../layouts/DocsLayout.astro
-title: FAQ
-description: Frequently asked questions about HelmForge charts — installation, configuration, backup, networking, and compatibility.
+title: Helm Charts FAQ — HelmForge
+description: Answers to common questions about HelmForge Helm charts — OCI registry, S3 backup with MinIO, TLS with cert-manager, ArgoCD and Flux integration, chart signing, and Kubernetes compatibility.
 ---
 
 import Callout from '../../components/Callout.astro';
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I add the HelmForge Helm repository?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run: helm repo add helmforge https://repo.helmforge.dev && helm repo update. You can also install charts directly from the OCI registry without adding a repo: helm install my-release oci://ghcr.io/helmforgedev/helm/redis"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I install charts using OCI instead of the Helm repo?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. All HelmForge charts are published as OCI artifacts on GitHub Container Registry. Install with: helm install my-release oci://ghcr.io/helmforgedev/helm/<chart-name>. All releases include GPG provenance files and Cosign keyless signatures."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I upgrade a chart without downtime?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For most charts, helm upgrade performs a rolling update by default. For database charts with standalone architecture, brief downtime during pod restart is expected. With replication, the upgrade rolls replicas first then the primary. Always back up data before upgrading database charts."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I configure S3 backup with MinIO?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Database charts that support backup accept S3-compatible endpoints. Set backup.enabled: true, backup.schedule, and backup.s3 with endpoint, bucket, accessKey, secretKey, and region. For MinIO use: endpoint: http://minio.minio.svc.cluster.local:9000."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which charts support automated backups?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Charts with built-in S3 backup CronJobs include: PostgreSQL (pg_dump), MySQL (mysqldump), MongoDB (mongodump), MariaDB (mariadb-dump), and many application charts. All backup jobs support AWS S3, MinIO, DigitalOcean Spaces, Cloudflare R2, and other S3-compatible endpoints."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I enable TLS with cert-manager?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Add the annotation cert-manager.io/cluster-issuer to your ingress and configure the tls section with secretName and hosts. HelmForge charts default to traefik as the ingress class but support any IngressClass-compatible controller."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use HelmForge charts with ArgoCD or Flux?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. For ArgoCD, create an Application resource pointing to repoURL: https://repo.helmforge.dev. For Flux, create a HelmRelease with a HelmRepository source. The Stack Builder at helmforge.dev/stack can generate both ArgoCD and Helmfile manifests."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are HelmForge charts signed?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. HelmForge uses dual signing: GPG provenance files for helm verify and Sigstore Cosign keyless signatures on OCI artifacts. Both are generated automatically in the CI/CD pipeline. The public key is available at repo.helmforge.dev/pgp-public-key.asc."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What license are HelmForge charts under?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All HelmForge charts are released under the MIT License. You can use them freely in personal and commercial projects with no usage restrictions, no license audits, and no surprise terms changes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What Kubernetes versions are supported?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "HelmForge charts are tested on Kubernetes 1.28+. Most charts work on 1.26+ but staying on a supported Kubernetes version is recommended."
+      }
+    }
+  ]
+})} />
+
+
 
 # Frequently Asked Questions
 
