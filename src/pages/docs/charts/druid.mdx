@@ -1,24 +1,49 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Apache Druid Chart
-description: HelmForge Druid chart for distributed analytics database with coordinator, broker, historical, and router.
+description: HelmForge Druid chart — high-performance analytics database with 6 independent components (coordinator, overlord, broker, router, historical, middlemanager), S3 or local deep storage, ZooKeeper, PostgreSQL metadata, per-component JVM tuning, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Apache Druid
 
-Deploy [Apache Druid](https://druid.apache.org/) on Kubernetes — a high-performance, real-time analytics database designed for fast slice-and-dice analytics on large datasets, commonly used for BI dashboards and real-time data exploration.
+Deploy [Apache Druid](https://druid.apache.org/) on Kubernetes — a high-performance real-time
+analytics database for fast slice-and-dice analysis on large datasets, commonly used as the backend
+for BI dashboards and real-time data exploration.
+
+<Callout type="danger" title="Local deep storage is development-only — production requires shared S3 deep storage">
+  Druid uses **deep storage** to share segment data between nodes. The default `deepStorage.type: local` stores segments
+  on each historical node's local disk, making them inaccessible to other nodes. **In any multi-node or production
+  deployment, switch to S3-compatible deep storage** so all historical nodes can read segments. Use
+  `deepStorage.s3.existingSecret` to keep credentials out of the values file.
+</Callout>
+
+<Callout type="warning" title="Druid is memory-intensive — all 6 components require at least 4 GiB RAM total">
+  Druid's default JVM settings allocate 256 MB–1 GiB per component. The six components together require a minimum of **4
+  GiB RAM** for a functional deployment. Size the JVM heap per component (`javaOpts`) based on your actual query and
+  ingestion workload before going to production.
+</Callout>
+
+## Component Architecture
+
+| Component     | Port | Role                                          | JVM Default |
+| ------------- | ---- | --------------------------------------------- | ----------- |
+| coordinator   | 8081 | Segment assignment and load balancing.        | `-Xmx512m`  |
+| overlord      | 8090 | Task management (ingestion scheduling).       | `-Xmx512m`  |
+| broker        | 8082 | Query routing to historical + realtime.       | `-Xmx1g`    |
+| router        | 8888 | Web console and API gateway (ingress target). | `-Xmx256m`  |
+| historical    | 8083 | Segment storage and query serving.            | `-Xmx1g`    |
+| middlemanager | 8091 | Task worker (ingestion, compaction).          | `-Xmx256m`  |
 
 ## Key Features
 
-- **6-component architecture** — coordinator, overlord, broker, router, historical, middlemanager
-- **Router web console** — built-in Druid console accessible via ingress
-- **PostgreSQL metadata store** — bundled subchart or external PostgreSQL/MySQL
-- **ZooKeeper coordination** — bundled subchart or external ZooKeeper
-- **Deep storage** — local or S3-compatible (MinIO, AWS S3)
-- **Persistent volumes** — segment cache (historical) and task storage (middlemanager)
-- **Per-component scaling** — independent replica counts and JVM tuning
-- **Health probes** — liveness on /status/health, readiness on /status/selfDiscovered
-- **Ingress support** — configurable class (traefik, nginx, etc.)
+- **6 independent Deployments** — each component scales and tunes independently
+- **Deep storage** — local (dev) or S3/MinIO (production)
+- **Two persistent volumes** — historical (segment cache) and middlemanager (task storage)
+- **ZooKeeper** — bundled subchart or external connection string
+- **PostgreSQL metadata** — bundled subchart or external PostgreSQL/MySQL
 
 ## Installation
 
@@ -36,22 +61,40 @@ helm install druid helmforge/druid -f values.yaml
 helm install druid oci://ghcr.io/helmforgedev/helm/druid -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'dev', label: 'Development (Local Storage)' },
+    { id: 'production', label: 'Production (S3 Storage)' },
+    { id: 'external', label: 'External PostgreSQL+ZK' },
+    { id: 'scaled', label: 'Scaled Production' },
+  ]}
+>
+
+<div data-tab-panel="dev">
 
 ```yaml
-coordinator:
-  enabled: true
-
-broker:
-  enabled: true
-
-router:
-  enabled: true
+# values.yaml — Druid development mode (local deep storage, not for production)
+# All segments stored locally on historical node disk
+# NOT suitable for multi-node or production use
 
 historical:
-  enabled: true
+  persistence:
+    size: 50Gi
+
+middleManager:
   persistence:
     size: 20Gi
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'db-password'
+
+zookeeper:
+  enabled: true
+  replicaCount: 1
 
 ingress:
   enabled: true
@@ -63,72 +106,220 @@ ingress:
           pathType: Prefix
 ```
 
-## S3 Deep Storage
+</div>
+
+<div data-tab-panel="production">
 
 ```yaml
+# values.yaml — Druid production mode with S3 deep storage (required for HA)
 deepStorage:
   type: s3
   s3:
-    bucket: my-druid-bucket
+    bucket: druid-deep-storage
     baseKey: druid/segments
     region: us-east-1
-    accessKey: 'AKIAIOSFODNN7EXAMPLE'
-    secretKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+    endpointUrl: '' # set for MinIO: https://minio.example.com
+    existingSecret: druid-s3-credentials
+    existingSecretAccessKeyKey: access-key
+    existingSecretSecretKeyKey: secret-key
+
+coordinator:
+  javaOpts: '-Xms512m -Xmx1g'
+
+overlord:
+  javaOpts: '-Xms512m -Xmx1g'
+
+broker:
+  javaOpts: '-Xms1g -Xmx2g'
+
+historical:
+  javaOpts: '-Xms1g -Xmx2g'
+  persistence:
+    size: 100Gi # local segment cache only; segments also stored in S3
+
+middleManager:
+  workerCapacity: 4
+  persistence:
+    size: 50Gi
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+zookeeper:
+  enabled: true
+  replicaCount: 3
+  persistence:
+    size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: druid.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: druid-tls
+      hosts:
+        - druid.example.com
 ```
 
-## External Services
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
-metadata:
-  mode: external
-  external:
-    type: postgresql
-    host: postgres.example.internal
-    port: 5432
-    name: druid
-    username: druid
-    existingSecret: druid-db
-
-zookeeperConfig:
-  mode: external
-  external:
-    hosts: 'zk1.example.internal:2181,zk2.example.internal:2181'
-
+# values.yaml — Druid with external PostgreSQL and ZooKeeper
 postgresql:
   enabled: false
 
 zookeeper:
   enabled: false
+
+metadata:
+  mode: external
+  external:
+    type: postgresql
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    name: druid
+    username: druid
+    existingSecret: druid-db-credentials
+    existingSecretPasswordKey: password
+
+zookeeperConfig:
+  mode: external
+  external:
+    hosts: 'zk-0.zookeeper:2181,zk-1.zookeeper:2181,zk-2.zookeeper:2181'
+
+deepStorage:
+  type: s3
+  s3:
+    bucket: druid-segments
+    existingSecret: druid-s3-credentials
 ```
 
-## Key Values
+</div>
 
-| Key                            | Default             | Description                          |
-| ------------------------------ | ------------------- | ------------------------------------ |
-| `image.repository`             | `apache/druid`      | Druid container image                |
-| `coordinator.enabled`          | `true`              | Enable coordinator                   |
-| `coordinator.javaOpts`         | `-Xms256m -Xmx512m` | Coordinator JVM options              |
-| `overlord.enabled`             | `true`              | Enable overlord                      |
-| `broker.enabled`               | `true`              | Enable broker                        |
-| `broker.javaOpts`              | `-Xms512m -Xmx1g`   | Broker JVM options                   |
-| `router.enabled`               | `true`              | Enable router (web console)          |
-| `historical.enabled`           | `true`              | Enable historical node               |
-| `historical.persistence.size`  | `10Gi`              | Segment cache volume size            |
-| `middleManager.enabled`        | `true`              | Enable middle manager                |
-| `middleManager.workerCapacity` | `2`                 | Tasks per middle manager             |
-| `metadata.mode`                | `subchart`          | Metadata mode: subchart or external  |
-| `zookeeperConfig.mode`         | `subchart`          | ZooKeeper mode: subchart or external |
-| `deepStorage.type`             | `local`             | Deep storage: local or s3            |
-| `ingress.enabled`              | `false`             | Enable ingress                       |
+<div data-tab-panel="scaled">
 
-## Operational Notes
+```yaml
+# values.yaml — Druid horizontally scaled (multiple brokers and historical nodes)
+deepStorage:
+  type: s3
+  s3:
+    bucket: druid-segments
+    existingSecret: druid-s3-credentials
 
-- Druid is memory-intensive — all 6 components together require 2GB+ RAM minimum
-- tune JVM heap per component via `javaOpts` for production sizing
-- the router component serves the web console and is the default ingress target
-- use S3 deep storage for production; local deep storage is only suitable for development
-- historical nodes cache segments on disk — size the PVC based on data volume
+# Scale query layer
+broker:
+  replicaCount: 3
+  javaOpts: '-Xms2g -Xmx4g'
+
+# Scale storage layer (shared S3 enables multiple historical nodes)
+historical:
+  replicaCount: 3
+  javaOpts: '-Xms2g -Xmx4g'
+  persistence:
+    size: 200Gi
+
+# Scale ingestion layer
+middleManager:
+  replicaCount: 2
+  workerCapacity: 8
+  persistence:
+    size: 100Gi
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+zookeeper:
+  enabled: true
+  replicaCount: 3
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Type   | Default                  | Description  |
+| ------------------ | ------ | ------------------------ | ------------ |
+| `image.repository` | string | `docker.io/apache/druid` | Druid image. |
+| `image.tag`        | string | `"36.0.0"`               | Image tag.   |
+
+### Components
+
+All 6 components share this structure:
+
+| Parameter                     | Type    | Default           | Description                                   |
+| ----------------------------- | ------- | ----------------- | --------------------------------------------- |
+| `<component>.enabled`         | boolean | `true`            | Deploy this component.                        |
+| `<component>.replicaCount`    | integer | `1`               | Pod replicas.                                 |
+| `<component>.javaOpts`        | string  | (see table above) | JVM flags. Tune `-Xms`/`-Xmx` for production. |
+| `<component>.extraProperties` | string  | `""`              | Extra `runtime.properties` lines.             |
+| `<component>.resources`       | object  | `{}`              | CPU and memory requests/limits.               |
+
+Historical and middlemanager also have:
+
+| Parameter                        | Type    | Default | Description                             |
+| -------------------------------- | ------- | ------- | --------------------------------------- |
+| `historical.persistence.size`    | string  | `10Gi`  | Segment cache PVC size.                 |
+| `middleManager.persistence.size` | string  | `10Gi`  | Task storage PVC size.                  |
+| `middleManager.workerCapacity`   | integer | `2`     | Concurrent tasks per middlemanager pod. |
+
+### Deep Storage
+
+| Parameter                                   | Type   | Default          | Description                              |
+| ------------------------------------------- | ------ | ---------------- | ---------------------------------------- |
+| `deepStorage.type`                          | string | `local`          | `local` (dev only) or `s3` (production). |
+| `deepStorage.s3.bucket`                     | string | `""`             | S3 bucket name.                          |
+| `deepStorage.s3.baseKey`                    | string | `druid/segments` | S3 key prefix for segments.              |
+| `deepStorage.s3.region`                     | string | `us-east-1`      | AWS region.                              |
+| `deepStorage.s3.endpointUrl`                | string | `""`             | Custom S3 endpoint (MinIO, Ceph, etc.).  |
+| `deepStorage.s3.existingSecret`             | string | `""`             | Existing secret with S3 credentials.     |
+| `deepStorage.s3.existingSecretAccessKeyKey` | string | `access-key`     | Key for S3 access key.                   |
+| `deepStorage.s3.existingSecretSecretKeyKey` | string | `secret-key`     | Key for S3 secret key.                   |
+
+### Metadata and ZooKeeper
+
+| Parameter                          | Type    | Default    | Description                                         |
+| ---------------------------------- | ------- | ---------- | --------------------------------------------------- |
+| `metadata.mode`                    | string  | `subchart` | Mode: `subchart` or `external`.                     |
+| `metadata.external.host`           | string  | `""`       | External PostgreSQL hostname.                       |
+| `metadata.external.existingSecret` | string  | `""`       | Existing secret with database password.             |
+| `postgresql.enabled`               | boolean | `true`     | Deploy the bundled PostgreSQL subchart.             |
+| `postgresql.auth.password`         | string  | `""`       | Password. Auto-generated if empty.                  |
+| `zookeeperConfig.mode`             | string  | `subchart` | Mode: `subchart` or `external`.                     |
+| `zookeeperConfig.external.hosts`   | string  | `""`       | External ZooKeeper hosts (`host1:port,host2:port`). |
+| `zookeeper.enabled`                | boolean | `true`     | Deploy the bundled ZooKeeper subchart.              |
+| `zookeeper.replicaCount`           | integer | `1`        | ZooKeeper replicas (3 for production HA).           |
+| `zookeeper.persistence.size`       | string  | `2Gi`      | ZooKeeper data PVC size.                            |
+
+### Service and Ingress
+
+| Parameter                     | Type    | Default     | Description                                         |
+| ----------------------------- | ------- | ----------- | --------------------------------------------------- |
+| `service.type`                | string  | `ClusterIP` | Service type (routes to router/web console).        |
+| `service.port`                | integer | `80`        | Service port.                                       |
+| `ingress.enabled`             | boolean | `false`     | Enable Ingress (routes to router on port 8888).     |
+| `ingress.ingressClassName`    | string  | `traefik`   | Ingress class name.                                 |
+| `druid.extraCommonProperties` | string  | `""`        | Extra runtime properties applied to all components. |
+| `druid.extraEnv`              | array   | `[]`        | Extra environment variables for all components.     |
+| `extraManifests`              | array   | `[]`        | Extra Kubernetes manifests.                         |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/druid) on GitHub.
+- [Apache Druid Official Documentation](https://druid.apache.org/docs/latest/)
+- [Apache Druid GitHub Repository](https://github.com/apache/druid)
+- [HelmForge Druid Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/druid)
