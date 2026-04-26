@@ -1,24 +1,38 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: CKAN Chart
-description: HelmForge CKAN chart for open data portal with DataPusher, Solr, PostgreSQL, and Redis.
+description: HelmForge CKAN chart — open data portal with uWSGI web, DataPusher sidecar, CKAN-specific Solr StatefulSet, dual PostgreSQL databases (ckan+datastore), Redis, 3 required secrets, S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # CKAN
 
-Deploy [CKAN](https://ckan.org/) on Kubernetes — the world's leading open-source data management system for powering data hubs and data portals with full catalog and API capabilities.
+Deploy [CKAN](https://ckan.org/) on Kubernetes — the world's leading open-source data management
+system for publishing, sharing, and discovering datasets. Powers government open-data portals and
+data hubs worldwide.
+
+<Callout type="warning" title="ckan.siteUrl is required — incorrect value breaks all dataset links and API responses">
+  CKAN uses `ckan.siteUrl` to generate absolute URLs for datasets, resources, and API responses. Setting it to the wrong
+  value (such as the default `http://localhost:5000`) causes all links to be incorrect and OAuth callbacks to fail.
+  Always set it to the full public URL before deployment.
+</Callout>
+
+<Callout type="info" title="CKAN requires two PostgreSQL databases: ckan (main) and datastore (DataStore API)">
+  The DataStore extension (used by DataPusher for CSV/Excel ingestion) requires a separate `datastore` database with a
+  dedicated read-only user (`datastore_ro`). When using the bundled PostgreSQL subchart, both databases are created
+  automatically. For external PostgreSQL, create both databases and the read-only user manually before deploying.
+</Callout>
 
 ## Key Features
 
-- **CKAN application** — uWSGI-based Python application on port 5000
-- **DataPusher** — optional automatic resource loading for CSV, Excel to DataStore
-- **Built-in Solr** — StatefulSet with CKAN-specific schema configuration
-- **PostgreSQL metadata store** — bundled subchart or external connection
-- **Redis task queue** — bundled subchart or external connection
-- **Auto-generated secrets** — sysadmin password, session secret, JWT secret
-- **Persistent storage** — uploaded datasets at /var/lib/ckan
-- **Plugin system** — configurable CKAN plugins list
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **uWSGI application** — CKAN web app on port 5000 behind a ClusterIP service
+- **DataPusher** — automatic CSV/Excel resource loading into the DataStore API
+- **CKAN-specific Solr** — `ckan/ckan-solr` StatefulSet with bundled search schema
+- **Dual PostgreSQL databases** — `ckan` (metadata) + `datastore` (DataStore API)
+- **Three secrets** — sysadmin password, Beaker session secret, JWT secret
+- **pg_dump backup** — daily PostgreSQL S3 backup CronJob
 
 ## Installation
 
@@ -36,13 +50,115 @@ helm install ckan helmforge/ckan -f values.yaml
 helm install ckan oci://ghcr.io/helmforgedev/helm/ckan -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (Bundled Services)' },
+    { id: 'external', label: 'External PostgreSQL+Redis' },
+    { id: 'plugins', label: 'Custom Plugins' },
+    { id: 'backup', label: 'With Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — CKAN with bundled PostgreSQL, Redis, Solr, and DataPusher
 ckan:
-  siteUrl: https://data.example.com
+  siteUrl: 'https://data.example.com' # required; wrong value breaks all links
+  siteTitle: 'My Open Data Portal'
   sysadminName: admin
-  sysadminPassword: 'my-secure-password'
+  sysadminEmail: admin@example.com
+  existingSecret: ckan-secrets
+  existingSecretPasswordKey: sysadmin-password
+  existingSecretSessionKey: session-secret
+  existingSecretJwtKey: jwt-secret
+
+postgresql:
+  enabled: true
+  auth:
+    database: ckan
+    username: ckan
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+solr:
+  enabled: true
+  persistence:
+    size: 10Gi
+
+datapusher:
+  enabled: true # auto-imports CSV/Excel files into DataStore API
+
+persistence:
+  enabled: true
+  size: 50Gi # uploaded datasets and resources
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: data.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: ckan-tls
+      hosts:
+        - data.example.com
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+# values.yaml — CKAN with external PostgreSQL (both ckan + datastore DBs) and Redis
+# Both databases must be created in PostgreSQL before deploying:
+#   CREATE DATABASE ckan;
+#   CREATE DATABASE datastore;
+#   CREATE USER ckan WITH PASSWORD '...';
+#   CREATE USER datastore_ro WITH PASSWORD '...';
+#   GRANT ALL ON DATABASE ckan TO ckan;
+#   GRANT CONNECT ON DATABASE datastore TO ckan;
+#   GRANT CONNECT ON DATABASE datastore TO datastore_ro;
+
+ckan:
+  siteUrl: 'https://data.example.com'
+  existingSecret: ckan-secrets
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    ckanDatabase: ckan
+    datastoreDatabase: datastore
+    username: ckan
+    datastoreReadUsername: datastore_ro
+    existingSecret: ckan-db-credentials
+    existingSecretPasswordKey: password
+
+redisConfig:
+  mode: external
+  external:
+    url: 'redis://:strong-redis-password@redis.cache.svc.cluster.local:6379/0'
+
+solr:
+  enabled: true # always use the bundled CKAN-specific Solr image
 
 ingress:
   enabled: true
@@ -54,57 +170,177 @@ ingress:
           pathType: Prefix
 ```
 
-## External Services
+</div>
+
+<div data-tab-panel="plugins">
 
 ```yaml
-database:
-  mode: external
-  external:
-    type: postgresql
-    host: postgres.example.internal
-    port: 5432
-    name: ckan
-    username: ckan
-    existingSecret: ckan-db
-
-redisConfig:
-  mode: external
-  external:
-    host: redis.example.internal
-    port: 6379
+# values.yaml — CKAN with additional plugins
+ckan:
+  siteUrl: 'https://data.example.com'
+  existingSecret: ckan-secrets
+  # Default plugins (keep all for full functionality):
+  # envvars image_view text_view datatables_view
+  plugins: 'envvars image_view text_view datatables_view datastore resource_proxy geo_view'
+  extraEnv:
+    - name: CKAN__DATAPUSHER__URL
+      value: 'http://ckan-datapusher:8800'
+    - name: CKAN__DATAPUSHER__CALLBACK_URL_BASE
+      value: 'http://ckan-ckan:5000'
 
 postgresql:
-  enabled: false
+  enabled: true
+  auth:
+    password: 'strong-db-password'
 
 redis:
-  enabled: false
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
 ```
 
-## Key Values
+</div>
 
-| Key                     | Default                                        | Description                         |
-| ----------------------- | ---------------------------------------------- | ----------------------------------- |
-| `image.repository`      | `ckan/ckan-base`                               | CKAN container image                |
-| `ckan.siteUrl`          | `http://localhost:5000`                        | Public site URL                     |
-| `ckan.sysadminName`     | `admin`                                        | Sysadmin username                   |
-| `ckan.sysadminPassword` | `""`                                           | Auto-generated if empty             |
-| `ckan.plugins`          | `envvars image_view text_view datatables_view` | Active plugins                      |
-| `ckan.replicaCount`     | `1`                                            | CKAN replicas                       |
-| `datapusher.enabled`    | `true`                                         | Enable DataPusher                   |
-| `solr.enabled`          | `true`                                         | Enable built-in Solr                |
-| `solr.persistence.size` | `5Gi`                                          | Solr data volume size               |
-| `database.mode`         | `subchart`                                     | Database mode: subchart or external |
-| `persistence.enabled`   | `true`                                         | Enable CKAN storage                 |
-| `persistence.size`      | `10Gi`                                         | CKAN storage volume size            |
-| `ingress.enabled`       | `false`                                        | Enable ingress                      |
+<div data-tab-panel="backup">
 
-## Operational Notes
+```yaml
+# values.yaml — CKAN with daily pg_dump backup
+# Note: backup covers the ckan database only; uploaded files in /var/lib/ckan (PVC)
+# are NOT included. Back up the PVC separately using Velero or storage snapshots.
+ckan:
+  siteUrl: 'https://data.example.com'
+  existingSecret: ckan-secrets
 
-- Solr is deployed as a StatefulSet with CKAN-specific schema — do not share with other applications
-- DataPusher is optional but recommended for automatic resource indexing
-- health probes target /api/action/status_show
-- set `ckan.siteUrl` to the actual public URL for correct link generation
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: ckan-backups
+    existingSecret: ckan-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: data.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Type   | Default                    | Description |
+| ------------------ | ------ | -------------------------- | ----------- |
+| `image.repository` | string | `docker.io/ckan/ckan-base` | CKAN image. |
+| `image.tag`        | string | `"2.11.4"`                 | Image tag.  |
+
+### CKAN Application
+
+| Parameter                        | Type    | Default                            | Description                                                |
+| -------------------------------- | ------- | ---------------------------------- | ---------------------------------------------------------- |
+| `ckan.siteUrl`                   | string  | `http://localhost:5000`            | **Required.** Full public URL (breaks all links if wrong). |
+| `ckan.siteTitle`                 | string  | `CKAN`                             | Portal display name.                                       |
+| `ckan.sysadminName`              | string  | `admin`                            | Sysadmin username.                                         |
+| `ckan.sysadminEmail`             | string  | `admin@ckan.local`                 | Sysadmin email.                                            |
+| `ckan.sysadminPassword`          | string  | `""`                               | Sysadmin password. Auto-generated if empty.                |
+| `ckan.existingSecret`            | string  | `""`                               | Existing secret with all three secrets.                    |
+| `ckan.existingSecretPasswordKey` | string  | `sysadmin-password`                | Key for sysadmin password.                                 |
+| `ckan.existingSecretSessionKey`  | string  | `session-secret`                   | Key for Beaker session secret.                             |
+| `ckan.existingSecretJwtKey`      | string  | `jwt-secret`                       | Key for JWT secret.                                        |
+| `ckan.plugins`                   | string  | `envvars image_view text_view ...` | Space-separated list of active CKAN plugins.               |
+| `ckan.replicaCount`              | integer | `1`                                | CKAN web pod replicas.                                     |
+| `ckan.extraEnv`                  | array   | `[]`                               | Extra environment variables.                               |
+
+### DataPusher
+
+| Parameter                 | Type    | Default | Description                                            |
+| ------------------------- | ------- | ------- | ------------------------------------------------------ |
+| `datapusher.enabled`      | boolean | `true`  | Deploy the DataPusher service (CSV/Excel → DataStore). |
+| `datapusher.replicaCount` | integer | `1`     | DataPusher pod replicas.                               |
+| `datapusher.port`         | integer | `8800`  | DataPusher service port.                               |
+
+### Solr
+
+<Callout type="warning" title="Do not share Solr with other applications — CKAN uses a custom schema">
+  The bundled Solr uses the `ckan/ckan-solr` image with a CKAN-specific schema. Connecting another application to this
+  Solr instance may overwrite the schema and break CKAN's search indexing.
+</Callout>
+
+| Parameter               | Type    | Default | Description                                        |
+| ----------------------- | ------- | ------- | -------------------------------------------------- |
+| `solr.enabled`          | boolean | `true`  | Deploy the bundled CKAN-specific Solr StatefulSet. |
+| `solr.persistence.size` | string  | `5Gi`   | Solr PVC size.                                     |
+| `solr.externalUrl`      | string  | `""`    | External Solr URL (when `solr.enabled: false`).    |
+
+### Database
+
+| Parameter                                 | Type    | Default        | Description                              |
+| ----------------------------------------- | ------- | -------------- | ---------------------------------------- |
+| `database.mode`                           | string  | `subchart`     | Mode: `subchart` or `external`.          |
+| `database.external.host`                  | string  | `""`           | External PostgreSQL hostname.            |
+| `database.external.ckanDatabase`          | string  | `ckan`         | CKAN main database name.                 |
+| `database.external.datastoreDatabase`     | string  | `datastore`    | DataStore extension database name.       |
+| `database.external.datastoreReadUsername` | string  | `datastore_ro` | Read-only user for the DataStore API.    |
+| `database.external.existingSecret`        | string  | `""`           | Existing secret with database passwords. |
+| `postgresql.enabled`                      | boolean | `true`         | Deploy the bundled PostgreSQL subchart.  |
+| `postgresql.auth.password`                | string  | `""`           | Password. Auto-generated if empty.       |
+
+### Redis
+
+| Parameter                  | Type    | Default    | Description                                      |
+| -------------------------- | ------- | ---------- | ------------------------------------------------ |
+| `redisConfig.mode`         | string  | `subchart` | Mode: `subchart` or `external`.                  |
+| `redisConfig.external.url` | string  | `""`       | Full Redis URL: `redis://:password@host:6379/0`. |
+| `redis.enabled`            | boolean | `true`     | Deploy the bundled Redis subchart.               |
+| `redis.auth.password`      | string  | `""`       | Password. Auto-generated if empty.               |
+
+### Persistence and Service
+
+| Parameter                  | Type    | Default   | Description                                          |
+| -------------------------- | ------- | --------- | ---------------------------------------------------- |
+| `persistence.enabled`      | boolean | `true`    | Enable PVC for `/var/lib/ckan` (uploaded resources). |
+| `persistence.size`         | string  | `10Gi`    | PVC size.                                            |
+| `service.port`             | integer | `80`      | Service port.                                        |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                          |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                                  |
+
+### Backup
+
+<Callout type="warning" title="Backup covers the ckan database only — uploaded files in /var/lib/ckan are not included">
+  The S3 backup CronJob runs `pg_dump` on the CKAN PostgreSQL database. Dataset files and resource uploads stored in the
+  `/var/lib/ckan` PVC are **not included** in the backup. Use Velero, NFS snapshots, or storage provider snapshots to
+  protect the PVC data.
+</Callout>
+
+| Parameter                  | Type    | Default       | Description                           |
+| -------------------------- | ------- | ------------- | ------------------------------------- |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled `pg_dump` S3 backup. |
+| `backup.schedule`          | string  | `"0 3 * * *"` | Cron schedule.                        |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
+| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/ckan) on GitHub.
+- [CKAN Official Documentation](https://docs.ckan.org/)
+- [CKAN GitHub Repository](https://github.com/ckan/ckan)
+- [HelmForge CKAN Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/ckan)
