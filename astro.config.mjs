@@ -26,7 +26,6 @@ export default defineConfig({
   integrations: [
     mdx(),
     sitemap({
-      filter: (page) => !page.includes('/playground'),
       serialize(item) {
         const url = item.url;
 
