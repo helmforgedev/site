@@ -1,23 +1,36 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: AdGuard Home Chart
-description: HelmForge AdGuard Home chart — DNS ad/tracker blocker with sync, S3 backup, and two deployment modes.
+description: HelmForge AdGuard Home chart — network-wide DNS ad/tracker blocker with wizard or pre-configured modes, dual PVC (conf+work), LoadBalancer DNS service, adguardhome-sync for multi-instance, full-volume S3 backup, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # AdGuard Home
 
-Deploy [AdGuard Home](https://adguard.com/adguard-home/overview.html) on Kubernetes using the official [adguard/adguardhome](https://hub.docker.com/r/adguard/adguardhome) Docker image. Network-wide DNS-level ad and tracker blocking for all devices.
+Deploy [AdGuard Home](https://adguard.com/adguard-home/overview.html) on Kubernetes — a network-wide
+DNS-level ad and tracker blocker. Supports DNS over HTTPS, DNS over TLS, custom rewrite rules,
+client-level settings, and optional multi-instance synchronization.
+
+<Callout type="info" title="Two deployment modes: wizard (default) vs pre-configured — each uses a different web UI port">
+  - **Wizard mode** (`config.adGuardHome: {}`): AdGuard Home starts on **port 3000** for the
+    initial setup wizard. After completing setup, the UI moves to port 80.
+  - **Pre-configured mode** (`config.adGuardHome` populated): Setup wizard is skipped entirely.
+    The UI starts directly on **port 80**, ready for production use.
+
+Choose pre-configured mode for GitOps or reproducible deployments. Wizard mode is suitable
+for first-time manual setup.
+
+</Callout>
 
 ## Key Features
 
-- **Network-wide ad blocking** — DNS-level filtering for all devices
-- **Two deployment modes** — wizard (port 3000) or pre-configured (port 80)
-- **DNS over HTTPS / TLS** — encrypted upstream DNS resolvers
-- **AdGuardHome Sync** — multi-instance synchronization via adguardhome-sync
-- **S3 backup** — automated CronJob-based backup to any S3-compatible storage
-- **Separate DNS service** — dedicated LoadBalancer for DNS traffic
-- **Ingress support** — TLS with cert-manager for the web UI
-- **Config seeding** — initial configuration preserved across upgrades
+- **Two deployment modes** — interactive wizard or full pre-configured via values
+- **Dual PVC** — separate `conf` (config + TLS certs) and `work` (query log + stats + filters) volumes
+- **Dedicated DNS service** — separate LoadBalancer for UDP/TCP port 53
+- **adguardhome-sync** — multi-instance config synchronization (primary → replicas)
+- **Full-volume backup** — `tar` archives both PVCs to S3 (no database involved)
 
 ## Installation
 
@@ -26,58 +39,174 @@ Deploy [AdGuard Home](https://adguard.com/adguard-home/overview.html) on Kuberne
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install adguard-home helmforge/adguard-home
+helm install adguard-home helmforge/adguard-home -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home
+helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home -f values.yaml
 ```
 
-## Wizard Mode (Default)
+## Deployment Examples
 
-By default, AdGuard Home starts in wizard mode on port 3000. Complete the setup via the web UI:
+<DocsTabs
+  tabs={[
+    { id: 'wizard', label: 'Wizard Mode' },
+    { id: 'preconfigured', label: 'Pre-Configured' },
+    { id: 'sync', label: 'Multi-Instance Sync' },
+    { id: 'backup', label: 'With Backup' },
+  ]}
+>
+
+<div data-tab-panel="wizard">
+
+```yaml
+# values.yaml — AdGuard Home in wizard mode (default)
+# Web UI starts on port 3000 for first-time setup
+# After wizard completion, UI moves to port 80
+
+service:
+  dns:
+    type: LoadBalancer
+    loadBalancerIP: '192.168.1.53' # static IP for DNS (optional, MetalLB/cloud LB)
+
+persistence:
+  conf:
+    enabled: true
+    size: 256Mi
+  work:
+    enabled: true
+    size: 5Gi # query log + filter lists + statistics
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: adguard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
 
 ```bash
-helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home \
-  --set service.dns.type=LoadBalancer \
-  --set service.dns.loadBalancerIP=192.168.1.53
-
-kubectl port-forward svc/adguard-home-adguard-home-web 3000:80
+# Access wizard for first-time setup:
+kubectl port-forward svc/<release>-adguard-home-web 3000:80
 # Visit http://localhost:3000
 ```
 
-## Pre-Configured Mode
+</div>
 
-Skip the wizard by providing `config.adGuardHome`:
+<div data-tab-panel="preconfigured">
 
 ```yaml
+# values.yaml — AdGuard Home pre-configured (wizard skipped, UI on port 80)
 config:
   adGuardHome:
     http:
       address: 0.0.0.0:80
+      session_ttl: 720h
     users:
       - name: admin
-        # bcrypt hash — generate with: htpasswd -bnBC 10 "" 'PASSWORD' | cut -d: -f2
+        # Generate: htpasswd -bnBC 10 "" 'mypassword' | cut -d: -f2
         password: '$2y$10$...'
     dns:
       bind_hosts:
         - 0.0.0.0
       port: 53
       upstream_dns:
-        - https://dns.cloudflare.com/dns-query
-        - https://dns.google/dns-query
+        - 'https://dns.cloudflare.com/dns-query'
+        - 'https://dns.google/dns-query'
       bootstrap_dns:
         - 1.1.1.1
+        - 8.8.8.8
       protection_enabled: true
       filtering_enabled: true
+      cache_size: 4194304
     filters:
       - enabled: true
-        url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+        url: 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt'
         name: AdGuard DNS filter
         id: 1
+      - enabled: true
+        url: 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt'
+        name: AdAway Default Blocklist
+        id: 2
+    querylog:
+      enabled: true
+      interval: 720h
+    statistics:
+      enabled: true
+      interval: 168h
     schema_version: 29
+
+service:
+  dns:
+    type: LoadBalancer
+    loadBalancerIP: '192.168.1.53'
+
+persistence:
+  conf:
+    enabled: true
+    size: 256Mi
+  work:
+    enabled: true
+    size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: adguard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: adguard-home-tls
+      hosts:
+        - adguard.example.com
+```
+
+</div>
+
+<div data-tab-panel="sync">
+
+```yaml
+# values.yaml — Primary instance with adguardhome-sync to replica
+# Deploy a second instance as the replica (separate helm release)
+config:
+  adGuardHome:
+    http:
+      address: 0.0.0.0:80
+    users:
+      - name: admin
+        password: '$2y$10$...'
+    schema_version: 29
+
+sync:
+  enabled: true
+  origin:
+    url: 'http://adguard-home.adguard.svc.cluster.local:80'
+    username: admin
+    password: 'admin-password' # use existingSecret in production
+  replicas:
+    - url: 'http://adguard-home-replica.adguard.svc.cluster.local:80'
+      username: admin
+      password: 'admin-password'
+  cron: '*/10 * * * *' # sync every 10 minutes; empty = continuous daemon
+  runOnStart: true
+  features:
+    dns:
+      serverConfig: true
+      accessLists: true
+      rewrites: true
+    general:
+      settings: true
+      protection: true
+      clients: true
+      filters: true
 
 service:
   dns:
@@ -85,42 +214,150 @@ service:
     loadBalancerIP: '192.168.1.53'
 ```
 
-## Multi-Instance Sync
+</div>
 
-Synchronize configuration from an origin to replicas using adguardhome-sync:
+<div data-tab-panel="backup">
 
 ```yaml
-sync:
+# values.yaml — AdGuard Home with daily S3 backup
+# Backup archives both conf and work PVCs (tar — no database)
+config:
+  adGuardHome:
+    http:
+      address: 0.0.0.0:80
+    users:
+      - name: admin
+        password: '$2y$10$...'
+    schema_version: 29
+
+service:
+  dns:
+    type: LoadBalancer
+    loadBalancerIP: '192.168.1.53'
+
+persistence:
+  conf:
+    enabled: true
+    size: 256Mi
+  work:
+    enabled: true
+    size: 5Gi
+
+backup:
   enabled: true
-  origin:
-    url: 'http://adguard-primary:80'
-    username: admin
-    password: changeme
-  replicas:
-    - url: 'http://adguard-replica:80'
-      username: admin
-      password: changeme
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: adguard-backups
+    prefix: adguard-home
+    existingSecret: adguard-s3-credentials # keys: access-key, secret-key
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: adguard.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                          | Default        | Description                           |
-| ---------------------------- | -------------- | ------------------------------------- |
-| `config.adGuardHome`         | `{}`           | Pre-seed config (empty = wizard mode) |
-| `config.existingSecret`      | `""`           | Existing Secret with AdGuardHome.yaml |
-| `persistence.conf.enabled`   | `true`         | Enable conf volume                    |
-| `persistence.conf.size`      | `256Mi`        | Conf PVC size                         |
-| `persistence.work.enabled`   | `true`         | Enable work volume                    |
-| `persistence.work.size`      | `2Gi`          | Work PVC size                         |
-| `service.web.type`           | `ClusterIP`    | Web UI service type                   |
-| `service.dns.type`           | `LoadBalancer` | DNS service type                      |
-| `service.dns.loadBalancerIP` | `""`           | Fixed DNS IP                          |
-| `ingress.enabled`            | `false`        | Enable ingress                        |
-| `sync.enabled`               | `false`        | Enable adguardhome-sync               |
-| `sync.cron`                  | `*/10 * * * *` | Sync schedule                         |
-| `backup.enabled`             | `false`        | Enable S3 backup CronJob              |
-| `backup.schedule`            | `0 2 * * *`    | Backup schedule                       |
+</DocsTabs>
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Type   | Default                         | Description         |
+| ------------------ | ------ | ------------------------------- | ------------------- |
+| `image.repository` | string | `docker.io/adguard/adguardhome` | AdGuard Home image. |
+| `image.tag`        | string | `"v0.107.73"`                   | Image tag.          |
+
+### Configuration
+
+| Parameter               | Type   | Default | Description                                                                |
+| ----------------------- | ------ | ------- | -------------------------------------------------------------------------- |
+| `config.adGuardHome`    | object | `{}`    | Pre-seed config rendered as `AdGuardHome.yaml`. Empty = wizard mode.       |
+| `config.existingSecret` | string | `""`    | Existing secret with `AdGuardHome.yaml` content (key: `AdGuardHome.yaml`). |
+
+<Callout type="tip" title="Generate bcrypt password hashes for config.adGuardHome.users">
+  AdGuard Home requires bcrypt-hashed passwords in the configuration file. Generate with:
+
+```bash
+htpasswd -bnBC 10 "" 'mypassword' | cut -d: -f2
+```
+
+Use the output (starting with `$2y$10$...`) as the `password` value.
+
+</Callout>
+
+### Persistence — Dual PVC
+
+| Parameter                        | Type    | Default | Description                                                                |
+| -------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `persistence.conf.enabled`       | boolean | `true`  | Enable PVC for `/opt/adguardhome/conf` (config + TLS certs).               |
+| `persistence.conf.size`          | string  | `256Mi` | Conf PVC size.                                                             |
+| `persistence.conf.storageClass`  | string  | `""`    | StorageClass for conf PVC.                                                 |
+| `persistence.conf.existingClaim` | string  | `""`    | Use an existing PVC for conf.                                              |
+| `persistence.work.enabled`       | boolean | `true`  | Enable PVC for `/opt/adguardhome/work` (query log + stats + filter lists). |
+| `persistence.work.size`          | string  | `2Gi`   | Work PVC size. Increase for longer query log retention.                    |
+| `persistence.work.storageClass`  | string  | `""`    | StorageClass for work PVC.                                                 |
+| `persistence.work.existingClaim` | string  | `""`    | Use an existing PVC for work.                                              |
+
+### Services
+
+| Parameter                    | Type    | Default        | Description                                                      |
+| ---------------------------- | ------- | -------------- | ---------------------------------------------------------------- |
+| `service.web.type`           | string  | `ClusterIP`    | Web UI service type.                                             |
+| `service.web.port`           | integer | `80`           | Web UI port.                                                     |
+| `service.dns.type`           | string  | `LoadBalancer` | DNS service type. Use `NodePort` for bare-metal without MetalLB. |
+| `service.dns.port`           | integer | `53`           | DNS service port (UDP + TCP).                                    |
+| `service.dns.loadBalancerIP` | string  | `""`           | Static IP for the DNS LoadBalancer.                              |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                    |
+| -------------------------- | ------- | --------- | ------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable Ingress for the web UI. |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.            |
+| `ingress.hosts`            | array   | `[]`      | Host and path rules.           |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.             |
+
+### Sync (adguardhome-sync)
+
+| Parameter                        | Type    | Default        | Description                                                |
+| -------------------------------- | ------- | -------------- | ---------------------------------------------------------- |
+| `sync.enabled`                   | boolean | `false`        | Deploy the adguardhome-sync sidecar.                       |
+| `sync.origin.url`                | string  | `""`           | URL of the origin AdGuard Home instance.                   |
+| `sync.origin.username`           | string  | `""`           | Admin username on the origin.                              |
+| `sync.origin.password`           | string  | `""`           | Admin password on the origin. Use `existingSecret`.        |
+| `sync.replicas`                  | array   | `[]`           | List of replica instances (`url`, `username`, `password`). |
+| `sync.cron`                      | string  | `*/10 * * * *` | Sync schedule. Empty string = continuous daemon mode.      |
+| `sync.runOnStart`                | boolean | `true`         | Run sync immediately on pod startup.                       |
+| `sync.existingSecret`            | string  | `""`           | Existing secret with sync credentials.                     |
+| `sync.features.dns.serverConfig` | boolean | `true`         | Sync DNS server configuration.                             |
+| `sync.features.general.filters`  | boolean | `true`         | Sync filter lists.                                         |
+| `sync.features.general.clients`  | boolean | `true`         | Sync client settings.                                      |
+
+### Backup
+
+Backup archives both PVCs (`conf` + `work`) as tar archives. No database is involved.
+
+| Parameter                  | Type    | Default        | Description                          |
+| -------------------------- | ------- | -------------- | ------------------------------------ |
+| `backup.enabled`           | boolean | `false`        | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`          | string  | `"0 2 * * *"`  | Cron schedule.                       |
+| `backup.archivePrefix`     | string  | `adguard-home` | Prefix for backup archive filenames. |
+| `backup.s3.endpoint`       | string  | `""`           | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`         | string  | `""`           | Target bucket name.                  |
+| `backup.s3.existingSecret` | string  | `""`           | Existing secret with S3 credentials. |
+| `extraManifests`           | array   | `[]`           | Extra Kubernetes manifests.          |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/adguard-home) on GitHub.
+- [AdGuard Home Official Documentation](https://adguard-dns.io/kb/adguard-home/getting-started/)
+- [AdGuard Home GitHub Repository](https://github.com/AdguardTeam/AdGuardHome)
+- [adguardhome-sync GitHub Repository](https://github.com/bakito/adguardhome-sync)
+- [HelmForge AdGuard Home Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/adguard-home)
