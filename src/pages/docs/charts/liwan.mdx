@@ -1,50 +1,300 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Liwan
-description: HelmForge Liwan chart for ultra-lightweight privacy-first web analytics with embedded DuckDB.
+title: Liwan Chart
+description: HelmForge Liwan chart — ultra-lightweight, privacy-first web analytics with embedded DuckDB, GeoIP enrichment, and cookie-free tracking for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Liwan
 
-Deploy [Liwan](https://github.com/explodingcamera/liwan) on Kubernetes — an ultra-lightweight, privacy-first web analytics tool with embedded DuckDB storage and minimal resource requirements.
+Ultra-lightweight, privacy-first web analytics with embedded DuckDB storage. Liwan runs as a single binary with
+minimal resource requirements and no external database dependency. All analytics data — including GeoIP
+location enrichment — lives in a local DuckDB file on a persistent volume.
 
 ## Key Features
 
-- **Minimal footprint** — single binary with embedded DuckDB
-- **Privacy-first** — no cookies, no tracking, GDPR-compliant
-- **Persistent storage** — PVC-backed data directory
+- **Single binary** — no external database, no sidecar, minimal footprint
+- **Privacy-first** — no cookies, no cross-site tracking, GDPR-compliant by design
+- **DuckDB storage** — columnar analytics engine embedded in the binary
+- **GeoIP enrichment** — automatic IP-to-location lookup stored alongside DuckDB data
+- **Cookie-free tracking** — JavaScript snippet embeddable on any site
 - **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Non-root by default** — `runAsNonRoot: true` and `fsGroup: 1000` preconfigured
 
 ## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install liwan helmforge/liwan
+```
+
+**OCI registry:**
 
 ```bash
 helm install liwan oci://ghcr.io/helmforgedev/helm/liwan
 ```
 
-## Basic Example
+## Tracking Script Integration
+
+After deploying Liwan and creating a site in the UI, embed the tracking snippet on your website. Replace
+`analytics.example.com` with your actual Liwan instance URL and `my-site` with your site slug:
+
+```html
+<script defer src="https://analytics.example.com/script.js" data-site-name="my-site"></script>
+```
+
+The script is cookie-free and GDPR-compliant. No consent banner is required under most EU interpretations
+when using Liwan's privacy-preserving tracking model.
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'production', label: 'Production (TLS)' },
+    { id: 'geoip', label: 'GeoIP + Resources' },
+    { id: 'minimal', label: 'Minimal (No TLS)' },
+  ]}
+>
+
+<div data-tab-panel="production">
 
 ```yaml
+# values.yaml — Production Liwan with TLS and resource limits
+liwan:
+  baseUrl: 'https://analytics.example.com'
+
 persistence:
   enabled: true
+  size: 5Gi
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 25m
+  limits:
+    memory: 256Mi
+    cpu: 250m
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: analytics.example.com
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: liwan-tls
+      hosts:
+        - analytics.example.com
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default | Description             |
-| --------------------- | ------- | ----------------------- |
-| `persistence.enabled` | `true`  | Enable data persistence |
-| `persistence.size`    | `5Gi`   | PVC size                |
-| `ingress.enabled`     | `false` | Enable ingress          |
+<div data-tab-panel="geoip">
+
+```yaml
+# values.yaml — Liwan with GeoIP enrichment and explicit resource limits
+# GeoIP data is automatically downloaded to /data on first startup.
+# A larger PVC is recommended when GeoIP enrichment is active.
+liwan:
+  baseUrl: 'https://analytics.example.com'
+
+persistence:
+  enabled: true
+  size: 5Gi # GeoIP database adds ~100MB to the DuckDB data directory
+  storageClass: fast-ssd
+
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 50m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: analytics.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: liwan-tls
+      hosts:
+        - analytics.example.com
+```
+
+</div>
+
+<div data-tab-panel="minimal">
+
+```yaml
+# values.yaml — Minimal Liwan, internal access only (no Ingress)
+liwan:
+  baseUrl: 'http://liwan.analytics.svc.cluster.local'
+
+persistence:
+  enabled: true
+  size: 2Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                         | Description                          |
+| ------------------ | ------ | ------------------------------- | ------------------------------------ |
+| `image.repository` | string | `ghcr.io/explodingcamera/liwan` | Liwan container image.               |
+| `image.tag`        | string | `"1.4.0"`                       | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
+
+### Liwan Configuration
+
+| Parameter        | Type    | Default | Description                                                                   |
+| ---------------- | ------- | ------- | ----------------------------------------------------------------------------- |
+| `liwan.port`     | integer | `9042`  | Application HTTP port inside the container.                                   |
+| `liwan.baseUrl`  | string  | `""`    | Public base URL of the Liwan instance (e.g. `https://analytics.example.com`). |
+| `liwan.extraEnv` | array   | `[]`    | Extra environment variables for advanced configuration.                       |
+
+<Callout type="warning" title="baseUrl is required for correct tracking script URLs">
+  Set `liwan.baseUrl` to your public URL. Without it, the JavaScript tracking snippet URL generated by Liwan will be
+  incorrect, causing the tracker to fail on embedded sites. This is the most common reason for a Liwan deployment that
+  appears to work but collects no data.
+</Callout>
+
+### Persistence
+
+Liwan stores both the DuckDB analytics database and the GeoIP enrichment database in the `/data` directory.
+GeoIP data is downloaded automatically on first startup and adds approximately 100 MB to the volume.
+
+| Parameter                   | Type    | Default             | Description                                              |
+| --------------------------- | ------- | ------------------- | -------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (DuckDB database + GeoIP data). |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                                |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                        |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.             |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+Liwan ships with a non-root security context preconfigured. The `fsGroup: 1000` ensures the DuckDB and GeoIP
+files in `/data` are writable by the container user without requiring privileged access.
+
+| Parameter                      | Type    | Default | Description                         |
+| ------------------------------ | ------- | ------- | ----------------------------------- |
+| `resources`                    | object  | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext.fsGroup`   | integer | `1000`  | Filesystem group for the pod.       |
+| `securityContext.runAsUser`    | integer | `1000`  | UID for the container process.      |
+| `securityContext.runAsGroup`   | integer | `1000`  | GID for the container process.      |
+| `securityContext.runAsNonRoot` | boolean | `true`  | Enforce non-root execution.         |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="All analytics data lost when persistence.enabled: false">
+  If `persistence.enabled` is `false`, all DuckDB data — including historical analytics and GeoIP files — is lost when
+  the pod restarts. Always enable persistence in production.
+</Callout>
+
+<Callout type="tip" title="Right-size your PVC from the start">
+  DuckDB compresses analytics data efficiently. For most small-to-medium sites, `2Gi` is sufficient for years of
+  analytics. Add ~100 MB for the GeoIP database. PVC resize requires a StorageClass with `allowVolumeExpansion: true`.
+  Start at `5Gi` for peace of mind.
+</Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/liwan) on GitHub.
+- [Liwan Official Website](https://liwan.dev)
+- [Liwan GitHub Repository](https://github.com/explodingcamera/liwan)
+- [HelmForge Liwan Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/liwan)

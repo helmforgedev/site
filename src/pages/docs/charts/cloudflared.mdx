@@ -1,21 +1,49 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Cloudflare Tunnel Chart
-description: HelmForge Cloudflare Tunnel chart — secure outbound-only connections with HA, PDB, and Prometheus metrics.
+description: HelmForge Cloudflare Tunnel chart — secure outbound-only ARGO tunnel with HA replicas, PodDisruptionBudget, Prometheus metrics, and ServiceMonitor for Kubernetes. No open ports or public IP required.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Cloudflare Tunnel (cloudflared)
 
-Deploy Cloudflare Tunnel on Kubernetes using the official [cloudflare/cloudflared](https://hub.docker.com/r/cloudflare/cloudflared) Docker image. Secure, outbound-only connections between your cluster and Cloudflare's network — no open ports, no public IP required.
+Secure, outbound-only tunnel between your Kubernetes cluster and Cloudflare's global network. cloudflared
+connects to Cloudflare from inside the cluster — no open inbound ports, no public IP required. Traffic
+routing is managed in the Cloudflare dashboard via Public Hostnames, and each replica opens an independent
+connection for high availability.
+
+<Callout type="warning" title="cloudflared replaces the Ingress controller for publicly exposed services">
+  When using Cloudflare Tunnel, traffic routing is configured in the **Cloudflare dashboard** under Networks → Tunnels →
+  Public Hostnames — not via Kubernetes Ingress resources. Adding a Kubernetes Ingress for the same service duplicates
+  routing and is usually unnecessary. Services are referenced by their cluster-internal DNS (e.g.
+  `http://my-service.namespace.svc.cluster.local:80`).
+</Callout>
 
 ## Key Features
 
-- **Zero-trust networking** — no inbound firewall rules needed
-- **Remotely-managed** — configure routes in the Cloudflare dashboard
-- **High availability** — 2 replicas with PodDisruptionBudget by default
-- **Prometheus metrics** — `/ready` and `/metrics` on port 2000
+- **Zero-trust networking** — outbound-only connections, no inbound firewall rules needed
+- **HA by default** — 2 replicas, each with an independent Cloudflare edge connection
+- **PodDisruptionBudget** — built-in disruption protection enabled by default
+- **Dashboard-managed routing** — Public Hostnames configured in the Cloudflare dashboard
+- **Prometheus metrics** — `/ready` and `/metrics` endpoint on port 2000, enabled by default
 - **ServiceMonitor** — optional Prometheus Operator integration
-- **Existing secrets** — bring your own Secret for the tunnel token
+- **Existing Secret support** — bring your own Secret for the tunnel token
+
+## Quick Start
+
+1. Go to [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com) → **Networks → Tunnels**
+2. Create a new tunnel and copy the token
+3. Deploy this chart with the token
+
+```bash
+helm install cloudflared helmforge/cloudflared \
+  --set tunnel.token='eyJhIjoiY2Y...'
+```
+
+4. In the dashboard, add **Public Hostnames** mapping your domain to services inside the cluster
+   (e.g. `https://app.example.com → http://myapp.default.svc.cluster.local:80`)
 
 ## Installation
 
@@ -33,21 +61,41 @@ helm install cloudflared helmforge/cloudflared -f values.yaml
 helm install cloudflared oci://ghcr.io/helmforgedev/helm/cloudflared -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production (Secret + Metrics)' },
+    { id: 'single', label: 'Single Replica (Dev)' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — cloudflared with inline token (not recommended for production)
+# Store the token in an existing Secret for production environments.
 tunnel:
   token: 'eyJhIjoiY2Y...' # From Cloudflare dashboard
+
+replicaCount: 2
+
+pdb:
+  enabled: true
+  minAvailable: 1
 ```
 
-Create a tunnel in the [Cloudflare dashboard](https://one.dash.cloudflare.com) under **Networks → Tunnels**, copy the token, and configure public hostnames to route traffic to your Kubernetes services.
+</div>
 
-## Production Example
+<div data-tab-panel="production">
 
 ```yaml
+# values.yaml — Production cloudflared with secret-backed token and Prometheus metrics
+# Create the secret first: kubectl create secret generic cloudflare-tunnel --from-literal=token='eyJ...'
 tunnel:
   existingSecret: cloudflare-tunnel
+  existingSecretKey: token
 
 replicaCount: 2
 
@@ -62,33 +110,175 @@ resources:
   limits:
     memory: 128Mi
 
+metrics:
+  enabled: true
+
 serviceMonitor:
   enabled: true
+  interval: 30s
   labels:
-    release: prometheus
+    prometheus: kube-prometheus
 ```
 
-## Key Values
+</div>
 
-| Key                        | Default | Description                            |
-| -------------------------- | ------- | -------------------------------------- |
-| `tunnel.token`             | `""`    | Tunnel token from Cloudflare dashboard |
-| `tunnel.existingSecret`    | `""`    | Existing secret with tunnel token      |
-| `replicaCount`             | `2`     | Number of replicas                     |
-| `cloudflared.logLevel`     | `info`  | Log level                              |
-| `cloudflared.noAutoupdate` | `true`  | Disable auto-update                    |
-| `cloudflared.metricsPort`  | `2000`  | Metrics listen port                    |
-| `pdb.enabled`              | `true`  | Create PodDisruptionBudget             |
-| `pdb.minAvailable`         | `1`     | Min available during disruption        |
-| `metrics.enabled`          | `true`  | Expose metrics service                 |
-| `serviceMonitor.enabled`   | `false` | Create Prometheus ServiceMonitor       |
+<div data-tab-panel="single">
 
-## Important Notes
+```yaml
+# values.yaml — Single replica for dev or resource-constrained environments
+tunnel:
+  existingSecret: cloudflare-tunnel
+  existingSecretKey: token
 
-- **Do not use HPA** — downscaling terminates active tunnel connections
-- **No ingress template** — cloudflared replaces traditional ingress controllers
-- **Routing is dashboard-managed** — use the Cloudflare dashboard to map hostnames to services
+replicaCount: 1
+
+pdb:
+  enabled: false # PDB with minAvailable:1 would block all maintenance on 1-replica deployments
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                            | Description                          |
+| ------------------ | ------ | ---------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/cloudflare/cloudflared` | cloudflared container image.         |
+| `image.tag`        | string | `"2026.3.0"`                       | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                     | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                               | Pull secrets for private registries. |
+
+### Tunnel
+
+| Parameter                  | Type   | Default | Description                                                                        |
+| -------------------------- | ------ | ------- | ---------------------------------------------------------------------------------- |
+| `tunnel.token`             | string | `""`    | Tunnel token from the Cloudflare dashboard. Prefer `existingSecret` in production. |
+| `tunnel.existingSecret`    | string | `""`    | Existing Kubernetes Secret containing the tunnel token.                            |
+| `tunnel.existingSecretKey` | string | `token` | Key inside the existing Secret for the token value.                                |
+
+<Callout type="danger" title="Do not store the tunnel token inline in values.yaml for production">
+  Setting `tunnel.token` inline exposes the token in `helm get values` and Helm release history. Use
+  `tunnel.existingSecret` with a pre-created Kubernetes Secret. The token grants full control over the tunnel and cannot
+  be rotated without updating the Cloudflare dashboard.
+</Callout>
+
+### cloudflared Options
+
+| Parameter                  | Type    | Default | Description                                                       |
+| -------------------------- | ------- | ------- | ----------------------------------------------------------------- |
+| `cloudflared.logLevel`     | string  | `info`  | Log verbosity: `info`, `debug`, `warn`, `error`, or `fatal`.      |
+| `cloudflared.noAutoupdate` | boolean | `true`  | Disable in-process auto-update. Always `true` in containers.      |
+| `cloudflared.metricsPort`  | integer | `2000`  | Port serving `/ready` and `/metrics`.                             |
+| `cloudflared.extraArgs`    | array   | `[]`    | Extra command-line arguments appended to the cloudflared command. |
+| `cloudflared.extraEnv`     | array   | `[]`    | Extra environment variables for the container.                    |
+
+### Replicas and Availability
+
+| Parameter      | Type    | Default | Description                                                                          |
+| -------------- | ------- | ------- | ------------------------------------------------------------------------------------ |
+| `replicaCount` | integer | `2`     | Number of cloudflared replicas. Each replica opens an independent tunnel connection. |
+
+<Callout type="warning" title="Do not use HPA with cloudflared">
+  Horizontal Pod Autoscaling that scales down replicas terminates active tunnel connections immediately. Clients
+  connected through those tunnels will experience dropped connections. Use a fixed `replicaCount` of 2 or more instead
+  of autoscaling.
+</Callout>
+
+### PodDisruptionBudget
+
+| Parameter          | Type    | Default | Description                                                      |
+| ------------------ | ------- | ------- | ---------------------------------------------------------------- |
+| `pdb.enabled`      | boolean | `true`  | Create a PodDisruptionBudget for cloudflared pods.               |
+| `pdb.minAvailable` | integer | `1`     | Minimum available replicas during voluntary cluster disruptions. |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                  |
+| --------------------- | ------- | ----------- | ---------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.     |
+| `service.port`        | integer | `2000`      | Metrics service port.        |
+| `service.annotations` | object  | `{}`        | Annotations for the Service. |
+
+### Metrics
+
+| Parameter                 | Type    | Default | Description                                             |
+| ------------------------- | ------- | ------- | ------------------------------------------------------- |
+| `metrics.enabled`         | boolean | `true`  | Expose the metrics Service for `/ready` and `/metrics`. |
+| `serviceMonitor.enabled`  | boolean | `false` | Create a Prometheus Operator ServiceMonitor.            |
+| `serviceMonitor.interval` | string  | `30s`   | Metrics scrape interval.                                |
+| `serviceMonitor.labels`   | object  | `{}`    | Extra labels added to the ServiceMonitor.               |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                         |
+| -------------------------------------- | ------- | ------- | ----------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe on `/ready`.   |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.        |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.               |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.              |
+| `probes.startup.failureThreshold`      | integer | `12`    | Startup probe failure threshold.    |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe on `/ready`.  |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.       |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.              |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.             |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.   |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe on `/ready`. |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.      |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.             |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.            |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold.  |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/cloudflared) on GitHub.
+- [Cloudflare Tunnel Documentation](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+- [cloudflared GitHub Repository](https://github.com/cloudflare/cloudflared)
+- [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com)
+- [HelmForge Cloudflare Tunnel Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/cloudflared)

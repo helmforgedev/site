@@ -1,21 +1,33 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: ntfy Chart
-description: HelmForge ntfy chart — self-hosted push notification server with Prometheus metrics and REST API.
+description: HelmForge ntfy chart — self-hosted push notification service via HTTP pub-sub, with Prometheus metrics, attachment support, and access control for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # ntfy
 
-Deploy ntfy on Kubernetes using the official [binwiederhier/ntfy](https://hub.docker.com/r/binwiederhier/ntfy) container image. ntfy is a simple HTTP-based pub-sub notification service that lets you send push notifications to your phone or desktop via scripts, without signup or cost.
+Self-hosted push notification service using simple HTTP pub-sub. Publish notifications from any script, CI pipeline,
+or monitoring system with a single `curl` command. Subscribe on Android, iOS, or the web. No signup, no cost, no
+third-party service — all traffic stays on your infrastructure.
+
+<Callout type="danger" title="Default access is open — secure before exposing publicly">
+  `ntfy.authDefaultAccess` defaults to `read-write`, meaning any unauthenticated user can publish and subscribe to any
+  topic. If you expose ntfy to the internet, set `authDefaultAccess: deny-all` and configure authentication via
+  `ntfy.extraConfig` to prevent unauthorized access and notification spam.
+</Callout>
 
 ## Key Features
 
-- **REST API & WebSocket** — publish and subscribe to topics via simple HTTP PUT/POST or WebSocket
-- **Firebase & UnifiedPush** — supports Android push delivery through FCM and UnifiedPush
-- **Prometheus Metrics** — optional `/metrics` endpoint with ServiceMonitor support
-- **Behind-Proxy Mode** — trusts `X-Forwarded-For` headers for correct client identification
-- **Attachment Support** — configurable file attachment size and expiry limits
-- **Persistence** — persistent storage for cache and authentication databases
+- **HTTP pub-sub** — publish via `PUT`/`POST`, subscribe via `GET` or WebSocket
+- **Mobile and web clients** — Android, iOS apps and progressive web app
+- **Access control** — per-topic user and permission management
+- **Attachment support** — configurable file attachment size and expiry limits
+- **Behind-proxy mode** — correct client IP identification via `X-Forwarded-For`
+- **Prometheus metrics** — optional `/metrics` endpoint with ServiceMonitor support
+- **Persistent storage** — PVC-backed SQLite cache and authentication databases
 
 ## Installation
 
@@ -33,14 +45,63 @@ helm install ntfy helmforge/ntfy
 helm install ntfy oci://ghcr.io/helmforgedev/helm/ntfy
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'auth', label: 'With Authentication' },
+    { id: 'attachments', label: 'With Attachments' },
+    { id: 'metrics', label: 'With Metrics' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — ntfy with ingress, behind Traefik
 ntfy:
   baseUrl: 'https://ntfy.example.com'
   behindProxy: true
-  enableMetrics: true
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: ntfy.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: ntfy-tls
+      hosts:
+        - ntfy.example.com
+```
+
+After deploying, send your first notification:
+
+```bash
+curl -d "Hello from Kubernetes!" https://ntfy.example.com/my-topic
+```
+
+</div>
+
+<div data-tab-panel="auth">
+
+```yaml
+# values.yaml — ntfy with authentication enabled (deny anonymous access)
+ntfy:
+  baseUrl: 'https://ntfy.example.com'
+  behindProxy: true
+  authDefaultAccess: deny-all
+  extraConfig: |
+    auth-file: /var/cache/ntfy/user.db
 
 persistence:
   enabled: true
@@ -56,20 +117,245 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+After deploying, create users via the ntfy CLI inside the pod:
 
-| Key                             | Default      | Description                              |
-| ------------------------------- | ------------ | ---------------------------------------- |
-| `ntfy.baseUrl`                  | `""`         | Public base URL of the instance          |
-| `ntfy.behindProxy`              | `true`       | Trust X-Forwarded-For headers            |
-| `ntfy.enableMetrics`            | `false`      | Enable Prometheus metrics endpoint       |
-| `ntfy.authDefaultAccess`        | `read-write` | Default access for unauthenticated users |
-| `ntfy.attachmentTotalSizeLimit` | `""`         | Attachment total size limit per visitor  |
-| `persistence.enabled`           | `true`       | Enable persistent storage                |
-| `persistence.size`              | `2Gi`        | PVC size                                 |
-| `ingress.enabled`               | `false`      | Enable ingress                           |
+```bash
+# Create an admin user
+kubectl exec -it deployment/ntfy -- ntfy user add --role=admin admin
+
+# Publish with authentication
+curl -u admin:password -d "Secure notification" https://ntfy.example.com/my-topic
+```
+
+</div>
+
+<div data-tab-panel="attachments">
+
+```yaml
+# values.yaml — ntfy with file attachment support
+ntfy:
+  baseUrl: 'https://ntfy.example.com'
+  behindProxy: true
+  attachmentTotalSizeLimit: '200M'
+  attachmentFileSizeLimit: '20M'
+  attachmentExpiryDuration: '24h'
+
+persistence:
+  enabled: true
+  # Increase PVC size to accommodate attachments
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: ntfy.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="metrics">
+
+```yaml
+# values.yaml — ntfy with Prometheus metrics
+ntfy:
+  baseUrl: 'https://ntfy.example.com'
+  enableMetrics: true
+  # Expose metrics on a separate port to avoid routing /metrics via Ingress
+  metricsListenHttp: ':9090'
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: ntfy.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                        | Description                          |
+| ------------------ | ------ | ------------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/binwiederhier/ntfy` | ntfy container image.                |
+| `image.tag`        | string | `"v2.21.0"`                    | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
+
+### ntfy Configuration
+
+| Parameter                       | Type    | Default      | Description                                                                      |
+| ------------------------------- | ------- | ------------ | -------------------------------------------------------------------------------- |
+| `ntfy.baseUrl`                  | string  | `""`         | Public base URL of the instance (e.g. `https://ntfy.example.com`).               |
+| `ntfy.authDefaultAccess`        | string  | `read-write` | Default access for unauthenticated users: `read-write`, `read-only`, `deny-all`. |
+| `ntfy.behindProxy`              | boolean | `true`       | Trust `X-Forwarded-For` headers for correct client IP and rate limiting.         |
+| `ntfy.enableMetrics`            | boolean | `false`      | Enable Prometheus metrics at `/metrics`.                                         |
+| `ntfy.metricsListenHttp`        | string  | `""`         | Separate listen address for the metrics endpoint (e.g. `:9090`).                 |
+| `ntfy.attachmentTotalSizeLimit` | string  | `""`         | Total attachment storage limit per visitor (e.g. `100M`).                        |
+| `ntfy.attachmentFileSizeLimit`  | string  | `""`         | Maximum size per attachment file (e.g. `15M`).                                   |
+| `ntfy.attachmentExpiryDuration` | string  | `""`         | How long attachments are retained (e.g. `3h`).                                   |
+| `ntfy.extraConfig`              | string  | `""`         | Raw `server.yml` configuration appended to the generated ConfigMap.              |
+| `ntfy.extraEnv`                 | array   | `[]`         | Extra environment variables injected into the container.                         |
+
+<Callout type="info" title="Append arbitrary configuration with extraConfig">
+  The `ntfy.extraConfig` field appends raw `server.yml` lines to the generated ConfigMap. Use it for any ntfy server
+  option not exposed as a dedicated value, such as authentication providers, Firebase credentials, or per-topic limits.
+  See the [ntfy server configuration reference](https://docs.ntfy.sh/config/) for all available options.
+</Callout>
+
+<Callout type="tip" title="behindProxy should stay true on Kubernetes">
+  When running behind a Kubernetes Ingress controller, all requests arrive from the Ingress pod IP unless
+  `X-Forwarded-For` is trusted. Keep `ntfy.behindProxy: true` (the default) so rate limits and client IP logging work
+  correctly.
+</Callout>
+
+### Persistence
+
+ntfy stores its SQLite cache database and authentication database in `/var/cache/ntfy`. Persistence is enabled by
+default to survive pod restarts without losing message history and user accounts.
+
+| Parameter                   | Type    | Default             | Description                                  |
+| --------------------------- | ------- | ------------------- | -------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/cache/ntfy`.          |
+| `persistence.size`          | string  | `2Gi`               | PVC size. Increase if using attachments.     |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+Probes use the `/v1/health` endpoint.
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Metrics
+
+| Parameter                         | Type    | Default | Description                                      |
+| --------------------------------- | ------- | ------- | ------------------------------------------------ |
+| `metrics.serviceMonitor.enabled`  | boolean | `false` | Create a ServiceMonitor for Prometheus Operator. |
+| `metrics.serviceMonitor.interval` | string  | `30s`   | Prometheus scrape interval.                      |
+| `metrics.serviceMonitor.labels`   | object  | `{}`    | Extra labels applied to the ServiceMonitor.      |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="warning" title="Notifications arriving with wrong client IP">
+  If rate limiting is not working or logs show all requests from the same IP (the Ingress pod), verify that
+  `ntfy.behindProxy: true` is set (it is the default) and that your Ingress controller is forwarding the
+  `X-Forwarded-For` header.
+</Callout>
+
+<Callout type="tip" title="Sending a test notification">
+  After deploying, verify your setup with a quick curl command:
+
+```bash
+curl -d "Test notification from Kubernetes" https://ntfy.example.com/test-topic
+```
+
+Subscribe to `https://ntfy.example.com/test-topic` in the ntfy app to receive it.
+
+</Callout>
 
 ## More Information
 
-- [ntfy documentation](https://docs.ntfy.sh)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/ntfy)
+- [ntfy Official Website](https://ntfy.sh)
+- [ntfy Documentation](https://docs.ntfy.sh)
+- [ntfy GitHub Repository](https://github.com/binwiederhier/ntfy)
+- [HelmForge ntfy Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/ntfy)

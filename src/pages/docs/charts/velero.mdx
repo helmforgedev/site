@@ -1,23 +1,39 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Velero Chart
-description: HelmForge Velero chart for Kubernetes backup, restore, migration, schedules, and S3-compatible object storage.
+description: HelmForge Velero chart — Kubernetes cluster backup, restore, and migration with S3-compatible storage, filesystem backup via node-agent, recurring schedules, and Prometheus metrics.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Velero
 
-Deploy [Velero](https://velero.io/) on Kubernetes using the official `docker.io/velero/velero` image for backup, restore, migration, and optional filesystem backup workflows.
+Kubernetes backup, restore, and migration tool. Velero saves cluster resource state (Deployments, Services,
+ConfigMaps, PVCs) and optionally PVC data to S3-compatible object storage. It supports recurring backup
+schedules, TTL-based expiration, and namespace-scoped or cluster-wide backup policies.
+
+<Callout type="warning" title="node-agent is required to back up PVC data">
+  The default installation backs up Kubernetes resource manifests only. To include the **contents** of Persistent
+  Volumes (databases, uploads, application data), you must enable `nodeAgent.enabled: true` and set
+  `configuration.defaultVolumesToFsBackup: true` (or set `defaultVolumesToFsBackup: true` per schedule). Without
+  node-agent, restoring from backup will recreate empty PVCs — no data included.
+</Callout>
 
 ## Key Features
 
-- **Latest stable Velero** — chart pinned to the latest stable upstream release
-- **Official CRDs included** — Velero CRDs shipped through the chart `crds/` directory
-- **S3-compatible storage** — validated with the AWS plugin against MinIO and similar providers
-- **Recurring schedules** — optional `Schedule` resources rendered from chart values
-- **Filesystem backup** — optional node-agent DaemonSet for pod volume backups
-- **Metrics support** — metrics Service and optional ServiceMonitor
+- **Cluster-scoped backup** — saves Kubernetes resources and optionally PVC data to S3
+- **Kopia filesystem backup** — `uploaderType: kopia` (modern replacement for Restic)
+- **Scheduled backups** — `Schedule` resources rendered directly from chart values
+- **TTL-based expiration** — backups expire automatically (default 7 days)
+- **Node-agent DaemonSet** — optional filesystem backup for PVC data inclusion
+- **S3-compatible storage** — validated with the AWS plugin for MinIO and AWS S3
+- **Restore-only mode** — lock a cluster to restores only (useful for DR environments)
+- **Prometheus metrics** — metrics Service and optional ServiceMonitor enabled by default
 
 ## Installation
+
+Velero requires cluster-wide permissions and is typically deployed in a dedicated namespace:
 
 **HTTPS repository:**
 
@@ -33,20 +49,31 @@ helm install velero helmforge/velero -n velero --create-namespace -f values.yaml
 helm install velero oci://ghcr.io/helmforgedev/helm/velero -n velero --create-namespace -f values.yaml
 ```
 
-## S3-Compatible Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'manifests-only', label: 'Manifests Only' },
+    { id: 'full-backup', label: 'Full Backup (PVC Data)' },
+    { id: 'scheduled', label: 'Scheduled Backups' },
+    { id: 'dr-mode', label: 'DR Restore-Only' },
+  ]}
+>
+
+<div data-tab-panel="manifests-only">
 
 ```yaml
+# values.yaml — Velero backing up Kubernetes resources only (no PVC data)
+# This is the default behavior. PVC contents are NOT included.
 credentials:
-  secretContents: |
-    [default]
-    aws_access_key_id=minioadmin
-    aws_secret_access_key=minioadmin123
+  existingSecret: velero-s3-credentials # must contain 'cloud' key with AWS-format credentials
 
 configuration:
+  defaultBackupTTL: 720h # 30 days
   backupStorageLocations:
     - name: default
       provider: aws
-      bucket: velero
+      bucket: my-velero-backups
       default: true
       config:
         region: minio
@@ -55,38 +82,293 @@ configuration:
         insecureSkipTLSVerify: true
 ```
 
-## Scheduled Backup Example
+</div>
+
+<div data-tab-panel="full-backup">
 
 ```yaml
+# values.yaml — Full cluster backup including PVC data via node-agent
+# Requires node-agent DaemonSet and uses Kopia for filesystem-level backup.
+credentials:
+  existingSecret: velero-s3-credentials
+
+configuration:
+  defaultBackupTTL: 720h
+  defaultVolumesToFsBackup: true # include PVC data in all backups by default
+  uploaderType: kopia
+  backupStorageLocations:
+    - name: default
+      provider: aws
+      bucket: my-velero-backups
+      default: true
+      config:
+        region: minio
+        s3Url: http://minio.minio.svc.cluster.local:9000
+        s3ForcePathStyle: true
+        insecureSkipTLSVerify: true
+
+nodeAgent:
+  enabled: true
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+```
+
+</div>
+
+<div data-tab-panel="scheduled">
+
+```yaml
+# values.yaml — Scheduled daily and weekly backups with different TTLs
+credentials:
+  existingSecret: velero-s3-credentials
+
+configuration:
+  defaultBackupTTL: 168h # 7 days default
+  backupStorageLocations:
+    - name: default
+      provider: aws
+      bucket: my-velero-backups
+      default: true
+      config:
+        region: us-east-1
+        # s3Url not needed for real AWS S3
+
+nodeAgent:
+  enabled: true
+
 schedules:
   - name: daily
     schedule: '0 3 * * *'
     template:
-      ttl: 168h
+      ttl: 168h # 7 days
       includedNamespaces:
+        - default
         - apps
+      defaultVolumesToFsBackup: true
       snapshotVolumes: false
+
+  - name: weekly
+    schedule: '0 2 * * 0'
+    template:
+      ttl: 720h # 30 days
+      includedNamespaces: [] # empty = all namespaces
       defaultVolumesToFsBackup: true
 ```
 
-## Key Values
+</div>
 
-| Key                                     | Default                   | Description                                 |
-| --------------------------------------- | ------------------------- | ------------------------------------------- |
-| `image.repository`                      | `docker.io/velero/velero` | Velero server image                         |
-| `plugins.aws.tag`                       | `v1.14.0`                 | Default AWS/S3 plugin image tag             |
-| `configuration.backupStorageLocations`  | one default entry         | Backup storage definitions                  |
-| `configuration.volumeSnapshotLocations` | `[]`                      | Snapshot storage definitions                |
-| `schedules`                             | `[]`                      | Schedule resources created by the chart     |
-| `nodeAgent.enabled`                     | `false`                   | Deploy the filesystem backup DaemonSet      |
-| `metrics.serviceMonitor.enabled`        | `false`                   | Create a Prometheus Operator ServiceMonitor |
+<div data-tab-panel="dr-mode">
 
-## Validation Guidance
+```yaml
+# values.yaml — DR environment: Velero locked to restore-only mode
+# Use this on a secondary cluster that only receives restores, never creates backups.
+credentials:
+  existingSecret: velero-s3-credentials
 
-- always confirm the active `kubectl` context before any local validation install, upgrade, or uninstall
-- for S3-compatible storage, validate that the `BackupStorageLocation` reaches `Available`
-- create at least one real test backup before enabling recurring schedules in shared environments
+configuration:
+  restoreOnlyMode: true
+  backupStorageLocations:
+    - name: default
+      provider: aws
+      bucket: my-velero-backups
+      default: true
+      accessMode: ReadOnly # read-only on DR side
+      config:
+        region: minio
+        s3Url: http://minio.minio.svc.cluster.local:9000
+        s3ForcePathStyle: true
+        insecureSkipTLSVerify: true
+```
+
+</div>
+
+</DocsTabs>
+
+## S3 Credentials Format
+
+Velero uses an AWS credentials file format regardless of the S3 provider (including MinIO). The
+`credentials.secretContents` field contains the full file content:
+
+```ini
+[default]
+aws_access_key_id=your-access-key
+aws_secret_access_key=your-secret-key
+```
+
+For production, store credentials in a pre-created Kubernetes Secret and reference it with
+`credentials.existingSecret`:
+
+```bash
+kubectl create secret generic velero-s3-credentials \
+  --from-literal=cloud='[default]
+aws_access_key_id=your-access-key
+aws_secret_access_key=your-secret-key' \
+  -n velero
+```
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                   | Description                          |
+| ------------------ | ------ | ------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/velero/velero` | Velero server image.                 |
+| `image.tag`        | string | `"v1.18.0"`               | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                      | Pull secrets for private registries. |
+
+### Plugins
+
+| Parameter                | Type    | Default                                  | Description                                  |
+| ------------------------ | ------- | ---------------------------------------- | -------------------------------------------- |
+| `plugins.enabled`        | boolean | `true`                                   | Enable the default AWS/S3-compatible plugin. |
+| `plugins.aws.name`       | string  | `velero-plugin-for-aws`                  | Init container name.                         |
+| `plugins.aws.repository` | string  | `docker.io/velero/velero-plugin-for-aws` | AWS plugin image repository.                 |
+| `plugins.aws.tag`        | string  | `v1.14.0`                                | AWS plugin image tag.                        |
+| `plugins.extra`          | array   | `[]`                                     | Extra plugin init containers.                |
+
+### Credentials
+
+| Parameter                    | Type    | Default | Description                                                              |
+| ---------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
+| `credentials.useSecret`      | boolean | `true`  | Mount credentials into the Velero pods.                                  |
+| `credentials.existingSecret` | string  | `""`    | Existing secret containing the credentials file (key: `cloud`).          |
+| `credentials.name`           | string  | `""`    | Name for the Secret created by the chart when `existingSecret` is empty. |
+| `credentials.key`            | string  | `cloud` | Key inside the credentials secret.                                       |
+| `credentials.secretContents` | string  | `""`    | Full AWS credentials file content for inline secret creation.            |
+
+### RBAC
+
+| Parameter                       | Type    | Default         | Description                                                 |
+| ------------------------------- | ------- | --------------- | ----------------------------------------------------------- |
+| `rbac.create`                   | boolean | `true`          | Create a ClusterRoleBinding for the Velero service account. |
+| `rbac.clusterAdministrator`     | boolean | `true`          | Bind to `cluster-admin`. Required for full cluster backup.  |
+| `rbac.clusterAdministratorName` | string  | `cluster-admin` | ClusterRole name to bind.                                   |
+
+### Configuration
+
+| Parameter                                   | Type    | Default | Description                                                                  |
+| ------------------------------------------- | ------- | ------- | ---------------------------------------------------------------------------- |
+| `configuration.uploaderType`                | string  | `kopia` | Filesystem backup engine. `kopia` is the current default (replaces Restic).  |
+| `configuration.defaultBackupTTL`            | string  | `168h`  | Default backup expiration TTL (7 days). Expired backups are deleted from S3. |
+| `configuration.defaultItemOperationTimeout` | string  | `4h`    | Default timeout for item-level operations.                                   |
+| `configuration.logLevel`                    | string  | `info`  | Server log verbosity.                                                        |
+| `configuration.logFormat`                   | string  | `text`  | Log format: `text` or `json`.                                                |
+| `configuration.restoreOnlyMode`             | boolean | `false` | Lock the server to restore operations only (useful for DR clusters).         |
+| `configuration.defaultVolumesToFsBackup`    | boolean | `false` | Include PVC data in backups by default. Requires `nodeAgent.enabled: true`.  |
+| `configuration.features`                    | string  | `""`    | Comma-separated Velero feature flags.                                        |
+| `configuration.extraArgs`                   | array   | `[]`    | Extra server arguments.                                                      |
+| `configuration.extraEnvVars`                | array   | `[]`    | Extra environment variables for the Velero server and node-agent.            |
+
+### Backup Storage Locations
+
+The default entry uses the AWS plugin in S3-compatible mode. For real AWS S3, omit `s3Url`.
+
+| Parameter                                                             | Type    | Default     | Description                                       |
+| --------------------------------------------------------------------- | ------- | ----------- | ------------------------------------------------- |
+| `configuration.backupStorageLocations[].name`                         | string  | `default`   | BSL name.                                         |
+| `configuration.backupStorageLocations[].provider`                     | string  | `aws`       | Provider plugin name.                             |
+| `configuration.backupStorageLocations[].bucket`                       | string  | `""`        | S3 bucket name.                                   |
+| `configuration.backupStorageLocations[].prefix`                       | string  | `""`        | Optional key prefix within the bucket.            |
+| `configuration.backupStorageLocations[].default`                      | boolean | `true`      | Mark as the default BSL.                          |
+| `configuration.backupStorageLocations[].accessMode`                   | string  | `ReadWrite` | `ReadWrite` for primary, `ReadOnly` for DR.       |
+| `configuration.backupStorageLocations[].config.region`                | string  | `us-east-1` | S3 region (use a custom string for MinIO).        |
+| `configuration.backupStorageLocations[].config.s3Url`                 | string  | `""`        | S3-compatible endpoint. Empty = AWS S3.           |
+| `configuration.backupStorageLocations[].config.s3ForcePathStyle`      | boolean | `true`      | Required for MinIO and most S3-compatible stores. |
+| `configuration.backupStorageLocations[].config.insecureSkipTLSVerify` | boolean | `false`     | Skip TLS verification (dev/MinIO HTTP only).      |
+
+### Schedules
+
+Schedules are rendered as Velero `Schedule` CRDs. The `template.ttl` in each schedule overrides the
+server-level `defaultBackupTTL`.
+
+| Parameter                                       | Type    | Description                                              |
+| ----------------------------------------------- | ------- | -------------------------------------------------------- |
+| `schedules[].name`                              | string  | Schedule name.                                           |
+| `schedules[].schedule`                          | string  | Cron expression for the backup schedule.                 |
+| `schedules[].template.ttl`                      | string  | Backup TTL for this schedule (overrides server default). |
+| `schedules[].template.includedNamespaces`       | array   | Namespaces to include. Empty = all namespaces.           |
+| `schedules[].template.defaultVolumesToFsBackup` | boolean | Include PVC data in this schedule's backups.             |
+| `schedules[].template.snapshotVolumes`          | boolean | Use volume snapshots (requires cloud provider support).  |
+
+### Node Agent (Filesystem Backup)
+
+<Callout type="info" title="node-agent runs as a DaemonSet on every node">
+  The node-agent requires host path access to pod volume directories. It runs as root (`runAsUser: 0`) by design — this
+  is necessary to read PVC mount paths on the node filesystem. Enabling node-agent is the only way to include PVC data
+  in backups via filesystem copy.
+</Callout>
+
+| Parameter                      | Type    | Default                    | Description                                             |
+| ------------------------------ | ------- | -------------------------- | ------------------------------------------------------- |
+| `nodeAgent.enabled`            | boolean | `false`                    | Deploy the node-agent DaemonSet for filesystem backup.  |
+| `nodeAgent.podVolumePath`      | string  | `/var/lib/kubelet/pods`    | Host path to pod volume directories.                    |
+| `nodeAgent.pluginVolumePath`   | string  | `/var/lib/kubelet/plugins` | Host path to kubelet plugin directories.                |
+| `nodeAgent.useScratchEmptyDir` | boolean | `true`                     | Mount an `emptyDir` scratch volume into the node-agent. |
+| `nodeAgent.resources`          | object  | `{}`                       | Resources for node-agent containers.                    |
+
+### Metrics
+
+| Parameter                                 | Type    | Default     | Description                                  |
+| ----------------------------------------- | ------- | ----------- | -------------------------------------------- |
+| `metrics.enabled`                         | boolean | `true`      | Expose Velero metrics on a Service.          |
+| `metrics.service.type`                    | string  | `ClusterIP` | Metrics service type.                        |
+| `metrics.service.port`                    | integer | `8085`      | Metrics service port.                        |
+| `metrics.serviceMonitor.enabled`          | boolean | `false`     | Create a Prometheus Operator ServiceMonitor. |
+| `metrics.serviceMonitor.interval`         | string  | `30s`       | Metrics scrape interval.                     |
+| `metrics.serviceMonitor.scrapeTimeout`    | string  | `10s`       | Metrics scrape timeout.                      |
+| `metrics.serviceMonitor.additionalLabels` | object  | `{}`        | Extra labels for the ServiceMonitor.         |
+
+### Resources and Security
+
+| Parameter                       | Type    | Default | Description                                                                |
+| ------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests and limits for the Velero server.                  |
+| `terminationGracePeriodSeconds` | integer | `3600`  | Grace period (1 hour). Allows in-progress backups or restores to complete. |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the Velero server pod.                                   |
+| `podSecurityContext`            | object  | `{}`    | Pod-level security context.                                                |
+
+### Service Account
+
+| Parameter                           | Type    | Default | Description                                                  |
+| ----------------------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `serviceAccount.server.create`      | boolean | `true`  | Create the Velero service account.                           |
+| `serviceAccount.server.name`        | string  | `""`    | Override the service account name.                           |
+| `serviceAccount.server.annotations` | object  | `{}`    | Annotations for the service account (e.g. IRSA for AWS EKS). |
+
+### Scheduling
+
+| Parameter           | Type   | Default | Description                        |
+| ------------------- | ------ | ------- | ---------------------------------- |
+| `nodeSelector`      | object | `{}`    | Node selector for the server pod.  |
+| `tolerations`       | array  | `[]`    | Tolerations for the server pod.    |
+| `affinity`          | object | `{}`    | Affinity rules for the server pod. |
+| `priorityClassName` | string | `""`    | PriorityClass for the server pod.  |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                     |
+| ------------------- | ----- | ------- | ----------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes for the server pod.               |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the server container.   |
+| `extraObjects`      | array | `[]`    | Extra Kubernetes manifests rendered with `tpl`. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/velero) on GitHub.
+- [Velero Official Website](https://velero.io)
+- [Velero Documentation](https://velero.io/docs/)
+- [Velero GitHub Repository](https://github.com/vmware-tanzu/velero)
+- [HelmForge Velero Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/velero)

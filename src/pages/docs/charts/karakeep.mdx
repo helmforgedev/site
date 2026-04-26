@@ -1,21 +1,40 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Karakeep Chart
-description: HelmForge Karakeep chart — AI-powered bookmark manager with Meilisearch and Chromium sidecars.
+description: HelmForge Karakeep chart — AI-powered bookmark manager with optional Meilisearch full-text search and Chromium screenshot sidecars for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Karakeep
 
-Deploy Karakeep on Kubernetes using the official [karakeep-app/karakeep](https://github.com/karakeep-app/karakeep) container image. Karakeep is an AI-powered bookmark manager with full-text search via Meilisearch, automatic web page screenshots via Chromium, and intelligent tagging.
+AI-powered bookmark manager. Karakeep saves links with full-text content archival, automatic screenshots via a
+headless Chromium browser, full-text search via Meilisearch, and optional AI-driven automatic tagging. All data
+is stored in SQLite on a single persistent volume.
+
+## Architecture
+
+Karakeep runs as a single pod with optional sidecars sharing the same PVC:
+
+- **karakeep** — main application (Next.js)
+- **meilisearch** _(optional)_ — full-text search engine, indexes archived content
+- **chromium** _(optional)_ — headless browser for web page screenshots and archiving
+
+<Callout type="warning" title="Chromium and Meilisearch require significant resources">
+  With both sidecars enabled (the default), the pod requires at least **1.5–2 GB RAM** to operate stably. The Chromium
+  sidecar alone needs ~500 MB on startup. On resource-constrained clusters (e.g. Raspberry Pi), disable one or both
+  sidecars and set explicit `resources` limits for the remaining containers.
+</Callout>
 
 ## Key Features
 
-- **Meilisearch Sidecar** — optional full-text search engine running alongside the app
-- **Chromium Sidecar** — optional headless browser for web page screenshots and archiving
-- **AI Tagging** — automatic bookmark categorization and tagging
-- **Full-Text Search** — search across bookmarks, tags, and archived content
-- **Persistence** — persistent storage for SQLite database and uploaded files
-- **Lightweight** — single-pod deployment with optional sidecars
+- **Meilisearch sidecar** — optional full-text search across bookmarks and archived content
+- **Chromium sidecar** — optional headless browser for automatic web page screenshots
+- **AI tagging** — automatic categorization via OpenAI or Ollama (configured via `extraEnv`)
+- **SQLite storage** — embedded database, no external database required
+- **Persistent storage** — single PVC shared by all containers
+- **Ingress support** — TLS via cert-manager with configurable ingress class
 
 ## Installation
 
@@ -33,12 +52,112 @@ helm install karakeep helmforge/karakeep
 helm install karakeep oci://ghcr.io/helmforgedev/helm/karakeep
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'full', label: 'Full (All Sidecars)' },
+    { id: 'lightweight', label: 'Lightweight' },
+    { id: 'ai', label: 'With AI Tagging' },
+    { id: 'resources', label: 'With Resource Limits' },
+  ]}
+>
+
+<div data-tab-panel="full">
 
 ```yaml
-# values.yaml
+# values.yaml — Karakeep with Meilisearch and Chromium (default)
 karakeep:
   nextAuthUrl: 'https://karakeep.example.com'
+
+meilisearch:
+  enabled: true
+
+chromium:
+  enabled: true
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: karakeep.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: karakeep-tls
+      hosts:
+        - karakeep.example.com
+```
+
+</div>
+
+<div data-tab-panel="lightweight">
+
+```yaml
+# values.yaml — Lightweight mode without sidecars
+# Suitable for resource-constrained environments (ARM, Raspberry Pi)
+# Full-text search and automatic screenshots will be unavailable.
+karakeep:
+  nextAuthUrl: 'https://karakeep.example.com'
+
+meilisearch:
+  enabled: false
+
+chromium:
+  enabled: false
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: karakeep.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="ai">
+
+```yaml
+# values.yaml — Karakeep with OpenAI automatic tagging
+karakeep:
+  nextAuthUrl: 'https://karakeep.example.com'
+  extraEnv:
+    # OpenAI integration for automatic AI tagging
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: karakeep-ai-secret
+          key: openai-api-key
+    - name: OPENAI_BASE_URL
+      value: 'https://api.openai.com/v1'
+
+    # Alternative: use Ollama for local AI inference
+    # - name: OLLAMA_BASE_URL
+    #   value: 'http://ollama.ollama.svc:11434'
+    # - name: INFERENCE_TEXT_MODEL
+    #   value: 'llama3.2'
 
 meilisearch:
   enabled: true
@@ -60,18 +179,228 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                    | Default | Description                                     |
-| ---------------------- | ------- | ----------------------------------------------- |
-| `karakeep.nextAuthUrl` | `""`    | Public URL of the Karakeep instance             |
-| `meilisearch.enabled`  | `true`  | Enable Meilisearch sidecar for full-text search |
-| `chromium.enabled`     | `true`  | Enable Chromium sidecar for screenshots         |
-| `persistence.enabled`  | `true`  | Enable persistent storage                       |
-| `persistence.size`     | `10Gi`  | PVC size                                        |
-| `ingress.enabled`      | `false` | Enable ingress                                  |
+<div data-tab-panel="resources">
+
+```yaml
+# values.yaml — Production setup with explicit resource limits per container
+karakeep:
+  nextAuthUrl: 'https://karakeep.example.com'
+
+meilisearch:
+  enabled: true
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+chromium:
+  enabled: true
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: karakeep.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                         | Description                          |
+| ------------------ | ------ | ------------------------------- | ------------------------------------ |
+| `image.repository` | string | `ghcr.io/karakeep-app/karakeep` | Karakeep container image.            |
+| `image.tag`        | string | `"0.31.0"`                      | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
+
+### Karakeep Configuration
+
+| Parameter              | Type   | Default | Description                                                                      |
+| ---------------------- | ------ | ------- | -------------------------------------------------------------------------------- |
+| `karakeep.nextAuthUrl` | string | `""`    | Public URL of the instance. Used as `NEXTAUTH_URL` for authentication callbacks. |
+| `karakeep.extraEnv`    | array  | `[]`    | Extra environment variables for AI integration and advanced configuration.       |
+
+<Callout type="warning" title="nextAuthUrl must match your exact public URL">
+  Karakeep uses Next.js authentication (NextAuth). The `NEXTAUTH_URL` must exactly match the URL your users use to
+  access the app — including the scheme (`https://`) and without a trailing slash. A mismatch causes login redirects to
+  fail or sessions to be rejected.
+</Callout>
+
+<Callout type="tip" title="Enable AI tagging via extraEnv">
+  Karakeep supports automatic AI-powered tagging using OpenAI or a local Ollama instance. Configure the integration by
+  setting `OPENAI_API_KEY` (and optionally `OPENAI_BASE_URL`) or `OLLAMA_BASE_URL` and `INFERENCE_TEXT_MODEL` via
+  `karakeep.extraEnv`. See the [Karakeep AI documentation](https://docs.karakeep.app/configuration) for the full list of
+  supported variables.
+</Callout>
+
+### Meilisearch Sidecar
+
+| Parameter                      | Type    | Default                          | Description                                          |
+| ------------------------------ | ------- | -------------------------------- | ---------------------------------------------------- |
+| `meilisearch.enabled`          | boolean | `true`                           | Enable the Meilisearch sidecar for full-text search. |
+| `meilisearch.image.repository` | string  | `docker.io/getmeili/meilisearch` | Meilisearch container image.                         |
+| `meilisearch.image.tag`        | string  | `"v1.41.0"`                      | Meilisearch image tag.                               |
+| `meilisearch.image.pullPolicy` | string  | `IfNotPresent`                   | Meilisearch image pull policy.                       |
+| `meilisearch.resources`        | object  | `{}`                             | CPU and memory requests and limits for Meilisearch.  |
+
+### Chromium Sidecar
+
+| Parameter                   | Type    | Default                        | Description                                                |
+| --------------------------- | ------- | ------------------------------ | ---------------------------------------------------------- |
+| `chromium.enabled`          | boolean | `true`                         | Enable the Chromium sidecar for screenshots and archiving. |
+| `chromium.image.repository` | string  | `ghcr.io/browserless/chromium` | Chromium container image.                                  |
+| `chromium.image.tag`        | string  | `"v2.46.0"`                    | Chromium image tag.                                        |
+| `chromium.image.pullPolicy` | string  | `IfNotPresent`                 | Chromium image pull policy.                                |
+| `chromium.resources`        | object  | `{}`                           | CPU and memory requests and limits for Chromium.           |
+
+### Persistence
+
+All containers in the pod share the same PVC. SQLite database, Meilisearch index, and uploaded files are
+all stored within this volume.
+
+| Parameter                   | Type    | Default             | Description                                                   |
+| --------------------------- | ------- | ------------------- | ------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for application data, search index, and uploads. |
+| `persistence.size`          | string  | `10Gi`              | PVC size.                                                     |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                     |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                             |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                  |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+These values apply to the main Karakeep container. Set `meilisearch.resources` and `chromium.resources` separately
+for the sidecars.
+
+| Parameter            | Type   | Default | Description                                      |
+| -------------------- | ------ | ------- | ------------------------------------------------ |
+| `resources`          | object | `{}`    | CPU and memory requests and limits for Karakeep. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.                      |
+| `securityContext`    | object | `{}`    | Container-level security context.                |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Pod OOMKilled with both sidecars enabled">
+  If the pod is killed shortly after startup with `OOMKilled`, the Chromium sidecar is most likely the cause. Set
+  explicit `chromium.resources.limits.memory` (at least `1Gi`) and `meilisearch.resources.limits.memory` (at least
+  `512Mi`). Check `kubectl describe pod` for which container was killed.
+</Callout>
+
+<Callout type="tip" title="Bookmarks saved but no screenshots appearing">
+  Screenshots require the Chromium sidecar to be running. Verify that `chromium.enabled: true` and check the
+  Chromium container logs: `kubectl logs <pod> -c chromium`. On ARM64 nodes, ensure the Chromium image has an
+  ARM64 variant available for your tag.
+</Callout>
 
 ## More Information
 
-- [Karakeep documentation](https://docs.karakeep.app)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/karakeep)
+- [Karakeep Official Website](https://karakeep.app)
+- [Karakeep Documentation](https://docs.karakeep.app)
+- [Karakeep GitHub Repository](https://github.com/karakeep-app/karakeep)
+- [HelmForge Karakeep Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/karakeep)

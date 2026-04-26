@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: MongoDB Chart
-description: HelmForge MongoDB chart — MongoDB with standalone and replica set configurations for Kubernetes.
+description: HelmForge MongoDB chart — standalone, replica set, and sharded cluster with official mongo image, replicaSetKey internal authentication, mongodump S3 backup, WiredTiger config, init scripts, Prometheus exporter, and non-root security context.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,16 +9,37 @@ import Callout from '../../../components/Callout.astro';
 
 # MongoDB
 
-Production-ready MongoDB deployment with support for standalone and replica set configurations.
+Deploy [MongoDB](https://www.mongodb.com/) on Kubernetes using the official `mongo` Docker image.
+Supports standalone single-instance, replica set for high availability, and sharded cluster for
+horizontal scalability.
+
+<Callout type="danger" title="Replica set keyFile must not change — rotating it breaks internal member authentication">
+  Replica set members authenticate each other using a shared keyFile (`auth.replicaSetKey`). If the key is not persisted
+  via `auth.existingKeySecret`, it is auto-generated on first deployment. **Rotating or regenerating this key after
+  initialization will cause all replica set members to reject each other**, resulting in a split-brain or total replica
+  set failure. Always persist it via `auth.existingKeySecret` before the first replica set deployment.
+</Callout>
+
+<Callout
+  type="warning"
+  title="Auth credentials are set on first initialization only — they cannot be changed via values on upgrade"
+>
+  `auth.rootPassword` and user passwords defined in `auth.users` are written during the first container initialization
+  (`/docker-entrypoint-initdb.d/`). Changing these values in a subsequent `helm upgrade` has **no effect** on the
+  running container. To rotate credentials, connect to MongoDB directly using the mongo shell (`db.updateUser()` /
+  `db.changeUserPassword()`).
+</Callout>
 
 ## Key Features
 
-- **Standalone and replica set** — Single instance or multi-member replica set
-- **Automatic initialization** — Init scripts and custom configuration
-- **Metrics** — Prometheus exporter with ServiceMonitor
-- **Security** — Authentication, non-root containers, network policies
-- **Persistent storage** — Configurable PVCs with storage class selection
-- **Arbiter support** — Optional arbiter for replica set elections
+- **Three architectures** — standalone, replica set, sharded cluster
+- **Replica set HA** — `rs0` with configurable member count and optional arbiter
+- **Sharded cluster** — mongos routers, config servers, and data shards
+- **Internal keyFile auth** — replica set member authentication via shared secret
+- **Init scripts** — `.js` and `.sh` files via `/docker-entrypoint-initdb.d/`
+- **WiredTiger tuning** — custom `mongod.conf` via `config` block
+- **Prometheus exporter** — `percona/mongodb_exporter` sidecar with ServiceMonitor
+- **`mongodump` backup** — scheduled S3 backup CronJob
 
 ## Installation
 
@@ -27,37 +48,52 @@ Production-ready MongoDB deployment with support for standalone and replica set 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-mongo helmforge/mongodb
+helm install my-mongo helmforge/mongodb -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-mongo oci://ghcr.io/helmforgedev/helm/mongodb
+helm install my-mongo oci://ghcr.io/helmforgedev/helm/mongodb -f values.yaml
 ```
 
 ## Deployment Examples
 
-<DocsTabs tabs={[
-  { id: 'standalone', label: 'Standalone' },
-  { id: 'replicaset', label: 'Replica Set' },
-  { id: 'arbiter', label: 'With Arbiter' },
-]}>
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone' },
+    { id: 'replicaset', label: 'Replica Set' },
+    { id: 'arbiter', label: 'With Arbiter' },
+    { id: 'sharded', label: 'Sharded Cluster' },
+  ]}
+>
 
 <div data-tab-panel="standalone">
 
 ```yaml
-# values.yaml
+# values.yaml — MongoDB standalone (single instance)
 architecture: standalone
 
 auth:
-  rootPassword: 'my-secret-password'
-  database: myapp
-  username: myuser
-  password: 'user-password'
+  enabled: true
+  rootUser: root
+  existingSecret: mongodb-root-credentials # keys: mongodb-root-username, mongodb-root-password
+  users:
+    - username: appuser
+      password: 'app-password'
+      database: myapp
+      roles:
+        - { role: readWrite, db: myapp }
 
 persistence:
+  enabled: true
   size: 20Gi
+
+config:
+  storage:
+    wiredTiger:
+      engineConfig:
+        cacheSizeGB: 1 # set to ~50% of available memory minus OS overhead
 
 metrics:
   enabled: true
@@ -70,19 +106,37 @@ metrics:
 <div data-tab-panel="replicaset">
 
 ```yaml
-# values.yaml
+# values.yaml — MongoDB replica set (3 members, HA)
 architecture: replicaset
 
 auth:
-  rootPassword: 'my-secret-password'
-  database: myapp
-  username: myuser
-  password: 'user-password'
+  enabled: true
+  existingSecret: mongodb-root-credentials
+  existingKeySecret: mongodb-replica-key # key: mongodb-replica-set-key (must not change)
 
-replicaCount: 3
+replicaSet:
+  name: rs0
+  members: 3
 
 persistence:
-  size: 20Gi
+  enabled: true
+  size: 50Gi
+
+config:
+  storage:
+    wiredTiger:
+      engineConfig:
+        cacheSizeGB: 2
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+```bash
+# Connection string for replica set:
+# mongodb://appuser:pass@my-mongo-mongodb-headless.namespace.svc:27017/myapp?replicaSet=rs0
 ```
 
 </div>
@@ -90,20 +144,25 @@ persistence:
 <div data-tab-panel="arbiter">
 
 ```yaml
-# values.yaml
+# values.yaml — Replica set with arbiter (2 data members + 1 arbiter)
+# Use when you want odd-number election votes without a 3rd data-bearing member
 architecture: replicaset
 
 auth:
-  rootPassword: 'my-secret-password'
-  database: myapp
+  enabled: true
+  existingSecret: mongodb-root-credentials
+  existingKeySecret: mongodb-replica-key
 
-replicaCount: 2
-
-persistence:
-  size: 20Gi
+replicaSet:
+  name: rs0
+  members: 2 # 2 data-bearing members; arbiter provides the 3rd vote
 
 arbiter:
+  enabled: true # lightweight pod: votes in elections but stores no data
+
+persistence:
   enabled: true
+  size: 50Gi
 ```
 
 <Callout type="info" title="When to use an arbiter">
@@ -113,50 +172,141 @@ arbiter:
 
 </div>
 
+<div data-tab-panel="sharded">
+
+```yaml
+# values.yaml — MongoDB sharded cluster (2 shards, 3 members each)
+architecture: sharded
+
+auth:
+  enabled: true
+  existingSecret: mongodb-root-credentials
+  existingKeySecret: mongodb-replica-key # shared across all replica sets in the cluster
+
+sharded:
+  mongos:
+    replicaCount: 2 # query routing layer
+    port: 27017
+  configServer:
+    replicaCount: 3 # cluster metadata (must be odd)
+    persistence:
+      size: 10Gi
+  shards:
+    count: 2 # number of shards
+    membersPerShard: 3 # members per shard replica set
+    persistence:
+      size: 100Gi
+
+config:
+  storage:
+    wiredTiger:
+      engineConfig:
+        cacheSizeGB: 4
+```
+
+<Callout type="info" title="Connect to a sharded cluster via mongos, not shard members directly">
+  Always connect to the `mongos` service, not to individual shard replica set members. Shards should only be accessed
+  directly for administrative operations.
+</Callout>
+
+</div>
+
 </DocsTabs>
 
-## Key Values
+## Configuration Reference
 
-| Key                              | Type    | Default      | Description                                           |
-| -------------------------------- | ------- | ------------ | ----------------------------------------------------- |
-| `architecture`                   | string  | `standalone` | Deployment architecture: `standalone` or `replicaset` |
-| `auth.rootPassword`              | string  | `""`         | MongoDB root password                                 |
-| `auth.database`                  | string  | `""`         | Default database to create                            |
-| `auth.username`                  | string  | `""`         | Default user to create                                |
-| `auth.password`                  | string  | `""`         | Password for default user                             |
-| `replicaCount`                   | integer | `1`          | Number of replica set members                         |
-| `persistence.size`               | string  | `8Gi`        | PVC size                                              |
-| `persistence.storageClass`       | string  | `""`         | Storage class for PVC                                 |
-| `resources.requests.memory`      | string  | `256Mi`      | Memory request                                        |
-| `resources.requests.cpu`         | string  | `250m`       | CPU request                                           |
-| `arbiter.enabled`                | boolean | `false`      | Enable arbiter node                                   |
-| `metrics.enabled`                | boolean | `false`      | Enable Prometheus exporter                            |
-| `metrics.serviceMonitor.enabled` | boolean | `false`      | Create ServiceMonitor resource                        |
-| `networkPolicy.enabled`          | boolean | `false`      | Enable network policies                               |
+### Image
+
+| Parameter          | Type   | Default                   | Description    |
+| ------------------ | ------ | ------------------------- | -------------- |
+| `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
+| `image.tag`        | string | `"8.2.6"`                 | Image tag.     |
+
+### Authentication
+
+| Parameter                | Type    | Default | Description                                                                                                    |
+| ------------------------ | ------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `auth.enabled`           | boolean | `true`  | Enable MongoDB `--auth` flag.                                                                                  |
+| `auth.rootUser`          | string  | `root`  | Root username (`MONGO_INITDB_ROOT_USERNAME`).                                                                  |
+| `auth.rootPassword`      | string  | `""`    | Root password. Auto-generated if empty. **Set only on first deployment.**                                      |
+| `auth.existingSecret`    | string  | `""`    | Existing secret. Keys: `mongodb-root-username`, `mongodb-root-password`.                                       |
+| `auth.replicaSetKey`     | string  | `""`    | KeyFile for internal replica set auth. Auto-generated if empty.                                                |
+| `auth.existingKeySecret` | string  | `""`    | Existing secret with keyFile. Key: `mongodb-replica-set-key`. **Persist before first replica set deployment.** |
+| `auth.users`             | array   | `[]`    | Additional users to create on first startup.                                                                   |
+
+### Architecture
+
+| Parameter            | Type    | Default      | Description                                              |
+| -------------------- | ------- | ------------ | -------------------------------------------------------- |
+| `architecture`       | string  | `standalone` | `standalone`, `replicaset`, or `sharded`.                |
+| `replicaSet.name`    | string  | `rs0`        | Replica set name.                                        |
+| `replicaSet.members` | integer | `3`          | Number of data-bearing replica set members.              |
+| `arbiter.enabled`    | boolean | `false`      | Add an arbiter pod (votes in elections, stores no data). |
+
+### Sharded Cluster
+
+| Parameter                               | Type    | Default | Description                          |
+| --------------------------------------- | ------- | ------- | ------------------------------------ |
+| `sharded.mongos.replicaCount`           | integer | `2`     | Number of mongos router pods.        |
+| `sharded.configServer.replicaCount`     | integer | `3`     | Config server members (must be odd). |
+| `sharded.configServer.persistence.size` | string  | `8Gi`   | Config server PVC size.              |
+| `sharded.shards.count`                  | integer | `2`     | Number of shards.                    |
+| `sharded.shards.membersPerShard`        | integer | `3`     | Replica set members per shard.       |
+| `sharded.shards.persistence.size`       | string  | `16Gi`  | Data PVC size per shard member.      |
+
+### Persistence and Configuration
+
+| Parameter             | Type    | Default | Description                                                  |
+| --------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `persistence.enabled` | boolean | `true`  | Enable PVC for data (StatefulSet volumeClaimTemplate).       |
+| `persistence.size`    | string  | `8Gi`   | PVC size per member.                                         |
+| `config`              | object  | `{}`    | Custom `mongod.conf` content (WiredTiger cache, profiling).  |
+| `port`                | integer | `27017` | MongoDB listen port.                                         |
+| `initdbScripts`       | object  | `{}`    | `.js`/`.sh` init scripts via `/docker-entrypoint-initdb.d/`. |
+
+<Callout type="tip" title="Set WiredTiger cache to ~50% of available memory">
+  MongoDB's WiredTiger engine defaults to 50% of available RAM for its cache. Always set `resources.limits.memory` and
+  tune `config.storage.wiredTiger.engineConfig.cacheSizeGB` explicitly to avoid OOM kills. For example, a pod with 4 GiB
+  memory limit should use `cacheSizeGB: 1.5` (leaving headroom for OS and index overhead).
+</Callout>
+
+### Metrics
+
+| Parameter                        | Type    | Default | Description                                |
+| -------------------------------- | ------- | ------- | ------------------------------------------ |
+| `metrics.enabled`                | boolean | `false` | Deploy `percona/mongodb_exporter` sidecar. |
+| `metrics.port`                   | integer | `9216`  | Exporter metrics port.                     |
+| `metrics.serviceMonitor.enabled` | boolean | `false` | Create Prometheus ServiceMonitor resource. |
+
+### Backup
+
+Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
+
+| Parameter                       | Type    | Default       | Description                             |
+| ------------------------------- | ------- | ------------- | --------------------------------------- |
+| `backup.enabled`                | boolean | `false`       | Enable scheduled `mongodump` S3 backup. |
+| `backup.schedule`               | string  | `"0 3 * * *"` | Cron schedule.                          |
+| `backup.s3.endpoint`            | string  | `""`          | S3-compatible endpoint URL.             |
+| `backup.s3.bucket`              | string  | `""`          | Target bucket name.                     |
+| `backup.s3.existingSecret`      | string  | `""`          | Existing secret with S3 credentials.    |
+| `backup.database.mongoDumpArgs` | string  | `""`          | Extra `mongodump` arguments.            |
+| `extraManifests`                | array   | `[]`          | Extra Kubernetes manifests.             |
 
 ## Upgrade Notes
 
-<Callout type="warning" title="Replica set reconfiguration">
-  Changing `replicaCount` triggers a replica set reconfiguration. MongoDB handles this gracefully, but scaling down
-  removes members — ensure no data is exclusively on the removed members.
-</Callout>
+<Callout type="warning" title="Switching from standalone to replicaset requires a full dump and restore">
+  MongoDB cannot automatically convert a standalone instance to a replica set with data. You must:
+  1. Dump the data with `mongodump`.
+  2. Deploy the chart in `replicaset` mode.
+  3. Restore data with `mongorestore`.
 
-- Upgrading from standalone to replicaset requires re-initialization (dump and restore)
-- Auth credentials are set during first initialization and cannot be changed via values on upgrade
-- WiredTiger cache size defaults to 50% of available memory — set `resources.limits.memory` accordingly
+Changing `replicaSet.members` on an existing replica set triggers a reconfiguration.
+Scaling down removes members — ensure no data is exclusively on the removed members.
 
-## Common Issues
-
-<Callout type="danger" title="Replica set members stuck in RECOVERING">
-  This usually means initial sync is still in progress for large datasets. Check sync progress with `rs.status()` inside
-  the mongo shell. If it persists, check disk IOPS and network bandwidth.
-</Callout>
-
-<Callout type="tip" title="Connection string for replica sets">
-  Use the full replica set connection string with all members listed, or use the headless service DNS:
-  `mongodb://user:pass@my-mongo-mongodb-headless.namespace.svc:27017/mydb?replicaSet=rs0`
 </Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mongodb) on GitHub.
+- [MongoDB Official Documentation](https://www.mongodb.com/docs/)
+- [MongoDB Docker Hub](https://hub.docker.com/_/mongo)
+- [HelmForge MongoDB Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/mongodb)

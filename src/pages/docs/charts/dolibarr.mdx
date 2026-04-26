@@ -1,26 +1,38 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Dolibarr
-description: Helm chart for Dolibarr ERP/CRM on Kubernetes with MySQL support.
+title: Dolibarr Chart
+description: HelmForge Dolibarr chart — ERP and CRM with unattended installation, module management, separate documents and custom-modules PVCs, MySQL backend, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Dolibarr
 
-Helm chart for deploying [Dolibarr ERP/CRM](https://www.dolibarr.org/) on Kubernetes using the official [`dolibarr/dolibarr`](https://hub.docker.com/r/dolibarr/dolibarr) Docker image.
+Open-source ERP and CRM platform for small and medium businesses. Dolibarr covers invoicing, order
+management, stock, CRM contacts, project tracking, HR, and 500+ optional modules — all in a single
+PHP application backed by MySQL.
+
+<Callout type="warning" title="S3 backup covers MySQL only — documents and custom modules are not included">
+  The built-in S3 backup CronJob runs `mysqldump` against the MySQL database. The two persistent volumes
+  (`persistence.documents` and `persistence.custom`) — which contain uploaded files, generated documents (invoices,
+  proposals, delivery notes), and custom PHP modules — **are not included in this backup**. Implement a separate backup
+  strategy (e.g. Velero PVC snapshots) for both volumes.
+</Callout>
 
 ## Key Features
 
-- **Official Dolibarr image** based on `dolibarr/dolibarr`
-- **MySQL subchart** bundled HelmForge MySQL dependency
-- **External MySQL/MariaDB** connect to a managed database
-- **Auto installation** unattended setup via `DOLI_*` environment variables
-- **Persistent storage** separate PVCs for documents and custom modules
-- **Ingress support** configurable ingress with TLS
-- **Secret preservation** admin, runtime, and database secrets preserved across upgrades
+- **Unattended installation** — `DOLI_*` environment variables configure the full setup on first boot
+- **Module selection** — enable specific Dolibarr modules at install time via `enableModules`
+- **Dual PVC storage** — separate volumes for generated documents and custom PHP modules
+- **MySQL backend** — bundled HelmForge MySQL subchart or external MySQL/MariaDB
+- **PHP tuning** — configurable `memory_limit`, `upload_max_filesize`, `post_max_size`, and `max_execution_time`
+- **Secret preservation** — admin and runtime secrets survive upgrades via `existingSecret`
+- **S3 backup** — scheduled `mysqldump` CronJob to S3-compatible storage
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,29 +40,119 @@ helm repo update
 helm install dolibarr helmforge/dolibarr
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
 helm install dolibarr oci://ghcr.io/helmforgedev/helm/dolibarr
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production (TLS + Backup)' },
+    { id: 'external-db', label: 'External MySQL' },
+    { id: 'php-tuning', label: 'PHP Tuning' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Dolibarr with bundled MySQL and core ERP modules
 dolibarr:
   siteUrl: 'https://erp.example.com'
-  companyName: 'Example Corp'
+  companyName: 'Acme Corp'
   companyCountryCode: 'US'
+  timezone: 'America/New_York'
+  installAuto: true
+  prod: true
+  # Enable core ERP modules on first boot
   enableModules: 'societe,produit,service,propal,commande,facture'
+
+admin:
+  login: admin
+  password: 'change-me-now'
 
 mysql:
   enabled: true
   auth:
-    password: 'change-me'
+    password: 'mysql-password'
+
+persistence:
+  documents:
+    enabled: true
+    size: 8Gi
+  custom:
+    enabled: true
+    size: 2Gi
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  hosts:
+    - host: erp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Production Dolibarr with TLS, S3 backup, and secret management
+dolibarr:
+  siteUrl: 'https://erp.example.com'
+  companyName: 'Acme Corp'
+  companyCountryCode: 'US'
+  timezone: 'America/Sao_Paulo'
+  installAuto: true
+  prod: true
+  initDemo: false # never enable in production
+  enableModules: 'societe,produit,service,propal,commande,facture,stock,projet'
+
+admin:
+  existingSecret: dolibarr-admin-secret
+  existingSecretPasswordKey: admin-password
+
+mysql:
+  enabled: true
+  auth:
+    password: 'mysql-password'
+
+persistence:
+  documents:
+    enabled: true
+    size: 20Gi
+  custom:
+    enabled: true
+    size: 2Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-dolibarr-backups
+    prefix: dolibarr
+    existingSecret: dolibarr-s3-credentials
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 500m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: erp.example.com
       paths:
@@ -62,26 +164,305 @@ ingress:
         - erp.example.com
 ```
 
-## Key Values
+</div>
 
-| Key                             | Default    | Description                                             |
-| ------------------------------- | ---------- | ------------------------------------------------------- |
-| `dolibarr.siteUrl`              | `""`       | Full external URL (auto-detected from ingress if empty) |
-| `dolibarr.companyName`          | `Dolibarr` | Company name for unattended setup                       |
-| `dolibarr.companyCountryCode`   | `US`       | ISO country code                                        |
-| `dolibarr.installAuto`          | `true`     | Enable unattended installation                          |
-| `dolibarr.enableModules`        | `""`       | Comma-separated modules to enable on first boot         |
-| `admin.login`                   | `admin`    | Admin login                                             |
-| `admin.password`                | `""`       | Admin password (auto-generated if empty)                |
-| `database.mode`                 | `auto`     | Database mode: `auto`, `external`, `mysql`              |
-| `mysql.enabled`                 | `true`     | Deploy MySQL subchart                                   |
-| `persistence.documents.enabled` | `true`     | Persist `/var/www/documents`                            |
-| `persistence.documents.size`    | `8Gi`      | Documents PVC size                                      |
-| `persistence.custom.enabled`    | `true`     | Persist `/var/www/html/custom`                          |
-| `persistence.custom.size`       | `2Gi`      | Custom modules PVC size                                 |
-| `ingress.enabled`               | `false`    | Enable ingress                                          |
-| `ingress.ingressClassName`      | `""`       | Ingress class (`traefik`, `nginx`, etc.)                |
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — Dolibarr with external managed MySQL or MariaDB
+dolibarr:
+  siteUrl: 'https://erp.example.com'
+  companyName: 'Acme Corp'
+  companyCountryCode: 'BR'
+
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    port: 3306
+    name: dolibarr
+    username: dolibarr
+    existingSecret: dolibarr-db-credentials
+    existingSecretPasswordKey: database-password
+
+mysql:
+  enabled: false
+
+persistence:
+  documents:
+    enabled: true
+    size: 20Gi
+  custom:
+    enabled: true
+    size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: erp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="php-tuning">
+
+```yaml
+# values.yaml — PHP limits tuned for large document and spreadsheet imports
+# Default PHP upload_max_filesize is 2MB — insufficient for ERP use.
+dolibarr:
+  siteUrl: 'https://erp.example.com'
+  companyName: 'Acme Corp'
+  companyCountryCode: 'US'
+
+php:
+  memoryLimit: '512M'
+  uploadMaxFilesize: '64M'
+  postMaxSize: '64M'
+  maxExecutionTime: '120'
+
+mysql:
+  enabled: true
+  auth:
+    password: 'mysql-password'
+
+persistence:
+  documents:
+    enabled: true
+    size: 20Gi
+  custom:
+    enabled: true
+    size: 2Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description                          |
+| ------------------ | ------ | ----------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/dolibarr/dolibarr` | Dolibarr container image.            |
+| `image.tag`        | string | `"23.0.0"`                    | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+
+### Dolibarr Configuration
+
+| Parameter                     | Type    | Default    | Description                                                                  |
+| ----------------------------- | ------- | ---------- | ---------------------------------------------------------------------------- |
+| `dolibarr.siteUrl`            | string  | `""`       | Full public URL. Auto-detected from Ingress when empty.                      |
+| `dolibarr.companyName`        | string  | `Dolibarr` | Company name used in the unattended installation.                            |
+| `dolibarr.companyCountryCode` | string  | `US`       | ISO country code for the company.                                            |
+| `dolibarr.auth`               | string  | `dolibarr` | Authentication method.                                                       |
+| `dolibarr.enableModules`      | string  | `""`       | Comma-separated list of modules to enable on first boot. Empty = no modules. |
+| `dolibarr.installAuto`        | boolean | `true`     | Enable unattended installation via `DOLI_*` environment variables.           |
+| `dolibarr.initDemo`           | boolean | `false`    | Load demo data on first boot. Never use `true` in production.                |
+| `dolibarr.prod`               | boolean | `true`     | Production mode. Disables debug output and developer warnings.               |
+| `dolibarr.timezone`           | string  | `UTC`      | PHP timezone. Affects date/time display and report generation.               |
+| `dolibarr.extraEnv`           | array   | `[]`       | Extra environment variables for the container.                               |
+
+<Callout type="tip" title="Enable the modules you need on first boot">
+  `dolibarr.enableModules` accepts a comma-separated list of internal module names. Common modules: `societe`
+  (companies), `produit` (products), `service` (services), `propal` (proposals), `commande` (orders), `facture`
+  (invoices), `stock` (inventory), `projet` (projects). If left empty, no modules are activated and the installation
+  will appear empty — all modules must then be enabled manually from the UI.
+</Callout>
+
+### Admin Credentials
+
+| Parameter                         | Type   | Default          | Description                                            |
+| --------------------------------- | ------ | ---------------- | ------------------------------------------------------ |
+| `admin.login`                     | string | `admin`          | Admin username created on first install.               |
+| `admin.password`                  | string | `""`             | Admin password. Auto-generated if empty.               |
+| `admin.existingSecret`            | string | `""`             | Existing secret containing the admin password.         |
+| `admin.existingSecretPasswordKey` | string | `admin-password` | Key inside the existing secret for the admin password. |
+
+### Runtime Secret
+
+| Parameter                                   | Type   | Default              | Description                                           |
+| ------------------------------------------- | ------ | -------------------- | ----------------------------------------------------- |
+| `runtime.existingSecret`                    | string | `""`                 | Existing secret for the runtime instance unique ID.   |
+| `runtime.existingSecretInstanceUniqueIdKey` | string | `instance-unique-id` | Key inside the existing secret.                       |
+| `runtime.instanceUniqueId`                  | string | `""`                 | Explicit instance unique ID. Auto-generated if empty. |
+
+### Database
+
+| Parameter                                     | Type    | Default             | Description                                                   |
+| --------------------------------------------- | ------- | ------------------- | ------------------------------------------------------------- |
+| `database.mode`                               | string  | `auto`              | Database mode: `auto`, `external`, or `mysql`.                |
+| `database.external.host`                      | string  | `""`                | External MySQL/MariaDB hostname.                              |
+| `database.external.port`                      | integer | `3306`              | External database port.                                       |
+| `database.external.name`                      | string  | `dolibarr`          | Database name on the external server.                         |
+| `database.external.username`                  | string  | `dolibarr`          | Username for the external database.                           |
+| `database.external.password`                  | string  | `""`                | Password for the external database (prefer `existingSecret`). |
+| `database.external.existingSecret`            | string  | `""`                | Existing secret containing the database password.             |
+| `database.external.existingSecretPasswordKey` | string  | `database-password` | Key inside the existing secret.                               |
+| `database.external.ssl`                       | boolean | `false`             | Enable SSL for external database connections.                 |
+
+### MySQL Subchart
+
+| Parameter                           | Type    | Default      | Description                                   |
+| ----------------------------------- | ------- | ------------ | --------------------------------------------- |
+| `mysql.enabled`                     | boolean | `true`       | Deploy the bundled MySQL subchart.            |
+| `mysql.architecture`                | string  | `standalone` | MySQL architecture.                           |
+| `mysql.auth.database`               | string  | `dolibarr`   | Database name created by the subchart.        |
+| `mysql.auth.username`               | string  | `dolibarr`   | Database user created by the subchart.        |
+| `mysql.auth.password`               | string  | `""`         | Database password. Auto-generated if empty.   |
+| `mysql.auth.rootPassword`           | string  | `""`         | MySQL root password. Auto-generated if empty. |
+| `mysql.primary.persistence.enabled` | boolean | `true`       | Enable persistence for MySQL data.            |
+| `mysql.primary.persistence.size`    | string  | `8Gi`        | PVC size for MySQL data.                      |
+
+### Persistence
+
+Dolibarr uses two separate PVCs. Both must be preserved in backups independently of the database.
+
+| Parameter                             | Type    | Default         | Description                                                          |
+| ------------------------------------- | ------- | --------------- | -------------------------------------------------------------------- |
+| `persistence.documents.enabled`       | boolean | `true`          | Enable PVC for `/var/www/documents` (generated files and uploads).   |
+| `persistence.documents.size`          | string  | `8Gi`           | Documents PVC size. Grows with invoices, proposals, and attachments. |
+| `persistence.documents.storageClass`  | string  | `""`            | StorageClass for the documents PVC.                                  |
+| `persistence.documents.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                                     |
+| `persistence.documents.existingClaim` | string  | `""`            | Use an existing PVC for documents.                                   |
+| `persistence.custom.enabled`          | boolean | `true`          | Enable PVC for `/var/www/html/custom` (custom PHP modules).          |
+| `persistence.custom.size`             | string  | `2Gi`           | Custom modules PVC size.                                             |
+| `persistence.custom.storageClass`     | string  | `""`            | StorageClass for the custom PVC.                                     |
+| `persistence.custom.accessMode`       | string  | `ReadWriteOnce` | PVC access mode.                                                     |
+| `persistence.custom.existingClaim`    | string  | `""`            | Use an existing PVC for custom modules.                              |
+
+### PHP Configuration
+
+<Callout type="warning" title="Default PHP upload limits are too small for ERP use">
+  PHP defaults (`upload_max_filesize: 2M`, `post_max_size: 8M`) prevent uploading large spreadsheets, PDF contracts, and
+  bulk imports. Set `php.uploadMaxFilesize` and `php.postMaxSize` to at least `32M` for typical ERP workloads. Also
+  increase `php.maxExecutionTime` for large import operations.
+</Callout>
+
+| Parameter               | Type   | Default | Description                                             |
+| ----------------------- | ------ | ------- | ------------------------------------------------------- |
+| `php.memoryLimit`       | string | `""`    | PHP memory limit (e.g. `512M`). Empty = PHP default.    |
+| `php.uploadMaxFilesize` | string | `""`    | Maximum upload file size (e.g. `64M`). Empty = `2M`.    |
+| `php.postMaxSize`       | string | `""`    | Maximum POST body size (e.g. `64M`). Empty = `8M`.      |
+| `php.maxExecutionTime`  | string | `""`    | Maximum script execution time in seconds. Empty = `30`. |
+
+### Backup
+
+| Parameter                              | Type    | Default                                      | Description                                                  |
+| -------------------------------------- | ------- | -------------------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                                      | Enable scheduled MySQL S3 backup CronJob.                    |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                                | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                                      | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                                     | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                          | Successful job records to keep.                              |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                          | Failed job records to keep.                                  |
+| `backup.backoffLimit`                  | integer | `1`                                          | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `dolibarr`                                   | Prefix for backup archive filenames.                         |
+| `backup.images.mysql`                  | string  | `docker.io/library/mysql:8.4`                | Image for `mysqldump`.                                       |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`               | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                                         | Resources for backup containers.                             |
+| `backup.database.mysqldumpArgs`        | string  | `--single-transaction --routines --triggers` | Extra args passed to `mysqldump`.                            |
+| `backup.s3.endpoint`                   | string  | `""`                                         | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                                         | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `dolibarr`                                   | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                       | Create the bucket if it does not exist.                      |
+| `backup.s3.existingSecret`             | string  | `""`                                         | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                                 | Key for the S3 access key.                                   |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                                 | Key for the S3 secret key.                                   |
+| `backup.s3.accessKey`                  | string  | `""`                                         | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                                         | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default | Description                                      |
+| -------------------------- | ------- | ------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false` | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `""`    | Ingress class name. Must be set explicitly.      |
+| `ingress.annotations`      | object  | `{}`    | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`    | TLS configuration.                               |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`   | integer | `20`    | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `10`    | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `20`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/dolibarr)
+- [Dolibarr Official Website](https://www.dolibarr.org)
+- [Dolibarr Documentation](https://wiki.dolibarr.org)
+- [Dolibarr GitHub Repository](https://github.com/Dolibarr/dolibarr)
+- [HelmForge Dolibarr Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/dolibarr)

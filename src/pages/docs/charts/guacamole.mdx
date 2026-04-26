@@ -1,25 +1,33 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Apache Guacamole Chart
-description: HelmForge Apache Guacamole chart — remote desktop gateway with guacd, PostgreSQL or MySQL, OIDC/SAML SSO, and S3 backup.
+description: HelmForge Apache Guacamole chart — clientless remote desktop gateway with guacd sidecar, RDP/VNC/SSH/telnet, PostgreSQL (default) or MySQL, schema init Job, OIDC/SAML SSO, TOTP 2FA, Tomcat reverse-proxy header support, and database-aware S3 backup.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Apache Guacamole
 
-Deploy Apache Guacamole on Kubernetes using the official [guacamole/guacamole](https://hub.docker.com/r/guacamole/guacamole) and [guacamole/guacd](https://hub.docker.com/r/guacamole/guacd) Docker images. A clientless remote desktop gateway supporting RDP, VNC, SSH, and telnet with OIDC/SAML SSO.
+Deploy [Apache Guacamole](https://guacamole.apache.org/) on Kubernetes — a clientless remote desktop
+gateway that allows RDP, VNC, SSH, and Telnet access directly from a web browser with no client
+installation required.
+
+<Callout type="danger" title="Default credentials are guacadmin / guacadmin — change immediately after first login">
+  Fresh Guacamole installations use `guacadmin` / `guacadmin` as the default administrator credentials. These are
+  **hardcoded in the schema SQL** and well-known publicly. **Change the password immediately** after the first login via
+  the Guacamole admin UI.
+</Callout>
 
 ## Key Features
 
-- **guacd Sidecar** — protocol daemon runs alongside the web app
-- **PostgreSQL Subchart** — bundled via HelmForge dependency (default)
-- **MySQL Subchart** — bundled via HelmForge dependency
-- **External Database** — connect to existing PostgreSQL or MySQL
-- **Database Init Job** — automatic schema initialization on install
-- **OpenID Connect** — SSO with Keycloak, Okta, Azure AD, and others
-- **SAML** — SSO with any SAML 2.0 identity provider
-- **TOTP** — two-factor authentication
-- **Scheduled Backups** — pg_dump or mysqldump with S3 upload
-- **Ingress Support** — TLS with cert-manager
+- **guacd sidecar** — protocol daemon runs alongside the web app, communicating on localhost:4822
+- **Dual-image architecture** — `guacamole` (Tomcat web app) + `guacd` (protocol daemon)
+- **PostgreSQL bundled by default** — no extra setup for quick start
+- **Schema init Job** — automatic `guacamole_db` schema creation on install
+- **OIDC, SAML, and TOTP** — SSO and MFA integrations
+- **Tomcat reverse proxy** — correct client IP via `X-Forwarded-For` support
+- **Database-aware backup** — `pg_dump` or `mysqldump` to S3
 
 ## Installation
 
@@ -37,76 +45,255 @@ helm install guacamole helmforge/guacamole -f values.yaml
 helm install guacamole oci://ghcr.io/helmforgedev/helm/guacamole -f values.yaml
 ```
 
-## Basic Example (PostgreSQL)
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (PostgreSQL)' },
+    { id: 'oidc', label: 'OIDC SSO' },
+    { id: 'saml', label: 'SAML SSO' },
+    { id: 'external', label: 'External DB + Backup' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Guacamole with bundled PostgreSQL (default)
+# Default credentials: guacadmin / guacadmin — CHANGE IMMEDIATELY after first login
+
+guacd:
+  logLevel: info
+
 postgresql:
-  auth:
-    password: 'change-me'
-```
-
-Default credentials: `guacadmin` / `guacadmin` — change immediately after first login.
-
-## OIDC with Keycloak
-
-```yaml
-oidc:
   enabled: true
-  authorizationEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/auth
-  jwksEndpoint: https://keycloak.example.com/realms/master/protocol/openid-connect/certs
-  issuer: https://keycloak.example.com/realms/master
-  clientId: guacamole
+  auth:
+    database: guacamole_db
+    username: guacamole_user
+    password: 'strong-db-password'
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: guacamole.example.com
+    - host: remote.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: guacamole-tls
       hosts:
-        - guacamole.example.com
+        - remote.example.com
 ```
 
-The `redirectUri` is auto-detected from the ingress configuration.
+</div>
 
-## External Database
+<div data-tab-panel="oidc">
 
 ```yaml
+# values.yaml — Guacamole with OIDC SSO (Keycloak example)
+# OIDC replaces local database authentication for login
+# redirectUri is auto-detected from ingress if left empty
+
+oidc:
+  enabled: true
+  authorizationEndpoint: 'https://auth.example.com/realms/myrealm/protocol/openid-connect/auth'
+  jwksEndpoint: 'https://auth.example.com/realms/myrealm/protocol/openid-connect/certs'
+  issuer: 'https://auth.example.com/realms/myrealm'
+  clientId: guacamole
+  redirectUri: 'https://remote.example.com/' # auto-detected from ingress if empty
+  scope: 'openid email profile'
+  usernameClaim: preferred_username
+  groupsClaim: groups
+
+totp:
+  enabled: true # combine OIDC with TOTP for 2FA on top of SSO
+
 postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: remote.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: guacamole-tls
+      hosts:
+        - remote.example.com
+```
+
+</div>
+
+<div data-tab-panel="saml">
+
+```yaml
+# values.yaml — Guacamole with SAML SSO
+saml:
+  enabled: true
+  idpMetadataUrl: 'https://auth.example.com/realms/myrealm/protocol/saml/descriptor'
+  entityId: 'https://remote.example.com/'
+  callbackUrl: 'https://remote.example.com/' # auto-detected from ingress if empty
+  strict: true
+  groupAttribute: groups
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: remote.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+# values.yaml — Guacamole with external PostgreSQL and S3 backup
+postgresql:
+  enabled: false
+
+mysql:
   enabled: false
 
 database:
   type: postgresql
   external:
-    host: db.example.com
+    host: postgres.database.svc.cluster.local
+    port: 5432
     name: guacamole_db
     username: guacamole_user
     existingSecret: guacamole-db-credentials
+    existingSecretPasswordKey: password
+
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: guacamole-backups
+    existingSecret: guacamole-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: remote.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                     | Default      | Description                       |
-| ----------------------- | ------------ | --------------------------------- |
-| `guacamole.contextPath` | `ROOT`       | Web context path (`ROOT` = `/`)   |
-| `guacd.port`            | `4822`       | guacd daemon port                 |
-| `guacd.logLevel`        | `info`       | guacd log level                   |
-| `database.type`         | `postgresql` | Database type (postgresql, mysql) |
-| `postgresql.enabled`    | `true`       | Deploy PostgreSQL subchart        |
-| `mysql.enabled`         | `false`      | Deploy MySQL subchart             |
-| `initDb.enabled`        | `true`       | Auto-initialize database schema   |
-| `oidc.enabled`          | `false`      | Enable OpenID Connect SSO         |
-| `oidc.clientId`         | `""`         | OIDC client ID                    |
-| `saml.enabled`          | `false`      | Enable SAML SSO                   |
-| `totp.enabled`          | `false`      | Enable TOTP 2FA                   |
-| `ingress.enabled`       | `false`      | Enable ingress                    |
-| `backup.enabled`        | `false`      | Enable S3 backups                 |
+</DocsTabs>
+
+## Configuration Reference
+
+### Images
+
+| Parameter                | Type   | Default                         | Description                  |
+| ------------------------ | ------ | ------------------------------- | ---------------------------- |
+| `image.repository`       | string | `docker.io/guacamole/guacamole` | Guacamole web app image.     |
+| `image.tag`              | string | `"1.6.0"`                       | Image tag.                   |
+| `guacd.image.repository` | string | `docker.io/guacamole/guacd`     | guacd protocol daemon image. |
+| `guacd.image.tag`        | string | `"1.6.0"`                       | guacd image tag.             |
+
+### Guacamole
+
+| Parameter               | Type    | Default | Description                                                                       |
+| ----------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
+| `guacamole.contextPath` | string  | `ROOT`  | Web context path. `ROOT` = serve at `/`. Change to `guacamole` for `/guacamole/`. |
+| `guacamole.extraEnv`    | array   | `[]`    | Extra environment variables.                                                      |
+| `guacd.port`            | integer | `4822`  | Internal guacd daemon port.                                                       |
+| `guacd.logLevel`        | string  | `info`  | guacd log level: `info`, `debug`, `warning`, `error`.                             |
+
+### Reverse Proxy
+
+| Parameter              | Type    | Default             | Description                                           |
+| ---------------------- | ------- | ------------------- | ----------------------------------------------------- |
+| `proxy.enabled`        | boolean | `true`              | Enable Tomcat `RemoteIpValve` for correct client IPs. |
+| `proxy.ipHeader`       | string  | `X-Forwarded-For`   | Header containing the real client IP.                 |
+| `proxy.protocolHeader` | string  | `X-Forwarded-Proto` | Header containing the protocol (http/https).          |
+
+### OIDC
+
+| Parameter                    | Type    | Default              | Description                                        |
+| ---------------------------- | ------- | -------------------- | -------------------------------------------------- |
+| `oidc.enabled`               | boolean | `false`              | Enable OIDC SSO.                                   |
+| `oidc.authorizationEndpoint` | string  | `""`                 | OIDC authorization endpoint URL.                   |
+| `oidc.jwksEndpoint`          | string  | `""`                 | JWKS token validation endpoint URL.                |
+| `oidc.issuer`                | string  | `""`                 | Expected token issuer.                             |
+| `oidc.clientId`              | string  | `""`                 | OIDC client ID.                                    |
+| `oidc.redirectUri`           | string  | `""`                 | Redirect URI. Auto-detected from ingress if empty. |
+| `oidc.usernameClaim`         | string  | `preferred_username` | JWT claim for the username.                        |
+| `oidc.groupsClaim`           | string  | `groups`             | JWT claim for groups.                              |
+
+### SAML
+
+| Parameter             | Type    | Default  | Description                                        |
+| --------------------- | ------- | -------- | -------------------------------------------------- |
+| `saml.enabled`        | boolean | `false`  | Enable SAML SSO.                                   |
+| `saml.idpMetadataUrl` | string  | `""`     | IdP SAML metadata URL.                             |
+| `saml.entityId`       | string  | `""`     | Service provider entity ID.                        |
+| `saml.callbackUrl`    | string  | `""`     | Callback URL. Auto-detected from ingress if empty. |
+| `saml.strict`         | boolean | `true`   | Enforce certificate validation.                    |
+| `saml.groupAttribute` | string  | `groups` | SAML group attribute name.                         |
+| `totp.enabled`        | boolean | `false`  | Enable TOTP two-factor authentication.             |
+
+### Database and Init Job
+
+| Parameter                          | Type    | Default      | Description                                         |
+| ---------------------------------- | ------- | ------------ | --------------------------------------------------- |
+| `database.type`                    | string  | `postgresql` | Database type: `postgresql` or `mysql`.             |
+| `database.external.host`           | string  | `""`         | External database hostname.                         |
+| `database.external.existingSecret` | string  | `""`         | Existing secret with database password.             |
+| `initDb.enabled`                   | boolean | `true`       | Run schema init Job on install (safe for upgrades). |
+| `postgresql.enabled`               | boolean | `true`       | Deploy the bundled PostgreSQL subchart.             |
+| `postgresql.auth.password`         | string  | `""`         | Password. Required when using the subchart.         |
+| `mysql.enabled`                    | boolean | `false`      | Deploy the bundled MySQL subchart.                  |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                 |
+| -------------------------- | ------- | ----------- | --------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.               |
+| `service.port`             | integer | `80`        | Service port.               |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
+| `ingress.ingressClassName` | string  | `traefik`   | Ingress class name.         |
+
+### Backup
+
+Database-aware: `pg_dump` for PostgreSQL, `mysqldump` for MySQL.
+
+| Parameter                  | Type    | Default       | Description                          |
+| -------------------------- | ------- | ------------- | ------------------------------------ |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled database S3 backup. |
+| `backup.schedule`          | string  | `"0 2 * * *"` | Cron schedule.                       |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                  |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials. |
+| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.          |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/guacamole) on GitHub.
+- [Apache Guacamole Official Documentation](https://guacamole.apache.org/doc/gug/)
+- [Apache Guacamole GitHub Repository](https://github.com/apache/guacamole-client)
+- [HelmForge Guacamole Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/guacamole)

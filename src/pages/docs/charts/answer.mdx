@@ -1,22 +1,31 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Apache Answer Chart
-description: HelmForge Apache Answer chart — Q&A platform with SQLite, PostgreSQL, or MySQL, auto-install, and S3 backup.
+description: HelmForge Apache Answer chart — Q&A platform with SQLite (zero-config), PostgreSQL, or MySQL, auto-install via environment variables, database-aware S3 backup (tar/pg_dump/mysqldump), and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Apache Answer
 
-Deploy Apache Answer on Kubernetes using the official [apache/answer](https://hub.docker.com/r/apache/answer) Docker image. Supports SQLite (default), PostgreSQL, MySQL, automatic setup, and scheduled backups.
+Deploy [Apache Answer](https://answer.apache.org/) on Kubernetes — an open-source Q&A platform for
+teams and communities. Supports SQLite (zero-configuration default), PostgreSQL, and MySQL, with
+automatic unattended installation and database-aware scheduled backups.
+
+<Callout type="tip" title="SQLite is the default — no database configuration required for small teams">
+  With the default configuration (`database.mode: auto` and no subchart enabled), Answer uses SQLite stored in the
+  `/data` PVC. No external database is needed for teams under a few hundred users. Migrate to PostgreSQL or MySQL when
+  you need concurrent write performance or replication.
+</Callout>
 
 ## Key Features
 
-- **SQLite by Default** — zero database configuration needed
-- **PostgreSQL Subchart** — bundled via HelmForge dependency
-- **MySQL Subchart** — bundled via HelmForge dependency
-- **External Database** — connect to existing PostgreSQL or MySQL
-- **Auto-Install** — unattended setup via environment variables
-- **Scheduled Backups** — database-aware CronJob with S3 upload
-- **Ingress Support** — TLS with cert-manager
+- **Three database backends** — SQLite (default), PostgreSQL, MySQL
+- **Auto-detection** — mode is inferred from which subchart or external host is configured
+- **Auto-install** — unattended first-boot setup via environment variables (`autoInstall: true`)
+- **Database-aware backup** — `tar` for SQLite, `pg_dump` for PostgreSQL, `mysqldump` for MySQL
+- **Admin credentials** — `existingSecret` for GitOps-safe secret management
 
 ## Installation
 
@@ -25,44 +34,51 @@ Deploy Apache Answer on Kubernetes using the official [apache/answer](https://hu
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install answer helmforge/answer
+helm install answer helmforge/answer -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install answer oci://ghcr.io/helmforgedev/helm/answer
+helm install answer oci://ghcr.io/helmforgedev/helm/answer -f values.yaml
 ```
 
-## Basic Example (SQLite)
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite (Default)' },
+    { id: 'postgresql', label: 'PostgreSQL' },
+    { id: 'mysql', label: 'MySQL' },
+    { id: 'external', label: 'External DB' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
-# values.yaml
+# values.yaml — Apache Answer with SQLite (zero database configuration)
 answer:
   siteName: 'My Q&A'
+  siteUrl: 'https://qa.example.com'
+  language: en-US
+  autoInstall: true
 
 admin:
   name: admin
-  password: 'change-me'
+  email: admin@example.com
+  existingSecret: answer-admin-credentials # key: admin-password
+  existingSecretPasswordKey: admin-password
 
 persistence:
   enabled: true
-  size: 5Gi
-```
-
-## PostgreSQL Example
-
-```yaml
-postgresql:
-  enabled: true
-  auth:
-    database: answer
-    username: answer
-    password: 'strong-password'
+  size: 10Gi # covers both SQLite file (/data/answer.db) and uploads
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: qa.example.com
       paths:
@@ -74,36 +90,284 @@ ingress:
         - qa.example.com
 ```
 
-## External Database Example
+</div>
+
+<div data-tab-panel="postgresql">
 
 ```yaml
+# values.yaml — Apache Answer with bundled PostgreSQL
+answer:
+  siteName: 'My Q&A'
+  siteUrl: 'https://qa.example.com'
+  autoInstall: true
+
+admin:
+  name: admin
+  email: admin@example.com
+  password: 'change-me'
+
+postgresql:
+  enabled: true
+  auth:
+    database: answer
+    username: answer
+    password: 'strong-db-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+persistence:
+  enabled: true
+  size: 10Gi # uploads only (SQLite not used when PostgreSQL is active)
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: qa.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="mysql">
+
+```yaml
+# values.yaml — Apache Answer with bundled MySQL
+answer:
+  siteName: 'My Q&A'
+  siteUrl: 'https://qa.example.com'
+  autoInstall: true
+
+admin:
+  name: admin
+  email: admin@example.com
+  password: 'change-me'
+
+mysql:
+  enabled: true
+  auth:
+    database: answer
+    username: answer
+    password: 'strong-db-password'
+    rootPassword: 'strong-root-password'
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: qa.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+# values.yaml — Apache Answer with external PostgreSQL
+answer:
+  siteName: 'My Q&A'
+  siteUrl: 'https://qa.example.com'
+  autoInstall: true
+
+admin:
+  existingSecret: answer-admin-credentials
+
+postgresql:
+  enabled: false
+
 database:
+  mode: external
   external:
-    vendor: postgres
-    host: db.example.com
+    vendor: postgres # or: mysql
+    host: postgres.database.svc.cluster.local
+    port: '5432'
     name: answer
     username: answer
     existingSecret: answer-db-credentials
+    existingSecretPasswordKey: database-password
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: answer-backups
+    existingSecret: answer-s3-credentials
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default         | Description                                               |
-| --------------------- | --------------- | --------------------------------------------------------- |
-| `answer.siteName`     | `Apache Answer` | Site name                                                 |
-| `answer.siteUrl`      | `""`            | Full external URL (auto-detected from ingress)            |
-| `answer.language`     | `en-US`         | Default UI language                                       |
-| `answer.autoInstall`  | `true`          | Enable unattended setup                                   |
-| `admin.name`          | `admin`         | Admin username                                            |
-| `admin.password`      | `""`            | Admin password (auto-generated)                           |
-| `database.mode`       | `auto`          | Database mode (auto, sqlite, external, postgresql, mysql) |
-| `postgresql.enabled`  | `false`         | Deploy PostgreSQL subchart                                |
-| `mysql.enabled`       | `false`         | Deploy MySQL subchart                                     |
-| `persistence.enabled` | `true`          | Enable persistent storage                                 |
-| `persistence.size`    | `5Gi`           | PVC size                                                  |
-| `ingress.enabled`     | `false`         | Enable ingress                                            |
-| `backup.enabled`      | `false`         | Enable S3 backups                                         |
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                   | Description                    |
+| ------------------ | ------ | ------------------------- | ------------------------------ |
+| `image.repository` | string | `docker.io/apache/answer` | Apache Answer container image. |
+| `image.tag`        | string | `"2.0.0"`                 | Image tag.                     |
+| `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.             |
+
+### Answer Configuration
+
+| Parameter             | Type    | Default             | Description                                                             |
+| --------------------- | ------- | ------------------- | ----------------------------------------------------------------------- |
+| `answer.siteUrl`      | string  | `""`                | Full public URL. Auto-detected from Ingress if empty.                   |
+| `answer.siteName`     | string  | `Apache Answer`     | Site name shown in browser tab and header.                              |
+| `answer.language`     | string  | `en-US`             | Default UI language.                                                    |
+| `answer.contactEmail` | string  | `admin@example.com` | Contact email shown in the site footer.                                 |
+| `answer.autoInstall`  | boolean | `true`              | Enable unattended first-boot setup using admin credentials from values. |
+| `answer.logLevel`     | string  | `INFO`              | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR`.                            |
+| `answer.extraEnv`     | array   | `[]`                | Extra environment variables for the container.                          |
+
+### Admin Credentials
+
+| Parameter                         | Type   | Default             | Description                                      |
+| --------------------------------- | ------ | ------------------- | ------------------------------------------------ |
+| `admin.name`                      | string | `admin`             | Admin username for initial setup.                |
+| `admin.password`                  | string | `""`                | Admin password. Auto-generated if empty.         |
+| `admin.email`                     | string | `admin@example.com` | Admin email address.                             |
+| `admin.existingSecret`            | string | `""`                | Existing secret with admin credentials.          |
+| `admin.existingSecretPasswordKey` | string | `admin-password`    | Key inside the existing secret for the password. |
+
+### Database
+
+**Auto-detection precedence** (`database.mode: auto`):
+
+| Priority | Condition                                                 | Result              |
+| -------- | --------------------------------------------------------- | ------------------- |
+| 1        | `database.external.host` or `external.existingSecret` set | External DB         |
+| 2        | `postgresql.enabled: true`                                | PostgreSQL subchart |
+| 3        | `mysql.enabled: true`                                     | MySQL subchart      |
+| 4        | None of the above                                         | SQLite (default)    |
+
+| Parameter                                     | Type   | Default             | Description                                                         |
+| --------------------------------------------- | ------ | ------------------- | ------------------------------------------------------------------- |
+| `database.mode`                               | string | `auto`              | Database mode: `auto`, `sqlite`, `external`, `postgresql`, `mysql`. |
+| `database.sqlite.file`                        | string | `/data/answer.db`   | SQLite file path inside the data volume.                            |
+| `database.external.vendor`                    | string | `postgres`          | External DB vendor: `postgres` or `mysql`.                          |
+| `database.external.host`                      | string | `""`                | External database hostname.                                         |
+| `database.external.port`                      | string | `""`                | External database port. Auto-detected from vendor if empty.         |
+| `database.external.name`                      | string | `answer`            | Database name.                                                      |
+| `database.external.username`                  | string | `answer`            | Database username.                                                  |
+| `database.external.existingSecret`            | string | `""`                | Existing secret with database password.                             |
+| `database.external.existingSecretPasswordKey` | string | `database-password` | Key for the password in the existing secret.                        |
+
+### Subcharts
+
+| Parameter                             | Type    | Default  | Description                             |
+| ------------------------------------- | ------- | -------- | --------------------------------------- |
+| `postgresql.enabled`                  | boolean | `false`  | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.database`            | string  | `answer` | Database name.                          |
+| `postgresql.auth.password`            | string  | `""`     | Password. Auto-generated if empty.      |
+| `postgresql.primary.persistence.size` | string  | `8Gi`    | PVC size.                               |
+| `mysql.enabled`                       | boolean | `false`  | Deploy the bundled MySQL subchart.      |
+| `mysql.auth.database`                 | string  | `answer` | Database name.                          |
+| `mysql.auth.password`                 | string  | `""`     | Password. Auto-generated if empty.      |
+| `mysql.primary.persistence.size`      | string  | `8Gi`    | PVC size.                               |
+
+### Persistence
+
+| Parameter                   | Type    | Default         | Description                                                 |
+| --------------------------- | ------- | --------------- | ----------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`          | Enable PVC for `/data` (SQLite DB file + uploads).          |
+| `persistence.size`          | string  | `5Gi`           | PVC size. Increase if using SQLite as the primary database. |
+| `persistence.storageClass`  | string  | `""`            | StorageClass for the PVC.                                   |
+| `persistence.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                            |
+| `persistence.existingClaim` | string  | `""`            | Use an existing PVC.                                        |
+
+### Backup
+
+<Callout type="info" title="Backup mode is automatically selected based on the active database vendor">
+  The backup CronJob detects which database is in use and runs the appropriate tool:
+  - **SQLite** → `tar` archive of the full `/data` directory (Alpine image)
+  - **PostgreSQL** → `pg_dump` (PostgreSQL Alpine image)
+  - **MySQL** → `mysqldump` (MySQL image)
+
+Only the images needed for the active database vendor are used.
+
+</Callout>
+
+| Parameter                          | Type    | Default                    | Description                            |
+| ---------------------------------- | ------- | -------------------------- | -------------------------------------- |
+| `backup.enabled`                   | boolean | `false`                    | Enable scheduled S3 backup CronJob.    |
+| `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                         |
+| `backup.archivePrefix`             | string  | `answer`                   | Prefix for backup archive filenames.   |
+| `backup.images.sqlite`             | string  | `alpine:3.22`              | Image for SQLite backup (tar).         |
+| `backup.images.postgresql`         | string  | `postgres:18.3-alpine`     | Image for PostgreSQL backup (pg_dump). |
+| `backup.images.mysql`              | string  | `mysql:8.4`                | Image for MySQL backup (mysqldump).    |
+| `backup.images.uploader`           | string  | `helmforge/mc:1.0.0`       | Image for S3 upload (MinIO client).    |
+| `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.            |
+| `backup.s3.bucket`                 | string  | `""`                       | Target bucket name.                    |
+| `backup.s3.existingSecret`         | string  | `""`                       | Existing secret with S3 credentials.   |
+| `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.         |
+| `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra arguments for `mysqldump`.       |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                 |
+| -------------------------- | ------- | ----------- | --------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.               |
+| `service.port`             | integer | `80`        | Service port.               |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
+| `ingress.ingressClassName` | string  | `""`        | Ingress class name.         |
+| `ingress.annotations`      | object  | `{}`        | Ingress annotations.        |
+| `ingress.hosts`            | array   | `[]`        | Host and path rules.        |
+| `ingress.tls`              | array   | `[]`        | TLS configuration.          |
+
+### Probes
+
+All probes use `/healthz` as the HTTP path.
+
+| Parameter                       | Type    | Default | Description                      |
+| ------------------------------- | ------- | ------- | -------------------------------- |
+| `startupProbe.enabled`          | boolean | `true`  | Enable startup probe.            |
+| `startupProbe.failureThreshold` | integer | `30`    | Startup probe failure threshold. |
+| `livenessProbe.enabled`         | boolean | `true`  | Enable liveness probe.           |
+| `readinessProbe.enabled`        | boolean | `true`  | Enable readiness probe.          |
+
+### Resources and Scheduling
+
+| Parameter                       | Type    | Default | Description                     |
+| ------------------------------- | ------- | ------- | ------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
+| `extraVolumes`                  | array   | `[]`    | Extra volumes.                  |
+| `extraVolumeMounts`             | array   | `[]`    | Extra volume mounts.            |
+| `extraManifests`                | array   | `[]`    | Extra Kubernetes manifests.     |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/answer) on GitHub.
+- [Apache Answer Official Documentation](https://answer.apache.org/docs/)
+- [Apache Answer GitHub Repository](https://github.com/apache/incubator-answer)
+- [HelmForge Answer Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/answer)

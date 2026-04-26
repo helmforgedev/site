@@ -1,103 +1,375 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: MariaDB
-description: Helm chart for MariaDB on Kubernetes with standalone and GTID-based replication modes.
+title: MariaDB Chart
+description: HelmForge MariaDB chart — standalone and GTID-based replication, configuration presets, TLS, mysqld-exporter Prometheus metrics, mariadb-dump S3 backup, NetworkPolicy, PDB with default pod anti-affinity for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # MariaDB
 
-Helm chart for deploying [MariaDB](https://mariadb.org/) on Kubernetes using the official [`mariadb`](https://hub.docker.com/_/mariadb) Docker image. Supports standalone and GTID-based replication architectures.
+Deploy [MariaDB](https://mariadb.org/) on Kubernetes using the official `mariadb` Docker image (11.4 LTS).
+Supports standalone and GTID-based asynchronous replication, six built-in configuration presets,
+TLS, Prometheus metrics via mysqld-exporter, and scheduled `mariadb-dump` backups to S3-compatible storage.
+
+<Callout type="info" title="Replication mode enables PDB and pod anti-affinity automatically">
+  When `architecture: replication`, the chart enables a PodDisruptionBudget (`replication.pdb`) and configures default
+  pod anti-affinity rules (`replication.scheduling.enableDefaultPodAntiAffinity`) to spread source and replica pods
+  across different nodes. No extra configuration is needed for basic HA scheduling.
+</Callout>
 
 ## Key Features
 
-- **Official MariaDB image** from Docker Hub (11.4 LTS)
-- **Standalone and replication** modes with explicit configuration
-- **GTID-based replication** using MariaDB-native `MASTER_USE_GTID=slave_pos`
-- **Configuration presets** small, medium, large, oltp, read-heavy, analytics
-- **TLS** server-side encryption with optional client enforcement
-- **Prometheus metrics** via mysqld-exporter sidecar and ServiceMonitor
-- **S3-compatible backup** CronJob with mariadb-dump
-- **NetworkPolicy and PDB** for production workloads
+- **Two architectures** — `standalone` (Deployment) or `replication` (StatefulSet + GTID)
+- **GTID-based replication** — `MASTER_USE_GTID=slave_pos` with parallel replica workers
+- **Configuration presets** — `small`, `medium`, `large`, `oltp`, `read-heavy`, `analytics`
+- **Writable/read-only probes** — source readiness requires writable, replica requires read-only
+- **Hardened by default** — non-root UID 999, ALL caps dropped, seccomp `RuntimeDefault`
+- **Init scripts** — SQL/Shell scripts executed on `docker-entrypoint-initdb.d` at first boot
+- **S3 backup** — `mariadb-dump` with `--routines --events --triggers` flags
+- **NetworkPolicy** — optional ingress-only policy for cluster isolation
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install mariadb helmforge/mariadb
+helm install mariadb helmforge/mariadb -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install mariadb oci://ghcr.io/helmforgedev/helm/mariadb
+helm install mariadb oci://ghcr.io/helmforgedev/helm/mariadb -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone' },
+    { id: 'replication', label: 'Replication (HA)' },
+    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'tls', label: 'With TLS' },
+  ]}
+>
+
+<div data-tab-panel="standalone">
 
 ```yaml
-architecture: replication
+# values.yaml — MariaDB standalone with preset and metrics
+architecture: standalone
 
 auth:
-  rootPassword: 'change-me'
+  rootPassword: 'strong-root-password'
   database: myapp
   username: myapp
-  password: 'change-me'
-  replicationPassword: 'change-me'
+  password: 'strong-app-password'
 
-replication:
-  source:
-    persistence:
-      size: 50Gi
-  readReplicas:
-    replicaCount: 2
-    persistence:
-      size: 50Gi
+config:
+  preset: oltp # optimized for transactional workloads
+  myCnf: |
+    # extra my.cnf content appended after the generated config
+    max_connections = 500
+
+standalone:
+  persistence:
+    enabled: true
+    size: 20Gi
 
 metrics:
   enabled: true
   serviceMonitor:
     enabled: true
+    interval: 30s
+    labels:
+      release: prometheus
+```
+
+</div>
+
+<div data-tab-panel="replication">
+
+```yaml
+# values.yaml — MariaDB 1 source + 2 read replicas with GTID
+architecture: replication
+
+auth:
+  existingSecret: mariadb-credentials
+  existingSecretRootPasswordKey: mariadb-root-password
+  existingSecretUserPasswordKey: mariadb-user-password
+  existingSecretReplicationPasswordKey: mariadb-replication-password
+  database: myapp
+  username: myapp
+  replicationUsername: replicator
+
+config:
+  preset: oltp
+
+replication:
+  source:
+    persistence:
+      enabled: true
+      size: 50Gi
+    probes:
+      requireWritable: true # source only becomes ready when confirmed writable
+
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+    probes:
+      requireReadOnly: true # replica only ready when read-only
+      requireRunningReplication: true # require IO and SQL threads running
+
+  binlog:
+    format: ROW
+    retentionDays: 7 # overrides expireLogsSeconds when > 0
+
+  replicaTuning:
+    parallelWorkers: 4 # parallel binlog applier workers on replicas
+
+  # Automatically enabled in replication mode:
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  scheduling:
+    enableDefaultPodAntiAffinity: true # spread source+replicas across nodes
+    enableDefaultTopologySpread: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — MariaDB with daily S3 backup using mariadb-dump
+architecture: standalone
+
+auth:
+  rootPassword: 'strong-root-password'
+  database: myapp
+  username: myapp
+  password: 'strong-app-password'
+
+standalone:
+  persistence:
+    enabled: true
+    size: 20Gi
 
 backup:
   enabled: true
   schedule: '0 3 * * *'
+  archivePrefix: mariadb
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-backups
-    prefix: mariadb
-    existingSecret: mariadb-backup-creds
+    bucket: my-mariadb-backups
+    existingSecret: mariadb-s3-credentials
+    existingSecretAccessKeyKey: access-key
+    existingSecretSecretKeyKey: secret-key
+  database:
+    mariadbdumpArgs: >-
+      --single-transaction --quick --skip-lock-tables
+      --no-tablespaces --routines --events --triggers
 ```
 
-## Key Values
+</div>
 
-| Key                                     | Default       | Description                                                             |
-| --------------------------------------- | ------------- | ----------------------------------------------------------------------- |
-| `architecture`                          | `standalone`  | Deployment mode: standalone or replication                              |
-| `image.tag`                             | `11.4`        | MariaDB version (LTS)                                                   |
-| `auth.rootPassword`                     | `""`          | Root password (auto-generated if empty)                                 |
-| `auth.database`                         | `app`         | Application database                                                    |
-| `auth.username`                         | `app`         | Application user                                                        |
-| `auth.password`                         | `""`          | Application password (auto-generated if empty)                          |
-| `auth.existingSecret`                   | `""`          | Existing secret with passwords                                          |
-| `config.preset`                         | `none`        | Configuration preset: small, medium, large, oltp, read-heavy, analytics |
-| `standalone.persistence.size`           | `8Gi`         | Standalone PVC size                                                     |
-| `replication.readReplicas.replicaCount` | `2`           | Number of read replicas                                                 |
-| `replication.binlog.format`             | `ROW`         | Binlog format                                                           |
-| `service.type`                          | `ClusterIP`   | Service type                                                            |
-| `service.port`                          | `3306`        | MariaDB port                                                            |
-| `metrics.enabled`                       | `false`       | Enable mysqld-exporter                                                  |
-| `tls.enabled`                           | `false`       | Enable server TLS                                                       |
-| `backup.enabled`                        | `false`       | Enable S3 backup CronJob                                                |
-| `backup.schedule`                       | `"0 3 * * *"` | Backup cron schedule                                                    |
-| `networkPolicy.enabled`                 | `false`       | Enable NetworkPolicy                                                    |
+<div data-tab-panel="tls">
 
-## Architecture Selection
+```yaml
+# values.yaml — MariaDB with server-side TLS
+architecture: standalone
 
-When `architecture` is `standalone` (default), the chart deploys a single MariaDB instance. Set `architecture: replication` for one fixed source with asynchronous GTID-based read replicas.
+auth:
+  rootPassword: 'strong-root-password'
+  database: myapp
+  username: myapp
+  password: 'strong-app-password'
+
+tls:
+  enabled: true
+  existingSecret: mariadb-tls-secret # must contain ca.crt, tls.crt, tls.key
+  caFilename: ca.crt
+  certFilename: tls.crt
+  keyFilename: tls.key
+  requireSecureTransport: true # reject plaintext connections
+  client:
+    enabled: true # use TLS for internal chart client connections (replication bootstrap)
+
+standalone:
+  persistence:
+    enabled: true
+    size: 20Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default         | Description                                     |
+| ------------------ | ------ | --------------- | ----------------------------------------------- |
+| `architecture`     | string | `standalone`    | Deployment mode: `standalone` or `replication`. |
+| `nameOverride`     | string | `""`            | Override the chart name.                        |
+| `fullnameOverride` | string | `""`            | Override the full release name.                 |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.            |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                      |
+
+### Image
+
+| Parameter          | Type   | Default                     | Description              |
+| ------------------ | ------ | --------------------------- | ------------------------ |
+| `image.repository` | string | `docker.io/library/mariadb` | MariaDB container image. |
+| `image.tag`        | string | `"11.4"`                    | Image tag (LTS).         |
+| `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy.       |
+
+### Authentication
+
+| Parameter                                   | Type   | Default                        | Description                                            |
+| ------------------------------------------- | ------ | ------------------------------ | ------------------------------------------------------ |
+| `auth.rootPassword`                         | string | `""`                           | Root password. Auto-generated if empty.                |
+| `auth.database`                             | string | `app`                          | Application database created on first bootstrap.       |
+| `auth.username`                             | string | `app`                          | Application user created on first bootstrap.           |
+| `auth.password`                             | string | `""`                           | Application user password. Auto-generated if empty.    |
+| `auth.replicationUsername`                  | string | `replicator`                   | Replication user (only used in replication mode).      |
+| `auth.replicationPassword`                  | string | `""`                           | Replication password. Auto-generated if empty.         |
+| `auth.existingSecret`                       | string | `""`                           | Existing secret with all MariaDB passwords.            |
+| `auth.existingSecretRootPasswordKey`        | string | `mariadb-root-password`        | Key for root password in `existingSecret`.             |
+| `auth.existingSecretUserPasswordKey`        | string | `mariadb-user-password`        | Key for application user password in `existingSecret`. |
+| `auth.existingSecretReplicationPasswordKey` | string | `mariadb-replication-password` | Key for replication password in `existingSecret`.      |
+
+### Configuration
+
+| Parameter       | Type   | Default | Description                                                                                    |
+| --------------- | ------ | ------- | ---------------------------------------------------------------------------------------------- |
+| `config.preset` | string | `none`  | Built-in tuning preset: `none`, `small`, `medium`, `large`, `oltp`, `read-heavy`, `analytics`. |
+| `config.myCnf`  | string | `""`    | Extra `my.cnf` content appended to the generated configuration.                                |
+
+### Initialization
+
+| Parameter                  | Type   | Default | Description                                                                    |
+| -------------------------- | ------ | ------- | ------------------------------------------------------------------------------ |
+| `initdb.scripts`           | object | `{}`    | SQL or Shell scripts injected into `docker-entrypoint-initdb.d` at first boot. |
+| `initdb.existingConfigMap` | string | `""`    | Existing ConfigMap also mounted into `docker-entrypoint-initdb.d`.             |
+
+### Standalone Mode
+
+| Parameter                             | Type    | Default | Description                 |
+| ------------------------------------- | ------- | ------- | --------------------------- |
+| `standalone.serverId`                 | integer | `1`     | MariaDB server ID.          |
+| `standalone.persistence.enabled`      | boolean | `true`  | Enable PVC for data.        |
+| `standalone.persistence.size`         | string  | `8Gi`   | PVC size.                   |
+| `standalone.persistence.storageClass` | string  | `""`    | StorageClass for the PVC.   |
+| `standalone.resources`                | object  | `{}`    | CPU and memory for the pod. |
+
+### Replication Mode
+
+<Callout type="warning" title="Set replication passwords before first deployment">
+  All passwords (root, user, replication) must be stable before the StatefulSet first starts. Auto-generated passwords
+  will change on Helm upgrades if not stored in an `existingSecret`, causing replicas to lose their replication
+  credentials.
+</Callout>
+
+| Parameter                                                   | Type    | Default | Description                                                       |
+| ----------------------------------------------------------- | ------- | ------- | ----------------------------------------------------------------- |
+| `replication.source.serverId`                               | integer | `1`     | Source server ID.                                                 |
+| `replication.source.persistence.size`                       | string  | `20Gi`  | PVC size for the source pod.                                      |
+| `replication.source.probes.requireWritable`                 | boolean | `true`  | Source only becomes ready when confirmed writable.                |
+| `replication.readReplicas.replicaCount`                     | integer | `2`     | Number of read replica pods.                                      |
+| `replication.readReplicas.serverIdBase`                     | integer | `100`   | Base server ID for replicas (replica ordinal added to this).      |
+| `replication.readReplicas.persistence.size`                 | string  | `20Gi`  | PVC size per replica pod.                                         |
+| `replication.readReplicas.probes.requireReadOnly`           | boolean | `true`  | Replica only ready when confirmed read-only.                      |
+| `replication.readReplicas.probes.requireRunningReplication` | boolean | `false` | Require IO and SQL replication threads running.                   |
+| `replication.binlog.format`                                 | string  | `ROW`   | Binlog format used by the source.                                 |
+| `replication.binlog.retentionDays`                          | integer | `7`     | Binlog retention in days. Overrides `expireLogsSeconds` when > 0. |
+| `replication.binlog.syncBinlog`                             | integer | `1`     | `sync_binlog` value on the source (1 = fully durable).            |
+| `replication.replicaTuning.parallelWorkers`                 | integer | `4`     | Parallel binlog applier workers on replicas.                      |
+| `replication.pdb.enabled`                                   | boolean | `true`  | Enable PodDisruptionBudget (default enabled in replication mode). |
+| `replication.pdb.minAvailable`                              | integer | `1`     | Minimum available pods.                                           |
+| `replication.scheduling.enableDefaultPodAntiAffinity`       | boolean | `true`  | Spread source and replicas across different nodes automatically.  |
+| `replication.scheduling.enableDefaultTopologySpread`        | boolean | `true`  | Enable topology spread constraints for replication pods.          |
+
+### TLS
+
+| Parameter                    | Type    | Default   | Description                                                 |
+| ---------------------------- | ------- | --------- | ----------------------------------------------------------- |
+| `tls.enabled`                | boolean | `false`   | Enable MariaDB server-side TLS.                             |
+| `tls.existingSecret`         | string  | `""`      | Existing Secret with CA, certificate, and private key.      |
+| `tls.caFilename`             | string  | `ca.crt`  | CA certificate filename in the secret.                      |
+| `tls.certFilename`           | string  | `tls.crt` | Server certificate filename.                                |
+| `tls.keyFilename`            | string  | `tls.key` | Server private key filename.                                |
+| `tls.requireSecureTransport` | boolean | `false`   | Reject plaintext connections (enforce TLS for all clients). |
+| `tls.client.enabled`         | boolean | `false`   | Use TLS for internal chart client connections.              |
+
+### Backup
+
+| Parameter                         | Type    | Default                    | Description                                                                          |
+| --------------------------------- | ------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| `backup.enabled`                  | boolean | `false`                    | Enable scheduled `mariadb-dump` S3 backup.                                           |
+| `backup.schedule`                 | string  | `"0 3 * * *"`              | Cron schedule.                                                                       |
+| `backup.archivePrefix`            | string  | `mariadb`                  | Prefix for backup archive filenames.                                                 |
+| `backup.s3.endpoint`              | string  | `""`                       | S3-compatible endpoint URL.                                                          |
+| `backup.s3.bucket`                | string  | `""`                       | Target bucket name.                                                                  |
+| `backup.s3.existingSecret`        | string  | `""`                       | Existing secret with S3 credentials.                                                 |
+| `backup.database.mariadbdumpArgs` | string  | `--single-transaction ...` | Extra args for `mariadb-dump`. Includes `--routines --events --triggers` by default. |
+
+### Metrics
+
+| Parameter                         | Type    | Default                          | Description                                  |
+| --------------------------------- | ------- | -------------------------------- | -------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false`                          | Enable `mysqld-exporter` sidecar.            |
+| `metrics.image.repository`        | string  | `docker.io/prom/mysqld-exporter` | Exporter image.                              |
+| `metrics.image.tag`               | string  | `"v0.17.2"`                      | Exporter image tag.                          |
+| `metrics.serviceMonitor.enabled`  | boolean | `false`                          | Create a Prometheus Operator ServiceMonitor. |
+| `metrics.serviceMonitor.interval` | string  | `30s`                            | Scrape interval.                             |
+
+### NetworkPolicy
+
+| Parameter                                  | Type    | Default | Description                                    |
+| ------------------------------------------ | ------- | ------- | ---------------------------------------------- |
+| `networkPolicy.enabled`                    | boolean | `false` | Create an ingress-only NetworkPolicy.          |
+| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow traffic from pods in the same namespace. |
+| `networkPolicy.ingress.extraFrom`          | array   | `[]`    | Extra ingress peer selectors.                  |
+| `networkPolicy.metrics.enabled`            | boolean | `false` | Allow ingress to the metrics port.             |
+
+### Security Context
+
+MariaDB runs hardened by default:
+
+| Parameter                                  | Default          | Description                            |
+| ------------------------------------------ | ---------------- | -------------------------------------- |
+| `podSecurityContext.fsGroup`               | `999`            | Filesystem group for volume ownership. |
+| `podSecurityContext.seccompProfile.type`   | `RuntimeDefault` | Seccomp profile.                       |
+| `securityContext.runAsUser`                | `999`            | Container UID.                         |
+| `securityContext.runAsNonRoot`             | `true`           | Enforce non-root execution.            |
+| `securityContext.allowPrivilegeEscalation` | `false`          | Disallow privilege escalation.         |
+| `securityContext.capabilities.drop`        | `["ALL"]`        | Drop all Linux capabilities.           |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                                                      |
+| ------------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `terminationGracePeriodSeconds` | integer | `120`   | Grace period. Allows in-progress transactions to commit cleanly. |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.                                    |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.                                      |
+| `affinity`                      | object  | `{}`    | Affinity rules (replaces default anti-affinity if set).          |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mariadb)
+- [MariaDB Official Documentation](https://mariadb.com/kb/en/)
+- [MariaDB GTID Replication](https://mariadb.com/kb/en/gtid/)
+- [HelmForge MariaDB Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/mariadb)

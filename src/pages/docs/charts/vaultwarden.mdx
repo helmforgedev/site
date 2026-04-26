@@ -1,22 +1,34 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Vaultwarden Chart
-description: HelmForge Vaultwarden chart — self-hosted Bitwarden-compatible password manager for Kubernetes.
+description: HelmForge Vaultwarden chart — self-hosted Bitwarden-compatible password manager with SQLite, PostgreSQL, MySQL backends, Argon2 admin token, NetworkPolicy, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Vaultwarden
 
-Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight, Rust-based implementation of the Bitwarden server API, compatible with all official Bitwarden clients.
+Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight Rust implementation of
+the Bitwarden server API, compatible with all official Bitwarden clients (iOS, Android, browser extensions,
+desktop apps). Supports SQLite, PostgreSQL, and MySQL backends.
+
+<Callout type="danger" title="Set domain before creating any user accounts">
+  Vaultwarden 1.33+ crashes at startup if `domain` is empty. Even when the server starts, leaving `domain` unset breaks
+  WebSocket notifications, attachment URLs, and all email links (invites, 2FA, password reset). Always configure
+  `domain` with your full public HTTPS URL before first use.
+</Callout>
 
 ## Key Features
 
-- **Bitwarden compatible** — Works with all official Bitwarden apps and browser extensions
-- **Lightweight** — Minimal resource footprint compared to the official Bitwarden server
-- **Database backends** — SQLite, PostgreSQL, or MySQL
-- **Admin panel** — Optional web-based administration interface
-- **Ingress support** — Configurable with `ingressClassName` and TLS
-- **Security hardening** — Network policies, non-root containers, pod security
-- **Persistent storage** — Data and attachment persistence
+- **Bitwarden compatible** — works with all official Bitwarden clients and browser extensions
+- **Multiple database backends** — SQLite (default), PostgreSQL, or MySQL
+- **Database auto-detection** — `database.mode: auto` selects backend by configuration precedence
+- **Argon2 admin token** — hardened admin panel with Argon2 PHC token support
+- **Signups disabled by default** — new registrations blocked until explicitly enabled
+- **SMTP integration** — email for invites, 2FA codes, and password reset
+- **NetworkPolicy** — optional ingress/egress policy for network isolation
+- **S3 backup** — supports SQLite tar, pg_dump, and mysqldump based on active backend
 
 ## Installation
 
@@ -25,28 +37,48 @@ Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight,
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-vault helmforge/vaultwarden
+helm install vaultwarden helmforge/vaultwarden -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-vault oci://ghcr.io/helmforgedev/helm/vaultwarden
+helm install vaultwarden oci://ghcr.io/helmforgedev/helm/vaultwarden -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite (Default)' },
+    { id: 'postgresql', label: 'PostgreSQL' },
+    { id: 'production', label: 'Production (Full)' },
+    { id: 'network-policy', label: 'With NetworkPolicy' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
-# values.yaml
+# values.yaml — Vaultwarden with SQLite and TLS
 domain: 'https://vault.example.com'
 
+vaultwarden:
+  signupsAllowed: false # default — enable only temporarily to create first accounts
+
 admin:
-  enabled: true
-  token: 'my-admin-token'
+  token: '$argon2id$v=19$m=65540,t=3,p=4$...' # use: docker run --rm -it vaultwarden/server /vaultwarden hash
+
+data:
+  persistence:
+    enabled: true
+    size: 10Gi
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: vault.example.com
       paths:
@@ -56,28 +88,38 @@ ingress:
     - secretName: vaultwarden-tls
       hosts:
         - vault.example.com
-
-persistence:
-  enabled: true
-  size: 10Gi
 ```
 
-## External Database Example
+</div>
+
+<div data-tab-panel="postgresql">
 
 ```yaml
+# values.yaml — Vaultwarden with external PostgreSQL
 domain: 'https://vault.example.com'
 
-database:
-  type: postgresql
-  host: postgresql.database.svc
-  port: 5432
-  name: vaultwarden
-  username: vaultwarden
-  password: 'db-password'
+vaultwarden:
+  signupsAllowed: false
 
-persistence:
-  enabled: true
-  size: 5Gi
+database:
+  mode: auto
+  external:
+    vendor: postgres
+    host: postgresql.database.svc.cluster.local
+    port: '5432'
+    name: vaultwarden
+    username: vaultwarden
+    existingSecret: vaultwarden-db-credentials
+    existingSecretUrlKey: database-url
+
+admin:
+  existingSecret: vaultwarden-admin
+  existingSecretTokenKey: admin-token
+
+data:
+  persistence:
+    enabled: true
+    size: 5Gi
 
 ingress:
   enabled: true
@@ -89,20 +131,387 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                        | Default   | Description                                       |
-| -------------------------- | --------- | ------------------------------------------------- |
-| `domain`                   | `""`      | Public URL for Vaultwarden                        |
-| `admin.enabled`            | `false`   | Enable admin panel                                |
-| `admin.token`              | `""`      | Admin panel access token                          |
-| `database.type`            | `sqlite`  | Database backend: `sqlite`, `postgresql`, `mysql` |
-| `persistence.enabled`      | `true`    | Enable persistent storage                         |
-| `persistence.size`         | `5Gi`     | PVC size                                          |
-| `ingress.enabled`          | `false`   | Enable ingress                                    |
-| `ingress.ingressClassName` | `traefik` | Ingress class                                     |
-| `signups.enabled`          | `true`    | Allow new user registrations                      |
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Full production Vaultwarden with SMTP, backup, and resource limits
+domain: 'https://vault.example.com'
+
+vaultwarden:
+  signupsAllowed: false
+  invitationsAllowed: true
+  sendsAllowed: true
+  passwordIterations: 600000
+
+admin:
+  existingSecret: vaultwarden-admin
+  existingSecretTokenKey: admin-token
+
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 587
+  from: vault@example.com
+  fromName: Vaultwarden
+  security: starttls
+  username: vault@example.com
+  existingSecret: vaultwarden-smtp
+  existingSecretPasswordKey: smtp-password
+
+database:
+  mode: auto
+  external:
+    vendor: postgres
+    existingSecret: vaultwarden-db-credentials
+    existingSecretUrlKey: database-url
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-vaultwarden-backups
+    existingSecret: vaultwarden-s3-credentials
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 200m
+
+data:
+  persistence:
+    enabled: true
+    size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: vault.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: vaultwarden-tls
+      hosts:
+        - vault.example.com
+```
+
+</div>
+
+<div data-tab-panel="network-policy">
+
+```yaml
+# values.yaml — Vaultwarden with NetworkPolicy for strict cluster isolation
+domain: 'https://vault.example.com'
+
+vaultwarden:
+  signupsAllowed: false
+
+admin:
+  existingSecret: vaultwarden-admin
+
+data:
+  persistence:
+    enabled: true
+    size: 5Gi
+
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: true
+    additionalFrom:
+      # Allow only from Traefik ingress namespace
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-system
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+  egress:
+    enabled: true
+    allowDns: true
+    additionalTo:
+      # Allow egress only to the database namespace
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: database
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: vault.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Admin Token (Argon2)
+
+<Callout type="warning" title="Use an Argon2 PHC hash for the admin token in production">
+  Setting `admin.token` to a plain text string works but exposes the token via bcrypt-equivalent checks.
+  Argon2 is significantly more secure. Generate one using the container itself:
+
+```bash
+docker run --rm -it vaultwarden/server:1.35.4 /vaultwarden hash
+# or with argon2 CLI:
+echo -n 'your-password' | argon2 "$(openssl rand -base64 32)" -e -id -k 65540 -t 3 -p 4
+```
+
+Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes Secret via
+`admin.existingSecret`.
+
+</Callout>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default         | Description                                     |
+| ------------------ | ------ | --------------- | ----------------------------------------------- |
+| `nameOverride`     | string | `""`            | Override the chart name.                        |
+| `fullnameOverride` | string | `""`            | Override the full release name.                 |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.            |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                      |
+| `domain`           | string | `""`            | **Required.** Public HTTPS URL for Vaultwarden. |
+
+### Image
+
+| Parameter          | Type   | Default                        | Description                          |
+| ------------------ | ------ | ------------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/vaultwarden/server` | Vaultwarden container image.         |
+| `image.tag`        | string | `"1.35.4"`                     | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
+
+### Vaultwarden Settings
+
+| Parameter                               | Type    | Default       | Description                                                                    |
+| --------------------------------------- | ------- | ------------- | ------------------------------------------------------------------------------ |
+| `vaultwarden.signupsAllowed`            | boolean | `false`       | Allow new user self-registration. Disabled by default.                         |
+| `vaultwarden.signupsVerify`             | boolean | `false`       | Require email verification for new signups.                                    |
+| `vaultwarden.signupsDomainsWhitelist`   | array   | `[]`          | Restrict signups to specific email domains when `signupsAllowed: false`.       |
+| `vaultwarden.invitationsAllowed`        | boolean | `true`        | Allow admin to invite users by email.                                          |
+| `vaultwarden.invitationOrgName`         | string  | `Vaultwarden` | Organization name shown in invitation emails.                                  |
+| `vaultwarden.invitationExpirationHours` | integer | `120`         | Hours before invite and verification tokens expire.                            |
+| `vaultwarden.sendsAllowed`              | boolean | `true`        | Allow Bitwarden Send file and text sharing.                                    |
+| `vaultwarden.emergencyAccessAllowed`    | boolean | `true`        | Allow emergency access features.                                               |
+| `vaultwarden.emailChangeAllowed`        | boolean | `true`        | Allow users to change their email addresses.                                   |
+| `vaultwarden.orgEventsEnabled`          | boolean | `false`       | Enable organization event logging.                                             |
+| `vaultwarden.orgCreationUsers`          | string  | `""`          | Who may create organizations: `""` (all), `"none"`, or comma-separated emails. |
+| `vaultwarden.passwordIterations`        | integer | `600000`      | Server-side PBKDF2 iterations for password hashing.                            |
+| `vaultwarden.passwordHintsAllowed`      | boolean | `true`        | Allow users to set password hints.                                             |
+| `vaultwarden.showPasswordHint`          | boolean | `false`       | Show hints on the login page (avoid if SMTP is configured).                    |
+| `vaultwarden.websocket.enabled`         | boolean | `true`        | Enable WebSocket notifications for real-time vault sync.                       |
+| `vaultwarden.logLevel`                  | string  | `info`        | Log verbosity.                                                                 |
+| `vaultwarden.proxy.ipHeader`            | string  | `X-Real-IP`   | Header used to identify the real client IP behind a reverse proxy.             |
+
+<Callout type="tip" title="signupsAllowed defaults to false">
+  New user self-registration is disabled by default. To create the first accounts, either temporarily set
+  `signupsAllowed: true` (then revert), use `invitationsAllowed: true` and invite via the admin panel, or restrict to
+  specific email domains with `signupsDomainsWhitelist`.
+</Callout>
+
+### Admin Panel
+
+| Parameter                      | Type   | Default       | Description                                            |
+| ------------------------------ | ------ | ------------- | ------------------------------------------------------ |
+| `admin.token`                  | string | `""`          | Admin panel token. Use Argon2 PHC hash for production. |
+| `admin.existingSecret`         | string | `""`          | Existing secret containing the admin token.            |
+| `admin.existingSecretTokenKey` | string | `admin-token` | Key inside the existing secret.                        |
+
+### SMTP
+
+| Parameter                        | Type    | Default         | Description                                             |
+| -------------------------------- | ------- | --------------- | ------------------------------------------------------- |
+| `smtp.enabled`                   | boolean | `false`         | Enable SMTP for email notifications.                    |
+| `smtp.host`                      | string  | `""`            | SMTP server hostname.                                   |
+| `smtp.port`                      | integer | `587`           | SMTP port.                                              |
+| `smtp.from`                      | string  | `""`            | Sender email address.                                   |
+| `smtp.fromName`                  | string  | `Vaultwarden`   | Sender display name.                                    |
+| `smtp.security`                  | string  | `starttls`      | Connection security: `starttls`, `force_tls`, or `off`. |
+| `smtp.username`                  | string  | `""`            | SMTP authentication username.                           |
+| `smtp.password`                  | string  | `""`            | SMTP password (prefer `existingSecret`).                |
+| `smtp.existingSecret`            | string  | `""`            | Existing secret containing the SMTP password.           |
+| `smtp.existingSecretPasswordKey` | string  | `smtp-password` | Key inside the existing secret.                         |
+| `smtp.timeout`                   | integer | `15`            | SMTP connection timeout in seconds.                     |
+| `smtp.debug`                     | boolean | `false`         | Enable verbose SMTP troubleshooting logs.               |
+| `smtp.acceptInvalidCerts`        | boolean | `false`         | Accept invalid TLS certificates. Not recommended.       |
+| `smtp.acceptInvalidHostnames`    | boolean | `false`         | Accept invalid TLS hostnames. Not recommended.          |
+
+### Database
+
+**Auto-detection precedence** when `database.mode: auto`:
+
+1. `database.external.host` or `database.external.existingSecret` → external DB
+2. `postgresql.enabled: true` → PostgreSQL subchart
+3. `mysql.enabled: true` → MySQL subchart
+4. SQLite fallback
+
+| Parameter                                | Type    | Default        | Description                                                            |
+| ---------------------------------------- | ------- | -------------- | ---------------------------------------------------------------------- |
+| `database.mode`                          | string  | `auto`         | Database mode: `auto`, `sqlite`, `external`, `postgresql`, or `mysql`. |
+| `database.sqlite.enableWal`              | boolean | `true`         | Enable SQLite WAL mode for better read concurrency.                    |
+| `database.connection.retries`            | integer | `15`           | Startup retries for database connection. `0` = infinite.               |
+| `database.connection.timeout`            | integer | `30`           | Timeout in seconds when acquiring a connection.                        |
+| `database.connection.idleTimeout`        | integer | `600`          | Seconds before idle connections are closed.                            |
+| `database.connection.minConnections`     | integer | `2`            | Minimum pool size.                                                     |
+| `database.connection.maxConnections`     | integer | `10`           | Maximum pool size.                                                     |
+| `database.external.vendor`               | string  | `postgres`     | External database vendor: `postgres` or `mysql`.                       |
+| `database.external.host`                 | string  | `""`           | External database hostname.                                            |
+| `database.external.port`                 | string  | `""`           | External database port.                                                |
+| `database.external.name`                 | string  | `vaultwarden`  | Database name.                                                         |
+| `database.external.username`             | string  | `vaultwarden`  | Database username.                                                     |
+| `database.external.password`             | string  | `""`           | Database password (prefer `existingSecret`).                           |
+| `database.external.existingSecret`       | string  | `""`           | Existing secret with a complete `DATABASE_URL` value.                  |
+| `database.external.existingSecretUrlKey` | string  | `database-url` | Key inside the existing secret.                                        |
+| `database.external.parameters`           | string  | `""`           | Optional query string appended to the generated `DATABASE_URL`.        |
+
+### Persistence
+
+| Parameter                         | Type    | Default         | Description                                                         |
+| --------------------------------- | ------- | --------------- | ------------------------------------------------------------------- |
+| `data.persistence.enabled`        | boolean | `true`          | Enable PVC for `/data` (SQLite DB, attachments, sends, icons).      |
+| `data.persistence.size`           | string  | `5Gi`           | PVC size.                                                           |
+| `data.persistence.storageClass`   | string  | `""`            | StorageClass for the PVC.                                           |
+| `data.persistence.accessMode`     | string  | `ReadWriteOnce` | PVC access mode.                                                    |
+| `data.persistence.existingClaim`  | string  | `""`            | Use an existing PVC.                                                |
+| `data.persistence.selectorLabels` | object  | `{}`            | Label selectors for pre-bound PV matching (useful for DR restores). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                  |
+| --------------------- | ------- | ----------- | ---------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.     |
+| `service.port`        | integer | `80`        | Service port.                |
+| `service.targetPort`  | integer | `80`        | Container port.              |
+| `service.annotations` | object  | `{}`        | Annotations for the Service. |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.                               |
+
+### NetworkPolicy
+
+| Parameter                                  | Type    | Default | Description                                                       |
+| ------------------------------------------ | ------- | ------- | ----------------------------------------------------------------- |
+| `networkPolicy.enabled`                    | boolean | `false` | Create a NetworkPolicy for Vaultwarden.                           |
+| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow traffic from pods in the same namespace.                    |
+| `networkPolicy.ingress.additionalFrom`     | array   | `[]`    | Extra ingress peer selectors.                                     |
+| `networkPolicy.egress.enabled`             | boolean | `false` | Enable egress policy (blocks all egress when enabled, add rules). |
+| `networkPolicy.egress.allowDns`            | boolean | `true`  | Allow DNS egress (port 53) when egress is restricted.             |
+| `networkPolicy.egress.additionalTo`        | array   | `[]`    | Extra egress peer selectors.                                      |
+
+### Backup
+
+The backup CronJob automatically selects the correct dump tool based on the active database:
+
+- **SQLite** — `tar` + `cp` via Alpine (archives `/data`)
+- **PostgreSQL** — `pg_dump`
+- **MySQL** — `mysqldump`
+
+| Parameter                              | Type    | Default                                                            | Description                                     |
+| -------------------------------------- | ------- | ------------------------------------------------------------------ | ----------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`                                                            | Enable scheduled S3 backup CronJob.             |
+| `backup.schedule`                      | string  | `"0 0 * * *"`                                                      | Cron schedule for backups.                      |
+| `backup.suspend`                       | boolean | `false`                                                            | Suspend the CronJob without deleting it.        |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                                                | Successful job records to keep.                 |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                                                | Failed job records to keep.                     |
+| `backup.resources`                     | object  | `{}`                                                               | Resources for backup containers.                |
+| `backup.s3.endpoint`                   | string  | `""`                                                               | S3-compatible endpoint URL.                     |
+| `backup.s3.bucket`                     | string  | `""`                                                               | Target bucket name.                             |
+| `backup.s3.prefix`                     | string  | `vaultwarden`                                                      | Key prefix within the bucket.                   |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                                             | Create the bucket if it does not exist.         |
+| `backup.s3.existingSecret`             | string  | `""`                                                               | Existing secret with S3 access and secret keys. |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                                                       | Key for the S3 access key.                      |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                                                       | Key for the S3 secret key.                      |
+| `backup.database.postgresDumpArgs`     | string  | `--clean --if-exists`                                              | Extra arguments passed to `pg_dump`.            |
+| `backup.database.mysqlDumpArgs`        | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra args for `mysqldump`.                     |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                         |
+| -------------------------------------- | ------- | ------- | ----------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe on `/alive`.   |
+| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.        |
+| `probes.startup.periodSeconds`         | integer | `10`    | Startup probe period.               |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.    |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe on `/alive`.  |
+| `probes.liveness.initialDelaySeconds`  | integer | `30`    | Liveness probe initial delay.       |
+| `probes.liveness.periodSeconds`        | integer | `20`    | Liveness probe period.              |
+| `probes.liveness.failureThreshold`     | integer | `6`     | Liveness probe failure threshold.   |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe on `/alive`. |
+| `probes.readiness.initialDelaySeconds` | integer | `10`    | Readiness probe initial delay.      |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.             |
+| `probes.readiness.failureThreshold`    | integer | `6`     | Readiness probe failure threshold.  |
+
+### Resources and Security
+
+Vaultwarden runs fully hardened: non-root (`UID 1000`), all capabilities dropped, seccomp `RuntimeDefault`.
+
+| Parameter                                  | Type    | Default          | Description                            |
+| ------------------------------------------ | ------- | ---------------- | -------------------------------------- |
+| `resources`                                | object  | `{}`             | CPU and memory requests and limits.    |
+| `podSecurityContext.runAsUser`             | integer | `1000`           | UID for the pod.                       |
+| `podSecurityContext.runAsGroup`            | integer | `1000`           | GID for the pod.                       |
+| `podSecurityContext.runAsNonRoot`          | boolean | `true`           | Enforce non-root execution.            |
+| `podSecurityContext.fsGroup`               | integer | `1000`           | Filesystem group for volume ownership. |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Seccomp profile type.                  |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Disallow privilege escalation.         |
+| `securityContext.capabilities.drop`        | array   | `["ALL"]`        | Drop all Linux capabilities.           |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `60`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Subcharts
+
+| Parameter                  | Type    | Default | Description                                           |
+| -------------------------- | ------- | ------- | ----------------------------------------------------- |
+| `postgresql.enabled`       | boolean | `false` | Deploy the bundled PostgreSQL subchart.               |
+| `postgresql.auth.password` | string  | `""`    | Required for deterministic `DATABASE_URL` generation. |
+| `mysql.enabled`            | boolean | `false` | Deploy the bundled MySQL subchart.                    |
+| `mysql.auth.password`      | string  | `""`    | Required for deterministic `DATABASE_URL` generation. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                    |
+| ------------------- | ----- | ------- | ---------------------------------------------- |
+| `extraEnv`          | array | `[]`    | Extra environment variables for the container. |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.            |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.         |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/vaultwarden) on GitHub.
+- [Vaultwarden GitHub Repository](https://github.com/dani-garcia/vaultwarden)
+- [Vaultwarden Wiki](https://github.com/dani-garcia/vaultwarden/wiki)
+- [Enabling Admin Page](https://github.com/dani-garcia/vaultwarden/wiki/Enabling-admin-page)
+- [Bitwarden Client Apps](https://bitwarden.com/download/)
+- [HelmForge Vaultwarden Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/vaultwarden)

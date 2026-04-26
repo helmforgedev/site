@@ -1,23 +1,33 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Uptime Kuma Chart
-description: HelmForge Uptime Kuma chart — self-hosted monitoring with SQLite or MariaDB, status pages, and S3 backup.
+description: HelmForge Uptime Kuma chart — self-hosted uptime monitoring with 20+ check types, 90+ notification services, public status pages, SQLite or MariaDB backend, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Uptime Kuma
 
-Deploy [Uptime Kuma](https://uptime.kuma.pet) on Kubernetes using the official [louislam/uptime-kuma](https://hub.docker.com/r/louislam/uptime-kuma) Docker image. Self-hosted monitoring with HTTP/TCP/DNS/Ping checks, 90+ notification services, and customizable status pages.
+Self-hosted uptime monitoring with a modern web UI. Uptime Kuma checks HTTP, TCP, DNS, Ping, Docker, WebSocket,
+and 20+ other monitor types on configurable intervals, sends alerts via 90+ notification services (Telegram,
+Discord, Slack, email, and more), and publishes customizable public status pages.
+
+<Callout type="warning" title="Single instance only — no horizontal scaling">
+  Uptime Kuma manages WebSocket connections and monitor state in-process. Running multiple replicas causes monitor
+  duplication and inconsistent alerts. Keep the deployment at 1 replica regardless of the database backend used.
+</Callout>
 
 ## Key Features
 
-- **20+ monitor types** — HTTP(s), TCP, Ping, DNS, Docker, WebSocket, and more
-- **90+ notification services** — Telegram, Discord, Slack, Email, Pushover, and more
-- **Status pages** — public status pages with custom domains
-- **SQLite or MariaDB** — embedded SQLite (default) or MySQL subchart
-- **External database** — connect to existing MariaDB instances
-- **Scheduled backups** — SQLite tar or mysqldump with S3 upload
-- **Ingress support** — TLS with cert-manager
-- **2FA** — built-in two-factor authentication
+- **20+ monitor types** — HTTP(s), TCP, Ping, DNS, Docker, WebSocket, Steam, MQTT, and more
+- **90+ notification services** — Telegram, Discord, Slack, Email, Pushover, Gotify, and more
+- **Public status pages** — customizable status pages with custom domains
+- **Two-factor authentication** — built-in 2FA for the admin account
+- **SQLite or MariaDB** — embedded SQLite (default) or MariaDB-compatible subchart
+- **External database** — connect to an existing MariaDB/MySQL instance
+- **Smart S3 backup** — `tar` for SQLite mode, `mysqldump` for MariaDB mode
+- **Custom CA certificates** — monitor internal HTTPS services with private CA
 
 ## Installation
 
@@ -35,55 +45,356 @@ helm install uptime-kuma helmforge/uptime-kuma -f values.yaml
 helm install uptime-kuma oci://ghcr.io/helmforgedev/helm/uptime-kuma -f values.yaml
 ```
 
-## Basic Example (SQLite)
+After deploying with default values, access the setup wizard to create the admin account:
 
-```yaml
-# values.yaml — default values are sufficient
-# SQLite is used by default, no database configuration needed
+```bash
+kubectl port-forward svc/<release>-uptime-kuma 3001:80
+# Open http://localhost:3001 in your browser
 ```
 
-After deploying, access the setup wizard via `kubectl port-forward svc/<release>-uptime-kuma 3001:80`.
+## Deployment Examples
 
-## MariaDB Mode
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite (Default)' },
+    { id: 'mariadb', label: 'With MariaDB' },
+    { id: 'external-db', label: 'External Database' },
+    { id: 'private-ca', label: 'Private CA Monitoring' },
+    { id: 'backup', label: 'With S3 Backup' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
+# values.yaml — Uptime Kuma with SQLite (default, no database configuration needed)
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: status.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: uptime-kuma-tls
+      hosts:
+        - status.example.com
+```
+
+</div>
+
+<div data-tab-panel="mariadb">
+
+```yaml
+# values.yaml — Uptime Kuma with bundled MariaDB subchart
 database:
   type: mariadb
 
 mysql:
   enabled: true
   auth:
-    password: 'change-me'
+    password: 'mariadb-password'
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: status.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## External Database
+</div>
+
+<div data-tab-panel="external-db">
 
 ```yaml
+# values.yaml — Uptime Kuma with external MariaDB/MySQL
 database:
   type: mariadb
   external:
-    host: mariadb.example.com
+    host: mariadb.database.svc.cluster.local
+    port: '3306'
     name: uptime_kuma
     username: uptime_kuma
     existingSecret: uptime-kuma-db-credentials
+    existingSecretPasswordKey: password
 
 mysql:
   enabled: false
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: status.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default  | Description                      |
-| --------------------- | -------- | -------------------------------- |
-| `uptimeKuma.port`     | `3001`   | Application port                 |
-| `database.type`       | `sqlite` | Database type (sqlite, mariadb)  |
-| `mysql.enabled`       | `false`  | Deploy MySQL subchart            |
-| `persistence.enabled` | `true`   | Enable persistence for /app/data |
-| `persistence.size`    | `2Gi`    | PVC size                         |
-| `ingress.enabled`     | `false`  | Enable ingress                   |
-| `backup.enabled`      | `false`  | Enable S3 backups                |
-| `service.port`        | `80`     | Service port                     |
+<div data-tab-panel="private-ca">
+
+```yaml
+# values.yaml — Monitor internal HTTPS services with a private CA certificate
+# The CA certificate must be stored in the /app/data PVC at /app/data/ca.pem
+uptimeKuma:
+  extraEnv:
+    - name: NODE_EXTRA_CA_CERTS
+      value: /app/data/ca.pem
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: status.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily S3 backup
+# Backup strategy is automatic: tar for SQLite mode, mysqldump for MariaDB mode
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-uptime-kuma-backups
+    prefix: uptime-kuma
+    existingSecret: uptime-kuma-s3-credentials
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: status.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                          | Description                          |
+| ------------------ | ------ | -------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/louislam/uptime-kuma` | Uptime Kuma container image.         |
+| `image.tag`        | string | `"2.2.1"`                        | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                   | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                             | Pull secrets for private registries. |
+
+### Uptime Kuma Configuration
+
+| Parameter                           | Type    | Default | Description                                                                       |
+| ----------------------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
+| `uptimeKuma.port`                   | integer | `3001`  | Internal HTTP port.                                                               |
+| `uptimeKuma.disableFrameSameOrigin` | boolean | `false` | Allow embedding the status page in iframes from other origins.                    |
+| `uptimeKuma.extraEnv`               | array   | `[]`    | Extra environment variables. Use for `NODE_EXTRA_CA_CERTS` and advanced settings. |
+
+<Callout type="tip" title="Enable iframe embedding for dashboard integration">
+  Status pages can be embedded in dashboards such as Heimdall or Homarr. Set `uptimeKuma.disableFrameSameOrigin: true`
+  to allow cross-origin iframe embedding. By default, the `X-Frame-Options: SAMEORIGIN` header prevents embedding from
+  other domains.
+</Callout>
+
+<Callout type="info" title="Monitoring services with private CA certificates">
+  To monitor internal HTTPS endpoints using a self-signed or private CA certificate, place the CA certificate file in
+  the PVC at `/app/data/ca.pem` and set `NODE_EXTRA_CA_CERTS` via `uptimeKuma.extraEnv`. Node.js will then trust that CA
+  for all outgoing HTTPS requests made by the monitor checks.
+</Callout>
+
+### Database
+
+| Parameter                                     | Type   | Default       | Description                                                 |
+| --------------------------------------------- | ------ | ------------- | ----------------------------------------------------------- |
+| `database.type`                               | string | `sqlite`      | Database backend: `sqlite` or `mariadb`.                    |
+| `database.external.host`                      | string | `""`          | External MariaDB/MySQL hostname.                            |
+| `database.external.port`                      | string | `"3306"`      | External MariaDB/MySQL port.                                |
+| `database.external.name`                      | string | `uptime_kuma` | Database name on the external server.                       |
+| `database.external.username`                  | string | `uptime_kuma` | Username for the external database.                         |
+| `database.external.password`                  | string | `""`          | Password for the external database (prefer existingSecret). |
+| `database.external.existingSecret`            | string | `""`          | Existing secret containing the database password.           |
+| `database.external.existingSecretPasswordKey` | string | `password`    | Key inside the existing secret for the password.            |
+
+### Database — MySQL Subchart
+
+<Callout type="info" title="The mysql subchart is MariaDB-compatible">
+  The subchart is named `mysql` in the values, but Uptime Kuma uses it as a MariaDB-compatible backend. Set
+  `database.type: mariadb` alongside `mysql.enabled: true` to activate this mode.
+</Callout>
+
+| Parameter             | Type    | Default       | Description                                           |
+| --------------------- | ------- | ------------- | ----------------------------------------------------- |
+| `mysql.enabled`       | boolean | `false`       | Deploy a bundled MySQL/MariaDB subchart.              |
+| `mysql.architecture`  | string  | `standalone`  | Database architecture.                                |
+| `mysql.auth.database` | string  | `uptime_kuma` | Database name created by the subchart.                |
+| `mysql.auth.username` | string  | `uptime_kuma` | Database user created by the subchart.                |
+| `mysql.auth.password` | string  | `""`          | Database password (required when using the subchart). |
+
+### Persistence
+
+| Parameter                   | Type    | Default             | Description                                                         |
+| --------------------------- | ------- | ------------------- | ------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/app/data` (SQLite, config, and CA certificates). |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                                           |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                           |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                   |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                        |
+
+### Backup
+
+The backup strategy adapts to the configured database mode automatically:
+
+- **SQLite mode** — archives the full `/app/data` directory using `tar`.
+- **MariaDB mode** — runs `mysqldump` against the database and uploads the SQL dump.
+
+| Parameter                              | Type    | Default                   | Description                                                  |
+| -------------------------------------- | ------- | ------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                   | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 2 * * *"`             | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                   | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                  | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                       | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                       | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                       | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `uptime-kuma`             | Prefix for backup archive filenames.                         |
+| `backup.resources`                     | object  | `{}`                      | Resources for backup containers.                             |
+| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`  | S3 uploader image repository.                                |
+| `backup.images.uploader.tag`           | string  | `"1.0.0"`                 | S3 uploader image tag.                                       |
+| `backup.images.mysql.repository`       | string  | `docker.io/library/mysql` | mysqldump image repository (MariaDB mode).                   |
+| `backup.images.mysql.tag`              | string  | `"8.4"`                   | mysqldump image tag.                                         |
+| `backup.s3.endpoint`                   | string  | `""`                      | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                      | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `uptime-kuma`             | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                    | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                      | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`              | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`              | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                      | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                      | Inline S3 secret key (ignored when `existingSecret` is set). |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/uptime-kuma) on GitHub.
+- [Uptime Kuma Official Website](https://uptime.kuma.pet)
+- [Uptime Kuma GitHub Repository](https://github.com/louislam/uptime-kuma)
+- [HelmForge Uptime Kuma Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/uptime-kuma)

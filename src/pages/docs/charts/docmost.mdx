@@ -1,106 +1,414 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Docmost
-description: Helm chart for Docmost on Kubernetes with bundled PostgreSQL, Redis, local storage, and optional S3.
+title: Docmost Chart
+description: HelmForge Docmost chart — collaborative wiki with bundled PostgreSQL and Redis, local or S3 uploads storage, pg_dump backup, PostgreSQL extension bootstrap, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Docmost
 
-Helm chart for deploying [Docmost](https://docmost.com/) on Kubernetes with bundled PostgreSQL and Redis by default, persistent local storage for uploads, and optional S3-compatible object storage.
+Deploy [Docmost](https://docmost.com/) on Kubernetes — an open-source collaborative wiki and documentation
+platform. Supports bundled or external PostgreSQL and Redis, local PVC or S3 uploads storage, and scheduled
+`pg_dump` backups.
+
+<Callout type="warning" title="appUrl must be set explicitly in production">
+  If `docmost.appUrl` is empty, Docmost auto-detects the URL from the Ingress host. In production, always set it
+  explicitly (e.g. `https://wiki.example.com`). An incorrect `appUrl` causes password reset emails, invite links, and
+  OAuth redirects to reference the wrong address.
+</Callout>
 
 ## Key Features
 
-- **Official Docmost image** based on `docmost/docmost`
-- **Bundled PostgreSQL** default install includes the HelmForge PostgreSQL chart
-- **Bundled Redis** default install includes the HelmForge Redis chart
-- **External services support** managed PostgreSQL and Redis can be used instead of subcharts
-- **Local or S3 storage** choose persistent local storage or S3-compatible object storage for uploads
-- **Ingress support** configurable ingress with stable external URL handling
-- **Bootstrap-ready database** PostgreSQL init scripts grant Docmost the required extension privileges on first startup
+- **Collaborative wiki** — real-time editing, spaces, pages, and permissions
+- **PostgreSQL + Redis** — bundled subcharts or external connections
+- **Auto-bootstrap** — `unaccent` and `pg_trgm` extensions granted on first start
+- **Storage modes** — local PVC (single replica) or S3-compatible (scalable)
+- **pg_dump backup** — scheduled CronJob to S3; database-only (uploads separate)
+- **JWT sessions** — configurable `jwtTokenExpiresIn` with auto-generated app secret
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install docmost helmforge/docmost
+helm install docmost helmforge/docmost -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install docmost oci://ghcr.io/helmforgedev/helm/docmost
+helm install docmost oci://ghcr.io/helmforgedev/helm/docmost -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (Bundled DB)' },
+    { id: 'external', label: 'External PostgreSQL + Redis' },
+    { id: 's3-storage', label: 'S3 Uploads Storage' },
+    { id: 'full', label: 'Full Production' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Docmost with bundled PostgreSQL and Redis
 docmost:
-  appUrl: https://docmost.example.com
+  appUrl: 'https://wiki.example.com'
+  appSecret: 'generate-with-openssl-rand-hex-32'
+
+postgresql:
+  enabled: true
+  auth:
+    database: docmost
+    username: docmost
+    password: 'strong-db-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+redis:
+  enabled: true
+  standalone:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+storage:
+  mode: local
+  local:
+    enabled: true
+    size: 20Gi
 
 ingress:
   enabled: true
   ingressClassName: traefik
   hosts:
-    - host: docmost.example.com
+    - host: wiki.example.com
       paths:
         - path: /
           pathType: Prefix
 ```
 
-## External Services with S3
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
-database:
-  mode: external
-  external:
-    host: postgres.example.internal
-    existingSecret: docmost-db
+# values.yaml — Docmost with external PostgreSQL and Redis
+# IMPORTANT: On the external PostgreSQL instance, run before installing:
+#   GRANT CREATE ON DATABASE docmost TO docmost;
+#   \connect docmost
+#   CREATE EXTENSION IF NOT EXISTS unaccent;
+#   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+docmost:
+  appUrl: 'https://wiki.example.com'
+  appSecret: 'generate-with-openssl-rand-hex-32'
 
 postgresql:
   enabled: false
 
+database:
+  mode: external
+  external:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    name: docmost
+    username: docmost
+    existingSecret: docmost-db-credentials
+    existingSecretPasswordKey: database-password
+
 redis:
   enabled: false
   external:
-    host: redis.example.internal
-    existingSecret: docmost-redis
+    host: redis.cache.svc.cluster.local
+    port: 6379
+    existingSecret: docmost-redis-credentials
+    existingSecretPasswordKey: redis-password
 
 storage:
-  mode: s3
-  s3:
-    bucket: docmost
-    endpoint: https://minio.example.internal
-    existingSecret: docmost-s3
+  mode: local
+  local:
+    enabled: true
+    size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: wiki.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                  | Default | Description                                        |
-| -------------------- | ------- | -------------------------------------------------- |
-| `replicaCount`       | `1`     | Number of Docmost application pods                 |
-| `docmost.appUrl`     | `""`    | External URL used by Docmost                       |
-| `database.mode`      | `auto`  | Database mode: `auto`, `external`, or `postgresql` |
-| `postgresql.enabled` | `true`  | Deploy bundled PostgreSQL                          |
-| `redis.enabled`      | `true`  | Deploy bundled Redis                               |
-| `storage.mode`       | `local` | Uploads storage mode: `local` or `s3`              |
-| `storage.local.size` | `10Gi`  | Local uploads PVC size                             |
-| `storage.s3.bucket`  | `""`    | S3 bucket name                                     |
-| `ingress.enabled`    | `false` | Enable ingress exposure                            |
+<div data-tab-panel="s3-storage">
 
-## Version Note
+```yaml
+# values.yaml — Docmost with S3 uploads (enables horizontal scaling)
+docmost:
+  appUrl: 'https://wiki.example.com'
+  appSecret: 'generate-with-openssl-rand-hex-32'
 
-- Docker Hub exposed `0.71.0`, while the official GitHub releases page still showed `v0.70.3` during chart creation
-- because HelmForge validates application releases against both sources, the chart currently pins `0.70.3`
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
 
-## Operational Notes
+redis:
+  enabled: true
 
-- this alpha chart currently supports `replicaCount=1` only
-- default installs use bundled PostgreSQL and Redis
-- the PostgreSQL bootstrap enables `unaccent` and `pg_trgm`, which Docmost migrations require
+storage:
+  mode: s3 # no local PVC created; allows replicaCount > 1
+  s3:
+    region: us-east-1
+    bucket: docmost-uploads
+    endpoint: https://s3.amazonaws.com # or MinIO endpoint
+    forcePathStyle: true # required for MinIO and most S3-compatible providers
+    existingSecret: docmost-s3-credentials
+    existingSecretAccessKeyKey: access-key
+    existingSecretSecretKeyKey: secret-key
+
+replicaCount: 2 # safe to scale with S3 storage
+```
+
+</div>
+
+<div data-tab-panel="full">
+
+```yaml
+# values.yaml — Full production Docmost with backup and TLS
+docmost:
+  appUrl: 'https://wiki.example.com'
+  appSecret: 'generate-with-openssl-rand-hex-32'
+  jwtTokenExpiresIn: 30d
+
+postgresql:
+  enabled: true
+  auth:
+    database: docmost
+    username: docmost
+    password: 'strong-db-password'
+    postgresPassword: 'strong-superuser-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: 'strong-redis-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+storage:
+  mode: local
+  local:
+    enabled: true
+    size: 50Gi
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: docmost-backups
+    existingSecret: docmost-backup-s3-credentials
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 200m
+  limits:
+    memory: 1Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: wiki.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: docmost-tls
+      hosts:
+        - wiki.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                                                  |
+| ------------------ | ------- | ------- | ------------------------------------------------------------ |
+| `replicaCount`     | integer | `1`     | Pod replicas. Safe to increase only with `storage.mode: s3`. |
+| `nameOverride`     | string  | `""`    | Override the chart name.                                     |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                              |
+| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                         |
+
+### Image
+
+| Parameter          | Type   | Default                     | Description        |
+| ------------------ | ------ | --------------------------- | ------------------ |
+| `image.repository` | string | `docker.io/docmost/docmost` | Docmost image.     |
+| `image.tag`        | string | `"0.70.3"`                  | Image tag.         |
+| `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy. |
+
+### Docmost Configuration
+
+| Parameter                   | Type   | Default | Description                                                                                    |
+| --------------------------- | ------ | ------- | ---------------------------------------------------------------------------------------------- |
+| `docmost.appUrl`            | string | `""`    | Full public URL. Auto-detected from first Ingress host if empty. Set explicitly in production. |
+| `docmost.appSecret`         | string | `""`    | Application secret key. Auto-generated if empty. Store in a stable secret for production.      |
+| `docmost.jwtTokenExpiresIn` | string | `30d`   | JWT token expiration for user sessions.                                                        |
+| `docmost.extraEnv`          | array  | `[]`    | Extra environment variables for the container.                                                 |
+
+### Database
+
+**Auto-detection precedence** (`database.mode: auto`):
+
+1. `database.external.host` or `database.external.existingSecret` → external PostgreSQL
+2. `postgresql.enabled: true` → bundled PostgreSQL subchart
+
+| Parameter                                     | Type    | Default             | Description                                         |
+| --------------------------------------------- | ------- | ------------------- | --------------------------------------------------- |
+| `database.mode`                               | string  | `auto`              | Database mode: `auto`, `external`, or `postgresql`. |
+| `database.external.host`                      | string  | `""`                | External PostgreSQL hostname.                       |
+| `database.external.port`                      | integer | `5432`              | External PostgreSQL port.                           |
+| `database.external.name`                      | string  | `docmost`           | Database name.                                      |
+| `database.external.username`                  | string  | `docmost`           | Database username.                                  |
+| `database.external.existingSecret`            | string  | `""`                | Existing secret with the database password.         |
+| `database.external.existingSecretPasswordKey` | string  | `database-password` | Key for the password in the existing secret.        |
+
+<Callout type="info" title="External PostgreSQL requires manual extension setup">
+  When using an external PostgreSQL, the bundled bootstrap scripts do not run. Before installing
+  Docmost, manually execute on the target database:
+
+```sql
+GRANT CREATE ON DATABASE docmost TO docmost;
+\connect docmost
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+```
+
+</Callout>
+
+### PostgreSQL Subchart
+
+| Parameter                                | Type    | Default   | Description                                  |
+| ---------------------------------------- | ------- | --------- | -------------------------------------------- |
+| `postgresql.enabled`                     | boolean | `true`    | Deploy the bundled PostgreSQL subchart.      |
+| `postgresql.auth.database`               | string  | `docmost` | Database name.                               |
+| `postgresql.auth.username`               | string  | `docmost` | Database username.                           |
+| `postgresql.auth.password`               | string  | `""`      | Database password. Auto-generated if empty.  |
+| `postgresql.auth.postgresPassword`       | string  | `""`      | Superuser password. Auto-generated if empty. |
+| `postgresql.standalone.persistence.size` | string  | `8Gi`     | PVC size for PostgreSQL.                     |
+
+### Redis Subchart / External
+
+| Parameter                           | Type    | Default | Description                                   |
+| ----------------------------------- | ------- | ------- | --------------------------------------------- |
+| `redis.enabled`                     | boolean | `true`  | Deploy the bundled Redis subchart.            |
+| `redis.auth.enabled`                | boolean | `true`  | Enable Redis password authentication.         |
+| `redis.auth.password`               | string  | `""`    | Redis password. Auto-generated if empty.      |
+| `redis.standalone.persistence.size` | string  | `1Gi`   | PVC size for Redis.                           |
+| `redis.external.host`               | string  | `""`    | External Redis hostname.                      |
+| `redis.external.existingSecret`     | string  | `""`    | Existing secret with external Redis password. |
+
+### Storage
+
+<Callout type="warning" title="local storage limits replicaCount to 1">
+  With `storage.mode: local`, the uploads PVC uses `ReadWriteOnce`. Only one pod can mount it at a
+  time — setting `replicaCount > 1` will leave extra pods in Pending state. Switch to `storage.mode: s3`
+  to enable horizontal scaling.
+</Callout>
+
+| Parameter                               | Type    | Default      | Description                                    |
+| --------------------------------------- | ------- | ------------ | ---------------------------------------------- |
+| `storage.mode`                          | string  | `local`      | Storage mode: `local` (PVC) or `s3`.           |
+| `storage.local.enabled`                 | boolean | `true`       | Create a local PVC for uploads.                |
+| `storage.local.size`                    | string  | `10Gi`       | Uploads PVC size.                              |
+| `storage.local.storageClass`            | string  | `""`         | StorageClass for the uploads PVC.              |
+| `storage.local.existingClaim`           | string  | `""`         | Use an existing PVC for uploads.               |
+| `storage.s3.region`                     | string  | `us-east-1`  | S3 region.                                     |
+| `storage.s3.bucket`                     | string  | `""`         | S3 bucket name.                                |
+| `storage.s3.endpoint`                   | string  | `""`         | S3-compatible endpoint URL.                    |
+| `storage.s3.forcePathStyle`             | boolean | `true`       | Force path-style requests. Required for MinIO. |
+| `storage.s3.existingSecret`             | string  | `""`         | Existing secret with S3 credentials.           |
+| `storage.s3.existingSecretAccessKeyKey` | string  | `access-key` | Key for the S3 access key.                     |
+| `storage.s3.existingSecretSecretKeyKey` | string  | `secret-key` | Key for the S3 secret key.                     |
+
+### Backup
+
+The backup CronJob runs `pg_dump` and uploads the result to S3. **Upload files are not included.**
+
+| Parameter                  | Type    | Default              | Description                           |
+| -------------------------- | ------- | -------------------- | ------------------------------------- |
+| `backup.enabled`           | boolean | `false`              | Enable scheduled `pg_dump` S3 backup. |
+| `backup.schedule`          | string  | `"0 3 * * *"`        | Cron schedule.                        |
+| `backup.archivePrefix`     | string  | `docmost`            | Prefix for backup archive filenames.  |
+| `backup.images.postgresql` | string  | `postgres:18-alpine` | Image providing `pg_dump`.            |
+| `backup.s3.endpoint`       | string  | `""`                 | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`         | string  | `""`                 | Target bucket name.                   |
+| `backup.s3.existingSecret` | string  | `""`                 | Existing secret with S3 credentials.  |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                              |
+| -------------------------- | ------- | ----------- | ---------------------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.                            |
+| `service.port`             | integer | `80`        | Service port.                            |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource.              |
+| `ingress.ingressClassName` | string  | `""`        | Ingress class name.                      |
+| `ingress.annotations`      | object  | `{}`        | Ingress annotations (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`        | Host and path rules.                     |
+| `ingress.tls`              | array   | `[]`        | TLS configuration.                       |
+
+### Probes
+
+All probes use `/api/health` as the HTTP path.
+
+| Parameter                       | Type    | Default | Description                      |
+| ------------------------------- | ------- | ------- | -------------------------------- |
+| `startupProbe.enabled`          | boolean | `true`  | Enable startup probe.            |
+| `startupProbe.failureThreshold` | integer | `30`    | Startup probe failure threshold. |
+| `livenessProbe.enabled`         | boolean | `true`  | Enable liveness probe.           |
+| `readinessProbe.enabled`        | boolean | `true`  | Enable readiness probe.          |
+
+### Resources and Scheduling
+
+| Parameter                       | Type    | Default | Description                     |
+| ------------------------------- | ------- | ------- | ------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
+| `extraVolumes`                  | array   | `[]`    | Extra volumes.                  |
+| `extraVolumeMounts`             | array   | `[]`    | Extra volume mounts.            |
+| `extraManifests`                | array   | `[]`    | Extra Kubernetes manifests.     |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/docmost)
+- [Docmost Official Documentation](https://docmost.com/docs/)
+- [Docmost GitHub Repository](https://github.com/docmost/docmost)
+- [HelmForge Docmost Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/docmost)

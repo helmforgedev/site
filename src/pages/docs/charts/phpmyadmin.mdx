@@ -1,26 +1,37 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: phpMyAdmin
-description: Helm chart for phpMyAdmin web-based MySQL/MariaDB administration on Kubernetes.
+title: phpMyAdmin Chart
+description: HelmForge phpMyAdmin chart — web-based MySQL and MariaDB administration interface, stateless and horizontally scalable, with single-server and multi-server modes for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # phpMyAdmin
 
-Helm chart for deploying [phpMyAdmin](https://www.phpmyadmin.net/) on Kubernetes using the official [`phpmyadmin/phpmyadmin`](https://hub.docker.com/r/phpmyadmin/phpmyadmin) Docker image.
+Web-based MySQL and MariaDB administration interface. phpMyAdmin provides a browser-based UI for managing
+databases, running SQL queries, importing and exporting data, managing users and permissions, and browsing
+table structures. It is stateless — no persistent storage is required.
+
+<Callout type="danger" title="Never expose phpMyAdmin publicly without additional authentication">
+  phpMyAdmin instances are actively scanned and attacked by bots on the internet. Never expose phpMyAdmin via an Ingress
+  without an additional authentication layer (e.g. Traefik BasicAuth middleware, IP allowlist, or VPN). Limit access to
+  internal cluster services or trusted IP ranges only.
+</Callout>
 
 ## Key Features
 
-- **Official phpMyAdmin image** based on `phpmyadmin/phpmyadmin`
-- **Single or multi-server** connect to one MySQL host or multiple servers
-- **Auto-login** optional automatic authentication via credentials or existing secret
-- **Custom configuration** mount `config.user.inc.php` via ConfigMap
-- **Upload limit** configurable max upload size for SQL imports
-- **Stateless** no persistent storage needed, scales horizontally
-- **Ingress support** configurable ingress with TLS
+- **MySQL and MariaDB** — connect to any accessible MySQL-compatible server
+- **Single or multi-server** — connect to one fixed host or let users choose from a list
+- **Stateless** — no persistent storage required, supports horizontal scaling
+- **Auto-login** — optional automatic authentication using stored credentials
+- **Custom configuration** — mount `config.user.inc.php` via ConfigMap for advanced settings
+- **Configurable upload limit** — adjust max SQL import size
+- **Ingress support** — configurable TLS via cert-manager
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,23 +39,39 @@ helm repo update
 helm install phpmyadmin helmforge/phpmyadmin --set phpmyadmin.host=mysql.default.svc
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
 helm install phpmyadmin oci://ghcr.io/helmforgedev/helm/phpmyadmin --set phpmyadmin.host=mysql.default.svc
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'single', label: 'Single Server' },
+    { id: 'multi', label: 'Multi-Server' },
+    { id: 'subpath', label: 'Behind Subpath Proxy' },
+    { id: 'custom-config', label: 'Custom Config' },
+  ]}
+>
+
+<div data-tab-panel="single">
 
 ```yaml
+# values.yaml — phpMyAdmin pointing to a single MySQL/MariaDB instance
 phpmyadmin:
-  host: mysql.default.svc.cluster.local
+  host: mysql.database.svc.cluster.local
   port: 3306
   uploadLimit: '128M'
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    # Add BasicAuth or IP allowlist middleware here
+    traefik.ingress.kubernetes.io/router.middlewares: default-basic-auth@kubernetescrd
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: pma.example.com
       paths:
@@ -56,24 +83,229 @@ ingress:
         - pma.example.com
 ```
 
-## Key Values
+</div>
 
-| Key                        | Default     | Description                                 |
-| -------------------------- | ----------- | ------------------------------------------- |
-| `phpmyadmin.host`          | `""`        | MySQL/MariaDB host to connect to            |
-| `phpmyadmin.hosts`         | `""`        | Comma-separated hosts for multi-server mode |
-| `phpmyadmin.port`          | `3306`      | MySQL port                                  |
-| `phpmyadmin.uploadLimit`   | `"64M"`     | Max upload size for SQL imports             |
-| `phpmyadmin.absoluteUri`   | `""`        | Absolute URI when behind a reverse proxy    |
-| `auth.username`            | `""`        | MySQL username for auto-login               |
-| `auth.existingSecret`      | `""`        | Existing secret with auto-login credentials |
-| `config.customConfig`      | `""`        | Raw content for config.user.inc.php         |
-| `replicaCount`             | `1`         | Number of replicas                          |
-| `service.type`             | `ClusterIP` | Service type                                |
-| `service.port`             | `80`        | Service port                                |
-| `ingress.enabled`          | `false`     | Enable ingress                              |
-| `ingress.ingressClassName` | `""`        | Ingress class (`traefik`, `nginx`, etc.)    |
+<div data-tab-panel="multi">
+
+```yaml
+# values.yaml — phpMyAdmin with multiple MySQL servers (user selects on login)
+phpmyadmin:
+  # Leave host empty when using multi-server mode
+  host: ''
+  hosts: 'mysql-prod.database.svc,mysql-staging.database.svc'
+  uploadLimit: '128M'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: pma.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="subpath">
+
+```yaml
+# values.yaml — phpMyAdmin served at a subpath (e.g. https://example.com/pma/)
+# absoluteUri is required when the proxy adds a path prefix
+phpmyadmin:
+  host: mysql.database.svc.cluster.local
+  absoluteUri: 'https://example.com/pma/'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: example.com
+      paths:
+        - path: /pma
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="custom-config">
+
+```yaml
+# values.yaml — phpMyAdmin with custom PHP configuration
+# config.user.inc.php is mounted via a ConfigMap
+phpmyadmin:
+  host: mysql.database.svc.cluster.local
+  uploadLimit: '256M'
+
+config:
+  customConfig: |
+    <?php
+    // Increase session timeout to 4 hours
+    $cfg['LoginCookieValidity'] = 14400;
+    // Set default charset
+    $cfg['DefaultCharset'] = 'utf8mb4';
+    // Enable SSL for MySQL connection
+    // $cfg['Servers'][$i]['ssl'] = true;
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: pma.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                                                  |
+| ------------------ | ------- | ------- | ------------------------------------------------------------ |
+| `nameOverride`     | string  | `""`    | Override the chart name.                                     |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                              |
+| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                         |
+| `replicaCount`     | integer | `1`     | Number of replicas. phpMyAdmin is stateless — safe to scale. |
+
+### Image
+
+| Parameter          | Type   | Default                           | Description                          |
+| ------------------ | ------ | --------------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/phpmyadmin/phpmyadmin` | phpMyAdmin container image.          |
+| `image.tag`        | string | `"5.2.3"`                         | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries. |
+
+### phpMyAdmin Configuration
+
+| Parameter                | Type    | Default | Description                                                                              |
+| ------------------------ | ------- | ------- | ---------------------------------------------------------------------------------------- |
+| `phpmyadmin.host`        | string  | `""`    | MySQL/MariaDB hostname to connect to (single-server mode).                               |
+| `phpmyadmin.hosts`       | string  | `""`    | Comma-separated list of MySQL hostnames (multi-server mode). Leave `host` empty.         |
+| `phpmyadmin.port`        | integer | `3306`  | MySQL port.                                                                              |
+| `phpmyadmin.uploadLimit` | string  | `"64M"` | Maximum SQL file size for imports (e.g. `64M`, `128M`, `256M`).                          |
+| `phpmyadmin.absoluteUri` | string  | `""`    | Absolute URI when behind a reverse proxy at a subpath (e.g. `https://example.com/pma/`). |
+| `phpmyadmin.extraEnv`    | array   | `[]`    | Extra environment variables for advanced phpMyAdmin configuration.                       |
+
+<Callout type="info" title="Single-server vs multi-server mode">
+  Use `phpmyadmin.host` to lock phpMyAdmin to a single MySQL server — users will not be able to choose a different host.
+  Use `phpmyadmin.hosts` (comma-separated) to present a server selection dropdown on the login page. When using
+  multi-server mode, leave `phpmyadmin.host` empty.
+</Callout>
+
+<Callout type="warning" title="uploadLimit must match PHP and web server settings">
+  The `uploadLimit` value sets the maximum SQL import file size. For large database imports, increase this value. Note
+  that this setting corresponds to the PHP `upload_max_filesize` and `post_max_size` directives. Values larger than your
+  proxy's body size limit (e.g. Traefik's `maxRequestBodyBytes`) will still be rejected at the ingress level.
+</Callout>
+
+### Authentication (Auto-Login)
+
+<Callout type="danger" title="Auto-login bypasses the phpMyAdmin login form">
+  Setting `auth.username` and `auth.password` (or `auth.existingSecret`) enables automatic authentication — anyone who
+  accesses the phpMyAdmin URL is immediately logged into the MySQL server without entering credentials. Only use
+  auto-login when phpMyAdmin is protected by an external authentication layer such as a Traefik BasicAuth middleware,
+  Authelia, or VPN access restriction.
+</Callout>
+
+| Parameter                        | Type   | Default    | Description                                                         |
+| -------------------------------- | ------ | ---------- | ------------------------------------------------------------------- |
+| `auth.username`                  | string | `""`       | MySQL username for auto-login. Bypasses the login form if set.      |
+| `auth.password`                  | string | `""`       | MySQL password for auto-login (plain text — prefer existingSecret). |
+| `auth.existingSecret`            | string | `""`       | Existing Kubernetes Secret containing auto-login credentials.       |
+| `auth.existingSecretUsernameKey` | string | `username` | Key in the existing secret for the MySQL username.                  |
+| `auth.existingSecretPasswordKey` | string | `password` | Key in the existing secret for the MySQL password.                  |
+
+### Custom Configuration
+
+| Parameter                  | Type   | Default | Description                                                         |
+| -------------------------- | ------ | ------- | ------------------------------------------------------------------- |
+| `config.customConfig`      | string | `""`    | Raw PHP content for `config.user.inc.php`, mounted via a ConfigMap. |
+| `config.existingConfigMap` | string | `""`    | Use an existing ConfigMap containing `config.user.inc.php`.         |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default | Description                                            |
+| -------------------------- | ------- | ------- | ------------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false` | Enable an Ingress resource.                            |
+| `ingress.ingressClassName` | string  | `""`    | Ingress class name. Must be set explicitly.            |
+| `ingress.annotations`      | object  | `{}`    | Annotations for the Ingress. Add auth middleware here. |
+| `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                           |
+| `ingress.tls`              | array   | `[]`    | TLS configuration (secret name and hosts).             |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `startupProbe.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `startupProbe.failureThreshold`      | integer | `12`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`        | integer | `20`    | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/phpmyadmin)
+- [phpMyAdmin Official Website](https://www.phpmyadmin.net)
+- [phpMyAdmin Documentation](https://docs.phpmyadmin.net)
+- [phpMyAdmin GitHub Repository](https://github.com/phpmyadmin/phpmyadmin)
+- [HelmForge phpMyAdmin Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/phpmyadmin)

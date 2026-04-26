@@ -1,23 +1,38 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Apache Superset Chart
-description: HelmForge Superset chart for data exploration and visualization with Celery workers, PostgreSQL, and Redis.
+description: HelmForge Superset chart — business intelligence platform with Gunicorn web, Celery workers, Celery Beat scheduler, init Job for migrations, PostgreSQL+Redis bundled by default, secretKey/existingSecret, extraConfig for superset_config.py, and pg_dump S3 backup.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Apache Superset
 
-Deploy [Apache Superset](https://superset.apache.org/) on Kubernetes — a modern, enterprise-ready business intelligence platform for data exploration and visualization with 60+ database connectors.
+Deploy [Apache Superset](https://superset.apache.org/) on Kubernetes — a modern business intelligence
+platform with 60+ database connectors, interactive dashboards, SQL editor, and chart builder. The
+chart deploys three independent components: a Gunicorn web server, Celery workers for async queries,
+and a Celery Beat scheduler for cache warming and alerts.
+
+<Callout type="warning" title="secretKey protects all sessions — losing it logs out every user simultaneously">
+  `superset.secretKey` is the Flask `SECRET_KEY` used to sign all session cookies. Without `superset.existingSecret`, a
+  reinstall auto-generates a new key and **immediately invalidates all active sessions**. Always persist it via
+  `superset.existingSecret` before the first deployment.
+</Callout>
+
+<Callout type="info" title="PostgreSQL and Redis are enabled by default — both subcharts are bundled">
+  Unlike most charts, Superset ships with `postgresql.enabled: true` and `redis.enabled: true`. No manual activation is
+  needed for a quick start. Set both to `false` and configure `database.mode: external` and `redisConfig.mode: external`
+  to use external services.
+</Callout>
 
 ## Key Features
 
-- **Three-component architecture** — Gunicorn web, Celery workers, Celery beat scheduler for independent scaling
-- **Init Job** — automatic database migration and admin user creation
-- **PostgreSQL metadata store** — bundled subchart or external connection
-- **Redis broker** — bundled subchart for Celery task queue or external
-- **Configurable** — superset_config.py delivered via ConfigMap
-- **Auto-generated secrets** — admin password, Flask SECRET_KEY, database and Redis passwords
-- **Health probes** — startup, liveness, and readiness on /health
-- **Ingress support** — configurable class (traefik, nginx, etc.)
+- **Three-component architecture** — web (Gunicorn), worker (Celery), beat (Celery Beat)
+- **Init Job** — runs `superset db upgrade` and admin creation on every install/upgrade
+- **Bundled PostgreSQL and Redis** — both enabled by default
+- **`superset_config.py` override** — arbitrary Python config via `superset.extraConfig`
+- **pg_dump backup** — scheduled PostgreSQL S3 backup CronJob
 
 ## Installation
 
@@ -35,13 +50,87 @@ helm install superset helmforge/superset -f values.yaml
 helm install superset oci://ghcr.io/helmforgedev/helm/superset -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic (Bundled DB+Redis)' },
+    { id: 'scaled', label: 'Scaled Workers' },
+    { id: 'external', label: 'External DB+Redis' },
+    { id: 'oidc', label: 'OIDC Auth' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
+# values.yaml — Superset with bundled PostgreSQL + Redis (defaults)
 superset:
   adminUsername: admin
-  adminPassword: 'my-secure-password'
-  secretKey: 'my-flask-secret-key'
+  adminEmail: admin@example.com
+  existingSecret: superset-secrets
+  existingSecretPasswordKey: admin-password
+  existingSecretSecretKeyKey: secret-key # Flask SECRET_KEY
+
+postgresql:
+  enabled: true
+  auth:
+    database: superset
+    username: superset
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: superset.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: superset-tls
+      hosts:
+        - superset.example.com
+```
+
+</div>
+
+<div data-tab-panel="scaled">
+
+```yaml
+# values.yaml — Superset with scaled web, workers, and beat scheduler
+superset:
+  existingSecret: superset-secrets
+
+web:
+  replicaCount: 2 # web server pods
+  workers: 4 # Gunicorn worker processes per web pod (NOT Celery workers)
+  timeout: 120
+
+worker:
+  enabled: true
+  replicaCount: 3 # Celery worker pods
+  concurrency: 4 # simultaneous Celery tasks per worker pod
+
+beat:
+  enabled: true # Celery Beat: cache warming, alerts, reports
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
 
 ingress:
   enabled: true
@@ -53,72 +142,210 @@ ingress:
           pathType: Prefix
 ```
 
-## Scaled Workers
+</div>
+
+<div data-tab-panel="external">
 
 ```yaml
-web:
-  replicaCount: 2
-  workers: 4
-
-worker:
-  replicaCount: 3
-  concurrency: 4
-
-beat:
-  enabled: true
-```
-
-## External Database and Redis
-
-```yaml
-database:
-  mode: external
-  external:
-    type: postgresql
-    host: postgres.example.internal
-    port: 5432
-    name: superset
-    username: superset
-    existingSecret: superset-db
-
-redisConfig:
-  mode: external
-  external:
-    host: redis.example.internal
-    port: 6379
+# values.yaml — Superset with external PostgreSQL and Redis
+superset:
+  existingSecret: superset-secrets
 
 postgresql:
   enabled: false
 
 redis:
   enabled: false
+
+database:
+  mode: external
+  external:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    name: superset
+    username: superset
+    existingSecret: superset-db-credentials
+    existingSecretPasswordKey: password
+
+redisConfig:
+  mode: external
+  external:
+    host: redis.cache.svc.cluster.local
+    port: 6379
+    db: 0
+    existingSecret: superset-redis-credentials
+    existingSecretPasswordKey: password
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: superset-backups
+    existingSecret: superset-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: superset.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                      | Default           | Description                         |
-| ------------------------ | ----------------- | ----------------------------------- |
-| `image.repository`       | `apache/superset` | Container image                     |
-| `superset.adminUsername` | `admin`           | Admin username                      |
-| `superset.adminPassword` | `""`              | Auto-generated if empty             |
-| `superset.secretKey`     | `""`              | Flask SECRET_KEY (auto-generated)   |
-| `superset.loadExamples`  | `false`           | Load example dashboards             |
-| `web.replicaCount`       | `1`               | Web server replicas                 |
-| `web.workers`            | `2`               | Gunicorn workers                    |
-| `worker.replicaCount`    | `1`               | Celery worker replicas              |
-| `worker.concurrency`     | `2`               | Celery concurrency                  |
-| `beat.enabled`           | `true`            | Enable Celery beat scheduler        |
-| `database.mode`          | `subchart`        | Database mode: subchart or external |
-| `redisConfig.mode`       | `subchart`        | Redis mode: subchart or external    |
-| `ingress.enabled`        | `false`           | Enable ingress                      |
+<div data-tab-panel="oidc">
 
-## Operational Notes
+```yaml
+# values.yaml — Superset with OIDC/OAuth2 via superset.extraConfig
+superset:
+  existingSecret: superset-secrets
+  extraConfig: |
+    from flask_appbuilder.security.manager import AUTH_OAUTH
+    AUTH_TYPE = AUTH_OAUTH
+    OAUTH_PROVIDERS = [
+      {
+        "name": "keycloak",
+        "token_key": "access_token",
+        "icon": "fa-key",
+        "remote_app": {
+          "client_id": "superset",
+          "client_secret": "my-client-secret",
+          "server_metadata_url": "https://auth.example.com/realms/myrealm/.well-known/openid-configuration",
+          "client_kwargs": {"scope": "openid email profile"},
+          "redirect_uri": "https://superset.example.com/oauth-authorized/keycloak",
+        },
+      }
+    ]
+    AUTH_USER_REGISTRATION = True
+    AUTH_USER_REGISTRATION_ROLE = "Gamma"
 
-- the init job runs database migrations and creates the admin user on every install/upgrade
-- web, worker, and beat components scale independently
-- configure `superset.extraConfig` for custom superset_config.py settings
-- use `superset.loadExamples: true` for demonstration environments
+postgresql:
+  enabled: true
+  auth:
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: superset.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Type   | Default                     | Description     |
+| ------------------ | ------ | --------------------------- | --------------- |
+| `image.repository` | string | `docker.io/apache/superset` | Superset image. |
+| `image.tag`        | string | `"4.1.4"`                   | Image tag.      |
+
+### Superset Application
+
+| Parameter                             | Type    | Default          | Description                                                             |
+| ------------------------------------- | ------- | ---------------- | ----------------------------------------------------------------------- |
+| `superset.adminUsername`              | string  | `admin`          | Admin username created by the init Job.                                 |
+| `superset.adminPassword`              | string  | `""`             | Admin password. Auto-generated if empty. Use `existingSecret`.          |
+| `superset.secretKey`                  | string  | `""`             | Flask `SECRET_KEY`. Auto-generated if empty. **Use `existingSecret`.**  |
+| `superset.existingSecret`             | string  | `""`             | Existing secret with admin password and `SECRET_KEY`.                   |
+| `superset.existingSecretPasswordKey`  | string  | `admin-password` | Key for the admin password in the existing secret.                      |
+| `superset.existingSecretSecretKeyKey` | string  | `secret-key`     | Key for the Flask `SECRET_KEY` in the existing secret.                  |
+| `superset.loadExamples`               | boolean | `false`          | Load example dashboards during init (use for demos only).               |
+| `superset.extraConfig`                | string  | `""`             | Extra Python appended to `superset_config.py` (OAuth, cache, features). |
+| `superset.extraEnv`                   | array   | `[]`             | Extra environment variables for all Superset containers.                |
+
+### Web Server
+
+| Parameter          | Type    | Default | Description                                                 |
+| ------------------ | ------- | ------- | ----------------------------------------------------------- |
+| `web.replicaCount` | integer | `1`     | Number of web server pods.                                  |
+| `web.workers`      | integer | `2`     | Gunicorn worker processes **per pod** (not Celery workers). |
+| `web.timeout`      | integer | `120`   | Gunicorn worker timeout in seconds.                         |
+| `web.resources`    | object  | `{}`    | CPU and memory requests/limits for web pods.                |
+
+### Celery Worker
+
+| Parameter             | Type    | Default | Description                                     |
+| --------------------- | ------- | ------- | ----------------------------------------------- |
+| `worker.enabled`      | boolean | `true`  | Enable Celery worker Deployment.                |
+| `worker.replicaCount` | integer | `1`     | Number of Celery worker pods.                   |
+| `worker.concurrency`  | integer | `2`     | Simultaneous Celery tasks per worker pod.       |
+| `worker.resources`    | object  | `{}`    | CPU and memory requests/limits for worker pods. |
+
+### Celery Beat
+
+| Parameter        | Type    | Default | Description                                                    |
+| ---------------- | ------- | ------- | -------------------------------------------------------------- |
+| `beat.enabled`   | boolean | `true`  | Enable Celery Beat scheduler (cache warming, alerts, reports). |
+| `beat.resources` | object  | `{}`    | CPU and memory requests/limits for the beat pod.               |
+
+### Init Job
+
+| Parameter        | Type    | Default | Description                                                                                |
+| ---------------- | ------- | ------- | ------------------------------------------------------------------------------------------ |
+| `init.enabled`   | boolean | `true`  | Enable the init Job. Runs `superset db upgrade` + admin creation on every install/upgrade. |
+| `init.resources` | object  | `{}`    | CPU and memory requests/limits for the init container.                                     |
+
+### Database
+
+| Parameter                                     | Type    | Default    | Description                                  |
+| --------------------------------------------- | ------- | ---------- | -------------------------------------------- |
+| `database.mode`                               | string  | `subchart` | Mode: `subchart` or `external`.              |
+| `database.external.host`                      | string  | `""`       | External database hostname.                  |
+| `database.external.existingSecret`            | string  | `""`       | Existing secret with database password.      |
+| `database.external.existingSecretPasswordKey` | string  | `password` | Key for the password in the existing secret. |
+| `postgresql.enabled`                          | boolean | `true`     | Deploy the bundled PostgreSQL subchart.      |
+| `postgresql.auth.password`                    | string  | `""`       | Password. Auto-generated if empty.           |
+
+### Redis
+
+| Parameter                             | Type    | Default    | Description                          |
+| ------------------------------------- | ------- | ---------- | ------------------------------------ |
+| `redisConfig.mode`                    | string  | `subchart` | Mode: `subchart` or `external`.      |
+| `redisConfig.external.host`           | string  | `""`       | External Redis hostname.             |
+| `redisConfig.external.existingSecret` | string  | `""`       | Existing secret with Redis password. |
+| `redis.enabled`                       | boolean | `true`     | Deploy the bundled Redis subchart.   |
+| `redis.auth.password`                 | string  | `""`       | Password. Auto-generated if empty.   |
+
+### Service and Ingress
+
+| Parameter                  | Type    | Default     | Description                 |
+| -------------------------- | ------- | ----------- | --------------------------- |
+| `service.type`             | string  | `ClusterIP` | Service type.               |
+| `service.port`             | integer | `80`        | Service port.               |
+| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
+| `ingress.ingressClassName` | string  | `traefik`   | Ingress class name.         |
+
+### Backup
+
+Backup runs `pg_dump` on PostgreSQL. No backup for Redis data.
+
+| Parameter                  | Type    | Default       | Description                           |
+| -------------------------- | ------- | ------------- | ------------------------------------- |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled `pg_dump` S3 backup. |
+| `backup.schedule`          | string  | `"0 3 * * *"` | Cron schedule.                        |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
+| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/superset) on GitHub.
+- [Apache Superset Official Documentation](https://superset.apache.org/docs/intro)
+- [Apache Superset GitHub Repository](https://github.com/apache/superset)
+- [HelmForge Superset Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/superset)

@@ -1,47 +1,134 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Flowise
-description: Helm chart for Flowise on Kubernetes with standalone SQLite mode or scalable queue mode using Redis, PostgreSQL, and S3.
+title: Flowise Chart
+description: HelmForge Flowise chart — low-code LLM app builder with standalone SQLite mode or queue mode (PostgreSQL + Redis + S3 shared storage), 5-key auth secret management, uuid-ossp PostgreSQL extension, and TLS ingress for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Flowise
 
-Helm chart for deploying [Flowise](https://flowiseai.com/) on Kubernetes using the official [`flowiseai/flowise`](https://hub.docker.com/r/flowiseai/flowise) image, with a simple standalone topology and a scalable queue topology for larger workloads.
+Deploy [Flowise](https://flowiseai.com/) on Kubernetes — an open-source low-code tool for building
+LLM applications, chatbots, and AI agents with a visual drag-and-drop editor. Supports standalone
+SQLite mode and scalable queue mode with PostgreSQL, Redis, and S3 shared storage.
+
+<Callout
+  type="danger"
+  title="auth.existingSecret holds 5 keys — losing any of them invalidates all sessions and stored credentials"
+>
+  Flowise auto-generates 5 secrets on first boot: `encryptionKey`, `jwtAuthTokenSecret`, `jwtRefreshTokenSecret`,
+  `expressSessionSecret`, and `tokenHashSecret`. Without `auth.existingSecret`, a reinstall generates new values and
+  **invalidates all existing sessions, stored API credentials, and tool configurations**. Always provide a stable
+  `auth.existingSecret` in production before the first deployment.
+</Callout>
 
 ## Key Features
 
-- **Official Flowise image** based on `flowiseai/flowise`
-- **Standalone mode** SQLite and local storage for simple installs
-- **Queue mode** separate main and worker deployments for scalable processing
-- **Bundled PostgreSQL and Redis** optional subcharts for queue mode
-- **External SQL support** external PostgreSQL or MySQL
-- **S3-backed shared storage** queue mode uses S3-compatible storage for shared blob data
-- **Ingress support** configurable ingress for the Flowise web UI
+- **Two topologies** — standalone (SQLite + local PVC) or queue mode (PostgreSQL + Redis + S3)
+- **5-key auth secret** — all Flowise security tokens managed via a single `existingSecret`
+- **BullMQ queue mode** — separate main pod (UI + API) and worker pods (execution) for scale-out
+- **PostgreSQL bootstrap** — `uuid-ossp` extension injected automatically on first run
+- **S3 shared storage required in queue mode** — local PVC is incompatible with multiple replicas
 
 ## Installation
 
-### HTTPS Repository
+**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install flowise helmforge/flowise
+helm install flowise helmforge/flowise -f values.yaml
 ```
 
-### OCI Registry
+**OCI registry:**
 
 ```bash
-helm install flowise oci://ghcr.io/helmforgedev/helm/flowise
+helm install flowise oci://ghcr.io/helmforgedev/helm/flowise -f values.yaml
 ```
 
-## Standalone Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone (SQLite)' },
+    { id: 'postgresql', label: 'Standalone + PostgreSQL' },
+    { id: 'queue', label: 'Queue Mode (HA)' },
+    { id: 'external', label: 'External DB' },
+  ]}
+>
+
+<div data-tab-panel="standalone">
 
 ```yaml
+# values.yaml — Flowise standalone with SQLite (zero database configuration)
 architecture:
   mode: standalone
 
 flowise:
-  appUrl: https://flowise.example.com
+  appUrl: 'https://flowise.example.com'
+  fileSizeLimit: 50mb
+
+auth:
+  existingSecret: flowise-auth-secrets # must contain all 5 keys before first deploy
+  existingSecretEncryptionKeyKey: encryption-key
+  existingSecretJwtAuthTokenSecretKey: jwt-auth-token-secret
+  existingSecretJwtRefreshTokenSecretKey: jwt-refresh-token-secret
+  existingSecretExpressSessionSecretKey: express-session-secret
+  existingSecretTokenHashSecretKey: token-hash-secret
+  secureCookies: true # enable when serving via HTTPS
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: flowise.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: flowise-tls
+      hosts:
+        - flowise.example.com
+```
+
+</div>
+
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — Flowise standalone with bundled PostgreSQL
+# NOTE: bundled PostgreSQL auto-injects uuid-ossp extension
+architecture:
+  mode: standalone
+
+flowise:
+  appUrl: 'https://flowise.example.com'
+
+auth:
+  existingSecret: flowise-auth-secrets
+  secureCookies: true
+
+postgresql:
+  enabled: true
+  auth:
+    database: flowise
+    username: flowise
+    password: 'strong-db-password'
+  standalone:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+persistence:
+  enabled: true
+  size: 5Gi # tool data and uploads (no SQLite when PostgreSQL active)
 
 ingress:
   enabled: true
@@ -53,61 +140,227 @@ ingress:
           pathType: Prefix
 ```
 
-## Queue Example
+</div>
+
+<div data-tab-panel="queue">
 
 ```yaml
+# values.yaml — Flowise in queue mode (PostgreSQL + Redis + S3 mandatory)
+# Queue mode: persistence.enabled MUST be false; storage.type MUST be s3
 architecture:
   mode: queue
 
 flowise:
-  replicaCount: 2
+  replicaCount: 2 # main pods (UI + API + job submission)
+  appUrl: 'https://flowise.example.com'
 
 queue:
+  name: flowise-queue
   worker:
-    replicaCount: 2
+    replicaCount: 3 # separate worker pods consuming BullMQ jobs
+    concurrency: 10 # simultaneous BullMQ jobs per worker
 
-persistence:
-  enabled: false
+auth:
+  existingSecret: flowise-auth-secrets
+  secureCookies: true
 
 postgresql:
   enabled: true
+  auth:
+    password: 'strong-db-password'
 
 redis:
   enabled: true
+  auth:
+    enabled: true
+    password: 'strong-redis-password'
+
+persistence:
+  enabled: false # local PVC is incompatible with queue mode replicas
 
 storage:
-  type: s3
+  type: s3 # required in queue mode for shared blob storage
   s3:
-    bucketName: flowise
-    existingSecret: flowise-s3
+    bucketName: flowise-storage
+    region: us-east-1
+    endpointUrl: 'https://s3.amazonaws.com'
+    forcePathStyle: false # set to true for MinIO
+    existingSecret: flowise-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: flowise.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                         | Default      | Description                                          |
-| --------------------------- | ------------ | ---------------------------------------------------- |
-| `architecture.mode`         | `standalone` | Flowise topology: `standalone` or `queue`            |
-| `flowise.replicaCount`      | `1`          | Number of main Flowise server replicas               |
-| `queue.worker.replicaCount` | `1`          | Number of worker replicas in queue mode              |
-| `database.mode`             | `auto`       | Database mode: `sqlite`, `external`, or `postgresql` |
-| `postgresql.enabled`        | `false`      | Deploy bundled PostgreSQL                            |
-| `redis.enabled`             | `false`      | Deploy bundled Redis                                 |
-| `storage.type`              | `local`      | Blob storage type: `local` or `s3`                   |
-| `persistence.enabled`       | `true`       | Persist local Flowise data                           |
-| `flowise.appUrl`            | `""`         | Public Flowise URL                                   |
+<div data-tab-panel="external">
 
-## Topology Notes
+```yaml
+# values.yaml — Flowise with external PostgreSQL
+# IMPORTANT: External PostgreSQL must have uuid-ossp extension:
+#   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+architecture:
+  mode: standalone
 
-- `standalone` defaults to SQLite plus a local PVC for the easiest install
-- `queue` requires Redis, a SQL database, `storage.type=s3`, and `persistence.enabled=false`
-- queue mode is intended for scale-out deployments with separate main and worker pods
-- local storage is intentionally single-node oriented
+flowise:
+  appUrl: 'https://flowise.example.com'
 
-## Version Note
+auth:
+  existingSecret: flowise-auth-secrets
 
-- the chart pins `3.1.1`
-- this version was validated against the official GitHub release `flowise@3.1.1` and the official Docker Hub tag `3.1.1`
+postgresql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    vendor: postgres
+    host: postgres.database.svc.cluster.local
+    name: flowise
+    username: flowise
+    existingSecret: flowise-db-credentials
+    existingSecretPasswordKey: database-password
+    ssl: false
+
+persistence:
+  enabled: true
+  size: 10Gi
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter           | Type   | Default      | Description                        |
+| ------------------- | ------ | ------------ | ---------------------------------- |
+| `nameOverride`      | string | `""`         | Override the chart name.           |
+| `fullnameOverride`  | string | `""`         | Override the full release name.    |
+| `architecture.mode` | string | `standalone` | Topology: `standalone` or `queue`. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description    |
+| ------------------ | ------ | ----------------------------- | -------------- |
+| `image.repository` | string | `docker.io/flowiseai/flowise` | Flowise image. |
+| `image.tag`        | string | `"3.1.1"`                     | Image tag.     |
+
+### Flowise Configuration
+
+| Parameter                  | Type    | Default | Description                                             |
+| -------------------------- | ------- | ------- | ------------------------------------------------------- |
+| `flowise.replicaCount`     | integer | `1`     | Main pod replicas. Use `queue` mode for more than 1.    |
+| `flowise.appUrl`           | string  | `""`    | Full public URL. Auto-detected from Ingress if empty.   |
+| `flowise.logLevel`         | string  | `info`  | Log level: `error`, `warn`, `info`, `verbose`, `debug`. |
+| `flowise.fileSizeLimit`    | string  | `50mb`  | Maximum file upload size accepted by Flowise.           |
+| `flowise.corsOrigins`      | string  | `*`     | Allowed CORS origins.                                   |
+| `flowise.disableTelemetry` | boolean | `true`  | Disable telemetry reporting.                            |
+| `flowise.extraEnv`         | array   | `[]`    | Extra environment variables for the main container.     |
+
+### Auth Secrets
+
+| Parameter                                     | Type    | Default                    | Description                                               |
+| --------------------------------------------- | ------- | -------------------------- | --------------------------------------------------------- |
+| `auth.existingSecret`                         | string  | `""`                       | Existing secret with all 5 Flowise auth tokens.           |
+| `auth.existingSecretEncryptionKeyKey`         | string  | `encryption-key`           | Key for `FLOWISE_SECRETKEY_OVERWRITE`.                    |
+| `auth.existingSecretJwtAuthTokenSecretKey`    | string  | `jwt-auth-token-secret`    | Key for `JWT_AUTH_TOKEN_SECRET`.                          |
+| `auth.existingSecretJwtRefreshTokenSecretKey` | string  | `jwt-refresh-token-secret` | Key for `JWT_REFRESH_TOKEN_SECRET`.                       |
+| `auth.existingSecretExpressSessionSecretKey`  | string  | `express-session-secret`   | Key for `EXPRESS_SESSION_SECRET`.                         |
+| `auth.existingSecretTokenHashSecretKey`       | string  | `token-hash-secret`        | Key for `TOKEN_HASH_SECRET`.                              |
+| `auth.secureCookies`                          | boolean | `false`                    | Enable secure cookies. Set `true` when serving via HTTPS. |
+
+### Database
+
+| Parameter                          | Type    | Default                          | Description                                          |
+| ---------------------------------- | ------- | -------------------------------- | ---------------------------------------------------- |
+| `database.mode`                    | string  | `auto`                           | Mode: `auto`, `sqlite`, `external`, or `postgresql`. |
+| `database.sqlite.path`             | string  | `/root/.flowise/database.sqlite` | SQLite file path inside the data volume.             |
+| `database.external.vendor`         | string  | `postgres`                       | External DB vendor: `postgres` or `mysql`.           |
+| `database.external.host`           | string  | `""`                             | External database hostname.                          |
+| `database.external.existingSecret` | string  | `""`                             | Existing secret with database password.              |
+| `database.external.ssl`            | boolean | `false`                          | Enable SSL for external database connections.        |
+
+<Callout type="info" title="External PostgreSQL requires uuid-ossp extension">
+  Flowise 3.1.1 migrations use `uuid_generate_v4()`, which requires `uuid-ossp`. The bundled
+  PostgreSQL subchart injects this extension automatically via `initdb.scripts`. For external
+  PostgreSQL, run manually before installing:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+```
+
+</Callout>
+
+### PostgreSQL Subchart
+
+| Parameter                                | Type    | Default   | Description                             |
+| ---------------------------------------- | ------- | --------- | --------------------------------------- |
+| `postgresql.enabled`                     | boolean | `false`   | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.database`               | string  | `flowise` | Database name.                          |
+| `postgresql.auth.password`               | string  | `""`      | Password. Auto-generated if empty.      |
+| `postgresql.standalone.persistence.size` | string  | `8Gi`     | PVC size for PostgreSQL.                |
+
+### Queue Mode
+
+<Callout type="warning" title="Queue mode requires persistence.enabled=false and storage.type=s3">
+  In queue mode, multiple main and worker pods share the same blob storage. Local PVC (`ReadWriteOnce`) cannot be shared
+  across pods. Set `persistence.enabled: false` and configure `storage.type: s3` with a shared S3-compatible bucket.
+</Callout>
+
+| Parameter                    | Type    | Default         | Description                                   |
+| ---------------------------- | ------- | --------------- | --------------------------------------------- |
+| `queue.name`                 | string  | `flowise-queue` | BullMQ queue name shared by main and workers. |
+| `queue.worker.replicaCount`  | integer | `1`             | Number of worker Deployment replicas.         |
+| `queue.worker.concurrency`   | integer | `100000`        | Simultaneous BullMQ jobs per worker.          |
+| `queue.worker.removeOnAge`   | integer | `86400`         | Completed job retention in seconds.           |
+| `queue.worker.removeOnCount` | integer | `10000`         | Maximum completed job count retained.         |
+| `queue.worker.extraEnv`      | array   | `[]`            | Extra environment variables for worker pods.  |
+| `queue.worker.resources`     | object  | `{}`            | CPU/memory requests and limits for workers.   |
+
+### Storage
+
+| Parameter                   | Type    | Default                  | Description                                      |
+| --------------------------- | ------- | ------------------------ | ------------------------------------------------ |
+| `storage.type`              | string  | `local`                  | Storage type: `local` or `s3`.                   |
+| `storage.local.path`        | string  | `/root/.flowise/storage` | Local blob storage path.                         |
+| `storage.s3.bucketName`     | string  | `""`                     | S3 bucket name.                                  |
+| `storage.s3.region`         | string  | `us-east-1`              | S3 region.                                       |
+| `storage.s3.endpointUrl`    | string  | `""`                     | Custom S3 endpoint URL.                          |
+| `storage.s3.forcePathStyle` | boolean | `false`                  | Force path-style requests. Set `true` for MinIO. |
+| `storage.s3.existingSecret` | string  | `""`                     | Existing secret with S3 credentials.             |
+
+### Persistence
+
+| Parameter                   | Type    | Default | Description                                                     |
+| --------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`  | Enable PVC for `/root/.flowise`. **Set `false` in queue mode.** |
+| `persistence.size`          | string  | `10Gi`  | PVC size.                                                       |
+| `persistence.storageClass`  | string  | `""`    | StorageClass for the PVC.                                       |
+| `persistence.existingClaim` | string  | `""`    | Use an existing PVC.                                            |
+
+### Backup
+
+Backup runs `pg_dump` on PostgreSQL only. SQLite and local storage blobs are not included.
+
+| Parameter                  | Type    | Default       | Description                           |
+| -------------------------- | ------- | ------------- | ------------------------------------- |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled `pg_dump` S3 backup. |
+| `backup.schedule`          | string  | `"0 3 * * *"` | Cron schedule.                        |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
 
 ## More Information
 
-- [Chart source and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/flowise)
+- [Flowise Official Documentation](https://docs.flowiseai.com/)
+- [Flowise GitHub Repository](https://github.com/FlowiseAI/Flowise)
+- [HelmForge Flowise Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/flowise)

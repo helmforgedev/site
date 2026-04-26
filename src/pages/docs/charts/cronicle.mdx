@@ -1,21 +1,27 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Cronicle Chart
-description: HelmForge Cronicle chart — multi-server task scheduler with web UI and persistent job storage.
+description: HelmForge Cronicle chart — multi-server task scheduler and cron replacement with web UI, SMTP notifications, session encryption, and persistent job storage for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Cronicle
 
-Deploy Cronicle on Kubernetes using the [soulteary/cronicle](https://hub.docker.com/r/soulteary/cronicle) container image. Cronicle is a multi-server task scheduler and runner with a web-based UI for managing scheduled jobs, cron replacements, and automated workflows.
+Multi-server task scheduler and cron replacement with a web-based UI. Cronicle lets you create and manage
+scheduled jobs from a browser — set cron expressions, set concurrency limits, view live logs, receive email
+alerts, and review job history. Job data and state are stored in flat JSON files on a persistent volume.
 
 ## Key Features
 
-- **Web UI** — browser-based interface for creating and managing scheduled tasks
-- **Multi-Server** — optional UDP auto-discovery for distributed job execution
-- **Job Storage** — persistent storage for job data, history, and state
-- **Email Notifications** — configurable SMTP for job success/failure alerts
-- **Session Encryption** — auto-generated secret key for secure sessions
-- **Concurrency Control** — configurable maximum concurrent jobs per server
+- **Web UI** — browser-based job management with live log streaming
+- **Cron replacement** — cron-compatible scheduling with visual editor
+- **Email notifications** — SMTP alerts for job success, failure, and warnings
+- **Session encryption** — auto-generated `secret_key` stored in a Kubernetes Secret
+- **Job memory limits** — configurable per-job memory cap
+- **Concurrency control** — configurable maximum concurrent jobs per server
+- **Persistent storage** — PVC for job data, history, and state JSON files
 
 ## Installation
 
@@ -33,15 +39,60 @@ helm install cronicle helmforge/cronicle
 helm install cronicle oci://ghcr.io/helmforgedev/helm/cronicle
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'email', label: 'With Email Notifications' },
+    { id: 'production', label: 'Production' },
+  ]}
+>
+
+<div data-tab-panel="basic">
 
 ```yaml
-# values.yaml
+# values.yaml — Cronicle with public URL and persistence
 cronicle:
   baseUrl: 'https://cronicle.example.com'
-  maxJobs: 5
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: cronicle.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cronicle-tls
+      hosts:
+        - cronicle.example.com
+```
+
+</div>
+
+<div data-tab-panel="email">
+
+```yaml
+# values.yaml — Cronicle with SMTP notifications
+cronicle:
+  baseUrl: 'https://cronicle.example.com'
   emailFrom: 'cronicle@example.com'
   smtpHostname: 'smtp.example.com'
+  extraEnv:
+    # SMTP port (default is 25; use 587 for STARTTLS)
+    - name: CRONICLE_smtp_port
+      value: '587'
+    # SMTP authentication (if required)
+    - name: CRONICLE_smtp_secure
+      value: 'true'
 
 persistence:
   enabled: true
@@ -57,20 +108,210 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                     | Default                 | Description                             |
-| ----------------------- | ----------------------- | --------------------------------------- |
-| `cronicle.baseUrl`      | `http://localhost:3012` | Public base URL of the instance         |
-| `cronicle.maxJobs`      | `0`                     | Maximum concurrent jobs (0 = unlimited) |
-| `cronicle.emailFrom`    | `cronicle@localhost`    | Email sender address for notifications  |
-| `cronicle.smtpHostname` | `localhost`             | SMTP server hostname                    |
-| `secret.create`         | `true`                  | Auto-generate session encryption key    |
-| `persistence.enabled`   | `true`                  | Enable persistent job storage           |
-| `persistence.size`      | `5Gi`                   | PVC size                                |
-| `ingress.enabled`       | `false`                 | Enable ingress                          |
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Production setup with job limits and existing secret
+cronicle:
+  baseUrl: 'https://cronicle.example.com'
+  emailFrom: 'cronicle@example.com'
+  smtpHostname: 'smtp.example.com'
+  maxJobs: 10
+  jobMemoryMax: 2147483648 # 2 GB per job
+
+secret:
+  create: false
+  existingSecret: cronicle-secret # must contain key: secret_key
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: cronicle.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                        | Description                          |
+| ------------------ | ------ | ------------------------------ | ------------------------------------ |
+| `image.repository` | string | `docker.io/soulteary/cronicle` | Cronicle container image.            |
+| `image.tag`        | string | `"0.9.80"`                     | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
+
+### Cronicle Configuration
+
+| Parameter                   | Type    | Default                 | Description                                                              |
+| --------------------------- | ------- | ----------------------- | ------------------------------------------------------------------------ |
+| `cronicle.port`             | integer | `3012`                  | Internal HTTP port for the Cronicle web UI.                              |
+| `cronicle.discoveryPort`    | integer | `3014`                  | UDP auto-discovery port for multi-server setups.                         |
+| `cronicle.discoveryEnabled` | boolean | `false`                 | Enable UDP auto-discovery Service port.                                  |
+| `cronicle.baseUrl`          | string  | `http://localhost:3012` | Public base URL. Must be updated for notifications and UI links to work. |
+| `cronicle.emailFrom`        | string  | `cronicle@localhost`    | Email sender address for job notifications.                              |
+| `cronicle.smtpHostname`     | string  | `localhost`             | SMTP server hostname for notifications.                                  |
+| `cronicle.jobMemoryMax`     | integer | `1073741824`            | Maximum memory per job in bytes (default 1 GB = `1073741824`).           |
+| `cronicle.maxJobs`          | integer | `0`                     | Maximum concurrent jobs. `0` means unlimited.                            |
+| `cronicle.extraEnv`         | array   | `[]`                    | Extra environment variables for SMTP auth and advanced configuration.    |
+
+<Callout type="warning" title="baseUrl defaults to localhost — update before deploying">
+  The default `cronicle.baseUrl` is `http://localhost:3012`. If not changed, email notification links and some internal
+  UI references will point to `localhost` instead of your actual instance. Set this to your public URL (e.g.
+  `https://cronicle.example.com`) before first deployment.
+</Callout>
+
+<Callout type="tip" title="Limit maxJobs in production to avoid node overload">
+  With `maxJobs: 0` (unlimited), Cronicle will run as many concurrent jobs as are scheduled, which can saturate the
+  node's CPU and memory. For production use, set `maxJobs` to a value that matches your available resources — typically
+  5–10 for a standard pod with 1–2 CPU cores.
+</Callout>
+
+### Session Secret
+
+| Parameter               | Type    | Default | Description                                                        |
+| ----------------------- | ------- | ------- | ------------------------------------------------------------------ |
+| `secret.create`         | boolean | `true`  | Auto-generate a `secret_key` for Cronicle session encryption.      |
+| `secret.existingSecret` | string  | `""`    | Use an existing Kubernetes Secret (must contain key `secret_key`). |
+
+<Callout type="info" title="Preserve the secret_key across reinstalls">
+  Cronicle uses `secret_key` to sign user sessions. If the Helm release is deleted and reinstalled with `secret.create:
+  true`, a new key is generated and all existing sessions are invalidated. For stable deployments, create the Secret
+  manually and reference it with `secret.existingSecret`.
+</Callout>
+
+### Persistence
+
+Cronicle stores all job definitions, schedules, history, and state in flat JSON files under
+`/opt/cronicle/data`. No external database is required.
+
+| Parameter                   | Type    | Default             | Description                                  |
+| --------------------------- | ------- | ------------------- | -------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/opt/cronicle/data`.       |
+| `persistence.size`          | string  | `5Gi`               | PVC size.                                    |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+| Parameter                              | Type    | Default | Description                        |
+| -------------------------------------- | ------- | ------- | ---------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Jobs not running after pod restart">
+  If scheduled jobs stop running after a pod restart, verify that `persistence.enabled: true` and that the PVC is
+  correctly mounted. Cronicle stores all job definitions in the PVC — if it is not mounted, the scheduler starts with no
+  configured jobs.
+</Callout>
+
+<Callout type="tip" title="Viewing job output and history">
+  Cronicle stores job run logs in the web UI under **Activity Log**. For debugging, live output is visible in real time
+  during job execution. Historical log files are also stored in the PVC under `/opt/cronicle/data/logs/`.
+</Callout>
 
 ## More Information
 
-- [Cronicle documentation](https://github.com/jhuckaby/Cronicle)
-- [Source code](https://github.com/helmforgedev/charts/tree/main/charts/cronicle)
+- [Cronicle GitHub Repository](https://github.com/jhuckaby/Cronicle)
+- [Cronicle Documentation](https://github.com/jhuckaby/Cronicle#readme)
+- [HelmForge Cronicle Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/cronicle)

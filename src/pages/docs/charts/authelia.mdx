@@ -1,26 +1,49 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Authelia Chart
-description: HelmForge Authelia chart — SSO, MFA, OpenID Connect, forward auth for Traefik/nginx, with SQLite/PostgreSQL/MySQL and Redis.
+description: HelmForge Authelia chart — SSO gateway with MFA (TOTP, WebAuthn), OpenID Connect IdP, forward auth for Traefik/nginx, 3 mandatory secrets, file/LDAP user backends, PostgreSQL/Redis for HA, database-aware S3 backup, Prometheus metrics.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Authelia
 
-Deploy [Authelia](https://www.authelia.com) on Kubernetes using the official [authelia/authelia](https://hub.docker.com/r/authelia/authelia) Docker image. Authentication and authorization server with single sign-on, multi-factor authentication, and OpenID Connect identity provider.
+Deploy [Authelia](https://www.authelia.com/) on Kubernetes — a full-featured authentication and
+authorization server with single sign-on (SSO), multi-factor authentication (TOTP, WebAuthn/FIDO2),
+OpenID Connect identity provider, and forward-auth middleware support for Traefik, nginx, Caddy, and
+Envoy.
+
+<Callout
+  type="danger"
+  title="storageEncryptionKey protects MFA registrations — losing it permanently destroys all TOTP and WebAuthn data"
+>
+  Authelia requires three secrets before it can start. The most critical is `storageEncryptionKey` (20+ chars), which
+  encrypts all MFA secrets stored in the database — TOTP keys and WebAuthn credentials. If this key is lost or rotated,
+  **all MFA device registrations become permanently unreadable** and users must re-enroll. Always persist all three
+  secrets via `secrets.existingSecret` before the first deployment.
+</Callout>
+
+<Callout type="info" title="Three secrets are required — Authelia will not start if any is missing">
+  | Secret               | Minimum Length | Purpose                                         |
+  | -------------------- | -------------- | ----------------------------------------------- |
+  | `jwtSecret`          | 64 chars       | Signs identity tokens for password resets.      |
+  | `sessionSecret`      | 64 chars       | Encrypts session cookies.                       |
+  | `storageEncryptionKey`| 20 chars      | Encrypts MFA secrets (TOTP, WebAuthn) in the DB.|
+
+Generate with: `openssl rand -base64 64 | head -c 64`
+
+</Callout>
 
 ## Key Features
 
-- **Forward auth middleware** — Traefik, nginx, Caddy, Envoy
-- **Multi-factor authentication** — TOTP, WebAuthn/FIDO2, Duo
-- **OpenID Connect** — certified identity provider for SSO
-- **File or LDAP** authentication backends
-- **SQLite, PostgreSQL, or MySQL** storage backends
-- **Redis** session storage for stateless HA deployments
-- **Access control rules** — domain, user, group, and network policies
-- **Brute force protection** — configurable regulation
+- **Forward auth middleware** — native Traefik, nginx, Caddy, and Envoy integration
+- **MFA** — TOTP, WebAuthn/FIDO2, and Duo Push
+- **OpenID Connect IdP** — certified OIDC provider for app SSO
+- **File or LDAP auth backends** — local YAML user database or LDAP/AD directory
+- **Access control rules** — domain, user, group, network, and method policies
+- **Brute force protection** — configurable regulation (`max_retries`, `ban_time`)
 - **Prometheus metrics** with optional ServiceMonitor
-- **S3 backup** — SQLite tar, pg_dump, or mysqldump with S3 upload
-- **Ingress support** — TLS with cert-manager
 
 ## Installation
 
@@ -38,13 +61,166 @@ helm install authelia helmforge/authelia -f values.yaml
 helm install authelia oci://ghcr.io/helmforgedev/helm/authelia -f values.yaml
 ```
 
-## Basic Example (SQLite)
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'sqlite', label: 'SQLite + File Users' },
+    { id: 'postgresql', label: 'PostgreSQL + Redis (HA)' },
+    { id: 'traefik', label: 'Traefik Forward Auth' },
+    { id: 'oidc', label: 'OIDC Provider' },
+  ]}
+>
+
+<div data-tab-panel="sqlite">
 
 ```yaml
+# values.yaml — Authelia with SQLite and file-based user database
 secrets:
-  jwtSecret: 'your-64-char-random-string'
-  sessionSecret: 'your-64-char-random-string'
-  storageEncryptionKey: 'your-20-plus-char-string'
+  existingSecret: authelia-master-secrets
+  existingSecretJwtKey: jwt-secret # 64+ chars
+  existingSecretSessionKey: session-secret # 64+ chars
+  existingSecretStorageEncryptionKey: storage-encryption-key # 20+ chars
+
+config:
+  session:
+    cookies:
+      - domain: example.com
+        authelia_url: 'https://auth.example.com'
+        default_redirection_url: 'https://www.example.com'
+  access_control:
+    default_policy: one_factor
+    rules:
+      - domain: 'public.example.com'
+        policy: bypass
+      - domain: '*.example.com'
+        policy: two_factor
+  notifier:
+    # filesystem notifier logs to /data/notification.txt — email not sent
+    # Switch to smtp notifier for production email delivery
+    filesystem:
+      filename: /data/notification.txt
+
+usersDatabase:
+  enabled: true
+  users:
+    admin:
+      displayname: 'Administrator'
+      email: 'admin@example.com'
+      # Generate password hash: authelia crypto hash generate argon2 --password 'mypassword'
+      password: '$argon2id$v=19$m=65536,t=3,p=4$...'
+      groups:
+        - admins
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: authelia-tls
+      hosts:
+        - auth.example.com
+```
+
+</div>
+
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — Authelia HA: PostgreSQL + Redis (required for multi-replica)
+replicaCount: 2 # requires Redis for session coordination
+
+secrets:
+  existingSecret: authelia-master-secrets
+
+config:
+  session:
+    cookies:
+      - domain: example.com
+        authelia_url: 'https://auth.example.com'
+  access_control:
+    default_policy: two_factor
+  notifier:
+    smtp:
+      address: 'submissions://smtp.example.com:465'
+      sender: 'Authelia <authelia@example.com>'
+      username: 'authelia@example.com'
+      password: 'smtp-password' # use extraEnv with secretKeyRef in production
+
+postgresql:
+  enabled: true
+  auth:
+    database: authelia
+    username: authelia
+    password: 'strong-db-password'
+
+redis:
+  enabled: true
+  auth:
+    password: 'strong-redis-password'
+
+database:
+  type: postgres
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: authelia-backups
+    existingSecret: authelia-s3-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="traefik">
+
+```yaml
+# values.yaml — Authelia configured for Traefik forwardAuth middleware
+# After deploying, create a Traefik Middleware resource in the same namespace:
+#
+# apiVersion: traefik.io/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: authelia
+# spec:
+#   forwardAuth:
+#     address: http://authelia.authelia.svc.cluster.local/api/authz/forward-auth
+#     trustForwardHeader: true
+#     authResponseHeaders:
+#       - Remote-User
+#       - Remote-Groups
+#       - Remote-Name
+#       - Remote-Email
+#
+# Then add annotation to protected services:
+#   traefik.ingress.kubernetes.io/router.middlewares: <namespace>-authelia@kubernetescrd
+
+secrets:
+  existingSecret: authelia-master-secrets
 
 config:
   session:
@@ -53,8 +229,14 @@ config:
         authelia_url: 'https://auth.example.com'
   access_control:
     default_policy: one_factor
+    rules:
+      - domain: 'auth.example.com'
+        policy: bypass
+      - domain: '*.example.com'
+        policy: one_factor
 
 usersDatabase:
+  enabled: true
   users:
     admin:
       displayname: 'Admin'
@@ -62,62 +244,178 @@ usersDatabase:
       password: '$argon2id$v=19$m=65536,t=3,p=4$...'
       groups:
         - admins
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-After deploying, access via `kubectl port-forward svc/<release>-authelia 9091:80`.
+</div>
 
-## PostgreSQL + Redis Mode
+<div data-tab-panel="oidc">
 
 ```yaml
-database:
-  type: postgres
+# values.yaml — Authelia as OIDC identity provider
+secrets:
+  existingSecret: authelia-master-secrets
+  existingSecretOidcHmacKey: oidc-hmac-secret # required for OIDC
+
+config:
+  session:
+    cookies:
+      - domain: example.com
+        authelia_url: 'https://auth.example.com'
+  access_control:
+    default_policy: two_factor
+  identity_providers:
+    oidc:
+      clients:
+        - client_id: grafana
+          client_name: Grafana
+          client_secret: '$pbkdf2-sha512$310000$...' # hashed client secret
+          public: false
+          authorization_policy: two_factor
+          redirect_uris:
+            - 'https://grafana.example.com/login/generic_oauth'
+          scopes:
+            - openid
+            - profile
+            - email
+            - groups
+          userinfo_signed_response_alg: none
 
 postgresql:
   enabled: true
   auth:
-    password: 'change-me'
+    password: 'strong-db-password'
 
 redis:
   enabled: true
   auth:
-    password: 'change-me'
-```
+    password: 'strong-redis-password'
 
-## External Database
-
-```yaml
 database:
   type: postgres
-  external:
-    host: postgres.example.com
-    name: authelia
-    username: authelia
-    existingSecret: authelia-db-credentials
 
-postgresql:
-  enabled: false
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                            | Default           | Description                        |
-| ------------------------------ | ----------------- | ---------------------------------- |
-| `config`                       | (see values.yaml) | Full Authelia configuration YAML   |
-| `secrets.jwtSecret`            | `""`              | JWT secret (64+ chars)             |
-| `secrets.sessionSecret`        | `""`              | Session secret (64+ chars)         |
-| `secrets.storageEncryptionKey` | `""`              | Storage encryption key (20+ chars) |
-| `database.type`                | `sqlite`          | Storage: sqlite, postgres, mysql   |
-| `usersDatabase.enabled`        | `true`            | Enable file-based user database    |
-| `persistence.enabled`          | `true`            | Enable persistence for /data       |
-| `persistence.size`             | `1Gi`             | PVC size                           |
-| `ingress.enabled`              | `false`           | Enable ingress                     |
-| `metrics.enabled`              | `false`           | Enable metrics service             |
-| `backup.enabled`               | `false`           | Enable S3 backups                  |
-| `postgresql.enabled`           | `false`           | Deploy PostgreSQL subchart         |
-| `mysql.enabled`                | `false`           | Deploy MySQL subchart              |
-| `redis.enabled`                | `false`           | Deploy Redis subchart              |
-| `service.port`                 | `80`              | Service port                       |
+</DocsTabs>
+
+## Configuration Reference
+
+### Image
+
+| Parameter          | Type   | Default                       | Description     |
+| ------------------ | ------ | ----------------------------- | --------------- |
+| `image.repository` | string | `docker.io/authelia/authelia` | Authelia image. |
+| `image.tag`        | string | `"4.39.16"`                   | Image tag.      |
+
+### Secrets
+
+| Parameter                                    | Type   | Default                  | Description                                                      |
+| -------------------------------------------- | ------ | ------------------------ | ---------------------------------------------------------------- |
+| `secrets.jwtSecret`                          | string | `""`                     | JWT signing secret (64+ chars). Required.                        |
+| `secrets.sessionSecret`                      | string | `""`                     | Session cookie encryption secret (64+ chars). Required.          |
+| `secrets.storageEncryptionKey`               | string | `""`                     | MFA data encryption key (20+ chars). Required. **Never rotate.** |
+| `secrets.oidcHmacSecret`                     | string | `""`                     | OIDC HMAC secret. Required only when using OIDC.                 |
+| `secrets.existingSecret`                     | string | `""`                     | Existing secret containing all secret keys.                      |
+| `secrets.existingSecretJwtKey`               | string | `jwt-secret`             | Key for JWT secret.                                              |
+| `secrets.existingSecretSessionKey`           | string | `session-secret`         | Key for session secret.                                          |
+| `secrets.existingSecretStorageEncryptionKey` | string | `storage-encryption-key` | Key for storage encryption key.                                  |
+| `secrets.existingSecretOidcHmacKey`          | string | `oidc-hmac-secret`       | Key for OIDC HMAC secret.                                        |
+
+### Configuration
+
+The `config` block is rendered as Authelia's `configuration.yml`. Key sub-sections:
+
+| Section                                | Description                                                        |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `config.session.cookies`               | Domain and Authelia URL for cookie scope (must match ingress).     |
+| `config.access_control.rules`          | Access control policies per domain, group, user, and network.      |
+| `config.access_control.default_policy` | Default policy: `bypass`, `one_factor`, `two_factor`, `deny`.      |
+| `config.notifier.filesystem`           | Log notifications to file (no email). Default.                     |
+| `config.notifier.smtp`                 | SMTP notifier for email delivery (password resets, device enroll). |
+| `config.totp`                          | TOTP algorithm, period, digits.                                    |
+| `config.webauthn`                      | WebAuthn/FIDO2 display name and timeout.                           |
+| `config.regulation`                    | Brute force: `max_retries`, `find_time`, `ban_time`.               |
+| `config.identity_providers.oidc`       | OIDC client registrations.                                         |
+
+### Users Database
+
+| Parameter                      | Type    | Default | Description                                                      |
+| ------------------------------ | ------- | ------- | ---------------------------------------------------------------- |
+| `usersDatabase.enabled`        | boolean | `true`  | Enable file-based user database at `/config/users_database.yml`. |
+| `usersDatabase.existingSecret` | string  | `""`    | Existing secret with the `users_database.yml` content.           |
+| `usersDatabase.users`          | object  | `{}`    | Inline user definitions. Passwords must be Argon2 hashes.        |
+
+<Callout type="tip" title="Generate Argon2 password hashes with the Authelia CLI">
+  Authelia enforces Argon2id hashes for user passwords. Generate a hash using the CLI:
+
+```bash
+docker run --rm authelia/authelia:latest authelia crypto hash generate argon2 --password 'mypassword'
+```
+
+The output hash goes in `usersDatabase.users.<user>.password`.
+
+</Callout>
+
+### Database
+
+| Parameter                                     | Type   | Default    | Description                                     |
+| --------------------------------------------- | ------ | ---------- | ----------------------------------------------- |
+| `database.type`                               | string | `sqlite`   | Storage backend: `sqlite`, `postgres`, `mysql`. |
+| `database.external.host`                      | string | `""`       | External database hostname.                     |
+| `database.external.existingSecret`            | string | `""`       | Existing secret with database password.         |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key for the database password.                  |
+
+### Subcharts
+
+| Parameter                  | Type    | Default | Description                                          |
+| -------------------------- | ------- | ------- | ---------------------------------------------------- |
+| `postgresql.enabled`       | boolean | `false` | Deploy the bundled PostgreSQL subchart.              |
+| `postgresql.auth.password` | string  | `""`    | Password. Required when using the subchart.          |
+| `mysql.enabled`            | boolean | `false` | Deploy the bundled MySQL subchart.                   |
+| `redis.enabled`            | boolean | `false` | Deploy the bundled Redis subchart (required for HA). |
+| `redis.auth.password`      | string  | `""`    | Password. Required when using the subchart.          |
+
+### Persistence, Service, Metrics
+
+| Parameter                        | Type    | Default | Description                                              |
+| -------------------------------- | ------- | ------- | -------------------------------------------------------- |
+| `persistence.enabled`            | boolean | `true`  | Enable PVC for `/data` (SQLite DB, filesystem notifier). |
+| `persistence.size`               | string  | `1Gi`   | PVC size.                                                |
+| `service.port`                   | integer | `80`    | Service port (Authelia listens on 9091).                 |
+| `metrics.enabled`                | boolean | `false` | Enable separate metrics service on port 9959.            |
+| `metrics.serviceMonitor.enabled` | boolean | `false` | Enable Prometheus ServiceMonitor.                        |
+
+### Backup
+
+| Parameter                  | Type    | Default       | Description                          |
+| -------------------------- | ------- | ------------- | ------------------------------------ |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`          | string  | `"0 2 * * *"` | Cron schedule.                       |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                  |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials. |
+| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.          |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/authelia) on GitHub.
+- [Authelia Official Documentation](https://www.authelia.com/configuration/prologue/introduction/)
+- [Authelia GitHub Repository](https://github.com/authelia/authelia)
+- [HelmForge Authelia Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/authelia)

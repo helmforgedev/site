@@ -1,32 +1,68 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
-title: Metabase
-description: HelmForge Metabase chart for open-source business intelligence with PostgreSQL and JVM tuning.
+title: Metabase Chart
+description: HelmForge Metabase chart — open-source business intelligence platform with PostgreSQL metadata store, JVM tuning, and S3 backup for Kubernetes.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Metabase
 
-Deploy [Metabase](https://www.metabase.com/) on Kubernetes — an open-source business intelligence and analytics platform with interactive dashboards and SQL querying.
+Open-source business intelligence and analytics platform. Metabase lets teams build interactive dashboards, run SQL
+queries, and share insights without writing code. It stores all metadata (dashboards, saved questions, user accounts,
+data source credentials) in a PostgreSQL database.
 
 ## Key Features
 
-- **Interactive dashboards** — drag-and-drop visualization builder
-- **PostgreSQL backend** — bundled subchart or external database
-- **JVM tuning** — configurable Java memory settings
-- **S3 backup** — scheduled PostgreSQL backup to S3-compatible storage
+- **Interactive dashboards** — drag-and-drop visualization builder, no SQL required
+- **SQL editor** — native query editor with autocomplete and result visualization
+- **PostgreSQL metadata store** — bundled subchart or external database
+- **Encrypted credential storage** — data source passwords encrypted with `encryptionSecretKey`
+- **JVM tuning** — configurable Java memory options and timezone
+- **S3 backup** — scheduled `pg_dump` of the Metabase metadata database to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
 
 ## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install metabase helmforge/metabase
+```
+
+**OCI registry:**
 
 ```bash
 helm install metabase oci://ghcr.io/helmforgedev/helm/metabase
 ```
 
-## Basic Example
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'embedded-db', label: 'Embedded PostgreSQL' },
+    { id: 'external-db', label: 'External PostgreSQL' },
+    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'production', label: 'Production' },
+  ]}
+>
+
+<div data-tab-panel="embedded-db">
 
 ```yaml
+# values.yaml — Metabase with bundled PostgreSQL subchart (default)
+metabase:
+  siteUrl: 'https://metabase.example.com'
+  encryptionSecretKey: 'a-random-32-char-secret-key-here'
+  javaOpts: '-Xms512m -Xmx1g'
+
 postgresql:
   enabled: true
+  auth:
+    password: 'postgres-password'
 
 ingress:
   enabled: true
@@ -38,14 +74,317 @@ ingress:
           pathType: Prefix
 ```
 
-## Key Values
+</div>
 
-| Key                  | Default | Description                |
-| -------------------- | ------- | -------------------------- |
-| `postgresql.enabled` | `true`  | Deploy PostgreSQL subchart |
-| `ingress.enabled`    | `false` | Enable ingress             |
-| `backup.enabled`     | `false` | Enable S3 backup CronJob   |
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml — Metabase pointing to an existing PostgreSQL instance
+metabase:
+  siteUrl: 'https://metabase.example.com'
+  encryptionSecretKey: 'a-random-32-char-secret-key-here'
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgresql.database.svc
+    port: '5432'
+    name: metabase
+    username: metabase
+    password: 'db-password'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: metabase.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+# values.yaml — Daily backup of the Metabase PostgreSQL metadata database
+metabase:
+  siteUrl: 'https://metabase.example.com'
+  encryptionSecretKey: 'a-random-32-char-secret-key-here'
+
+postgresql:
+  enabled: true
+  auth:
+    password: 'postgres-password'
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-metabase-backups
+    accessKey: '<set-me>'
+    secretKey: '<set-me>'
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml — Production-grade setup with secrets, resources, and TLS
+metabase:
+  siteUrl: 'https://metabase.example.com'
+  existingSecret: metabase-secret
+  existingSecretKey: encryption-secret-key
+  javaOpts: '-Xms1g -Xmx2g'
+  javaTimezone: America/Sao_Paulo
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgresql.production.svc
+    port: '5432'
+    name: metabase
+    username: metabase
+    existingSecret: metabase-db-secret
+    existingSecretPasswordKey: password
+
+resources:
+  requests:
+    memory: 1.5Gi
+    cpu: 500m
+  limits:
+    memory: 2.5Gi
+    cpu: 2000m
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: metabase.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: metabase-tls
+      hosts:
+        - metabase.example.com
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type   | Default | Description                          |
+| ------------------ | ------ | ------- | ------------------------------------ |
+| `nameOverride`     | string | `""`    | Override the chart name.             |
+| `fullnameOverride` | string | `""`    | Override the full release name.      |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+
+### Image
+
+| Parameter          | Type   | Default                       | Description                          |
+| ------------------ | ------ | ----------------------------- | ------------------------------------ |
+| `image.repository` | string | `docker.io/metabase/metabase` | Metabase container image.            |
+| `image.tag`        | string | `"v0.54.5"`                   | Image tag.                           |
+| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+
+### Metabase Configuration
+
+| Parameter                      | Type    | Default                 | Description                                                           |
+| ------------------------------ | ------- | ----------------------- | --------------------------------------------------------------------- |
+| `metabase.port`                | integer | `3000`                  | Internal HTTP port for the Metabase container.                        |
+| `metabase.encryptionSecretKey` | string  | `""`                    | Secret key used to encrypt saved data source credentials.             |
+| `metabase.existingSecret`      | string  | `""`                    | Existing secret containing the encryption key.                        |
+| `metabase.existingSecretKey`   | string  | `encryption-secret-key` | Key inside the existing secret holding the encryption value.          |
+| `metabase.siteUrl`             | string  | `""`                    | Public URL of the Metabase instance. Used for email links and embeds. |
+| `metabase.javaTimezone`        | string  | `UTC`                   | JVM timezone (`TZ` environment variable).                             |
+| `metabase.javaOpts`            | string  | `""`                    | JVM options for memory tuning (e.g. `-Xms512m -Xmx1g`).               |
+| `metabase.extraEnv`            | array   | `[]`                    | Extra environment variables injected into the Metabase container.     |
+
+<Callout type="danger" title="Always set encryptionSecretKey">
+  If `metabase.encryptionSecretKey` is empty, Metabase auto-generates one at startup. If the pod is recreated without a
+  persistent key, **all saved data source credentials become unreadable** and must be re-entered manually. Always set an
+  explicit key or use `metabase.existingSecret`.
+</Callout>
+
+<Callout type="warning" title="JVM memory sizing">
+  Metabase is a JVM application. Without `-Xmx`, the JVM may claim all available container memory. Set
+  `metabase.javaOpts: '-Xms512m -Xmx1g'` and `resources.limits.memory` to a value at least 20% higher than `-Xmx` to
+  avoid OOMKilled restarts.
+</Callout>
+
+### Database — Embedded Subchart
+
+| Parameter                  | Type    | Default      | Description                                                 |
+| -------------------------- | ------- | ------------ | ----------------------------------------------------------- |
+| `postgresql.enabled`       | boolean | `true`       | Deploy a bundled PostgreSQL subchart for Metabase metadata. |
+| `postgresql.architecture`  | string  | `standalone` | PostgreSQL deployment architecture.                         |
+| `postgresql.auth.database` | string  | `metabase`   | Database name created by the subchart.                      |
+| `postgresql.auth.username` | string  | `metabase`   | Database username created by the subchart.                  |
+| `postgresql.auth.password` | string  | `""`         | Database password (auto-generated if empty).                |
+
+### Database — External
+
+| Parameter                                     | Type   | Default    | Description                                                      |
+| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| `database.external.host`                      | string | `""`       | External PostgreSQL hostname or IP.                              |
+| `database.external.port`                      | string | `"5432"`   | External PostgreSQL port.                                        |
+| `database.external.name`                      | string | `metabase` | Database name on the external server.                            |
+| `database.external.username`                  | string | `metabase` | Username for the external database.                              |
+| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
+| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
+| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                          |
+| --------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                                      |
+| -------------------------- | ------- | --------- | ------------------------------------------------ |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
+| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
+| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Probes
+
+Metabase has a slow startup — the JVM initialization and database migrations can take 2–3 minutes.
+
+| Parameter                              | Type    | Default | Description                                  |
+| -------------------------------------- | ------- | ------- | -------------------------------------------- |
+| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe (uses `/api/health`).   |
+| `probes.startup.initialDelaySeconds`   | integer | `30`    | Startup probe initial delay.                 |
+| `probes.startup.periodSeconds`         | integer | `10`    | Startup probe period.                        |
+| `probes.startup.timeoutSeconds`        | integer | `5`     | Startup probe timeout.                       |
+| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold (5 minutes). |
+| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.                       |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.                |
+| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.                       |
+| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.                      |
+| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.            |
+| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.                      |
+| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.               |
+| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.                      |
+| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.                     |
+| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold.           |
+
+### Backup
+
+The backup CronJob runs `pg_dump` against the Metabase PostgreSQL metadata database and uploads the archive to
+S3-compatible storage. This protects dashboards, saved questions, users, and data source definitions.
+
+| Parameter                                   | Type    | Default                                | Description                                                        |
+| ------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------ |
+| `backup.enabled`                            | boolean | `false`                                | Enable scheduled S3 backup CronJob.                                |
+| `backup.schedule`                           | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                         |
+| `backup.suspend`                            | boolean | `false`                                | Suspend the CronJob without deleting it.                           |
+| `backup.concurrencyPolicy`                  | string  | `Forbid`                               | CronJob concurrency policy.                                        |
+| `backup.successfulJobsHistoryLimit`         | integer | `3`                                    | Number of successful Job records to keep.                          |
+| `backup.failedJobsHistoryLimit`             | integer | `3`                                    | Number of failed Job records to keep.                              |
+| `backup.backoffLimit`                       | integer | `1`                                    | Job retry limit.                                                   |
+| `backup.archivePrefix`                      | string  | `metabase`                             | Prefix for backup archive filenames.                               |
+| `backup.images.postgresql`                  | string  | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                                          |
+| `backup.images.uploader`                    | string  | `docker.io/helmforge/mc:1.0.0`         | Image used for S3 upload.                                          |
+| `backup.resources`                          | object  | `{}`                                   | Resources for backup containers.                                   |
+| `backup.s3.endpoint`                        | string  | `""`                                   | S3-compatible endpoint URL.                                        |
+| `backup.s3.bucket`                          | string  | `""`                                   | Target bucket name.                                                |
+| `backup.s3.prefix`                          | string  | `metabase`                             | Key prefix within the bucket.                                      |
+| `backup.s3.createBucketIfNotExists`         | boolean | `true`                                 | Create the bucket automatically if it does not exist.              |
+| `backup.s3.existingSecret`                  | string  | `""`                                   | Existing secret containing S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey`      | string  | `access-key`                           | Key in the existing secret for the S3 access key.                  |
+| `backup.s3.existingSecretSecretKeyKey`      | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.                  |
+| `backup.s3.accessKey`                       | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set).       |
+| `backup.s3.secretKey`                       | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set).       |
+| `backup.database.host`                      | string  | `""`                                   | Override database host for backup (uses app credentials if empty). |
+| `backup.database.port`                      | string  | `""`                                   | Override database port for backup.                                 |
+| `backup.database.name`                      | string  | `""`                                   | Override database name for backup.                                 |
+| `backup.database.username`                  | string  | `""`                                   | Override database username for backup.                             |
+| `backup.database.password`                  | string  | `""`                                   | Override database password for backup.                             |
+| `backup.database.existingSecret`            | string  | `""`                                   | Existing secret containing backup database credentials.            |
+| `backup.database.existingSecretPasswordKey` | string  | `password`                             | Key in the existing secret for the backup database password.       |
+| `backup.database.postgresDumpArgs`          | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                         |
+| -------------------- | ------ | ------- | ----------------------------------- |
+| `resources`          | object | `{}`    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
+| `securityContext`    | object | `{}`    | Container-level security context.   |
+
+### Service Account
+
+| Parameter                    | Type    | Default | Description                         |
+| ---------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
+| `affinity`                      | object  | `{}`    | Affinity rules.                |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+
+### Extra
+
+| Parameter           | Type  | Default | Description                                              |
+| ------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Common Issues
+
+<Callout type="danger" title="Pod stuck in CrashLoopBackOff — OOMKilled">
+  Metabase is a JVM application and requires adequate memory. If the pod is killed without a clear error, check
+  `kubectl describe pod <name>` for `OOMKilled`. Set `metabase.javaOpts: '-Xms512m -Xmx1g'` and configure
+  `resources.limits.memory` at least 20% above `-Xmx`.
+</Callout>
+
+<Callout type="tip" title="First startup takes time">
+  Metabase runs database migrations on first boot. With the embedded PostgreSQL subchart, the first startup can take 2–4
+  minutes. The startup probe is configured with a 5-minute window (`failureThreshold: 30` × `periodSeconds: 10`). Do not
+  reduce these values on a fresh install.
+</Callout>
+
+<Callout type="info" title="Backing up encryptionSecretKey separately">
+  The S3 backup protects the PostgreSQL data, but `encryptionSecretKey` is not stored in the database — it is stored in
+  your values or Kubernetes secret. Back it up separately. Without it, a restored database is unusable for re-encrypting
+  credentials.
+</Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/metabase) on GitHub.
+- [Metabase Official Website](https://www.metabase.com)
+- [Metabase Documentation](https://www.metabase.com/docs/latest/)
+- [Metabase GitHub Repository](https://github.com/metabase/metabase)
+- [HelmForge Metabase Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/metabase)

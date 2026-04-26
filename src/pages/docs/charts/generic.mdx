@@ -1,21 +1,35 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Generic Chart
-description: HelmForge Generic chart — a multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, and CronJobs.
+description: HelmForge Generic chart — multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, multi-container pods, PVCs, ConfigMaps, HPA, VPA, PDB, ServiceMonitor, and extraManifests with Helm templating.
 ---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
 
 # Generic
 
-A multi-purpose Helm chart that can deploy virtually any container workload on Kubernetes. Instead of writing boilerplate templates for each application, the Generic chart lets you configure everything through `values.yaml`.
+A multi-purpose Helm chart for deploying any container workload on Kubernetes without writing boilerplate
+templates. One chart for Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, multi-container pods,
+PVC management, ConfigMaps, and arbitrary extra manifests with Helm `tpl` support.
+
+<Callout type="info" title="Jobs and CronJobs are separate lists — not workload types">
+  Unlike some charts, `workload.type` only accepts `Deployment`, `StatefulSet`, and `DaemonSet`. One-shot Jobs and
+  scheduled CronJobs are configured via the separate `jobs[]` and `cronjobs[]` arrays. Set `workload.enabled: false` to
+  deploy a release that contains only Jobs or CronJobs with no long-running workload.
+</Callout>
 
 ## Key Features
 
-- **Multiple workload types** — Deployment, StatefulSet, DaemonSet, Job, CronJob
-- **Flexible container configuration** — Ports, environment variables, volumes, probes
-- **Ingress support** — Configurable with `ingressClassName` and TLS
-- **Service accounts** — Create or reference existing service accounts
-- **Init containers and sidecars** — Full support for multi-container pods
-- **HPA and PDB** — Autoscaling and disruption budgets
+- **All workload types** — Deployment, StatefulSet, DaemonSet, Job, CronJob
+- **Multi-container pods** — `containers[]` array with per-container image, env, ports, and probes
+- **Flexible persistence** — separate `volumes`, `storage` (PVCs), and `mounts` arrays
+- **Inline ConfigMaps** — create ConfigMaps directly from `values.yaml`
+- **Global and per-container env** — `env`/`envFrom` at root apply to all containers
+- **HPA and VPA** — horizontal and vertical pod autoscaling
+- **PDB** — PodDisruptionBudget for production availability
+- **Helm-templated extraManifests** — inject any Kubernetes manifest with `tpl` support
+- **ServiceMonitor** — Prometheus Operator integration
 
 ## Installation
 
@@ -33,27 +47,58 @@ helm install my-app helmforge/generic -f values.yaml
 helm install my-app oci://ghcr.io/helmforgedev/helm/generic -f values.yaml
 ```
 
-## Basic Example
+## Deployment Examples
 
-Deploy a simple web application:
+<DocsTabs
+  tabs={[
+    { id: 'web-app', label: 'Web App' },
+    { id: 'statefulset', label: 'StatefulSet + PVC' },
+    { id: 'sidecar', label: 'Multi-Container' },
+    { id: 'job-cronjob', label: 'Job + CronJob' },
+    { id: 'full', label: 'Full Example' },
+  ]}
+>
+
+<div data-tab-panel="web-app">
 
 ```yaml
-# values.yaml
+# values.yaml — Simple web application Deployment
+workload:
+  enabled: true
+  type: Deployment
+
 image:
-  repository: nginx
+  repository: docker.io/library/nginx
   tag: '1.27'
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+containers:
+  - name: app
+    image: {} # inherits top-level image
+    ports:
+      - containerPort: 80
 
 service:
+  type: ClusterIP
   port: 80
+  targetPort: 80
 
 ingress:
   enabled: true
   ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: app.example.com
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: app-tls
+      hosts:
+        - app.example.com
 
 resources:
   requests:
@@ -63,37 +108,446 @@ resources:
     memory: 256Mi
 ```
 
-## StatefulSet Example
+</div>
+
+<div data-tab-panel="statefulset">
 
 ```yaml
-workloadType: StatefulSet
+# values.yaml — StatefulSet with PVC and volumeClaimTemplate
+workload:
+  enabled: true
+  type: StatefulSet
+  podManagementPolicy: OrderedReady
 
 image:
-  repository: my-stateful-app
+  repository: docker.io/my-org/my-stateful-app
   tag: '2.0'
 
 replicaCount: 3
 
-persistence:
+containers:
+  - name: app
+    image: {}
+    ports:
+      - containerPort: 8080
+    volumeMounts:
+      - name: data
+        mountPath: /data
+
+# StatefulSet uses volumeClaimTemplates for per-pod PVCs
+workload:
   enabled: true
-  size: 10Gi
-  storageClass: standard
+  type: StatefulSet
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 10Gi
 ```
 
-## Key Values
+</div>
 
-| Key                   | Default      | Description                                                     |
-| --------------------- | ------------ | --------------------------------------------------------------- |
-| `workloadType`        | `Deployment` | Workload type: Deployment, StatefulSet, DaemonSet, Job, CronJob |
-| `replicaCount`        | `1`          | Number of replicas                                              |
-| `image.repository`    | `""`         | Container image repository                                      |
-| `image.tag`           | `""`         | Container image tag                                             |
-| `service.type`        | `ClusterIP`  | Kubernetes service type                                         |
-| `service.port`        | `80`         | Service port                                                    |
-| `ingress.enabled`     | `false`      | Enable ingress resource                                         |
-| `resources`           | `{}`         | CPU/memory requests and limits                                  |
-| `persistence.enabled` | `false`      | Enable persistent storage                                       |
+<div data-tab-panel="sidecar">
+
+```yaml
+# values.yaml — Main app with Prometheus metrics sidecar
+workload:
+  enabled: true
+  type: Deployment
+
+image:
+  repository: docker.io/my-org/my-app
+  tag: '1.0'
+
+containers:
+  - name: app
+    image: {}
+    ports:
+      - containerPort: 8080
+    env:
+      - name: APP_ENV
+        value: production
+
+  - name: metrics-exporter
+    image:
+      repository: docker.io/prom/node-exporter
+      tag: v1.8.0
+    ports:
+      - containerPort: 9100
+
+# Global env applied to ALL containers
+env:
+  - name: CLUSTER_NAME
+    value: my-cluster
+
+service:
+  type: ClusterIP
+  port: 8080
+  extraPorts:
+    - name: metrics
+      port: 9100
+      targetPort: 9100
+
+serviceMonitor:
+  enabled: true
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+```
+
+</div>
+
+<div data-tab-panel="job-cronjob">
+
+```yaml
+# values.yaml — Release with only Jobs and CronJobs (no long-running workload)
+workload:
+  enabled: false # no Deployment/StatefulSet/DaemonSet
+
+# One-shot database migration Job
+jobs:
+  - name: db-migrate
+    image:
+      repository: docker.io/my-org/my-app
+      tag: '1.0'
+    command: ['npm', 'run', 'migrate']
+    backoffLimit: 3
+    activeDeadlineSeconds: 600
+
+# Scheduled cleanup CronJob
+cronjobs:
+  - name: cleanup
+    schedule: '0 2 * * *'
+    timeZone: America/Sao_Paulo
+    image:
+      repository: docker.io/my-org/my-app
+      tag: '1.0'
+    command: ['npm', 'run', 'cleanup']
+    concurrencyPolicy: Forbid
+    suspend: false
+
+# Global env applied to all Jobs and CronJobs
+env:
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: app-db-secret
+        key: database-url
+```
+
+</div>
+
+<div data-tab-panel="full">
+
+```yaml
+# values.yaml — Full example: Deployment + PVC + ConfigMap + HPA + PDB + ServiceMonitor
+workload:
+  enabled: true
+  type: Deployment
+
+image:
+  repository: docker.io/my-org/my-app
+  tag: '1.0'
+
+replicaCount: 3
+
+containers:
+  - name: app
+    image: {}
+    ports:
+      - containerPort: 8080
+    envFrom:
+      - configMapRef:
+          name: my-app-config # created below via configMaps[]
+      - secretRef:
+          name: my-app-secrets
+
+# Global env applied to all containers
+env:
+  - name: LOG_LEVEL
+    value: info
+
+# Inline ConfigMap created by the chart
+configMaps:
+  - name: my-app-config
+    data:
+      config.yaml: |
+        debug: false
+        timeout: 30
+
+# Persistence: create a PVC and mount it
+persistence:
+  storage:
+    - name: data
+      capacity: 10Gi
+      accessMode: ReadWriteOnce
+  mounts:
+    - name: data
+      mountPath: /app/data
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - resource: cpu
+      type: Utilization
+      target: 75
+
+pdb:
+  enabled: true
+  minAvailable: 2
+
+service:
+  type: ClusterIP
+  port: 8080
+
+serviceMonitor:
+  enabled: true
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Core
+
+| Parameter          | Type    | Default | Description                                          |
+| ------------------ | ------- | ------- | ---------------------------------------------------- |
+| `replicaCount`     | integer | `1`     | Number of pod replicas. Ignored when HPA is enabled. |
+| `nameOverride`     | string  | `""`    | Override the chart name.                             |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                      |
+| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                 |
+
+### Workload
+
+| Parameter                       | Type    | Default      | Description                                                             |
+| ------------------------------- | ------- | ------------ | ----------------------------------------------------------------------- |
+| `workload.enabled`              | boolean | `true`       | Deploy the long-running workload. Set to `false` for Job-only releases. |
+| `workload.type`                 | string  | `Deployment` | Workload kind: `Deployment`, `StatefulSet`, or `DaemonSet`.             |
+| `workload.podManagementPolicy`  | string  | —            | StatefulSet pod management policy (`OrderedReady` or `Parallel`).       |
+| `workload.volumeClaimTemplates` | array   | —            | StatefulSet per-pod PVC templates.                                      |
+| `workload.updateStrategy`       | object  | —            | Update strategy for StatefulSet or DaemonSet.                           |
+
+### Image
+
+| Parameter          | Type   | Default                               | Description                          |
+| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
+| `image.repository` | string | `container.registry.io/project/image` | Default container image.             |
+| `image.tag`        | string | `latest`                              | Image tag.                           |
+| `image.pullPolicy` | string | `Always`                              | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
+
+### Containers
+
+Each entry in `containers[]` becomes a container in the pod spec:
+
+| Field             | Description                                                            |
+| ----------------- | ---------------------------------------------------------------------- |
+| `name`            | Container name.                                                        |
+| `image`           | Per-container image override. Use `{}` to inherit the top-level image. |
+| `ports`           | List of `containerPort` entries.                                       |
+| `env`             | Per-container environment variables.                                   |
+| `envFrom`         | Per-container `configMapRef` or `secretRef` sources.                   |
+| `command`         | Container command override.                                            |
+| `args`            | Container args override.                                               |
+| `livenessProbe`   | Per-container liveness probe.                                          |
+| `readinessProbe`  | Per-container readiness probe.                                         |
+| `startupProbe`    | Per-container startup probe.                                           |
+| `resources`       | Per-container resource requests and limits.                            |
+| `securityContext` | Per-container security context.                                        |
+| `volumeMounts`    | Per-container volume mounts.                                           |
+| `lifecycle`       | Per-container lifecycle hooks.                                         |
+
+`initContainers[]` accepts the same fields and runs before the main containers start.
+
+### Global Environment
+
+Applied to **all containers**, including those defined in `jobs[]` and `cronjobs[]`:
+
+| Parameter | Type  | Default | Description                                                       |
+| --------- | ----- | ------- | ----------------------------------------------------------------- |
+| `env`     | array | `[]`    | Global environment variables injected into all containers.        |
+| `envFrom` | array | `[]`    | Global `configMapRef` and `secretRef` sources for all containers. |
+
+### Persistence
+
+The generic chart separates persistence into three independent lists:
+
+| Parameter               | Description                                                              |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `persistence.volumes[]` | Inline volume definitions (emptyDir, configMap, secret, hostPath, etc.). |
+| `persistence.storage[]` | PVCs created by the chart (specify `name`, `capacity`, `accessMode`).    |
+| `persistence.mounts[]`  | Volume mount definitions mapping volume names to container paths.        |
+
+Example:
+
+```yaml
+persistence:
+  storage:
+    - name: data
+      capacity: 10Gi
+      accessMode: ReadWriteOnce
+      storageClassName: standard
+
+  volumes:
+    - name: config
+      configMap:
+        name: my-app-config
+
+  mounts:
+    - name: data
+      mountPath: /app/data
+    - name: config
+      mountPath: /etc/config
+      readOnly: true
+```
+
+### ConfigMaps
+
+| Parameter           | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `configMaps[]`      | Inline ConfigMaps created by the chart.         |
+| `configMaps[].name` | ConfigMap name.                                 |
+| `configMaps[].data` | Key-value pairs for the ConfigMap data section. |
+
+### Service
+
+| Parameter             | Type    | Default     | Description                             |
+| --------------------- | ------- | ----------- | --------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Service type.                           |
+| `service.port`        | integer | `8080`      | Service port.                           |
+| `service.targetPort`  | integer | `8080`      | Container port the Service forwards to. |
+| `service.extraPorts`  | array   | `[]`        | Additional ports (e.g. metrics, admin). |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.            |
+
+### Ingress
+
+| Parameter                  | Type    | Default   | Description                  |
+| -------------------------- | ------- | --------- | ---------------------------- |
+| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.  |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.          |
+| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress. |
+| `ingress.hosts`            | array   | `[]`      | Host and path rules.         |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.           |
+
+### Update Strategy
+
+| Parameter                                     | Type   | Default         | Description                                 |
+| --------------------------------------------- | ------ | --------------- | ------------------------------------------- |
+| `updateStrategy.type`                         | string | `RollingUpdate` | Deployment update strategy type.            |
+| `updateStrategy.rollingUpdate.maxSurge`       | string | `25%`           | Max pods above desired count during update. |
+| `updateStrategy.rollingUpdate.maxUnavailable` | string | `25%`           | Max unavailable pods during update.         |
+
+### Autoscaling
+
+| Parameter         | Type    | Default | Description                                     |
+| ----------------- | ------- | ------- | ----------------------------------------------- |
+| `hpa.enabled`     | boolean | `false` | Enable Horizontal Pod Autoscaler.               |
+| `hpa.minReplicas` | integer | —       | Minimum replica count.                          |
+| `hpa.maxReplicas` | integer | —       | Maximum replica count.                          |
+| `hpa.metrics`     | array   | —       | HPA metric targets (CPU/memory utilization).    |
+| `vpa.enabled`     | boolean | `false` | Enable Vertical Pod Autoscaler.                 |
+| `vpa.updateMode`  | string  | `Off`   | VPA update mode (`Off` = recommendations only). |
+
+### PodDisruptionBudget
+
+| Parameter            | Type    | Default | Description                                  |
+| -------------------- | ------- | ------- | -------------------------------------------- |
+| `pdb.enabled`        | boolean | `false` | Create a PodDisruptionBudget.                |
+| `pdb.minAvailable`   | integer | —       | Minimum available pods during disruptions.   |
+| `pdb.maxUnavailable` | integer | —       | Maximum unavailable pods during disruptions. |
+
+### ServiceMonitor
+
+| Parameter                    | Description                                           |
+| ---------------------------- | ----------------------------------------------------- |
+| `serviceMonitor.enabled`     | Create a Prometheus Operator ServiceMonitor.          |
+| `serviceMonitor.labels`      | Extra labels for the ServiceMonitor.                  |
+| `serviceMonitor.endpoints[]` | Scrape endpoints with `port`, `path`, and `interval`. |
+
+### Jobs
+
+Each entry in `jobs[]` creates a Kubernetes `Job`:
+
+| Field                   | Description                                         |
+| ----------------------- | --------------------------------------------------- |
+| `name`                  | Job name.                                           |
+| `image`                 | Job container image.                                |
+| `command`               | Command to run.                                     |
+| `args`                  | Arguments.                                          |
+| `backoffLimit`          | Number of retries before marking the Job as failed. |
+| `activeDeadlineSeconds` | Maximum duration before the Job is terminated.      |
+| `env`                   | Per-Job environment variables (merged with global). |
+| `envFrom`               | Per-Job envFrom sources.                            |
+
+### CronJobs
+
+Each entry in `cronjobs[]` creates a Kubernetes `CronJob`:
+
+| Field               | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `name`              | CronJob name.                                              |
+| `schedule`          | Cron expression.                                           |
+| `timeZone`          | IANA timezone for the schedule (e.g. `America/Sao_Paulo`). |
+| `image`             | Container image.                                           |
+| `command`           | Command to run.                                            |
+| `concurrencyPolicy` | `Forbid`, `Replace`, or `Allow`.                           |
+| `suspend`           | Suspend the CronJob without deleting it.                   |
+
+### Extra Manifests
+
+<Callout type="tip" title="extraManifests supports Helm tpl templating">
+  Unlike most charts, `extraManifests` in the Generic chart processes each manifest through the Helm
+  `tpl` function, enabling the use of template expressions like
+  `{{ include "chart.fullname" . }}-extra` inside the manifest definitions.
+</Callout>
+
+| Parameter        | Type  | Default | Description                                                                                   |
+| ---------------- | ----- | ------- | --------------------------------------------------------------------------------------------- |
+| `extraManifests` | array | `[]`    | Arbitrary Kubernetes manifests rendered via Helm `tpl`. Supports all Helm template functions. |
+
+### Resources and Security
+
+| Parameter            | Type   | Default | Description                                                    |
+| -------------------- | ------ | ------- | -------------------------------------------------------------- |
+| `resources`          | object | `{}`    | Default CPU and memory requests and limits for all containers. |
+| `podSecurityContext` | object | `{}`    | Pod-level security context.                                    |
+| `securityContext`    | object | `{}`    | Default container-level security context.                      |
+
+### Scheduling
+
+| Parameter                       | Type    | Default | Description                            |
+| ------------------------------- | ------- | ------- | -------------------------------------- |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.          |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.            |
+| `affinity`                      | object  | `{}`    | Affinity rules.                        |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.           |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.             |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.              |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.              |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod.         |
+| `annotations`                   | object  | `{}`    | Annotations for the workload resource. |
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/generic) on GitHub.
+- [HelmForge Generic Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/generic)
