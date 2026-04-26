@@ -152,3 +152,6 @@ export const chartCategories: ChartCategory[] = [
 const allChartNavItems: NavItem[] = chartCategories.flatMap((cat) => cat.charts);
 
 export const allPages: NavItem[] = [{ label: 'Documentation', href: '/docs' }, ...sidebarNav, ...allChartNavItems];
+
+/** Total number of charts — auto-updates when chartCategories grows */
+export const chartCount: number = allChartNavItems.length;

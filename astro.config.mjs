@@ -27,17 +27,48 @@ export default defineConfig({
     mdx(),
     sitemap({
       serialize(item) {
-        const match = item.url.match(/\/docs\/charts\/([a-z0-9-]+)$/);
-        if (match) {
-          const slug = match[1];
+        const url = item.url;
+
+        // Homepage
+        if (url === 'https://helmforge.dev' || url === 'https://helmforge.dev/') {
+          return { ...item, priority: 1.0, changefreq: 'weekly' };
+        }
+
+        // Individual chart pages — highest priority (most searched)
+        const chartMatch = url.match(/\/docs\/charts\/([a-z0-9-]+)$/);
+        if (chartMatch) {
+          const slug = chartMatch[1];
           /** @type {any} */ (item).img = [
             {
               url: `https://helmforge.dev/icons/charts/${slug}.png`,
               title: `${slug} Helm chart icon`,
             },
           ];
+          return { ...item, priority: 0.9, changefreq: 'monthly' };
         }
-        return item;
+
+        // Charts index and comparison — very high priority
+        if (url.includes('/docs/charts') || url.includes('/docs/comparison')) {
+          return { ...item, priority: 0.9, changefreq: 'monthly' };
+        }
+
+        // Core docs pages
+        if (url.includes('/docs/')) {
+          return { ...item, priority: 0.8, changefreq: 'monthly' };
+        }
+
+        // Blog posts
+        if (url.match(/\/blog\/[a-z0-9-]+$/)) {
+          return { ...item, priority: 0.7, changefreq: 'never' };
+        }
+
+        // Blog index, changelog, roadmap
+        if (url.includes('/blog') || url.includes('/changelog') || url.includes('/roadmap')) {
+          return { ...item, priority: 0.6, changefreq: 'weekly' };
+        }
+
+        // Secondary pages (community, request, stack, newsletter)
+        return { ...item, priority: 0.5, changefreq: 'monthly' };
       },
     }),
   ],
