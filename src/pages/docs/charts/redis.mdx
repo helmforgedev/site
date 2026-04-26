@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Redis Chart
-description: HelmForge Redis chart — Redis with standalone and Sentinel high-availability for Kubernetes.
+description: HelmForge Redis chart — Redis standalone, replication, Sentinel HA, and cluster modes with official redis image, existingSecret auth, TLS, maxmemory config, Prometheus exporter, PodDisruptionBudget, and non-root security context.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,17 +11,37 @@ import RedisDiagram from '../../../components/diagrams/RedisDiagram.astro';
 
 # Redis
 
-Production-ready Redis deployment with support for standalone and Sentinel high-availability architectures.
+Deploy [Redis](https://redis.io/) on Kubernetes using the official `redis` Docker image. Supports
+four architectures: standalone (single instance), replication (primary + replicas), Sentinel
+(automatic HA failover), and cluster (horizontal sharding).
 
-## Key Features
+<Callout
+  type="danger"
+  title="OOMKilled: Redis stores all data in memory — always set maxmemory and resources.limits.memory"
+>
+  Redis is an in-memory data store. If your dataset grows beyond the container's memory limit, Kubernetes kills the pod
+  with OOMKilled. Always set `resources.limits.memory` and configure `config.redis` with `maxmemory` (slightly below the
+  memory limit) and a `maxmemory-policy` appropriate for your use case. Without these, Redis will consume all available
+  memory.
+</Callout>
 
-- **Standalone and Sentinel** — Single instance or HA with automatic failover
-- **Persistence** — RDB and AOF persistence options
-- **Metrics** — Prometheus exporter with ServiceMonitor
-- **Security** — Password authentication, non-root containers, network policies
-- **Configurable** — Custom Redis configuration parameters
+<Callout
+  type="warning"
+  title="Sentinel clients must use the Sentinel service — direct master connection breaks after failover"
+>
+  In Sentinel mode, the master pod changes after a failover event. Applications that connect directly to the master pod
+  IP or hostname will fail after failover. Always use a **Sentinel-aware client library** that queries the Sentinel
+  service (port 26379) to discover the current master dynamically.
+</Callout>
 
-## Architecture
+## Architectures
+
+| Architecture  | Use Case                                     | HA  | Horizontal Scale |
+| ------------- | -------------------------------------------- | --- | ---------------- |
+| `standalone`  | Development, low-traffic caching.            | ✗   | ✗                |
+| `replication` | Read scaling via replicas, manual failover.  | ✗   | Read only        |
+| `sentinel`    | Automatic failover HA for persistent data.   | ✓   | Read only        |
+| `cluster`     | Large datasets exceeding single-node memory. | ✓   | Full             |
 
 <ArchitectureDiagram title="Standalone" description="Single Redis instance with persistent storage (RDB/AOF).">
   <RedisDiagram mode="standalone" />
@@ -29,10 +49,21 @@ Production-ready Redis deployment with support for standalone and Sentinel high-
 
 <ArchitectureDiagram
   title="Sentinel"
-  description="Redis master with replicas, monitored by Sentinel for automatic failover."
+  description="Redis primary with replicas, monitored by Sentinel for automatic failover."
 >
   <RedisDiagram mode="sentinel" />
 </ArchitectureDiagram>
+
+## Key Features
+
+- **Four architectures** — standalone, replication, Sentinel, cluster
+- **Sentinel quorum** — configurable failover quorum (default: 2 out of 3 Sentinels)
+- **Cluster mode** — 6 nodes by default (3 master + 3 replica), auto-initialized via init Job
+- **TLS encryption** — mutual TLS for all Redis connections
+- **`existingSecret`** — keep credentials out of the values file
+- **`config.redis`** — custom `redis.conf` lines (maxmemory, eviction policy, etc.)
+- **Prometheus exporter** — `oliver006/redis_exporter` sidecar with ServiceMonitor
+- **Non-root** — runs as UID/GID 999 by default
 
 ## Installation
 
@@ -41,35 +72,55 @@ Production-ready Redis deployment with support for standalone and Sentinel high-
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-redis helmforge/redis
+helm install my-redis helmforge/redis -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-redis oci://ghcr.io/helmforgedev/helm/redis
+helm install my-redis oci://ghcr.io/helmforgedev/helm/redis -f values.yaml
 ```
 
 ## Deployment Examples
 
-<DocsTabs tabs={[
-  { id: 'standalone', label: 'Standalone' },
-  { id: 'sentinel', label: 'Sentinel HA' },
-  { id: 'cache', label: 'Cache Only' },
-]}>
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone' },
+    { id: 'sentinel', label: 'Sentinel HA' },
+    { id: 'cluster', label: 'Cluster' },
+    { id: 'cache', label: 'Cache Only (no persistence)' },
+  ]}
+>
 
 <div data-tab-panel="standalone">
 
 ```yaml
-# values.yaml
+# values.yaml — Redis standalone (persistent, single instance)
 architecture: standalone
 
 auth:
-  password: 'my-secret-password'
+  enabled: true
+  existingSecret: redis-credentials
+  existingSecretPasswordKey: redis-password
 
-master:
+standalone:
   persistence:
-    size: 8Gi
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+
+config:
+  redis: |
+    maxmemory 800mb       # ~80% of limits.memory; leave headroom for overhead
+    maxmemory-policy allkeys-lru
+    save 900 1            # RDB: save after 900s if at least 1 key changed
+    save 300 10
+    appendonly yes        # AOF for durability
 
 metrics:
   enabled: true
@@ -82,23 +133,86 @@ metrics:
 <div data-tab-panel="sentinel">
 
 ```yaml
-# values.yaml
+# values.yaml — Redis Sentinel HA (primary + 3 replicas + 3 Sentinels)
+# Requires Sentinel-aware client (redis-py, Jedis, ioredis with Sentinel option)
+# Connect to port 26379 (Sentinel) — clients discover the current primary dynamically
 architecture: sentinel
 
 auth:
-  password: 'my-secret-password'
+  enabled: true
+  existingSecret: redis-credentials
+  existingSecretPasswordKey: redis-password
 
-master:
-  persistence:
-    size: 8Gi
-
-replica:
+replication:
   replicaCount: 3
-  persistence:
-    size: 8Gi
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        memory: 2Gi
+  replica:
+    persistence:
+      enabled: true
+      size: 20Gi
 
 sentinel:
+  replicaCount: 3 # always deploy an ODD number of Sentinels
+  quorum: 2 # minimum Sentinels that must agree to trigger failover
+  downAfterMilliseconds: 60000 # time without response before marking as down
+  failoverTimeout: 180000
+
+config:
+  redis: |
+    maxmemory 1700mb   # ~85% of limits.memory
+    maxmemory-policy allkeys-lru
+
+metrics:
   enabled: true
+  serviceMonitor:
+    enabled: true
+
+pdb:
+  enabled: true # prevent all Sentinel pods from being evicted simultaneously
+```
+
+</div>
+
+<div data-tab-panel="cluster">
+
+```yaml
+# values.yaml — Redis Cluster (horizontal sharding for large datasets)
+# Cluster mode distributes keys across 3 master shards (each with 1 replica)
+# Requires cluster-aware client library
+architecture: cluster
+
+auth:
+  enabled: true
+  existingSecret: redis-credentials
+  existingSecretPasswordKey: redis-password
+
+cluster:
+  nodes: 6 # total pods: 3 masters + 3 replicas (minimum for cluster)
+  replicasPerMaster: 1
+  initJob:
+    enabled: true # Job that runs redis-cli --cluster create after pods are ready
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    limits:
+      memory: 2Gi
+
+config:
+  redis: |
+    maxmemory 1700mb   # per-shard; total dataset capacity = maxmemory × number of masters
+    maxmemory-policy allkeys-lru
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
 ```
 
 </div>
@@ -106,68 +220,129 @@ sentinel:
 <div data-tab-panel="cache">
 
 ```yaml
-# values.yaml — Ephemeral cache with no persistence
+# values.yaml — Redis as ephemeral cache (no persistence, LRU eviction)
+# Data is lost on pod restart — acceptable only for pure caching use cases
 architecture: standalone
 
 auth:
-  password: 'my-secret-password'
+  enabled: true
+  existingSecret: redis-credentials
+  existingSecretPasswordKey: redis-password
 
-master:
+standalone:
   persistence:
-    enabled: false
-  configuration: |
-    maxmemory 512mb
-    maxmemory-policy allkeys-lru
+    enabled: false # ephemeral; no PVC
+  resources:
+    requests:
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+config:
+  redis: |
+    maxmemory 400mb           # ~80% of limits.memory
+    maxmemory-policy allkeys-lru   # evict least-recently-used keys when full
+    save ""                   # disable RDB snapshots
+    appendonly no             # disable AOF (pure cache mode)
 ```
 
 </div>
 
 </DocsTabs>
 
-## Key Values
+## Configuration Reference
 
-| Key                                | Type    | Default      | Description                                         |
-| ---------------------------------- | ------- | ------------ | --------------------------------------------------- |
-| `architecture`                     | string  | `standalone` | Deployment architecture: `standalone` or `sentinel` |
-| `auth.enabled`                     | boolean | `true`       | Enable password authentication                      |
-| `auth.password`                    | string  | `""`         | Redis password                                      |
-| `master.persistence.enabled`       | boolean | `true`       | Enable persistence for master                       |
-| `master.persistence.size`          | string  | `8Gi`        | Master PVC size                                     |
-| `master.persistence.storageClass`  | string  | `""`         | Storage class for master PVC                        |
-| `master.resources.requests.memory` | string  | `128Mi`      | Memory request for master                           |
-| `master.resources.requests.cpu`    | string  | `100m`       | CPU request for master                              |
-| `master.configuration`             | string  | `""`         | Custom Redis configuration                          |
-| `replica.replicaCount`             | integer | `3`          | Number of replicas (Sentinel mode)                  |
-| `replica.persistence.size`         | string  | `8Gi`        | Replica PVC size                                    |
-| `sentinel.enabled`                 | boolean | `false`      | Enable Sentinel                                     |
-| `metrics.enabled`                  | boolean | `false`      | Enable Prometheus exporter                          |
-| `metrics.serviceMonitor.enabled`   | boolean | `false`      | Create ServiceMonitor resource                      |
-| `networkPolicy.enabled`            | boolean | `false`      | Enable network policies                             |
+### Image
+
+| Parameter          | Type   | Default                   | Description  |
+| ------------------ | ------ | ------------------------- | ------------ |
+| `image.repository` | string | `docker.io/library/redis` | Redis image. |
+| `image.tag`        | string | `"8.6.0"`                 | Image tag.   |
+
+### Authentication
+
+| Parameter                        | Type    | Default          | Description                                  |
+| -------------------------------- | ------- | ---------------- | -------------------------------------------- |
+| `auth.enabled`                   | boolean | `true`           | Enable password authentication.              |
+| `auth.password`                  | string  | `""`             | Redis password. Auto-generated if empty.     |
+| `auth.existingSecret`            | string  | `""`             | Existing secret with Redis password.         |
+| `auth.existingSecretPasswordKey` | string  | `redis-password` | Key for the password in the existing secret. |
+
+### TLS
+
+| Parameter            | Type    | Default | Description                                                 |
+| -------------------- | ------- | ------- | ----------------------------------------------------------- |
+| `tls.enabled`        | boolean | `false` | Enable TLS. Requires `tls.existingSecret` with cert/key/CA. |
+| `tls.existingSecret` | string  | `""`    | Secret with `tls.crt`, `tls.key`, `ca.crt`.                 |
+
+### Standalone
+
+| Parameter                        | Type    | Default | Description                     |
+| -------------------------------- | ------- | ------- | ------------------------------- |
+| `standalone.persistence.enabled` | boolean | `true`  | Enable PVC for standalone.      |
+| `standalone.persistence.size`    | string  | `8Gi`   | PVC size.                       |
+| `standalone.resources`           | object  | `{}`    | CPU and memory requests/limits. |
+
+### Replication
+
+| Parameter                              | Type    | Default | Description             |
+| -------------------------------------- | ------- | ------- | ----------------------- |
+| `replication.replicaCount`             | integer | `2`     | Number of replica pods. |
+| `replication.primary.persistence.size` | string  | `8Gi`   | Primary PVC size.       |
+| `replication.replica.persistence.size` | string  | `8Gi`   | Replica PVC size.       |
+
+### Sentinel
+
+| Parameter                        | Type    | Default  | Description                                            |
+| -------------------------------- | ------- | -------- | ------------------------------------------------------ |
+| `sentinel.replicaCount`          | integer | `3`      | Number of Sentinel pods (always use an odd number).    |
+| `sentinel.quorum`                | integer | `2`      | Minimum Sentinels that must agree to trigger failover. |
+| `sentinel.downAfterMilliseconds` | integer | `60000`  | Milliseconds before marking a primary as down.         |
+| `sentinel.failoverTimeout`       | integer | `180000` | Failover timeout in milliseconds.                      |
+| `sentinel.parallelSyncs`         | integer | `1`      | Replicas that sync in parallel during failover.        |
+
+### Cluster
+
+| Parameter                   | Type    | Default | Description                                                |
+| --------------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `cluster.nodes`             | integer | `6`     | Total cluster nodes (minimum 6: 3 masters + 3 replicas).   |
+| `cluster.replicasPerMaster` | integer | `1`     | Replicas per master shard.                                 |
+| `cluster.initJob.enabled`   | boolean | `true`  | Run `redis-cli --cluster create` Job after pods are ready. |
+| `cluster.persistence.size`  | string  | `8Gi`   | PVC size per cluster node.                                 |
+
+### Configuration and Metrics
+
+| Parameter                        | Type    | Default | Description                                                               |
+| -------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
+| `config.redis`                   | string  | `""`    | Extra lines appended to `redis.conf` (maxmemory, save, appendonly, etc.). |
+| `config.sentinel`                | string  | `""`    | Extra lines appended to `sentinel.conf`.                                  |
+| `metrics.enabled`                | boolean | `false` | Deploy `redis_exporter` Prometheus sidecar.                               |
+| `metrics.serviceMonitor.enabled` | boolean | `false` | Create Prometheus ServiceMonitor resource.                                |
+| `pdb.enabled`                    | boolean | `false` | Enable PodDisruptionBudget.                                               |
+| `service.ports.redis`            | integer | `6379`  | Redis client port.                                                        |
+| `service.ports.sentinel`         | integer | `26379` | Sentinel client port.                                                     |
+| `extraManifests`                 | array   | `[]`    | Extra Kubernetes manifests.                                               |
+
+<Callout type="tip" title="Set maxmemory to ~80% of resources.limits.memory">
+  Redis needs headroom above `maxmemory` for internal overhead (AOF buffers, client output buffers, Lua, etc.). A safe
+  rule: set `maxmemory` to 80–85% of `resources.limits.memory`. For example, a pod with `limits.memory: 1Gi` should use
+  `maxmemory 820mb`.
+</Callout>
 
 ## Upgrade Notes
 
-<Callout type="warning" title="Sentinel failover during upgrades">
-  In Sentinel mode, rolling upgrades may trigger a failover. This is expected behavior — Sentinel promotes a replica
-  when the master pod restarts. Applications using Sentinel-aware clients handle this transparently.
+<Callout type="warning" title="Sentinel failover during rolling upgrades is expected behavior">
+  In Sentinel mode, rolling upgrades restart the primary pod and trigger a failover. Sentinel promotes a replica to
+  primary. Applications using Sentinel-aware clients handle this transparently. Expect a brief connection interruption
+  (seconds) during master pod restart.
 </Callout>
 
-- Switching from `standalone` to `sentinel` requires a fresh deployment (data migration needed)
+- Switching from `standalone` to `sentinel` or `cluster` requires a fresh deployment and data migration (`redis-cli --rdb`, Valkey migration tools, or a `DUMP`/`RESTORE` approach)
 - Persistence changes only affect new pods; existing PVCs retain their size
-- Custom `master.configuration` overrides are appended to the default config
-
-## Common Issues
-
-<Callout type="danger" title="OOMKilled pods">
-  Redis stores data in memory. If your dataset exceeds the pod's memory limit, Kubernetes kills the pod. Set
-  `master.resources.limits.memory` higher than your expected dataset size, and configure `maxmemory` in Redis to leave
-  headroom for overhead.
-</Callout>
-
-<Callout type="tip" title="Connection refused after failover">
-  If your application connects directly to the master pod IP instead of using the Sentinel service, connections break
-  after failover. Use a Sentinel-aware client library or connect via the `-headless` service.
-</Callout>
+- Custom `config.redis` lines are appended to the generated `redis.conf`
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/redis) on GitHub.
+- [Redis Official Documentation](https://redis.io/docs/)
+- [Redis Docker Hub](https://hub.docker.com/_/redis)
+- [HelmForge Redis Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/redis)
