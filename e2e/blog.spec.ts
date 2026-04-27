@@ -140,11 +140,16 @@ test.describe('Blog', () => {
     await page.goto('/blog/kubernetes-1-34-image-short-names');
 
     const scripts = page.locator('script[type="application/ld+json"]');
-    const combined = (await scripts.allTextContents()).join('\n');
+    const structuredData = (await scripts.allTextContents()).map((content) => JSON.parse(content));
+    const article = structuredData.find((schema) =>
+      ['Article', 'BlogPosting', 'NewsArticle'].includes(schema['@type']),
+    );
 
-    expect(combined).toContain('"@type":"Article"');
-    expect(combined).toContain('"@type":"Person"');
-    expect(combined).toContain('Maicon Berlofa');
+    expect(article).toBeTruthy();
+    expect(article.author).toMatchObject({
+      '@type': 'Person',
+      name: 'Maicon Berlofa',
+    });
   });
 
   test('blog post includes canonical, rss discovery, and is indexable', async ({ page }) => {

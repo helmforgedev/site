@@ -5,14 +5,15 @@ import { charts } from '../data/charts';
 
 export async function GET(context: APIContext) {
   const posts = await getCollection('blog');
+  const getPublishedDate = (post: (typeof posts)[number]) => post.data.publishDate ?? post.data.date;
 
   const blogItems = posts
-    .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+    .sort((a, b) => getPublishedDate(b).valueOf() - getPublishedDate(a).valueOf())
     .map((post) => ({
       title: post.data.title,
       description: post.data.description,
       link: `/blog/${post.id}`,
-      pubDate: post.data.date,
+      pubDate: getPublishedDate(post),
     }));
 
   const chartItems = charts.map((chart) => ({

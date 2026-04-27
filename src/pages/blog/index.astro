@@ -7,7 +7,9 @@ import SectionHeader from '../../components/SectionHeader.astro';
 import { getCollection } from 'astro:content';
 import { AUTHORS, DEFAULT_AUTHOR_ID } from '../../data/authors';
 
-const posts = (await getCollection('blog')).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const allPosts = await getCollection('blog');
+const getPublishedDate = (post: (typeof allPosts)[number]) => post.data.publishDate ?? post.data.date;
+const posts = allPosts.sort((a, b) => getPublishedDate(b).valueOf() - getPublishedDate(a).valueOf());
 const getAuthorName = (authorId: string) => (AUTHORS[authorId] ?? AUTHORS[DEFAULT_AUTHOR_ID]).name;
 ---
 
@@ -79,8 +81,12 @@ const getAuthorName = (authorId: string) => (AUTHORS[authorId] ?? AUTHORS[DEFAUL
                   <div class="flex items-center gap-2">
                     <span>{getAuthorName(post.data.authorId)}</span>
                     <span class="text-border">|</span>
-                    <time datetime={post.data.date.toISOString()}>
-                      {post.data.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <time datetime={getPublishedDate(post).toISOString()}>
+                      {getPublishedDate(post).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
                     </time>
                   </div>
                   <span class="flex items-center gap-1 text-primary-light opacity-0 group-hover:opacity-100 transition-opacity">
