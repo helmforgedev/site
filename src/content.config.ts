@@ -10,11 +10,14 @@ const blog = defineCollection({
     title: z.string(),
     description: z.string(),
     date: z.coerce.date(),
+    publishDate: z.coerce.date().optional(),
+    updatedAt: z.coerce.date().optional(),
     authorId: z.enum(AUTHOR_IDS),
     tags: z.array(z.string()).default([]),
     image: z.string().optional(),
     coverImage: z.string().optional(),
     coverAlt: z.string().optional(),
+    schemaType: z.enum(['Article', 'BlogPosting', 'NewsArticle']).default('BlogPosting'),
   }),
 });
 
