@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Generic Chart
-description: HelmForge Generic chart — multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, multi-container pods, PVCs, ConfigMaps, HPA, VPA, PDB, ServiceMonitor, and extraManifests with Helm templating.
+description: HelmForge Generic chart — multi-purpose Helm chart for Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, networking, security, storage, observability, autoscaling, Gateway API, and extraManifests with Helm templating.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,31 +9,45 @@ import Callout from '../../../components/Callout.astro';
 
 # Generic
 
-A multi-purpose Helm chart for deploying any container workload on Kubernetes without writing boilerplate
-templates. One chart for Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, multi-container pods,
-PVC management, ConfigMaps, and arbitrary extra manifests with Helm `tpl` support.
+A multi-purpose Helm chart for Kubernetes workloads that need a reusable platform contract instead of
+application-specific templates. It supports Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, multiple
+containers, Services, Ingress, storage, security resources, observability hooks, autoscaling, Gateway API, and
+arbitrary extra manifests rendered through Helm `tpl`.
 
-<Callout type="info" title="Jobs and CronJobs are separate lists — not workload types">
-  Unlike some charts, `workload.type` only accepts `Deployment`, `StatefulSet`, and `DaemonSet`. One-shot Jobs and
-  scheduled CronJobs are configured via the separate `jobs[]` and `cronjobs[]` arrays. Set `workload.enabled: false` to
-  deploy a release that contains only Jobs or CronJobs with no long-running workload.
+<Callout type="warning" title="Breaking feature release">
+  The default image is now pinned to `docker.io/library/nginx:1.27.5`, image pull policy defaults to `IfNotPresent`, pod
+  templates are deterministic, and stricter validation blocks invalid combinations such as HPA on DaemonSets. Review
+  image, HPA, PDB, and rollout values before upgrading.
+</Callout>
+
+<Callout type="info" title="Jobs and CronJobs are separate lists">
+  `workload.type` accepts `Deployment`, `StatefulSet`, and `DaemonSet`. One-shot Jobs and scheduled CronJobs are
+  configured with `jobs[]` and `cronjobs[]`. Set `workload.enabled: false` for a batch-only release.
 </Callout>
 
 ## Key Features
 
-- **All workload types** — Deployment, StatefulSet, DaemonSet, Job, CronJob
-- **Multi-container pods** — `containers[]` array with per-container image, env, ports, and probes
-- **Flexible persistence** — separate `volumes`, `storage` (PVCs), and `mounts` arrays
-- **Inline ConfigMaps** — create ConfigMaps directly from `values.yaml`
-- **Global and per-container env** — `env`/`envFrom` at root apply to all containers
-- **HPA and VPA** — horizontal and vertical pod autoscaling
-- **PDB** — PodDisruptionBudget for production availability
-- **Helm-templated extraManifests** — inject any Kubernetes manifest with `tpl` support
-- **ServiceMonitor** — Prometheus Operator integration
+- **Workloads** — Deployment, StatefulSet, DaemonSet, Job, and CronJob.
+- **Images** — pinned default image, digest support, per-container overrides, and `global.imageRegistry`.
+- **Networking** — primary Service, additional Services, headless Service mode, Ingress custom backends, and HTTPRoute.
+- **Security** — ServiceAccount token control, Secrets, ExternalSecret, SealedSecret, RBAC, and NetworkPolicy.
+- **Security presets** — opt-in `baseline` and `restricted` pod/container contexts when explicit contexts are absent.
+- **Storage** — legacy `persistence.storage[]`, declarative PVCs, explicit opt-in PVs, and StatefulSet claim templates.
+- **Observability** — ServiceMonitor, PodMonitor, PrometheusRule, HPA, VPA, and KEDA.
+- **Rollout control** — explicit `rollout.restartAt` and optional ConfigMap/Secret checksums.
+- **Extensibility** — `extraManifests[]` supports Helm templating with `tpl`.
+
+<Callout type="tip" title="CRD-backed resources are opt-in">
+  Gateway API, ExternalSecret, SealedSecret, ServiceMonitor, PodMonitor, PrometheusRule, VPA, and KEDA resources require
+  their CRDs to be installed first. The chart does not render them by default.
+</Callout>
+
+<Callout type="info" title="Disabled Service routing is explicit">
+  When `service.enabled: false`, Ingress paths must set `backend` and HTTPRoute rules must set `backendRefs`. The chart
+  blocks fallback routes to a primary Service that it is not rendering.
+</Callout>
 
 ## Installation
-
-**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -41,71 +55,52 @@ helm repo update
 helm install my-app helmforge/generic -f values.yaml
 ```
 
-**OCI registry:**
-
 ```bash
 helm install my-app oci://ghcr.io/helmforgedev/helm/generic -f values.yaml
 ```
 
-## Deployment Examples
+## Examples
 
 <DocsTabs
   tabs={[
     { id: 'web-app', label: 'Web App' },
-    { id: 'statefulset', label: 'StatefulSet + PVC' },
-    { id: 'sidecar', label: 'Multi-Container' },
-    { id: 'job-cronjob', label: 'Job + CronJob' },
-    { id: 'full', label: 'Full Example' },
+    { id: 'statefulset', label: 'StatefulSet' },
+    { id: 'security', label: 'Security' },
+    { id: 'batch', label: 'Batch' },
+    { id: 'platform', label: 'Platform' },
   ]}
 >
 
 <div data-tab-panel="web-app">
 
 ```yaml
-# values.yaml — Simple web application Deployment
 workload:
   enabled: true
   type: Deployment
 
 image:
   repository: docker.io/library/nginx
-  tag: '1.27'
+  tag: '1.27.5'
   pullPolicy: IfNotPresent
-
-replicaCount: 2
 
 containers:
   - name: app
-    image: {} # inherits top-level image
     ports:
-      - containerPort: 80
+      - name: http
+        containerPort: 80
 
 service:
-  type: ClusterIP
+  enabled: true
   port: 80
   targetPort: 80
 
 ingress:
   enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: app.example.com
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: app-tls
-      hosts:
-        - app.example.com
-
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    memory: 256Mi
 ```
 
 </div>
@@ -113,31 +108,13 @@ resources:
 <div data-tab-panel="statefulset">
 
 ```yaml
-# values.yaml — StatefulSet with PVC and volumeClaimTemplate
 workload:
   enabled: true
   type: StatefulSet
-  podManagementPolicy: OrderedReady
-
-image:
-  repository: docker.io/my-org/my-stateful-app
-  tag: '2.0'
-
-replicaCount: 3
-
-containers:
-  - name: app
-    image: {}
-    ports:
-      - containerPort: 8080
-    volumeMounts:
-      - name: data
-        mountPath: /data
-
-# StatefulSet uses volumeClaimTemplates for per-pod PVCs
-workload:
-  enabled: true
-  type: StatefulSet
+  podManagementPolicy: Parallel
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -146,181 +123,117 @@ workload:
         resources:
           requests:
             storage: 10Gi
-```
-
-</div>
-
-<div data-tab-panel="sidecar">
-
-```yaml
-# values.yaml — Main app with Prometheus metrics sidecar
-workload:
-  enabled: true
-  type: Deployment
-
-image:
-  repository: docker.io/my-org/my-app
-  tag: '1.0'
-
-containers:
-  - name: app
-    image: {}
-    ports:
-      - containerPort: 8080
-    env:
-      - name: APP_ENV
-        value: production
-
-  - name: metrics-exporter
-    image:
-      repository: docker.io/prom/node-exporter
-      tag: v1.8.0
-    ports:
-      - containerPort: 9100
-
-# Global env applied to ALL containers
-env:
-  - name: CLUSTER_NAME
-    value: my-cluster
 
 service:
-  type: ClusterIP
-  port: 8080
-  extraPorts:
-    - name: metrics
-      port: 9100
-      targetPort: 9100
-
-serviceMonitor:
-  enabled: true
-  endpoints:
-    - port: metrics
-      path: /metrics
-      interval: 30s
+  headless:
+    enabled: true
 ```
 
 </div>
 
-<div data-tab-panel="job-cronjob">
+<div data-tab-panel="security">
 
 ```yaml
-# values.yaml — Release with only Jobs and CronJobs (no long-running workload)
-workload:
-  enabled: false # no Deployment/StatefulSet/DaemonSet
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
 
-# One-shot database migration Job
+secrets:
+  - name: app
+    stringData:
+      password: change-me
+
+rbac:
+  create: true
+  rules:
+    - apiGroups: ['']
+      resources: ['configmaps']
+      verbs: ['get', 'list']
+
+networkPolicy:
+  enabled: true
+  defaultDeny: true
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+```
+
+</div>
+
+<div data-tab-panel="batch">
+
+```yaml
+workload:
+  enabled: false
+
+service:
+  enabled: false
+
 jobs:
   - name: db-migrate
     image:
       repository: docker.io/my-org/my-app
-      tag: '1.0'
-    command: ['npm', 'run', 'migrate']
-    backoffLimit: 3
-    activeDeadlineSeconds: 600
+      tag: '1.0.0'
+    command: ['./bin/migrate']
+    backoffLimit: 2
+    hooks:
+      enabled: true
+      events: ['pre-install', 'pre-upgrade']
+      deletePolicy: before-hook-creation,hook-succeeded
 
-# Scheduled cleanup CronJob
 cronjobs:
   - name: cleanup
     schedule: '0 2 * * *'
     timeZone: America/Sao_Paulo
     image:
       repository: docker.io/my-org/my-app
-      tag: '1.0'
-    command: ['npm', 'run', 'cleanup']
+      tag: '1.0.0'
+    command: ['./bin/cleanup']
     concurrencyPolicy: Forbid
-    suspend: false
-
-# Global env applied to all Jobs and CronJobs
-env:
-  - name: DATABASE_URL
-    valueFrom:
-      secretKeyRef:
-        name: app-db-secret
-        key: database-url
 ```
 
 </div>
 
-<div data-tab-panel="full">
+<div data-tab-panel="platform">
 
 ```yaml
-# values.yaml — Full example: Deployment + PVC + ConfigMap + HPA + PDB + ServiceMonitor
-workload:
+rollout:
+  restartAt: ''
+  checksum:
+    enabled: true
+    configMaps: true
+    secrets: true
+
+podMonitor:
   enabled: true
-  type: Deployment
-
-image:
-  repository: docker.io/my-org/my-app
-  tag: '1.0'
-
-replicaCount: 3
-
-containers:
-  - name: app
-    image: {}
-    ports:
-      - containerPort: 8080
-    envFrom:
-      - configMapRef:
-          name: my-app-config # created below via configMaps[]
-      - secretRef:
-          name: my-app-secrets
-
-# Global env applied to all containers
-env:
-  - name: LOG_LEVEL
-    value: info
-
-# Inline ConfigMap created by the chart
-configMaps:
-  - name: my-app-config
-    data:
-      config.yaml: |
-        debug: false
-        timeout: 30
-
-# Persistence: create a PVC and mount it
-persistence:
-  storage:
-    - name: data
-      capacity: 10Gi
-      accessMode: ReadWriteOnce
-  mounts:
-    - name: data
-      mountPath: /app/data
-
-hpa:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-    - resource: cpu
-      type: Utilization
-      target: 75
-
-pdb:
-  enabled: true
-  minAvailable: 2
-
-service:
-  type: ClusterIP
-  port: 8080
-
-serviceMonitor:
-  enabled: true
-  endpoints:
+  podMetricsEndpoints:
     - port: http
       path: /metrics
-      interval: 30s
 
-ingress:
+prometheusRule:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: app.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  groups:
+    - name: generic.rules
+      rules:
+        - alert: GenericDown
+          expr: up == 0
+
+gatewayApi:
+  enabled: true
+  httpRoutes:
+    - name: web
+      parentRefs:
+        - name: public
+      hostnames:
+        - app.example.com
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
 ```
 
 </div>
@@ -329,225 +242,141 @@ ingress:
 
 ## Configuration Reference
 
-### Core
+This section covers the Generic chart values surface used by operators. For nested Kubernetes-native shapes, such as
+container probes, affinity, tolerations, Ingress backends, HTTPRoute matches, and KEDA triggers, use the upstream
+Kubernetes or operator API fields inside the corresponding value.
 
-| Parameter          | Type    | Default | Description                                          |
-| ------------------ | ------- | ------- | ---------------------------------------------------- |
-| `replicaCount`     | integer | `1`     | Number of pod replicas. Ignored when HPA is enabled. |
-| `nameOverride`     | string  | `""`    | Override the chart name.                             |
-| `fullnameOverride` | string  | `""`    | Override the full release name.                      |
-| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                 |
+### Core and Image
 
-### Workload
+| Parameter              | Default                   | Description                                                   |
+| ---------------------- | ------------------------- | ------------------------------------------------------------- |
+| `replicaCount`         | `1`                       | Replica count when HPA is disabled.                           |
+| `nameOverride`         | `""`                      | Override the release name component.                          |
+| `fullnameOverride`     | `""`                      | Override the generated full name.                             |
+| `commonLabels`         | `{}`                      | Labels added to chart-managed resources.                      |
+| `workload.enabled`     | `true`                    | Render the long-running workload.                             |
+| `workload.type`        | `Deployment`              | `Deployment`, `StatefulSet`, or `DaemonSet`.                  |
+| `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
+| `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
+| `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
+| `image.tag`            | `1.27.5`                  | Default image tag.                                            |
+| `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
+| `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
+| `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |
+| `containers[]`         | app container             | Workload containers with image, env, ports, probes, and more. |
+| `initContainers[]`     | `[]`                      | Init containers using the same container shape.               |
+| `env`                  | `[]`                      | Global environment variables for workloads and batch jobs.    |
+| `envFrom`              | `[]`                      | Global ConfigMap or Secret environment sources.               |
 
-| Parameter                       | Type    | Default      | Description                                                             |
-| ------------------------------- | ------- | ------------ | ----------------------------------------------------------------------- |
-| `workload.enabled`              | boolean | `true`       | Deploy the long-running workload. Set to `false` for Job-only releases. |
-| `workload.type`                 | string  | `Deployment` | Workload kind: `Deployment`, `StatefulSet`, or `DaemonSet`.             |
-| `workload.podManagementPolicy`  | string  | —            | StatefulSet pod management policy (`OrderedReady` or `Parallel`).       |
-| `workload.volumeClaimTemplates` | array   | —            | StatefulSet per-pod PVC templates.                                      |
-| `workload.updateStrategy`       | object  | —            | Update strategy for StatefulSet or DaemonSet.                           |
+### Networking
 
-### Image
+| Parameter                  | Default   | Description                                                                        |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `service.enabled`          | `true`    | Render the primary Service.                                                        |
+| `service.nameOverride`     | `""`      | Override primary Service name.                                                     |
+| `service.headless.enabled` | `false`   | Render primary Service with `clusterIP: None`.                                     |
+| `service.extraPorts`       | `[]`      | Extra ports on the primary Service.                                                |
+| `services[]`               | `[]`      | Additional Service resources.                                                      |
+| `ingress.enabled`          | `false`   | Render Ingress.                                                                    |
+| `ingress.ingressClassName` | `traefik` | Ingress class name.                                                                |
+| `ingress.annotations`      | `{}`      | Annotations for Ingress.                                                           |
+| `ingress.defaultBackend`   | `{}`      | Optional default backend for Ingress.                                              |
+| `ingress.hosts[]`          | `[]`      | Ingress host rules; paths require explicit `backend` when `service.enabled=false`. |
+| `ingress.tls`              | `[]`      | Ingress TLS entries.                                                               |
+| `gatewayApi.enabled`       | `false`   | Render Gateway API HTTPRoutes.                                                     |
+| `gatewayApi.httpRoutes[]`  | `[]`      | Gateway API HTTPRoutes; rules require `backendRefs` when `service.enabled=false`.  |
 
-| Parameter          | Type   | Default                               | Description                          |
-| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
-| `image.repository` | string | `container.registry.io/project/image` | Default container image.             |
-| `image.tag`        | string | `latest`                              | Image tag.                           |
-| `image.pullPolicy` | string | `Always`                              | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
+### Security and Storage
 
-### Containers
+| Parameter                                     | Default | Description                                                  |
+| --------------------------------------------- | ------- | ------------------------------------------------------------ |
+| `serviceAccount.create`                       | `false` | Render a ServiceAccount.                                     |
+| `serviceAccount.automountServiceAccountToken` | `false` | Mount API token into pods.                                   |
+| `resources`                                   | `{}`    | Default container resources.                                 |
+| `livenessProbe`                               | `{}`    | Global liveness probe for the first container.               |
+| `readinessProbe`                              | `{}`    | Global readiness probe for the first container.              |
+| `startupProbe`                                | `{}`    | Global startup probe for the first container.                |
+| `podSecurityContext`                          | `{}`    | Pod-level security context.                                  |
+| `securityContext`                             | `{}`    | Container-level security context.                            |
+| `securityPreset`                              | `""`    | Optional `baseline` or `restricted` security context preset. |
+| `configMaps[]`                                | `[]`    | Chart-managed ConfigMaps.                                    |
+| `secrets[]`                                   | `[]`    | Chart-managed Secrets.                                       |
+| `externalSecrets.enabled`                     | `false` | Render ExternalSecret resources.                             |
+| `sealedSecrets.enabled`                       | `false` | Render SealedSecret resources.                               |
+| `rbac.create`                                 | `false` | Render Role and RoleBinding.                                 |
+| `rbac.clusterRole.create`                     | `false` | Render a ClusterRole and binding.                            |
+| `networkPolicy.enabled`                       | `false` | Render NetworkPolicy.                                        |
+| `persistence.volumes[]`                       | `[]`    | Pod volume definitions.                                      |
+| `persistence.mounts[]`                        | `[]`    | Container volume mounts.                                     |
+| `persistence.storage[]`                       | `[]`    | Legacy PV/PVC helper definitions.                            |
+| `persistence.persistentVolumeClaims[]`        | `[]`    | Declarative PVCs.                                            |
+| `persistence.persistentVolumes[]`             | `[]`    | Explicit opt-in PVs.                                         |
 
-Each entry in `containers[]` becomes a container in the pod spec:
+### Scheduling and Rollout
 
-| Field             | Description                                                            |
-| ----------------- | ---------------------------------------------------------------------- |
-| `name`            | Container name.                                                        |
-| `image`           | Per-container image override. Use `{}` to inherit the top-level image. |
-| `ports`           | List of `containerPort` entries.                                       |
-| `env`             | Per-container environment variables.                                   |
-| `envFrom`         | Per-container `configMapRef` or `secretRef` sources.                   |
-| `command`         | Container command override.                                            |
-| `args`            | Container args override.                                               |
-| `livenessProbe`   | Per-container liveness probe.                                          |
-| `readinessProbe`  | Per-container readiness probe.                                         |
-| `startupProbe`    | Per-container startup probe.                                           |
-| `resources`       | Per-container resource requests and limits.                            |
-| `securityContext` | Per-container security context.                                        |
-| `volumeMounts`    | Per-container volume mounts.                                           |
-| `lifecycle`       | Per-container lifecycle hooks.                                         |
+| Parameter                           | Default             | Description                                 |
+| ----------------------------------- | ------------------- | ------------------------------------------- |
+| `updateStrategy`                    | `RollingUpdate 25%` | Deployment rollout strategy.                |
+| `nodeSelector`                      | `{}`                | Node selector.                              |
+| `tolerations`                       | `[]`                | Pod tolerations.                            |
+| `affinity`                          | `{}`                | Pod affinity and anti-affinity rules.       |
+| `topologySpreadConstraints`         | `[]`                | Pod topology spread constraints.            |
+| `priorityClassName`                 | `""`                | PriorityClass name.                         |
+| `preemptionPolicy`                  | `""`                | Pod preemption policy.                      |
+| `terminationGracePeriodSeconds`     | `30`                | Pod termination grace period.               |
+| `runtimeClassName`                  | `""`                | RuntimeClass name.                          |
+| `schedulerName`                     | `""`                | Scheduler name.                             |
+| `hostNetwork`, `hostPID`, `hostIPC` | `false`             | Host namespace toggles.                     |
+| `shareProcessNamespace`             | `false`             | Share process namespace between containers. |
+| `enableServiceLinks`                | `true`              | Inject Service environment variables.       |
+| `dnsPolicy`                         | `""`                | Pod DNS policy.                             |
+| `dnsConfig`                         | `{}`                | Pod DNS configuration.                      |
+| `hostAliases`                       | `[]`                | Pod host aliases.                           |
+| `rollout.restartAt`                 | `""`                | Explicit pod restart marker.                |
+| `rollout.podAnnotations`            | `{}`                | Rollout-only pod annotations.               |
+| `rollout.checksum`                  | enabled             | ConfigMap/Secret checksum rollout controls. |
 
-`initContainers[]` accepts the same fields and runs before the main containers start.
+### Observability and Autoscaling
 
-### Global Environment
+| Parameter                | Default               | Description                                                     |
+| ------------------------ | --------------------- | --------------------------------------------------------------- |
+| `serviceMonitor.enabled` | `false`               | Render ServiceMonitor.                                          |
+| `podMonitor.enabled`     | `false`               | Render PodMonitor.                                              |
+| `prometheusRule.enabled` | `false`               | Render PrometheusRule.                                          |
+| `hpa.enabled`            | `false`               | Render HPA; not valid for DaemonSet.                            |
+| `hpa.minReplicas`        | `1`                   | HPA minimum replicas.                                           |
+| `hpa.maxReplicas`        | required when enabled | HPA maximum replicas.                                           |
+| `hpa.metrics`            | `[]`                  | HPA metrics.                                                    |
+| `hpa.behavior`           | `{}`                  | HPA scaling behavior.                                           |
+| `vpa.enabled`            | `false`               | Render VerticalPodAutoscaler.                                   |
+| `vpa.updateMode`         | `Off`                 | VPA update mode.                                                |
+| `keda.enabled`           | `false`               | Render KEDA ScaledObject/ScaledJob resources.                   |
+| `keda.scaledObject`      | disabled              | Scales the chart workload; requires `workload.enabled=true`.    |
+| `keda.scaledJobs[]`      | `[]`                  | KEDA ScaledJob definitions for batch scaling.                   |
+| `pdb.enabled`            | `false`               | Render PodDisruptionBudget.                                     |
+| `pdb.minAvailable`       | unset                 | Minimum available pods; mutually exclusive with maxUnavailable. |
+| `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
-Applied to **all containers**, including those defined in `jobs[]` and `cronjobs[]`:
+Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
 
-| Parameter | Type  | Default | Description                                                       |
-| --------- | ----- | ------- | ----------------------------------------------------------------- |
-| `env`     | array | `[]`    | Global environment variables injected into all containers.        |
-| `envFrom` | array | `[]`    | Global `configMapRef` and `secretRef` sources for all containers. |
+### Batch
 
-### Persistence
+| Parameter          | Default  | Description                                                 |
+| ------------------ | -------- | ----------------------------------------------------------- |
+| `jobs[]`           | `[]`     | One-time Job definitions.                                   |
+| `cronjobs[]`       | `[]`     | Scheduled CronJob definitions.                              |
+| `jobs[].hooks`     | disabled | Optional Helm hook annotations for Jobs.                    |
+| `extraManifests[]` | `[]`     | Arbitrary Kubernetes manifests rendered through Helm `tpl`. |
 
-The generic chart separates persistence into three independent lists:
+## Upgrade Notes
 
-| Parameter               | Description                                                              |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `persistence.volumes[]` | Inline volume definitions (emptyDir, configMap, secret, hostPath, etc.). |
-| `persistence.storage[]` | PVCs created by the chart (specify `name`, `capacity`, `accessMode`).    |
-| `persistence.mounts[]`  | Volume mount definitions mapping volume names to container paths.        |
-
-Example:
-
-```yaml
-persistence:
-  storage:
-    - name: data
-      capacity: 10Gi
-      accessMode: ReadWriteOnce
-      storageClassName: standard
-
-  volumes:
-    - name: config
-      configMap:
-        name: my-app-config
-
-  mounts:
-    - name: data
-      mountPath: /app/data
-    - name: config
-      mountPath: /etc/config
-      readOnly: true
-```
-
-### ConfigMaps
-
-| Parameter           | Description                                     |
-| ------------------- | ----------------------------------------------- |
-| `configMaps[]`      | Inline ConfigMaps created by the chart.         |
-| `configMaps[].name` | ConfigMap name.                                 |
-| `configMaps[].data` | Key-value pairs for the ConfigMap data section. |
-
-### Service
-
-| Parameter             | Type    | Default     | Description                             |
-| --------------------- | ------- | ----------- | --------------------------------------- |
-| `service.type`        | string  | `ClusterIP` | Service type.                           |
-| `service.port`        | integer | `8080`      | Service port.                           |
-| `service.targetPort`  | integer | `8080`      | Container port the Service forwards to. |
-| `service.extraPorts`  | array   | `[]`        | Additional ports (e.g. metrics, admin). |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.            |
-
-### Ingress
-
-| Parameter                  | Type    | Default   | Description                  |
-| -------------------------- | ------- | --------- | ---------------------------- |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.  |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.          |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress. |
-| `ingress.hosts`            | array   | `[]`      | Host and path rules.         |
-| `ingress.tls`              | array   | `[]`      | TLS configuration.           |
-
-### Update Strategy
-
-| Parameter                                     | Type   | Default         | Description                                 |
-| --------------------------------------------- | ------ | --------------- | ------------------------------------------- |
-| `updateStrategy.type`                         | string | `RollingUpdate` | Deployment update strategy type.            |
-| `updateStrategy.rollingUpdate.maxSurge`       | string | `25%`           | Max pods above desired count during update. |
-| `updateStrategy.rollingUpdate.maxUnavailable` | string | `25%`           | Max unavailable pods during update.         |
-
-### Autoscaling
-
-| Parameter         | Type    | Default | Description                                     |
-| ----------------- | ------- | ------- | ----------------------------------------------- |
-| `hpa.enabled`     | boolean | `false` | Enable Horizontal Pod Autoscaler.               |
-| `hpa.minReplicas` | integer | —       | Minimum replica count.                          |
-| `hpa.maxReplicas` | integer | —       | Maximum replica count.                          |
-| `hpa.metrics`     | array   | —       | HPA metric targets (CPU/memory utilization).    |
-| `vpa.enabled`     | boolean | `false` | Enable Vertical Pod Autoscaler.                 |
-| `vpa.updateMode`  | string  | `Off`   | VPA update mode (`Off` = recommendations only). |
-
-### PodDisruptionBudget
-
-| Parameter            | Type    | Default | Description                                  |
-| -------------------- | ------- | ------- | -------------------------------------------- |
-| `pdb.enabled`        | boolean | `false` | Create a PodDisruptionBudget.                |
-| `pdb.minAvailable`   | integer | —       | Minimum available pods during disruptions.   |
-| `pdb.maxUnavailable` | integer | —       | Maximum unavailable pods during disruptions. |
-
-### ServiceMonitor
-
-| Parameter                    | Description                                           |
-| ---------------------------- | ----------------------------------------------------- |
-| `serviceMonitor.enabled`     | Create a Prometheus Operator ServiceMonitor.          |
-| `serviceMonitor.labels`      | Extra labels for the ServiceMonitor.                  |
-| `serviceMonitor.endpoints[]` | Scrape endpoints with `port`, `path`, and `interval`. |
-
-### Jobs
-
-Each entry in `jobs[]` creates a Kubernetes `Job`:
-
-| Field                   | Description                                         |
-| ----------------------- | --------------------------------------------------- |
-| `name`                  | Job name.                                           |
-| `image`                 | Job container image.                                |
-| `command`               | Command to run.                                     |
-| `args`                  | Arguments.                                          |
-| `backoffLimit`          | Number of retries before marking the Job as failed. |
-| `activeDeadlineSeconds` | Maximum duration before the Job is terminated.      |
-| `env`                   | Per-Job environment variables (merged with global). |
-| `envFrom`               | Per-Job envFrom sources.                            |
-
-### CronJobs
-
-Each entry in `cronjobs[]` creates a Kubernetes `CronJob`:
-
-| Field               | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `name`              | CronJob name.                                              |
-| `schedule`          | Cron expression.                                           |
-| `timeZone`          | IANA timezone for the schedule (e.g. `America/Sao_Paulo`). |
-| `image`             | Container image.                                           |
-| `command`           | Command to run.                                            |
-| `concurrencyPolicy` | `Forbid`, `Replace`, or `Allow`.                           |
-| `suspend`           | Suspend the CronJob without deleting it.                   |
-
-### Extra Manifests
-
-<Callout type="tip" title="extraManifests supports Helm tpl templating">
-  Unlike most charts, `extraManifests` in the Generic chart processes each manifest through the Helm
-  `tpl` function, enabling the use of template expressions like
-  `{{ include "chart.fullname" . }}-extra` inside the manifest definitions.
-</Callout>
-
-| Parameter        | Type  | Default | Description                                                                                   |
-| ---------------- | ----- | ------- | --------------------------------------------------------------------------------------------- |
-| `extraManifests` | array | `[]`    | Arbitrary Kubernetes manifests rendered via Helm `tpl`. Supports all Helm template functions. |
-
-### Resources and Security
-
-| Parameter            | Type   | Default | Description                                                    |
-| -------------------- | ------ | ------- | -------------------------------------------------------------- |
-| `resources`          | object | `{}`    | Default CPU and memory requests and limits for all containers. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.                                    |
-| `securityContext`    | object | `{}`    | Default container-level security context.                      |
-
-### Scheduling
-
-| Parameter                       | Type    | Default | Description                            |
-| ------------------------------- | ------- | ------- | -------------------------------------- |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.          |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.            |
-| `affinity`                      | object  | `{}`    | Affinity rules.                        |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.           |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.             |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.              |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.              |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod.         |
-| `annotations`                   | object  | `{}`    | Annotations for the workload resource. |
+- Replace any inherited `latest` assumptions with an explicit tag or digest.
+- Set `service.enabled: false` for batch-only releases that should not render a Service.
+- Set `hpa.maxReplicas` whenever `hpa.enabled: true`.
+- Configure exactly one of `pdb.minAvailable` or `pdb.maxUnavailable` when enabling PDB.
+- Use `rollout.restartAt` or checksum settings instead of relying on render-time timestamps.
 
 ## More Information
 
 - [HelmForge Generic Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/generic)
+- [Kubernetes Documentation](https://kubernetes.io/docs/home/)
