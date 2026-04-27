@@ -23,7 +23,7 @@ export const comparisonFull: ComparisonRow[] = [
   },
   {
     aspect: 'License',
-    helmforge: 'MIT — forever open source',
+    helmforge: 'Apache-2.0 — CNCF-aligned open source',
     bitnami: 'Apache 2.0 charts; images under EULA',
     community: 'Varies',
     highlight: true,
@@ -107,7 +107,7 @@ export const comparisonSummary: ComparisonSummaryRow[] = [
     feature: 'License',
     generic: 'Varies (some restrictive)',
     bitnami: 'Proprietary for production secure images',
-    helmforge: 'MIT — open source',
+    helmforge: 'Apache-2.0 — open source',
   },
   {
     feature: 'Pricing / Tiering',
