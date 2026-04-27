@@ -16,7 +16,7 @@
   <p>
     <a href="https://github.com/helmforgedev/site/actions/workflows/ci.yml"><img src="https://github.com/helmforgedev/site/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <a href="https://github.com/helmforgedev/site/actions/workflows/deploy.yml"><img src="https://github.com/helmforgedev/site/actions/workflows/deploy.yml/badge.svg" alt="Deploy" /></a>
-    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License: Apache-2.0" /></a>
     <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome" /></a>
   </p>
 
@@ -136,4 +136,4 @@ npx playwright install --with-deps chromium firefox webkit
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License 2.0](LICENSE).
