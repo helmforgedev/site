@@ -42,6 +42,11 @@ arbitrary extra manifests rendered through Helm `tpl`.
   their CRDs to be installed first. The chart does not render them by default.
 </Callout>
 
+<Callout type="info" title="Disabled Service routing is explicit">
+  When `service.enabled: false`, Ingress paths must set `backend` and HTTPRoute rules must set `backendRefs`. The chart
+  blocks fallback routes to a primary Service that it is not rendering.
+</Callout>
+
 ## Installation
 
 ```bash
@@ -237,68 +242,131 @@ gatewayApi:
 
 ## Configuration Reference
 
-This section highlights the primary values for the Generic chart platform surface documented on this page. For the full
-values contract, review the chart README and `values.yaml` in the source repository.
+This section covers the Generic chart values surface used by operators. For nested Kubernetes-native shapes, such as
+container probes, affinity, tolerations, Ingress backends, HTTPRoute matches, and KEDA triggers, use the upstream
+Kubernetes or operator API fields inside the corresponding value.
 
 ### Core and Image
 
-| Parameter              | Default                   | Description                                   |
-| ---------------------- | ------------------------- | --------------------------------------------- |
-| `workload.enabled`     | `true`                    | Render the long-running workload.             |
-| `workload.type`        | `Deployment`              | `Deployment`, `StatefulSet`, or `DaemonSet`.  |
-| `image.repository`     | `docker.io/library/nginx` | Default image repository.                     |
-| `image.tag`            | `1.27.5`                  | Default image tag.                            |
-| `image.digest`         | `""`                      | Image digest; takes precedence over tag.      |
-| `global.imageRegistry` | `""`                      | Registry prefix for unqualified repositories. |
-| `rollout.restartAt`    | `""`                      | Explicit pod restart marker.                  |
-| `rollout.checksum`     | enabled                   | ConfigMap/Secret checksum rollout controls.   |
+| Parameter              | Default                   | Description                                                   |
+| ---------------------- | ------------------------- | ------------------------------------------------------------- |
+| `replicaCount`         | `1`                       | Replica count when HPA is disabled.                           |
+| `nameOverride`         | `""`                      | Override the release name component.                          |
+| `fullnameOverride`     | `""`                      | Override the generated full name.                             |
+| `commonLabels`         | `{}`                      | Labels added to chart-managed resources.                      |
+| `workload.enabled`     | `true`                    | Render the long-running workload.                             |
+| `workload.type`        | `Deployment`              | `Deployment`, `StatefulSet`, or `DaemonSet`.                  |
+| `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
+| `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
+| `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
+| `image.tag`            | `1.27.5`                  | Default image tag.                                            |
+| `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
+| `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
+| `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |
+| `containers[]`         | app container             | Workload containers with image, env, ports, probes, and more. |
+| `initContainers[]`     | `[]`                      | Init containers using the same container shape.               |
+| `env`                  | `[]`                      | Global environment variables for workloads and batch jobs.    |
+| `envFrom`              | `[]`                      | Global ConfigMap or Secret environment sources.               |
 
 ### Networking
 
-| Parameter                  | Default | Description                                    |
-| -------------------------- | ------- | ---------------------------------------------- |
-| `service.enabled`          | `true`  | Render the primary Service.                    |
-| `service.nameOverride`     | `""`    | Override primary Service name.                 |
-| `service.headless.enabled` | `false` | Render primary Service with `clusterIP: None`. |
-| `service.extraPorts`       | `[]`    | Extra ports on the primary Service.            |
-| `services[]`               | `[]`    | Additional Service resources.                  |
-| `ingress.defaultBackend`   | `{}`    | Optional default backend for Ingress.          |
-| `gatewayApi.httpRoutes[]`  | `[]`    | Gateway API HTTPRoutes.                        |
+| Parameter                  | Default   | Description                                                                        |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `service.enabled`          | `true`    | Render the primary Service.                                                        |
+| `service.nameOverride`     | `""`      | Override primary Service name.                                                     |
+| `service.headless.enabled` | `false`   | Render primary Service with `clusterIP: None`.                                     |
+| `service.extraPorts`       | `[]`      | Extra ports on the primary Service.                                                |
+| `services[]`               | `[]`      | Additional Service resources.                                                      |
+| `ingress.enabled`          | `false`   | Render Ingress.                                                                    |
+| `ingress.ingressClassName` | `traefik` | Ingress class name.                                                                |
+| `ingress.annotations`      | `{}`      | Annotations for Ingress.                                                           |
+| `ingress.defaultBackend`   | `{}`      | Optional default backend for Ingress.                                              |
+| `ingress.hosts[]`          | `[]`      | Ingress host rules; paths require explicit `backend` when `service.enabled=false`. |
+| `ingress.tls`              | `[]`      | Ingress TLS entries.                                                               |
+| `gatewayApi.enabled`       | `false`   | Render Gateway API HTTPRoutes.                                                     |
+| `gatewayApi.httpRoutes[]`  | `[]`      | Gateway API HTTPRoutes; rules require `backendRefs` when `service.enabled=false`.  |
 
 ### Security and Storage
 
 | Parameter                                     | Default | Description                                                  |
 | --------------------------------------------- | ------- | ------------------------------------------------------------ |
+| `serviceAccount.create`                       | `false` | Render a ServiceAccount.                                     |
 | `serviceAccount.automountServiceAccountToken` | `false` | Mount API token into pods.                                   |
+| `resources`                                   | `{}`    | Default container resources.                                 |
+| `livenessProbe`                               | `{}`    | Global liveness probe for the first container.               |
+| `readinessProbe`                              | `{}`    | Global readiness probe for the first container.              |
+| `startupProbe`                                | `{}`    | Global startup probe for the first container.                |
+| `podSecurityContext`                          | `{}`    | Pod-level security context.                                  |
+| `securityContext`                             | `{}`    | Container-level security context.                            |
 | `securityPreset`                              | `""`    | Optional `baseline` or `restricted` security context preset. |
+| `configMaps[]`                                | `[]`    | Chart-managed ConfigMaps.                                    |
 | `secrets[]`                                   | `[]`    | Chart-managed Secrets.                                       |
 | `externalSecrets.enabled`                     | `false` | Render ExternalSecret resources.                             |
 | `sealedSecrets.enabled`                       | `false` | Render SealedSecret resources.                               |
 | `rbac.create`                                 | `false` | Render Role and RoleBinding.                                 |
+| `rbac.clusterRole.create`                     | `false` | Render a ClusterRole and binding.                            |
 | `networkPolicy.enabled`                       | `false` | Render NetworkPolicy.                                        |
+| `persistence.volumes[]`                       | `[]`    | Pod volume definitions.                                      |
+| `persistence.mounts[]`                        | `[]`    | Container volume mounts.                                     |
+| `persistence.storage[]`                       | `[]`    | Legacy PV/PVC helper definitions.                            |
 | `persistence.persistentVolumeClaims[]`        | `[]`    | Declarative PVCs.                                            |
 | `persistence.persistentVolumes[]`             | `[]`    | Explicit opt-in PVs.                                         |
 
+### Scheduling and Rollout
+
+| Parameter                           | Default             | Description                                 |
+| ----------------------------------- | ------------------- | ------------------------------------------- |
+| `updateStrategy`                    | `RollingUpdate 25%` | Deployment rollout strategy.                |
+| `nodeSelector`                      | `{}`                | Node selector.                              |
+| `tolerations`                       | `[]`                | Pod tolerations.                            |
+| `affinity`                          | `{}`                | Pod affinity and anti-affinity rules.       |
+| `topologySpreadConstraints`         | `[]`                | Pod topology spread constraints.            |
+| `priorityClassName`                 | `""`                | PriorityClass name.                         |
+| `preemptionPolicy`                  | `""`                | Pod preemption policy.                      |
+| `terminationGracePeriodSeconds`     | `30`                | Pod termination grace period.               |
+| `runtimeClassName`                  | `""`                | RuntimeClass name.                          |
+| `schedulerName`                     | `""`                | Scheduler name.                             |
+| `hostNetwork`, `hostPID`, `hostIPC` | `false`             | Host namespace toggles.                     |
+| `shareProcessNamespace`             | `false`             | Share process namespace between containers. |
+| `enableServiceLinks`                | `true`              | Inject Service environment variables.       |
+| `dnsPolicy`                         | `""`                | Pod DNS policy.                             |
+| `dnsConfig`                         | `{}`                | Pod DNS configuration.                      |
+| `hostAliases`                       | `[]`                | Pod host aliases.                           |
+| `rollout.restartAt`                 | `""`                | Explicit pod restart marker.                |
+| `rollout.podAnnotations`            | `{}`                | Rollout-only pod annotations.               |
+| `rollout.checksum`                  | enabled             | ConfigMap/Secret checksum rollout controls. |
+
 ### Observability and Autoscaling
 
-| Parameter                | Default | Description                                   |
-| ------------------------ | ------- | --------------------------------------------- |
-| `serviceMonitor.enabled` | `false` | Render ServiceMonitor.                        |
-| `podMonitor.enabled`     | `false` | Render PodMonitor.                            |
-| `prometheusRule.enabled` | `false` | Render PrometheusRule.                        |
-| `hpa.enabled`            | `false` | Render HPA; not valid for DaemonSet.          |
-| `vpa.enabled`            | `false` | Render VerticalPodAutoscaler.                 |
-| `keda.enabled`           | `false` | Render KEDA ScaledObject/ScaledJob resources. |
+| Parameter                | Default               | Description                                                     |
+| ------------------------ | --------------------- | --------------------------------------------------------------- |
+| `serviceMonitor.enabled` | `false`               | Render ServiceMonitor.                                          |
+| `podMonitor.enabled`     | `false`               | Render PodMonitor.                                              |
+| `prometheusRule.enabled` | `false`               | Render PrometheusRule.                                          |
+| `hpa.enabled`            | `false`               | Render HPA; not valid for DaemonSet.                            |
+| `hpa.minReplicas`        | `1`                   | HPA minimum replicas.                                           |
+| `hpa.maxReplicas`        | required when enabled | HPA maximum replicas.                                           |
+| `hpa.metrics`            | `[]`                  | HPA metrics.                                                    |
+| `hpa.behavior`           | `{}`                  | HPA scaling behavior.                                           |
+| `vpa.enabled`            | `false`               | Render VerticalPodAutoscaler.                                   |
+| `vpa.updateMode`         | `Off`                 | VPA update mode.                                                |
+| `keda.enabled`           | `false`               | Render KEDA ScaledObject/ScaledJob resources.                   |
+| `keda.scaledObject`      | disabled              | Scales the chart workload; requires `workload.enabled=true`.    |
+| `keda.scaledJobs[]`      | `[]`                  | KEDA ScaledJob definitions for batch scaling.                   |
+| `pdb.enabled`            | `false`               | Render PodDisruptionBudget.                                     |
+| `pdb.minAvailable`       | unset                 | Minimum available pods; mutually exclusive with maxUnavailable. |
+| `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
-Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
+Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
 
 ### Batch
 
-| Parameter      | Default  | Description                              |
-| -------------- | -------- | ---------------------------------------- |
-| `jobs[]`       | `[]`     | One-time Job definitions.                |
-| `cronjobs[]`   | `[]`     | Scheduled CronJob definitions.           |
-| `jobs[].hooks` | disabled | Optional Helm hook annotations for Jobs. |
+| Parameter          | Default  | Description                                                 |
+| ------------------ | -------- | ----------------------------------------------------------- |
+| `jobs[]`           | `[]`     | One-time Job definitions.                                   |
+| `cronjobs[]`       | `[]`     | Scheduled CronJob definitions.                              |
+| `jobs[].hooks`     | disabled | Optional Helm hook annotations for Jobs.                    |
+| `extraManifests[]` | `[]`     | Arbitrary Kubernetes manifests rendered through Helm `tpl`. |
 
 ## Upgrade Notes
 
