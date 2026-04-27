@@ -1,0 +1,50 @@
+---
+title: 'Migrating to the Generic Chart Breaking Platform Contract'
+description: 'A focused migration guide for the Generic chart breaking feature release, covering images, deterministic rollouts, validation, security, networking, storage, and CRD-backed integrations.'
+date: 2026-04-27
+publishDate: 2026-04-27
+authorId: 'maicon-berlofa'
+tags: ['helm', 'generic-chart', 'migration', 'kubernetes']
+coverImage: '/blog/2026-04-27-generic-breaking-platform-contract-hero.webp'
+coverAlt: 'HelmForge Generic chart migration guide'
+---
+
+The Generic chart is becoming a broader platform contract. This release adds networking, security, storage,
+observability, autoscaling, Gateway API, and batch controls while tightening several defaults that were too loose for
+production use.
+
+## What changed
+
+- The default image is now `docker.io/library/nginx:1.27.5` with `IfNotPresent`.
+- Image digests are supported globally and per container.
+- Pod templates no longer receive render-time timestamp annotations.
+- HPA is blocked for DaemonSets and requires `hpa.maxReplicas`.
+- PDB requires exactly one availability budget: `minAvailable` or `maxUnavailable`.
+- Optional CRD-backed resources stay disabled until explicitly enabled.
+
+## Migration checklist
+
+1. Set an explicit `image.repository` plus `image.tag` or `image.digest` for every production workload.
+2. Replace timestamp-driven restarts with `rollout.restartAt` or ConfigMap/Secret checksums.
+3. Review HPA and PDB values before upgrade; invalid combinations now fail early.
+4. Set `service.enabled: false` for batch-only releases.
+5. Enable ExternalSecret, SealedSecret, ServiceMonitor, PodMonitor, PrometheusRule, VPA, KEDA, or Gateway API only in clusters where the CRDs already exist.
+6. Review new security primitives before enabling `rbac.create` or `networkPolicy.enabled`.
+
+## Recommended rollout
+
+Start by rendering your values locally:
+
+```bash
+helm lint charts/generic --strict
+helm template my-release charts/generic -f values.yaml
+```
+
+Then validate in a local k3d cluster with CRD-backed integrations disabled. Enable CRD-backed integrations in a second
+pass only after the platform operators are present.
+
+## Why this is breaking
+
+The chart now prefers deterministic, explicit behavior over permissive defaults. The result is a safer generic chart,
+but some previous values that rendered loosely will now fail fast so teams can fix the contract before the manifests
+reach a cluster.
