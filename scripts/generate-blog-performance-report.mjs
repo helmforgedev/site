@@ -36,13 +36,24 @@ function getList(frontmatter, key) {
     .filter(Boolean);
 }
 
-function getPosts() {
+function getBlogFiles(dir = BLOG_DIR) {
   return fs
-    .readdirSync(BLOG_DIR)
-    .filter((file) => file.endsWith('.md') || file.endsWith('.mdx'))
-    .map((file) => {
-      const slug = path.basename(file, path.extname(file));
-      const content = fs.readFileSync(path.join(BLOG_DIR, file), 'utf8');
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return getBlogFiles(fullPath);
+      if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.mdx'))) return [fullPath];
+      return [];
+    })
+    .sort();
+}
+
+function getPosts() {
+  return getBlogFiles()
+    .map((filePath) => {
+      const relativePath = path.relative(BLOG_DIR, filePath);
+      const slug = relativePath.slice(0, -path.extname(relativePath).length).split(path.sep).join('/');
+      const content = fs.readFileSync(filePath, 'utf8');
       const frontmatter = getFrontmatter(content);
 
       return {
