@@ -31,12 +31,12 @@ Use this report as the recurring Phase 7 review artifact after Search Console, B
 
 | URL | Title | Category | Published | Updated | Google clicks | Impressions | CTR | Avg position | Discover clicks | Bing clicks | CWV notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-[/blog/migration-generic-breaking-platform-contract](https://helmforge.dev/blog/migration-generic-breaking-platform-contract) | Migrating to the Generic Chart Breaking Platform Contract | helm | 2026-04-27 | - |  |  |  |  |  |  | 
-[/blog/fastmcp-server-deploy-mcp-anywhere](https://helmforge.dev/blog/fastmcp-server-deploy-mcp-anywhere) | Deploy MCP Servers Anywhere with FastMCP Server | operations | 2026-04-05 | - |  |  |  |  |  |  | 
-[/blog/kubernetes-1-34-image-short-names](https://helmforge.dev/blog/kubernetes-1-34-image-short-names) | Kubernetes 1.34 and Short Image Names: What Broke, Why, and How to Fix It Fast | releases | 2026-04-03 | - |  |  |  |  |  |  | 
-[/blog/production-postgresql-kubernetes](https://helmforge.dev/blog/production-postgresql-kubernetes) | Deploy Production-Ready PostgreSQL on Kubernetes | databases | 2026-04-02 | - |  |  |  |  |  |  | 
-[/blog/helmforge-vs-bitnami](https://helmforge.dev/blog/helmforge-vs-bitnami) | HelmForge vs Bitnami: A Practical Comparison | comparisons | 2026-04-01 | - |  |  |  |  |  |  | 
-[/blog/introducing-helmforge](https://helmforge.dev/blog/introducing-helmforge) | Introducing HelmForge: Why We Built It | cncf | 2026-04-01 | - |  |  |  |  |  |  | 
+[/blog/migration-generic-breaking-platform-contract](https://helmforge.dev/blog/migration-generic-breaking-platform-contract) | Migrating to the Generic Chart Breaking Platform Contract | helm | 2026-04-27 | - |  |  |  |  |  |  |
+[/blog/fastmcp-server-deploy-mcp-anywhere](https://helmforge.dev/blog/fastmcp-server-deploy-mcp-anywhere) | Deploy MCP Servers Anywhere with FastMCP Server | operations | 2026-04-05 | - |  |  |  |  |  |  |
+[/blog/kubernetes-1-34-image-short-names](https://helmforge.dev/blog/kubernetes-1-34-image-short-names) | Kubernetes 1.34 and Short Image Names: What Broke, Why, and How to Fix It Fast | kubernetes | 2026-04-03 | 2026-04-03 |  |  |  |  |  |  |
+[/blog/production-postgresql-kubernetes](https://helmforge.dev/blog/production-postgresql-kubernetes) | Deploy Production-Ready PostgreSQL on Kubernetes | databases | 2026-04-02 | - |  |  |  |  |  |  |
+[/blog/helmforge-vs-bitnami](https://helmforge.dev/blog/helmforge-vs-bitnami) | HelmForge vs Bitnami: A Practical Comparison | comparisons | 2026-04-01 | - |  |  |  |  |  |  |
+[/blog/introducing-helmforge](https://helmforge.dev/blog/introducing-helmforge) | Introducing HelmForge: Why We Built It | cncf | 2026-04-01 | - |  |  |  |  |  |  |
 
 <!-- prettier-ignore-end -->
 

@@ -93,7 +93,9 @@ function buildReport(posts) {
         '',
         '',
         '',
-      ].join(' | '),
+      ]
+        .join(' | ')
+        .trimEnd(),
     )
     .join('\n');
 

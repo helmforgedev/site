@@ -35,11 +35,9 @@ test.describe('Blog', () => {
     const editorialSections = page.locator('section').filter({ hasText: 'Editorial sections' }).first();
     await expect(editorialSections).toBeVisible();
     await expect(editorialSections.locator('a[href="/blog/category/databases"]')).toContainText(
-      /Databases\s+\d+\s+posts/i,
+      /Databases\s+1/i,
     );
-    await expect(editorialSections.locator('a[href="/blog/category/kubernetes"]')).toContainText(
-      /Kubernetes\s+\d+\s+posts/i,
-    );
+    await expect(editorialSections.locator('a[href="/blog/category/kubernetes"]')).toContainText(/Kubernetes\s+1/i);
     await expect(page.locator('a[href="/blog/tag/postgresql"]').first()).toBeVisible();
     await expect(page.locator('a[aria-label="Open editorial calendar"]')).toHaveAttribute(
       'href',
@@ -82,6 +80,10 @@ test.describe('Blog', () => {
   });
 
   test('category and tag pages render grouped posts', async ({ page }) => {
+    await page.goto('/blog/category/kubernetes');
+    await expect(page.locator('h1')).toContainText('Kubernetes');
+    await expect(page.locator('a[href="/blog/kubernetes-1-34-image-short-names"]:has(h2)')).toBeVisible();
+
     await page.goto('/blog/category/databases');
     await expect(page.locator('h1')).toContainText('Databases');
     await expect(page.locator('a[href="/blog/production-postgresql-kubernetes"]:has(h2)')).toBeVisible();
@@ -196,7 +198,7 @@ test.describe('Blog', () => {
     );
 
     expect(article).toBeTruthy();
-    expect(article.articleSection).toBe('Releases');
+    expect(article.articleSection).toBe('Kubernetes');
     expect(article.author).toMatchObject({
       '@type': 'Person',
       name: 'Maicon Berlofa',

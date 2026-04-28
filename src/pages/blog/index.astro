@@ -13,6 +13,7 @@ import { getSortedBlogPosts } from '../../lib/blogFeed';
 const allPosts = await getCollection('blog');
 const posts = getSortedBlogPosts(allPosts);
 const categoryCounts = getCategoryCounts(posts);
+const activeCategories = BLOG_CATEGORIES.filter((slug) => categoryCounts[slug] > 0);
 const tags = getAllTags(posts).slice(0, 12);
 ---
 
@@ -69,20 +70,19 @@ const tags = getAllTags(posts).slice(0, 12);
       <section class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
         <div>
           <h2 class="text-sm font-bold uppercase tracking-[0.18em] text-text-base">Editorial sections</h2>
-          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="mt-4 flex flex-wrap gap-2">
             {
-              BLOG_CATEGORIES.map((slug) => {
+              activeCategories.map((slug) => {
                 const category = BLOG_CATEGORY_DETAILS[slug];
                 return (
                   <a
                     href={`/blog/category/${category.slug}`}
-                    class="rounded-xl border border-border bg-bg-surface/40 p-4 transition-colors hover:border-primary/40"
+                    class="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:border-primary/40 hover:text-primary-light"
                   >
-                    <div class="flex items-center justify-between gap-3">
-                      <span class="text-sm font-semibold text-text-base">{category.label}</span>
-                      <span class="text-xs text-text-muted">{categoryCounts[slug]} posts</span>
-                    </div>
-                    <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-text-muted">{category.description}</p>
+                    <span>{category.label}</span>
+                    <span class="rounded-full bg-bg-muted px-2 py-0.5 text-[11px] text-text-muted">
+                      {categoryCounts[slug]}
+                    </span>
                   </a>
                 );
               })
