@@ -86,6 +86,8 @@ test.describe('Blog', () => {
     const hero = page.locator('figure img[src*="/blog/"][src$=".webp"]').first();
     await expect(hero).toBeVisible();
     await expect(hero).toHaveAttribute('alt', /Kubernetes 1\.34/i);
+    await expect(hero).toHaveAttribute('width', '1600');
+    await expect(hero).toHaveAttribute('height', '900');
   });
 
   test('blog post renders author card with social links', async ({ page }) => {
