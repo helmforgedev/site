@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      submit_all_blog_to_indexnow:
+        description: 'Submit all blog URLs to IndexNow after deploy'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 6 * * *'
 
@@ -31,3 +37,16 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=helmforge --branch=main --commit-dirty=true
+
+      - name: Submit changed blog URLs to IndexNow
+        env:
+          INDEXNOW_SOFT_FAIL: '1'
+          INDEXNOW_SITE_URL: https://helmforge.dev
+          INDEXNOW_KEY_FILE: public/helmforge-indexnow-key.txt
+          SUBMIT_ALL_BLOG_TO_INDEXNOW: ${{ inputs.submit_all_blog_to_indexnow || 'false' }}
+        run: |
+          args=()
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$SUBMIT_ALL_BLOG_TO_INDEXNOW" = "true" ]; then
+            args+=(--all-blog)
+          fi
+          node scripts/submit-indexnow.mjs "${args[@]}"
