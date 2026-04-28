@@ -32,9 +32,14 @@ test.describe('Blog', () => {
   test('blog index exposes editorial sections, tags, and calendar', async ({ page }) => {
     await page.goto('/blog');
 
-    await expect(page.getByText('Editorial sections')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Databases 1 posts/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Kubernetes 0 posts/i })).toBeVisible();
+    const editorialSections = page.locator('section').filter({ hasText: 'Editorial sections' }).first();
+    await expect(editorialSections).toBeVisible();
+    await expect(editorialSections.locator('a[href="/blog/category/databases"]')).toContainText(
+      /Databases\s+\d+\s+posts/i,
+    );
+    await expect(editorialSections.locator('a[href="/blog/category/kubernetes"]')).toContainText(
+      /Kubernetes\s+\d+\s+posts/i,
+    );
     await expect(page.locator('a[href="/blog/tag/postgresql"]').first()).toBeVisible();
     await expect(page.locator('a[aria-label="Open editorial calendar"]')).toHaveAttribute(
       'href',
