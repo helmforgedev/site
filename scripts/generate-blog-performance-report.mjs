@@ -54,11 +54,19 @@ function getPosts() {
         tags: getList(frontmatter, 'tags'),
       };
     })
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+    .sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.slug.localeCompare(b.slug);
+    });
 }
 
 function buildReport(posts) {
-  const generatedAt = new Date().toISOString().slice(0, 10);
+  const contentSnapshot = posts
+    .map((post) => post.updatedAt || post.date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
   const rows = posts
     .map((post) =>
       [
@@ -80,7 +88,7 @@ function buildReport(posts) {
 
   return `# HelmForge Blog Performance Report
 
-Generated: ${generatedAt}
+Content snapshot: ${contentSnapshot ?? 'no-posts'}
 
 Use this report as the recurring Phase 7 review artifact after Search Console, Bing Webmaster Tools, and analytics have enough data. Fill the empty metric columns during weekly and monthly reviews.
 
