@@ -101,6 +101,31 @@ function validateEditorialQuality(frontmatter, filePath, errors) {
   }
 }
 
+function isTechnicalPost(frontmatter, tags) {
+  const category = getFrontmatterScalar(frontmatter, 'category');
+  const isAnnouncement = tags.includes('announcement');
+  const technicalCategories = new Set(['kubernetes', 'helm', 'security', 'databases', 'operations', 'releases']);
+  const technicalTags = new Set([
+    'cri-o',
+    'database',
+    'docker',
+    'generic-chart',
+    'helm',
+    'images',
+    'kubernetes',
+    'migration',
+    'operations',
+    'postgresql',
+    'tutorial',
+  ]);
+
+  if (isAnnouncement) {
+    return false;
+  }
+
+  return technicalCategories.has(category) || tags.some((tag) => technicalTags.has(tag));
+}
+
 function getSignificantSlugTokens(filePath) {
   const stopWords = new Set(['a', 'an', 'and', 'for', 'in', 'on', 'the', 'to', 'vs', 'with']);
   return path
@@ -164,11 +189,13 @@ function hostIsBanned(hostname) {
   return false;
 }
 
-function validateReferencesSection(body, filePath, errors) {
+function validateReferencesSection(body, filePath, errors, required) {
   const referencesHeading = /^##\s+References\s*$/im;
   const headingMatch = referencesHeading.exec(body);
   if (!headingMatch) {
-    errors.push(`${filePath}: technical posts must include a ## References section with official sources`);
+    if (required) {
+      errors.push(`${filePath}: technical posts must include a ## References section with official sources`);
+    }
     return;
   }
 
@@ -316,7 +343,7 @@ function main() {
     validateEditorialQuality(frontmatter, fullPath, errors);
     validateCoverImage(frontmatter, fullPath, errors, warnings, seenCoverImages);
     validateTechnicalVisual(tags, body, fullPath, errors);
-    validateReferencesSection(body, fullPath, errors);
+    validateReferencesSection(body, fullPath, errors, isTechnicalPost(frontmatter, tags));
   }
 
   if (errors.length > 0) {
