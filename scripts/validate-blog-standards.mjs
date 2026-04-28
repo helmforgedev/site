@@ -205,6 +205,11 @@ function validateReferencesSection(body, filePath, errors, required) {
   const section = nextHeading === -1 ? remaining : remaining.slice(0, nextHeading);
 
   const urls = [...section.matchAll(/\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1]);
+  if (required && urls.length === 0) {
+    errors.push(`${filePath}: technical posts must include at least one official source link in ## References`);
+    return;
+  }
+
   for (const rawUrl of urls) {
     try {
       const hostname = new URL(rawUrl).hostname;
