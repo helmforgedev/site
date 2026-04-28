@@ -4,7 +4,7 @@ test.describe('Blog', () => {
   test('blog index renders post cards', async ({ page }) => {
     await page.goto('/blog');
     await expect(page).toHaveTitle(/Blog/i);
-    const cards = page.locator('a[href^="/blog/"]');
+    const cards = page.locator('a[href^="/blog/"]:has(h2)');
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
   });
 
@@ -17,7 +17,7 @@ test.describe('Blog', () => {
 
     const subscribe = page.locator('a[aria-label="Subscribe via RSS"]').first();
     await expect(subscribe).toBeVisible();
-    await expect(subscribe).toHaveAttribute('href', '/rss.xml');
+    await expect(subscribe).toHaveAttribute('href', '/blog/rss.xml');
   });
 
   test('blog index keeps subscription actions near header', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Blog', () => {
   test('blog cards expose title, description, author, and date', async ({ page }) => {
     await page.goto('/blog');
 
-    const firstCard = page.locator('a[href^="/blog/"]').first();
+    const firstCard = page.locator('a[href^="/blog/"]:has(h2)').first();
     await expect(firstCard.locator('h2')).toBeVisible();
     await expect(firstCard.locator('p')).toBeVisible();
     await expect(firstCard.locator('time')).toBeVisible();
@@ -41,7 +41,7 @@ test.describe('Blog', () => {
 
   test('blog post renders with content', async ({ page }) => {
     await page.goto('/blog');
-    const firstPost = page.locator('a[href^="/blog/"]').first();
+    const firstPost = page.locator('a[href^="/blog/"]:has(h2)').first();
     const href = await firstPost.getAttribute('href');
     expect(href).toBeTruthy();
 
@@ -53,7 +53,7 @@ test.describe('Blog', () => {
 
   test('blog post has date and tags', async ({ page }) => {
     await page.goto('/blog');
-    const firstPost = page.locator('a[href^="/blog/"]').first();
+    const firstPost = page.locator('a[href^="/blog/"]:has(h2)').first();
     const href = await firstPost.getAttribute('href');
     await page.goto(href!);
 
@@ -69,7 +69,7 @@ test.describe('Blog', () => {
 
   test('blog post has share links', async ({ page }) => {
     await page.goto('/blog');
-    const firstPost = page.locator('a[href^="/blog/"]').first();
+    const firstPost = page.locator('a[href^="/blog/"]:has(h2)').first();
     const href = await firstPost.getAttribute('href');
     await page.goto(href!);
 
@@ -109,7 +109,10 @@ test.describe('Blog', () => {
       'href',
       '/newsletter',
     );
-    await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
+    await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute(
+      'href',
+      '/blog/rss.xml',
+    );
   });
 
   test('blog post has end-of-article newsletter cta', async ({ page }) => {
@@ -118,7 +121,7 @@ test.describe('Blog', () => {
     const ctaSection = page.locator('article section').filter({ hasText: 'Get the next post in your inbox' }).first();
     await expect(ctaSection).toBeVisible();
     await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
-    await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/rss.xml');
+    await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/blog/rss.xml');
   });
 
   test('newsletter page embeds listmonk form', async ({ page }) => {
@@ -160,8 +163,10 @@ test.describe('Blog', () => {
     const canonical = page.locator('link[rel="canonical"]');
     await expect(canonical).toHaveAttribute('href', /\/blog\/kubernetes-1-34-image-short-names\/?$/);
 
-    const rssAlternate = page.locator('link[rel="alternate"][type="application/rss+xml"]');
-    await expect(rssAlternate).toHaveAttribute('href', '/rss.xml');
+    await expect(page.locator('link[rel="alternate"][type="application/rss+xml"][href="/rss.xml"]')).toHaveCount(1);
+    await expect(page.locator('link[rel="alternate"][type="application/rss+xml"][href="/blog/rss.xml"]')).toHaveCount(
+      1,
+    );
 
     await expect(page.locator('meta[name="robots"][content*="noindex" i]')).toHaveCount(0);
   });
@@ -178,6 +183,25 @@ test.describe('Blog', () => {
     expect(body).toContain('<language>en</language>');
   });
 
+  test('blog rss endpoint contains only blog posts with media metadata', async ({ page }) => {
+    const response = await page.request.get('/blog/rss.xml');
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()['content-type']).toContain('xml');
+
+    const body = await response.text();
+    expect(body).toContain('<rss');
+    expect(body).toContain('xmlns:atom="http://www.w3.org/2005/Atom"');
+    expect(body).toContain('xmlns:media="http://search.yahoo.com/mrss/"');
+    expect(body).toContain(
+      '<atom:link href="https://helmforge.dev/blog/rss.xml" rel="self" type="application/rss+xml"',
+    );
+    expect(body).toContain('https://helmforge.dev/blog/kubernetes-1-34-image-short-names');
+    expect(body).toContain('<dc:creator>Maicon Berlofa</dc:creator>');
+    expect(body).toContain('<media:content url="https://helmforge.dev/blog/');
+    expect(body).toContain('<enclosure url="https://helmforge.dev/blog/');
+    expect(body).not.toContain('https://helmforge.dev/docs/charts/');
+  });
+
   test('sitemap includes blog urls', async ({ page }) => {
     const response = await page.request.get('/sitemap-index.xml');
     expect(response.ok()).toBeTruthy();
@@ -186,11 +210,16 @@ test.describe('Blog', () => {
     const sitemapMatch = indexBody.match(/<loc>([^<]*sitemap-0\.xml)<\/loc>/);
     expect(sitemapMatch).toBeTruthy();
 
-    const sitemapResponse = await page.request.get(sitemapMatch![1]);
+    const sitemapResponse = await page.request.get(new URL(sitemapMatch![1]).pathname);
     expect(sitemapResponse.ok()).toBeTruthy();
     const sitemapBody = await sitemapResponse.text();
 
     expect(sitemapBody).toContain('https://helmforge.dev/blog/');
     expect(sitemapBody).toContain('https://helmforge.dev/blog/kubernetes-1-34-image-short-names');
+    expect(sitemapBody).toContain('<image:image>');
+    expect(sitemapBody).toContain(
+      'https://helmforge.dev/blog/2026-04-03-kubernetes-1-34-short-name-enforcement-hero.webp',
+    );
+    expect(sitemapBody).toContain('<lastmod>2026-04-03');
   });
 });
