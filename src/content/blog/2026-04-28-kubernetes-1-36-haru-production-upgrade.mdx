@@ -1,0 +1,174 @@
+---
+title: 'Kubernetes 1.36 Haru: Spring Cleaning for Production Clusters'
+description: 'Kubernetes 1.36 makes security, storage, and hardware scheduling more practical. Here is what Helm chart maintainers should audit.'
+date: 2026-04-28
+publishDate: 2026-04-28
+updatedAt: 2026-04-28
+authorId: 'maicon-berlofa'
+category: 'releases'
+tags: ['kubernetes', 'release', 'security', 'operations', 'helm']
+relatedCharts: ['generic', 'mosquitto']
+coverImage: '/blog/2026-04-28-kubernetes-1-36-haru-production-upgrade-hero.webp'
+coverAlt: 'Kubernetes 1.36 Haru release map for production cluster upgrades'
+schemaType: 'BlogPosting'
+---
+
+Kubernetes 1.36 is named **Haru**, the Japanese word for spring. That name fits the release better than a plain version number does.
+
+This is not just another batch of knobs. It is a spring-cleaning release for production clusters: old unsafe paths are closing, security boundaries are becoming more practical, and the scheduler is getting closer to a world where GPUs and other accelerators are first-class shared infrastructure.
+
+The official release blog lists **70 enhancements**, including **18 stable graduations**, **25 beta enhancements**, and **25 alpha enhancements**. For platform teams, the headline is simple: Kubernetes 1.36 rewards clusters that have already moved toward explicit RBAC, CSI-backed storage, policy-driven admission, and predictable workload isolation.
+
+For Helm chart maintainers, it is a good release to audit defaults before users discover warnings or removals during their own upgrades.
+
+## What Haru changes in practice
+
+The most useful way to read Kubernetes 1.36 is by operational surface area, not by SIG.
+
+Some changes are immediately relevant to nearly every cluster:
+
+- `gitRepo` volumes are permanently disabled.
+- `Service.spec.externalIPs` is deprecated, with removal planned for a future release.
+- fine-grained kubelet API authorization is GA and locked on.
+- user namespaces are GA for Linux workloads.
+- SELinux volume label handling becomes more efficient and more visible.
+- DRA keeps maturing for GPUs and other specialized hardware.
+- at least one kube-controller-manager metric was renamed and can break dashboards.
+
+That mix says a lot. Kubernetes is making older implicit behavior less attractive while making safer primitives easier to use.
+
+## The removal that should get searched first
+
+The `gitRepo` volume plugin has been deprecated for years. In Kubernetes 1.36, it is permanently disabled.
+
+That matters because old charts, internal templates, and one-off manifests sometimes used `gitRepo` as a convenient way to clone configuration or static content directly into a Pod. The recommended replacement pattern is boring but safer: use an init container, clone into an `emptyDir`, and mount that volume into the application container.
+
+For chart maintainers, this is the first grep:
+
+```bash
+rg -n "gitRepo:" charts/ manifests/ values*.yaml
+```
+
+If that returns anything, treat it as a release blocker for Kubernetes 1.36 compatibility.
+
+## externalIPs becomes technical debt
+
+Kubernetes 1.36 also deprecates `Service.spec.externalIPs`. The field still works in this release, but Kubernetes now emits deprecation warnings and the upstream release blog says removal is planned for v1.43.
+
+This one is easy to underestimate because `externalIPs` often appears as a harmless optional value:
+
+```yaml
+service:
+  externalIPs: []
+```
+
+The risk is not the empty default. The risk is presenting the field as a normal production exposure strategy without explaining the security trade-off. Upstream has connected this area to CVE-2020-8554-style traffic interception risk, so the better chart posture is:
+
+- keep the default empty.
+- document the deprecation where the value is exposed.
+- point users toward `LoadBalancer`, Gateway API, ingress controllers, or provider-specific routing where appropriate.
+- avoid adding new chart features that depend on `externalIPs`.
+
+The practical HelmForge takeaway is that `service.externalIPs` should now be treated as legacy compatibility surface, not a modern exposure recommendation.
+
+![Upgrade audit map for Kubernetes 1.36 showing workload, service, RBAC, storage, and observability checks.](/blog/2026-04-28-kubernetes-1-36-upgrade-audit-map.webp)
+
+_Visual summary: Kubernetes 1.36 upgrade work is less about one breaking API and more about auditing the operational edges around Services, kubelet RBAC, volumes, workload isolation, and monitoring._
+
+## Kubelet RBAC gets less blunt
+
+Fine-grained kubelet API authorization is GA in Kubernetes 1.36. The feature started as alpha in v1.32, was enabled by default in v1.33, and is now locked on.
+
+This is a meaningful security improvement because many monitoring and node-level tools historically depended on broad `nodes/proxy` permissions. Kubernetes 1.36 gives operators narrower subresources such as:
+
+- `nodes/metrics`
+- `nodes/stats`
+- `nodes/log`
+- `nodes/spec`
+- `nodes/configz`
+- `nodes/healthz`
+- `nodes/pods`
+
+Chart maintainers should audit any bundled RBAC for agents, exporters, debuggers, or observability sidecars. If a chart asks for `nodes/proxy`, the question in 1.36 is no longer "does this work?" but "can this be reduced?"
+
+That audit usually starts here:
+
+```bash
+rg -n "nodes/proxy|nodes/metrics|nodes/stats|nodes/log" charts/ manifests/
+```
+
+Least privilege is easier to sell when the platform gives you vocabulary for it.
+
+## User namespaces finally reach GA
+
+User namespaces are now GA for Kubernetes Linux workloads. In Pod specs, the core interface is still direct:
+
+```yaml
+spec:
+  hostUsers: false
+```
+
+The security win is important: a process can run as UID 0 inside the container without mapping directly to UID 0 on the host. That does not remove the need for seccomp, AppArmor, SELinux, Pod Security Admission, read-only filesystems, or careful volume design. It does change the risk model for workloads that need container-local privilege.
+
+For chart authors, the right default is usually restraint. Do not flip a broad chart-wide `hostUsers: false` switch without checking runtime, kernel, storage, and workload assumptions. Instead, expose it deliberately when the application benefits from it and document the compatibility boundary.
+
+## DRA keeps moving toward real accelerator operations
+
+Dynamic Resource Allocation is one of the most interesting parts of Kubernetes 1.36 because it is about expensive hardware, not just API polish.
+
+The release blog highlights multiple DRA movements:
+
+- stable governance and selection features such as admin access and prioritized lists.
+- beta features for partitionable devices, consumable capacity, and device taints/tolerations.
+- alpha work that connects DRA more naturally to higher-level workload patterns.
+
+For teams running GPU-backed AI, media processing, simulation, or specialized networking workloads, this is the long game: fewer static node pools, more schedulable device intent, and better sharing of costly hardware.
+
+For general-purpose Helm charts, the advice is different. Avoid pretending DRA is a universal default. Keep accelerator-specific values explicit, keep fallbacks boring, and leave cluster-level DRA policy to the platform team.
+
+## The quiet monitoring break
+
+The Kubernetes 1.36 changelog includes an urgent upgrade note for kube-controller-manager: the metric `volume_operation_total_errors` was renamed to `volume_operation_errors_total`.
+
+That is the kind of change that does not break Pods, but does break the dashboard you need during the upgrade.
+
+Before rolling control-plane components, search alerts, recording rules, SLO dashboards, and runbooks:
+
+```bash
+rg -n "volume_operation_total_errors" observability/ dashboards/ alerts/
+```
+
+Then update the query and validate it in staging. The worst time to discover a silent graph is after a storage incident.
+
+## A maintainer checklist for Kubernetes 1.36
+
+Use this as a practical pre-release checklist for charts and platform bundles:
+
+1. Search for `gitRepo` volumes and remove them.
+2. Search for `service.externalIPs` and mark it as deprecated compatibility surface.
+3. Review RBAC that grants `nodes/proxy`; replace it with kubelet subresources where possible.
+4. Decide whether user namespaces belong in chart values, and document runtime assumptions if they do.
+5. Check SELinux-related volume behavior in staging if your chart runs on SELinux-enforcing nodes.
+6. Keep DRA-specific values explicit and opt-in.
+7. Update observability rules that reference renamed Kubernetes metrics.
+8. Test against a staging cluster that matches the production runtime, CSI drivers, admission stack, and node OS.
+
+Kubernetes 1.36 is not scary if you treat it as an audit window. The risk is assuming that "still works" means "still a good default."
+
+## The bigger read
+
+Haru is a release about maturing contracts.
+
+Kubernetes is becoming clearer about which old conveniences should disappear, which security boundaries are ready for everyday use, and which advanced scheduling patterns are no longer niche experiments. That is good news for platform teams, but it raises the quality bar for charts.
+
+The best chart defaults after Kubernetes 1.36 are explicit, boring, and easy to audit. That is exactly where production Kubernetes should be heading.
+
+## References
+
+- [Kubernetes v1.36 release blog](https://kubernetes.io/blog/2026/04/22/kubernetes-v1-36-release/)
+- [Kubernetes v1.36 changelog](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.36.md)
+- [Kubernetes v1.36 release schedule](https://github.com/kubernetes/sig-release/blob/master/releases/release-1.36/README.md)
+- [Kubernetes releases page](https://kubernetes.io/releases/)
+- [Kubernetes v1.36 user namespaces GA](https://kubernetes.io/blog/2026/04/23/kubernetes-v1-36-userns-ga/)
+- [Kubernetes v1.36 fine-grained kubelet authorization GA](https://kubernetes.io/blog/2026/04/24/kubernetes-v1-36-fine-grained-kubelet-authorization-ga/)
+- [Kubernetes v1.36 sneak peek](https://kubernetes.io/blog/2026/03/30/kubernetes-v1-36-sneak-peek/)

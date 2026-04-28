@@ -1,6 +1,6 @@
 # HelmForge Blog Performance Report
 
-Content snapshot: 2026-04-27
+Content snapshot: 2026-04-28
 
 Use this report as the recurring Phase 7 review artifact after Search Console, Bing Webmaster Tools, and analytics have enough data. Fill the empty metric columns during weekly and monthly reviews.
 
@@ -31,6 +31,7 @@ Use this report as the recurring Phase 7 review artifact after Search Console, B
 
 | URL | Title | Category | Published | Updated | Google clicks | Impressions | CTR | Avg position | Discover clicks | Bing clicks | CWV notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+[/blog/2026-04-28-kubernetes-1-36-haru-production-upgrade](https://helmforge.dev/blog/2026-04-28-kubernetes-1-36-haru-production-upgrade) | Kubernetes 1.36 Haru: Spring Cleaning for Production Clusters | releases | 2026-04-28 | 2026-04-28 |  |  |  |  |  |  |
 [/blog/migration-generic-breaking-platform-contract](https://helmforge.dev/blog/migration-generic-breaking-platform-contract) | Migrating to the Generic Chart Breaking Platform Contract | helm | 2026-04-27 | - |  |  |  |  |  |  |
 [/blog/fastmcp-server-deploy-mcp-anywhere](https://helmforge.dev/blog/fastmcp-server-deploy-mcp-anywhere) | Deploy MCP Servers Anywhere with FastMCP Server | operations | 2026-04-05 | - |  |  |  |  |  |  |
 [/blog/kubernetes-1-34-image-short-names](https://helmforge.dev/blog/kubernetes-1-34-image-short-names) | Kubernetes 1.34 and Short Image Names: What Broke, Why, and How to Fix It Fast | kubernetes | 2026-04-03 | 2026-04-03 |  |  |  |  |  |  |
