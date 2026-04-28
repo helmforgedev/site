@@ -4,7 +4,7 @@ test.describe('Blog', () => {
   test('blog index renders post cards', async ({ page }) => {
     await page.goto('/blog');
     await expect(page).toHaveTitle(/Blog/i);
-    const cards = page.locator('a[href^="/blog/"]:has(h2)');
+    const cards = page.locator('article:has(a[href^="/blog/"]:has(h2))');
     expect(await cards.count()).toBeGreaterThanOrEqual(3);
   });
 
@@ -32,11 +32,12 @@ test.describe('Blog', () => {
   test('blog cards expose title, description, author, and date', async ({ page }) => {
     await page.goto('/blog');
 
-    const firstCard = page.locator('a[href^="/blog/"]:has(h2)').first();
+    const firstCard = page.locator('article:has(a[href^="/blog/"]:has(h2))').first();
     await expect(firstCard.locator('h2')).toBeVisible();
     await expect(firstCard.locator('p')).toBeVisible();
     await expect(firstCard.locator('time')).toBeVisible();
     await expect(firstCard.locator('time')).toHaveAttribute('datetime', /\d{4}-\d{2}-\d{2}T/);
+    await expect(firstCard.locator('a[href="/authors/maicon-berlofa"]')).toBeVisible();
   });
 
   test('blog post renders with content', async ({ page }) => {
@@ -95,7 +96,8 @@ test.describe('Blog', () => {
 
     const authorCard = page.locator('aside section').filter({ hasText: 'Written by' }).first();
     await expect(authorCard).toBeVisible();
-    await expect(authorCard.getByText('Maicon Berlofa')).toBeVisible();
+    await expect(authorCard.locator('a[href="/authors/maicon-berlofa"]')).toContainText('Maicon Berlofa');
+    await expect(authorCard.getByText(/founder and maintainer of HelmForge/i)).toBeVisible();
     await expect(authorCard.locator('a[aria-label*="GitHub"]')).toBeVisible();
     await expect(authorCard.locator('a[aria-label*="LinkedIn"]')).toBeVisible();
   });
@@ -154,6 +156,12 @@ test.describe('Blog', () => {
     expect(article.author).toMatchObject({
       '@type': 'Person',
       name: 'Maicon Berlofa',
+      url: 'https://helmforge.dev/authors/maicon-berlofa',
+      jobTitle: 'Founder and Maintainer',
+      affiliation: {
+        '@type': 'Organization',
+        name: 'HelmForge',
+      },
     });
   });
 
