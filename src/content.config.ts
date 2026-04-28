@@ -15,8 +15,8 @@ const blog = defineCollection({
     authorId: z.enum(AUTHOR_IDS),
     tags: z.array(z.string()).default([]),
     image: z.string().optional(),
-    coverImage: z.string().optional(),
-    coverAlt: z.string().optional(),
+    coverImage: z.string().min(1),
+    coverAlt: z.string().min(24),
     schemaType: z.enum(['Article', 'BlogPosting', 'NewsArticle']).default('BlogPosting'),
   }),
 });

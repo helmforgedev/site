@@ -18,8 +18,8 @@ interface Props {
   tags: string[];
   readingTime: number;
   postSlug: string;
-  coverImage?: string;
-  coverAlt?: string;
+  coverImage: string;
+  coverAlt: string;
   schemaType?: ArticleSchemaType;
 }
 
@@ -47,7 +47,7 @@ const formattedDate = publishedDate.toLocaleDateString('en-US', {
 const canonicalUrl = `https://helmforge.dev/blog/${postSlug}`;
 const modifiedDate = updatedAt ?? publishedDate;
 const articleSection = tags[0] ?? 'Blog';
-const articleImage = coverImage ? new URL(coverImage, Astro.site).href : undefined;
+const articleImage = new URL(coverImage, Astro.site).href;
 
 const articleJsonLd = {
   '@context': 'https://schema.org',
@@ -64,7 +64,7 @@ const articleJsonLd = {
     url: author.linkedin || author.github || 'https://helmforge.dev',
     sameAs: [author.github, author.linkedin].filter(Boolean),
   },
-  image: articleImage ? [articleImage] : undefined,
+  image: [articleImage],
   mainEntityOfPage: canonicalUrl,
   publisher: {
     '@type': 'Organization',
@@ -84,9 +84,9 @@ const articleJsonLd = {
   title={title}
   description={description}
   image={coverImage}
-  imageAlt={coverAlt ?? title}
-  imageWidth={coverImage ? 1600 : undefined}
-  imageHeight={coverImage ? 900 : undefined}
+  imageAlt={coverAlt}
+  imageWidth={1600}
+  imageHeight={900}
   ogType="article"
   articlePublishedTime={publishedDate.toISOString()}
   articleModifiedTime={modifiedDate.toISOString()}
@@ -135,7 +135,7 @@ const articleJsonLd = {
           </div>
         </header>
 
-        {coverImage && <BlogHero src={coverImage} alt={coverAlt ?? title} />}
+        <BlogHero src={coverImage} alt={coverAlt} width={1600} height={900} />
 
         <article class="glass-panel rounded-2xl px-6 py-8 sm:px-8 lg:px-10" data-pagefind-body>
           <div class="prose prose-docs max-w-none">

@@ -53,8 +53,22 @@ function getFrontmatterTags(frontmatter) {
   }
   return match[1]
     .split(',')
-    .map((t) => t.trim().replace(/^['"]|['"]$/g, '').toLowerCase())
+    .map((t) =>
+      t
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
+        .toLowerCase(),
+    )
     .filter(Boolean);
+}
+
+function getSignificantSlugTokens(filePath) {
+  const stopWords = new Set(['a', 'an', 'and', 'for', 'in', 'on', 'the', 'to', 'vs', 'with']);
+  return path
+    .basename(filePath, path.extname(filePath))
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3 && !stopWords.has(token));
 }
 
 function getAllowedAuthorIds() {
@@ -138,22 +152,50 @@ function validateReferencesSection(body, filePath, errors) {
   }
 }
 
-function validateCoverImage(frontmatter, filePath, errors) {
+function validateCoverImage(frontmatter, filePath, errors, warnings, seenCoverImages) {
   const coverImage = getFrontmatterScalar(frontmatter, 'coverImage');
   const coverAlt = getFrontmatterScalar(frontmatter, 'coverAlt');
+  const publishDate = getFrontmatterScalar(frontmatter, 'publishDate') ?? getFrontmatterScalar(frontmatter, 'date');
 
   if (!coverImage) {
+    errors.push(`${filePath}: coverImage is required for discovery-ready blog posts`);
+  }
+  if (!coverAlt) {
+    errors.push(`${filePath}: coverAlt is required for discovery-ready blog posts`);
+  }
+  if (!coverImage || !coverAlt) {
     return;
   }
 
+  if (coverImage === '/og-default.png') {
+    errors.push(`${filePath}: coverImage must be a post-specific hero image, not /og-default.png`);
+  }
   if (!coverImage.startsWith('/blog/')) {
     errors.push(`${filePath}: coverImage must be under /blog/`);
   }
   if (!coverImage.endsWith('-hero.webp')) {
     errors.push(`${filePath}: coverImage must end with -hero.webp`);
   }
-  if (!coverAlt || coverAlt.length < 12) {
-    errors.push(`${filePath}: coverAlt is required and must be descriptive`);
+  if (coverAlt.length < 24) {
+    errors.push(`${filePath}: coverAlt must be descriptive and at least 24 characters`);
+  }
+  if (/^(hero|image|preview|blog image|cover image|thumbnail)$/i.test(coverAlt.trim())) {
+    errors.push(`${filePath}: coverAlt is too generic`);
+  }
+  if (seenCoverImages.has(coverImage)) {
+    errors.push(`${filePath}: coverImage duplicates ${seenCoverImages.get(coverImage)}`);
+  } else {
+    seenCoverImages.set(coverImage, filePath);
+  }
+
+  const coverFileName = path.basename(coverImage).toLowerCase();
+  if (publishDate && !coverFileName.includes(publishDate.slice(0, 10))) {
+    errors.push(`${filePath}: coverImage filename must include the publish date (${publishDate.slice(0, 10)})`);
+  }
+
+  const slugTokenMatches = getSignificantSlugTokens(filePath).filter((token) => coverFileName.includes(token));
+  if (slugTokenMatches.length < 2) {
+    errors.push(`${filePath}: coverImage filename must be descriptive and include at least two post topic tokens`);
   }
 
   const imagePath = path.join(PUBLIC_DIR, coverImage.replace(/^\//, ''));
@@ -167,6 +209,16 @@ function validateCoverImage(frontmatter, filePath, errors) {
     const ratio = dimensions.width / dimensions.height;
     const expected = 16 / 9;
     const delta = Math.abs(ratio - expected);
+    if (dimensions.width < 1200) {
+      errors.push(
+        `${filePath}: coverImage must be at least 1200px wide. Current ${dimensions.width}x${dimensions.height}`,
+      );
+    }
+    if (dimensions.width !== 1600 || dimensions.height !== 900) {
+      warnings.push(
+        `${filePath}: recommended coverImage size is 1600x900. Current ${dimensions.width}x${dimensions.height}`,
+      );
+    }
     if (delta > 0.03) {
       errors.push(
         `${filePath}: coverImage must be near 16:9. Current ${dimensions.width}x${dimensions.height} (${ratio.toFixed(3)})`,
@@ -198,9 +250,8 @@ function validateTechnicalVisual(tags, body, filePath, errors) {
   }
 
   const hasImage = /!\[[^\]]*\]\([^)]+\)/.test(body);
-  const hasDiagramComponent = /<ArchitectureDiagram\b|<PostgresqlDiagram\b|<MysqlDiagram\b|<RedisDiagram\b|<KeycloakDiagram\b/.test(
-    body,
-  );
+  const hasDiagramComponent =
+    /<ArchitectureDiagram\b|<PostgresqlDiagram\b|<MysqlDiagram\b|<RedisDiagram\b|<KeycloakDiagram\b/.test(body);
 
   if (!hasImage && !hasDiagramComponent) {
     errors.push(`${filePath}: technical tutorial/incident post must include at least one explanatory image or diagram`);
@@ -211,6 +262,8 @@ function main() {
   const allowedAuthorIds = getAllowedAuthorIds();
   const files = fs.readdirSync(BLOG_DIR).filter((file) => file.endsWith('.md') || file.endsWith('.mdx'));
   const errors = [];
+  const warnings = [];
+  const seenCoverImages = new Map();
 
   for (const fileName of files) {
     const fullPath = path.join(BLOG_DIR, fileName);
@@ -219,7 +272,7 @@ function main() {
     const tags = getFrontmatterTags(frontmatter);
 
     validateAuthorId(frontmatter, fullPath, allowedAuthorIds, errors);
-    validateCoverImage(frontmatter, fullPath, errors);
+    validateCoverImage(frontmatter, fullPath, errors, warnings, seenCoverImages);
     validateTechnicalVisual(tags, body, fullPath, errors);
     validateReferencesSection(body, fullPath, errors);
   }
@@ -230,6 +283,13 @@ function main() {
       console.error(`- ${error}`);
     }
     process.exit(1);
+  }
+
+  if (warnings.length > 0) {
+    console.warn('Blog standards validation warnings:\n');
+    for (const warning of warnings) {
+      console.warn(`- ${warning}`);
+    }
   }
 
   console.log(`Blog standards validation passed for ${files.length} post(s).`);
