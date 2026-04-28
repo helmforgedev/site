@@ -36,6 +36,9 @@ const siteName = 'HelmForge';
 const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
 const imageUrl = new URL(image, Astro.site).href;
 const robotsContent = 'index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1';
+const googleAnalyticsId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-5PD0B83HRE';
+const googleSiteVerification = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
+const bingSiteVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 
 // Detect page type from path
 const pathname = Astro.url.pathname;
@@ -49,6 +52,19 @@ const chartDisplay = chartSlug ? chartSlug.replace(/-/g, ' ') : null;
 
 // Determine og:type
 const resolvedOgType = ogType ?? (isBlogPost ? 'article' : 'website');
+const analyticsContentGroup = isBlogPage ? 'Blog' : isChartPage ? 'Chart docs' : isHomepage ? 'Home' : 'Site';
+const ga4InlineScript = `
+window.dataLayer = window.dataLayer || [];
+window.gtag = function gtag() {
+  window.dataLayer.push(arguments);
+};
+window.gtag('js', new Date());
+window.gtag('config', ${JSON.stringify(googleAnalyticsId)}, {
+  content_group: ${JSON.stringify(analyticsContentGroup)},
+  page_path: window.location.pathname,
+  page_title: document.title,
+});
+`;
 
 // Smart auto-keywords: chart pages get specific install/deploy keywords
 const autoKeywords = chartDisplay
@@ -127,7 +143,7 @@ const websiteJsonLd = isHomepage
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-content-group={analyticsContentGroup}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -149,6 +165,8 @@ const websiteJsonLd = isHomepage
     <meta name="description" content={description} />
     <meta name="keywords" content={autoKeywords} />
     <meta name="robots" content={robotsContent} />
+    {googleSiteVerification && <meta name="google-site-verification" content={googleSiteVerification} />}
+    {bingSiteVerification && <meta name="msvalidate.01" content={bingSiteVerification} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -186,15 +204,8 @@ const websiteJsonLd = isHomepage
     <link rel="preconnect" href="https://www.google-analytics.com" />
 
     <!-- GA4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5PD0B83HRE"></script>
-    <script is:inline>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag('js', new Date());
-      gtag('config', 'G-5PD0B83HRE');
-    </script>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}></script>
+    <script is:inline set:html={ga4InlineScript} />
 
     <!-- JSON-LD Structured Data for Organization -->
     <script type="application/ld+json" set:html={JSON.stringify(organizationJsonLd)} />
@@ -243,14 +254,31 @@ const websiteJsonLd = isHomepage
     <script>
       import { onCLS, onLCP, onTTFB, onINP } from 'web-vitals';
 
-      function sendToGA4(metric: { name: string; value: number; id: string }) {
-        if (typeof gtag === 'function') {
-          gtag('event', metric.name, {
-            value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
-            event_label: metric.id,
-            non_interaction: true,
-          });
-        }
+      type WebVitalMetric = {
+        name: string;
+        value: number;
+        delta: number;
+        id: string;
+        rating: 'good' | 'needs-improvement' | 'poor';
+      };
+
+      function sendToGA4(metric: WebVitalMetric) {
+        const gtag = (window as any).gtag;
+        if (typeof gtag !== 'function') return;
+
+        const contentGroup = document.documentElement.dataset.contentGroup ?? 'Site';
+        gtag('event', metric.name, {
+          value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
+          event_category: 'Web Vitals',
+          event_label: metric.id,
+          metric_name: metric.name,
+          metric_value: metric.value,
+          metric_delta: metric.delta,
+          metric_rating: metric.rating,
+          content_group: contentGroup,
+          page_path: window.location.pathname,
+          non_interaction: true,
+        });
       }
 
       onCLS(sendToGA4);
