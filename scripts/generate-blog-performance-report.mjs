@@ -1,0 +1,151 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const BLOG_DIR = path.join(process.cwd(), 'src', 'content', 'blog');
+const OUTPUT_PATH = path.join(process.cwd(), 'reports', 'blog-performance-report.md');
+
+function getFrontmatter(content) {
+  return content.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? '';
+}
+
+function getScalar(frontmatter, key) {
+  const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+  if (!match) return '';
+  return match[1].trim().replace(/^['"]|['"]$/g, '');
+}
+
+function getList(frontmatter, key) {
+  const inlineMatch = frontmatter.match(new RegExp(`^${key}:\\s*\\[(.*)\\]$`, 'm'));
+  if (inlineMatch) {
+    return inlineMatch[1]
+      .split(',')
+      .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean);
+  }
+
+  const blockMatch = frontmatter.match(new RegExp(`^${key}:\\s*\\r?\\n((?:\\s+-\\s+.+\\r?\\n?)+)`, 'm'));
+  if (!blockMatch) return [];
+  return blockMatch[1]
+    .split(/\r?\n/)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^-\s+/, '')
+        .replace(/^['"]|['"]$/g, ''),
+    )
+    .filter(Boolean);
+}
+
+function getPosts() {
+  return fs
+    .readdirSync(BLOG_DIR)
+    .filter((file) => file.endsWith('.md') || file.endsWith('.mdx'))
+    .map((file) => {
+      const slug = path.basename(file, path.extname(file));
+      const content = fs.readFileSync(path.join(BLOG_DIR, file), 'utf8');
+      const frontmatter = getFrontmatter(content);
+
+      return {
+        slug,
+        title: getScalar(frontmatter, 'title'),
+        date: getScalar(frontmatter, 'date'),
+        updatedAt: getScalar(frontmatter, 'updatedAt'),
+        category: getScalar(frontmatter, 'category'),
+        tags: getList(frontmatter, 'tags'),
+      };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function buildReport(posts) {
+  const generatedAt = new Date().toISOString().slice(0, 10);
+  const rows = posts
+    .map((post) =>
+      [
+        `[/blog/${post.slug}](https://helmforge.dev/blog/${post.slug})`,
+        post.title.replaceAll('|', '\\|'),
+        post.category,
+        post.date,
+        post.updatedAt || '-',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ].join(' | '),
+    )
+    .join('\n');
+
+  return `# HelmForge Blog Performance Report
+
+Generated: ${generatedAt}
+
+Use this report as the recurring Phase 7 review artifact after Search Console, Bing Webmaster Tools, and analytics have enough data. Fill the empty metric columns during weekly and monthly reviews.
+
+<!-- prettier-ignore-start -->
+
+## Console Status
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Google Search Console property | Pending manual verification | Verify https://helmforge.dev/ and submit https://helmforge.dev/sitemap-index.xml. |
+| Bing Webmaster Tools property | Pending manual verification | Verify or import from Google Search Console, then submit the sitemap index. |
+| IndexNow | Configured | Review deploy logs and Bing IndexNow insights after publication. |
+| RSS discovery | Configured | Confirm /blog/rss.xml freshness after each blog deploy. |
+| Core Web Vitals | Instrumented | Review Search Console CWV and GA4 Web Vitals events. |
+
+## Source Segments
+
+- Google Search
+- Google Discover
+- Google News surfaces
+- Bing
+- Microsoft Start
+- Social shares
+- RSS
+- Direct and referrals
+
+## Per-Post Metrics
+
+| URL | Title | Category | Published | Updated | Google clicks | Impressions | CTR | Avg position | Discover clicks | Bing clicks | CWV notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+${rows}
+
+<!-- prettier-ignore-end -->
+
+## Monthly Review Notes
+
+- Top query wins:
+- Posts with declining CTR:
+- Posts with indexing issues:
+- Posts with image indexing issues:
+- Core Web Vitals actions:
+- Next editorial opportunities:
+`;
+}
+
+function main() {
+  const checkOnly = process.argv.includes('--check');
+  const posts = getPosts();
+  const report = buildReport(posts);
+
+  if (checkOnly) {
+    const current = fs.existsSync(OUTPUT_PATH) ? fs.readFileSync(OUTPUT_PATH, 'utf8') : '';
+    if (current !== report) {
+      console.error(
+        `${path.relative(process.cwd(), OUTPUT_PATH)} is out of date. Run npm run blog:performance-report.`,
+      );
+      process.exit(1);
+    }
+    console.log(`${path.relative(process.cwd(), OUTPUT_PATH)} is current.`);
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
+  fs.writeFileSync(OUTPUT_PATH, report);
+  console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_PATH)} for ${posts.length} post(s).`);
+}
+
+main();

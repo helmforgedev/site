@@ -1,0 +1,165 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import Container from '../../components/Container.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import {
+  acquisitionSources,
+  consoleChecks,
+  discoveryProperties,
+  monitoringCadence,
+  officialMonitoringLinks,
+  perPostMetrics,
+} from '../../data/analyticsMonitoring';
+
+const monitoringJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'HelmForge Blog Discovery Monitoring',
+  url: 'https://helmforge.dev/blog/monitoring',
+  about: 'Search, Discover, Bing, RSS, and Core Web Vitals monitoring workflow for the HelmForge blog',
+};
+---
+
+<BaseLayout
+  title="Blog Discovery Monitoring"
+  description="HelmForge blog monitoring workflow for Google Search Console, Bing Webmaster Tools, source segmentation, per-post metrics, and Core Web Vitals."
+>
+  <Header />
+  <script type="application/ld+json" set:html={JSON.stringify(monitoringJsonLd)} />
+
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <SectionHeader
+        label="Analytics and Monitoring"
+        as="h1"
+        title="Blog discovery monitoring."
+        description="A repeatable operating view for indexing, traffic source quality, per-post search performance, image discovery, and Core Web Vitals."
+      />
+
+      <section class="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-3" aria-labelledby="properties-heading">
+        <div class="lg:col-span-3">
+          <h2 id="properties-heading" class="heading-font text-2xl font-bold text-text-base">Discovery properties</h2>
+        </div>
+        <div class="glass-panel rounded-2xl p-5">
+          <div class="text-xs font-bold uppercase tracking-[0.18em] text-primary">Canonical site</div>
+          <a class="mt-3 block break-words text-sm font-semibold text-text-base hover:text-primary" href="/">
+            {discoveryProperties.canonicalSite}
+          </a>
+        </div>
+        <div class="glass-panel rounded-2xl p-5">
+          <div class="text-xs font-bold uppercase tracking-[0.18em] text-primary">Sitemap index</div>
+          <a
+            class="mt-3 block break-words text-sm font-semibold text-text-base hover:text-primary"
+            href="/sitemap-index.xml"
+          >
+            {discoveryProperties.sitemapIndex}
+          </a>
+        </div>
+        <div class="glass-panel rounded-2xl p-5">
+          <div class="text-xs font-bold uppercase tracking-[0.18em] text-primary">Blog feed</div>
+          <a
+            class="mt-3 block break-words text-sm font-semibold text-text-base hover:text-primary"
+            href="/blog/rss.xml"
+          >
+            {discoveryProperties.blogFeed}
+          </a>
+        </div>
+      </section>
+
+      <section class="mt-12" aria-labelledby="console-heading">
+        <h2 id="console-heading" class="heading-font text-2xl font-bold text-text-base">Console checklist</h2>
+        <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {
+            consoleChecks.map((group) => (
+              <article class="glass-panel rounded-2xl p-5">
+                <div class="text-xs font-bold uppercase tracking-[0.18em] text-primary">{group.status}</div>
+                <h3 class="mt-3 text-lg font-bold text-text-base heading-font">{group.tool}</h3>
+                <ul class="mt-4 space-y-3 text-sm leading-relaxed text-text-muted">
+                  {group.checks.map((check) => (
+                    <li>{check}</li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div>
+          <h2 class="heading-font text-2xl font-bold text-text-base">Review cadence</h2>
+          <div class="mt-5 overflow-hidden rounded-2xl border border-border">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-bg-muted text-xs uppercase tracking-[0.16em] text-text-muted">
+                <tr>
+                  <th class="px-4 py-3">Cadence</th>
+                  <th class="px-4 py-3">Owner</th>
+                  <th class="px-4 py-3">Focus</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                {
+                  monitoringCadence.map((item) => (
+                    <tr>
+                      <td class="px-4 py-4 font-semibold text-text-base">{item.cadence}</td>
+                      <td class="px-4 py-4 text-text-muted">{item.owner}</td>
+                      <td class="px-4 py-4 text-text-muted">{item.focus}</td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="heading-font text-2xl font-bold text-text-base">Source segmentation</h2>
+          <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {
+              acquisitionSources.map((source) => (
+                <div class="rounded-lg border border-border bg-bg-surface px-4 py-3 text-sm font-semibold text-text-base">
+                  {source}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-12" aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading" class="heading-font text-2xl font-bold text-text-base">Per-post metrics</h2>
+        <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {
+            perPostMetrics.map((metric) => (
+              <div class="rounded-lg border border-border bg-bg-surface px-4 py-3 text-sm text-text-muted">
+                {metric}
+              </div>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="mt-12" aria-labelledby="references-heading">
+        <h2 id="references-heading" class="heading-font text-2xl font-bold text-text-base">Official references</h2>
+        <div class="mt-5 flex flex-wrap gap-3">
+          {
+            officialMonitoringLinks.map((link) => (
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="rounded-lg border border-border bg-bg-surface px-4 py-3 text-sm font-semibold text-text-base transition-colors hover:border-primary hover:text-primary"
+              >
+                {link.label}
+              </a>
+            ))
+          }
+        </div>
+      </section>
+    </Container>
+  </main>
+
+  <Footer />
+</BaseLayout>
