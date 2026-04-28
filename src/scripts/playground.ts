@@ -484,25 +484,26 @@ function generateValuesYaml(): string {
 
   const tree: Record<string, any> = {};
   changes.forEach(({ key, value }) => {
-    const parts = key.split('.');
-    let node = tree;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!node[parts[i]]) node[parts[i]] = {};
-      node = node[parts[i]];
-    }
-    if (value === 'true' || value === 'false') {
-      node[parts[parts.length - 1]] = value === 'true';
-    } else if (/^\d+$/.test(value)) {
-      node[parts[parts.length - 1]] = parseInt(value, 10);
-    } else {
-      node[parts[parts.length - 1]] = value;
-    }
+    setTreeValue(tree, key, coerceValue(value));
   });
 
-  function renderYaml(obj: Record<string, any>, indent: number): void {
+  function renderYaml(obj: any, indent: number): void {
+    if (Array.isArray(obj)) {
+      obj.forEach((item) => {
+        const pad = '  '.repeat(indent);
+        if (typeof item === 'object' && item !== null) {
+          lines.push(`${pad}-`);
+          renderYaml(item, indent + 1);
+        } else {
+          lines.push(`${pad}- ${item}`);
+        }
+      });
+      return;
+    }
+
     for (const [k, v] of Object.entries(obj)) {
       const pad = '  '.repeat(indent);
-      if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      if (typeof v === 'object' && v !== null) {
         lines.push(`${pad}<span class="text-sky-400">${k}</span>:`);
         renderYaml(v, indent + 1);
       } else if (typeof v === 'boolean') {
@@ -538,25 +539,26 @@ function getPlainValuesYaml(): string {
 
   const tree: Record<string, any> = {};
   changes.forEach(({ key, value }) => {
-    const parts = key.split('.');
-    let node = tree;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!node[parts[i]]) node[parts[i]] = {};
-      node = node[parts[i]];
-    }
-    if (value === 'true' || value === 'false') {
-      node[parts[parts.length - 1]] = value === 'true';
-    } else if (/^\d+$/.test(value)) {
-      node[parts[parts.length - 1]] = parseInt(value, 10);
-    } else {
-      node[parts[parts.length - 1]] = value;
-    }
+    setTreeValue(tree, key, coerceValue(value));
   });
 
-  function renderYaml(obj: Record<string, any>, indent: number): void {
+  function renderYaml(obj: any, indent: number): void {
+    if (Array.isArray(obj)) {
+      obj.forEach((item) => {
+        const pad = '  '.repeat(indent);
+        if (typeof item === 'object' && item !== null) {
+          lines.push(`${pad}-`);
+          renderYaml(item, indent + 1);
+        } else {
+          lines.push(`${pad}- ${item}`);
+        }
+      });
+      return;
+    }
+
     for (const [k, v] of Object.entries(obj)) {
       const pad = '  '.repeat(indent);
-      if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      if (typeof v === 'object' && v !== null) {
         lines.push(`${pad}${k}:`);
         renderYaml(v, indent + 1);
       } else {
@@ -567,6 +569,65 @@ function getPlainValuesYaml(): string {
 
   renderYaml(tree, 0);
   return lines.join('\n');
+}
+
+function coerceValue(value: string): boolean | number | string {
+  if (value === 'true' || value === 'false') return value === 'true';
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  return value;
+}
+
+function parseKeyPath(key: string): Array<string | number> {
+  const segments: Array<string | number> = [];
+  let token = '';
+
+  for (let i = 0; i < key.length; i++) {
+    const char = key[i];
+
+    if (char === '.') {
+      if (token) segments.push(token);
+      token = '';
+      continue;
+    }
+
+    if (char === '[') {
+      if (token) segments.push(token);
+      token = '';
+
+      const close = key.indexOf(']', i);
+      if (close === -1) break;
+
+      segments.push(Number(key.slice(i + 1, close)));
+      i = close;
+      continue;
+    }
+
+    token += char;
+  }
+
+  if (token) segments.push(token);
+  return segments;
+}
+
+function setTreeValue(tree: Record<string, any>, key: string, value: boolean | number | string): void {
+  const parts = parseKeyPath(key);
+  let node: any = tree;
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    const nextPart = parts[i + 1];
+
+    if (typeof part === 'number') {
+      if (!node[part]) node[part] = typeof nextPart === 'number' ? [] : {};
+      node = node[part];
+      continue;
+    }
+
+    if (!node[part]) node[part] = typeof nextPart === 'number' ? [] : {};
+    node = node[part];
+  }
+
+  node[parts[parts.length - 1]] = value;
 }
 
 function updateOutput() {

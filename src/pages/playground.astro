@@ -6,7 +6,7 @@ import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
 import { charts, chartIcon, FALLBACK_ICON } from '../data/charts';
 
-const stableCharts = charts.filter((c) => c.maturity === 'stable');
+const stableCharts = charts.filter((c) => c.maturity === 'stable' || c.slug === 'gophish');
 
 // Field definition for playground configs
 interface PlaygroundField {
@@ -1914,6 +1914,85 @@ const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '0 2 * * *',
           description: 'Cron schedule for backups',
+        },
+      ],
+    },
+  ],
+  gophish: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Database Mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'sqlite', 'mysql', 'external'],
+          description: 'SQLite, embedded MySQL, or external MySQL',
+        },
+        {
+          label: 'Replica Count',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'SQLite requires one replica',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'PVC storage size',
+        },
+      ],
+    },
+    {
+      name: 'Phishing Ingress',
+      collapsible: true,
+      gateField: 'phishIngress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'phishIngress.hosts[0].host',
+          type: 'text',
+          default: 'training.example.com',
+          description: 'Public campaign hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'phishIngress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'SQLite Backup',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'Cron schedule for backups',
+        },
+        {
+          label: 'S3 Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: 'https://s3.amazonaws.com',
+          description: 'S3-compatible endpoint',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'gophish-backups',
+          description: 'Backup bucket name',
         },
       ],
     },
@@ -4356,6 +4435,40 @@ const scenarios: Record<string, { label: string; description: string; values: Re
         'backup.schedule': '0 4 * * *',
         'backup.s3.endpoint': 'https://minio.example.com',
         'backup.s3.bucket': 'drupal-backups',
+      },
+    },
+  ],
+  gophish: [
+    {
+      label: 'SQLite Default',
+      description: 'Private admin access through port-forward with PVC-backed SQLite',
+      values: {
+        'database.mode': 'auto',
+        replicaCount: '1',
+        'persistence.size': '5Gi',
+        'phishIngress.enabled': 'false',
+        'backup.enabled': 'false',
+      },
+    },
+    {
+      label: 'Public Campaigns',
+      description: 'Public phishing listener while keeping admin private',
+      values: {
+        'database.mode': 'auto',
+        'phishIngress.enabled': 'true',
+        'phishIngress.hosts[0].host': 'training.example.com',
+        'phishIngress.ingressClassName': 'traefik',
+      },
+    },
+    {
+      label: 'SQLite Backup',
+      description: 'SQLite deployment with scheduled S3-compatible backup',
+      values: {
+        'database.mode': 'sqlite',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 3 * * *',
+        'backup.s3.endpoint': 'https://s3.amazonaws.com',
+        'backup.s3.bucket': 'gophish-backups',
       },
     },
   ],

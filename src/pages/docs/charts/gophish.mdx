@@ -1,0 +1,326 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Gophish Chart
+description: HelmForge Gophish chart — phishing awareness platform with separated admin and campaign traffic.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
+# Gophish
+
+Gophish is an open-source phishing awareness platform for authorized security training and simulation programs. The HelmForge chart installs Gophish `0.12.1` with separate admin and phishing Services, private-by-default access, SQLite persistence, optional HelmForge MySQL, external MySQL support, NetworkPolicy, and SQLite backup.
+
+<Callout type="warning" title="Authorized use only">
+  Keep Gophish deployments limited to approved security awareness and testing workflows. The chart keeps the admin UI
+  private by default and requires explicit values before exposing it through ingress.
+</Callout>
+
+## Key Features
+
+- **Separated traffic** — dedicated admin and phishing Services and ingresses
+- **Safe defaults** — admin ingress disabled, phishing ingress disabled, one replica, PVC-backed SQLite
+- **Secret-backed config** — generated `config.json` is rendered as a Secret with an existing Secret override
+- **Database choices** — SQLite default, HelmForge MySQL dependency, or external MySQL DSN Secret
+- **NetworkPolicy** — separate admin, phishing, database, DNS, and SMTP egress controls
+- **SQLite backup** — optional CronJob uploads archive and checksum to S3-compatible storage
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install gophish helmforge/gophish --namespace gophish --create-namespace
+```
+
+**OCI registry:**
+
+```bash
+helm install gophish oci://ghcr.io/helmforgedev/helm/gophish --namespace gophish --create-namespace
+```
+
+## Access
+
+The admin UI is private by default:
+
+```bash
+kubectl port-forward svc/gophish-gophish-admin 3333:3333 -n gophish
+```
+
+Open `http://127.0.0.1:3333`.
+
+The generated initial admin password is written to first-start logs:
+
+```bash
+kubectl logs deploy/gophish-gophish -n gophish | grep "Please login with the username admin"
+```
+
+Change the password immediately after the first login and avoid copying it into tickets, values files, or PRs.
+
+## Deployment Examples
+
+<DocsTabs tabs={[
+  { id: 'sqlite', label: 'SQLite Default' },
+  { id: 'phish', label: 'Phishing Ingress' },
+  { id: 'external', label: 'External MySQL' },
+  { id: 'production', label: 'Production' },
+  { id: 'backup', label: 'Backup' },
+]}>
+
+<div data-tab-panel="sqlite">
+
+```yaml
+replicaCount: 1
+
+persistence:
+  enabled: true
+  size: 5Gi
+```
+
+</div>
+
+<div data-tab-panel="phish">
+
+```yaml
+phishIngress:
+  enabled: true
+  hosts:
+    - host: training.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: gophish-phish-tls
+      hosts:
+        - training.example.com
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    port: 3306
+    name: gophish
+    username: gophish
+    existingSecret: gophish-db
+    existingSecretDsnKey: dsn
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    name: gophish
+    username: gophish
+    existingSecret: gophish-db
+    existingSecretDsnKey: dsn
+
+phishIngress:
+  enabled: true
+  hosts:
+    - host: training.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: gophish-phish-tls
+      hosts:
+        - training.example.com
+
+networkPolicy:
+  enabled: true
+  admin:
+    ipBlocks:
+      - cidr: 10.10.0.0/16
+  phish:
+    namespaceSelectors:
+      - matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+  egress:
+    externalDatabase:
+      enabled: true
+      cidrs:
+        - 10.0.0.0/8
+```
+
+</div>
+
+<div data-tab-panel="backup">
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: gophish-backups
+    prefix: gophish
+    existingSecret: gophish-backup
+```
+
+</div>
+
+</DocsTabs>
+
+## Admin Ingress
+
+Admin ingress is disabled by default and requires TLS when enabled:
+
+```yaml
+adminIngress:
+  enabled: true
+  tls:
+    - secretName: gophish-admin-tls
+      hosts:
+        - gophish-admin.example.com
+  hosts:
+    - host: gophish-admin.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+Use `gophish.adminServer.trustedOrigins` when a proxy or ingress terminates TLS and Gophish must trust the external origin.
+
+## Database Notes
+
+SQLite is the default and requires `replicaCount: 1`. Embedded MySQL uses the HelmForge MySQL dependency and sets `mysql.config.myCnf` to `sql_mode=NO_ENGINE_SUBSTITUTION` because Gophish `0.12.1` bootstraps zero-date values that MySQL 8.4 rejects under strict zero-date modes.
+
+External MySQL should use `database.external.existingSecret` with a complete DSN. Inline external passwords are blocked unless `database.external.allowInlinePassword=true`, which is intended only for local tests.
+
+## Backup Notes
+
+Chart-managed backup covers SQLite mode only. It archives the chart-managed PVC path containing the SQLite database, writes a SHA256 checksum, and uploads both files with `docker.io/helmforge/mc:1.0.0`.
+
+Embedded MySQL and external MySQL backup are delegated to MySQL-specific backup tooling.
+
+## Values Reference
+
+| Key                                           | Type    | Default                               | Description                                   |
+| --------------------------------------------- | ------- | ------------------------------------- | --------------------------------------------- |
+| `nameOverride`                                | string  | `""`                                  | Override chart name in resource names         |
+| `fullnameOverride`                            | string  | `""`                                  | Override full resource name                   |
+| `commonLabels`                                | object  | `{}`                                  | Labels added to chart resources               |
+| `replicaCount`                                | integer | `1`                                   | Gophish replicas; SQLite requires `1`         |
+| `clusterDomain`                               | string  | `cluster.local`                       | Kubernetes cluster domain                     |
+| `image.repository`                            | string  | `docker.io/gophish/gophish`           | Official Gophish image repository             |
+| `image.tag`                                   | string  | `0.12.1`                              | Pinned Gophish image tag                      |
+| `image.pullPolicy`                            | string  | `IfNotPresent`                        | Image pull policy                             |
+| `imagePullSecrets`                            | array   | `[]`                                  | Private registry pull secrets                 |
+| `gophish.config.existingSecret`               | string  | `""`                                  | Existing Secret with complete `config.json`   |
+| `gophish.config.existingSecretKey`            | string  | `config.json`                         | Key for `config.json`                         |
+| `gophish.adminServer.listenUrl`               | string  | `0.0.0.0:3333`                        | Admin listener inside the container           |
+| `gophish.adminServer.useTls`                  | boolean | `false`                               | Enable native Gophish admin TLS               |
+| `gophish.adminServer.certSecret`              | string  | `""`                                  | Secret for native admin TLS                   |
+| `gophish.adminServer.trustedOrigins`          | array   | `[]`                                  | Trusted admin origins behind ingress          |
+| `gophish.phishServer.listenUrl`               | string  | `0.0.0.0:80`                          | Phishing listener inside the container        |
+| `gophish.phishServer.useTls`                  | boolean | `false`                               | Enable native Gophish phishing TLS            |
+| `gophish.phishServer.certSecret`              | string  | `""`                                  | Secret for native phishing TLS                |
+| `gophish.logging.filename`                    | string  | `""`                                  | Optional log filename                         |
+| `gophish.logging.level`                       | string  | `""`                                  | Optional log level                            |
+| `gophish.contactAddress`                      | string  | `""`                                  | Optional contact address in Gophish config    |
+| `database.mode`                               | string  | `auto`                                | `auto`, `sqlite`, `mysql`, or `external`      |
+| `database.sqlite.path`                        | string  | `/opt/gophish/data/gophish.db`        | SQLite database path                          |
+| `database.external.host`                      | string  | `""`                                  | External MySQL host                           |
+| `database.external.port`                      | integer | `3306`                                | External MySQL port                           |
+| `database.external.name`                      | string  | `gophish`                             | External database name                        |
+| `database.external.username`                  | string  | `gophish`                             | External database username                    |
+| `database.external.password`                  | string  | `""`                                  | Inline password for local tests only          |
+| `database.external.allowInlinePassword`       | boolean | `false`                               | Explicit opt-in for inline external password  |
+| `database.external.existingSecret`            | string  | `""`                                  | Secret containing complete DSN                |
+| `database.external.existingSecretDsnKey`      | string  | `dsn`                                 | Secret key for DSN                            |
+| `database.external.parameters`                | string  | `charset=utf8&parseTime=True&loc=UTC` | DSN query parameters                          |
+| `mysql.enabled`                               | boolean | `false`                               | Enable HelmForge MySQL dependency             |
+| `mysql.config.myCnf`                          | string  | Gophish-compatible sql_mode           | Extra embedded MySQL config                   |
+| `mysql.auth.database`                         | string  | `gophish`                             | Embedded MySQL database                       |
+| `mysql.auth.username`                         | string  | `gophish`                             | Embedded MySQL user                           |
+| `mysql.auth.password`                         | string  | `""`                                  | Embedded MySQL password, generated when empty |
+| `mysql.auth.existingSecret`                   | string  | `""`                                  | Existing MySQL credential Secret              |
+| `persistence.enabled`                         | boolean | `true`                                | Create chart-managed PVC                      |
+| `persistence.existingClaim`                   | string  | `""`                                  | Existing PVC name                             |
+| `persistence.storageClass`                    | string  | `""`                                  | PVC storage class                             |
+| `persistence.accessModes`                     | array   | `["ReadWriteOnce"]`                   | PVC access modes                              |
+| `persistence.size`                            | string  | `5Gi`                                 | PVC size                                      |
+| `serviceAccount.create`                       | boolean | `true`                                | Create ServiceAccount                         |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`                               | Automount API token                           |
+| `adminService.type`                           | string  | `ClusterIP`                           | Admin Service type                            |
+| `adminService.port`                           | integer | `3333`                                | Admin Service port                            |
+| `adminService.ipFamilyPolicy`                 | string  | omitted                               | Optional Service IP family policy             |
+| `adminService.ipFamilies`                     | array   | omitted                               | Optional ordered Service IP families          |
+| `phishService.type`                           | string  | `ClusterIP`                           | Phishing Service type                         |
+| `phishService.port`                           | integer | `80`                                  | Phishing Service port                         |
+| `phishService.ipFamilyPolicy`                 | string  | omitted                               | Optional Service IP family policy             |
+| `phishService.ipFamilies`                     | array   | omitted                               | Optional ordered Service IP families          |
+| `adminIngress.enabled`                        | boolean | `false`                               | Enable admin ingress                          |
+| `adminIngress.hosts`                          | array   | `[]`                                  | Admin ingress hosts                           |
+| `adminIngress.tls`                            | array   | `[]`                                  | Admin ingress TLS, required when enabled      |
+| `phishIngress.enabled`                        | boolean | `false`                               | Enable phishing ingress                       |
+| `phishIngress.hosts`                          | array   | `[]`                                  | Phishing ingress hosts                        |
+| `phishIngress.tls`                            | array   | `[]`                                  | Phishing ingress TLS                          |
+| `networkPolicy.enabled`                       | boolean | `false`                               | Enable NetworkPolicy                          |
+| `networkPolicy.admin.*`                       | object  | see values                            | Admin ingress allow rules                     |
+| `networkPolicy.phish.*`                       | object  | see values                            | Phishing ingress allow rules                  |
+| `networkPolicy.egress.allowDns`               | boolean | `true`                                | Allow DNS egress                              |
+| `networkPolicy.egress.externalDatabase.*`     | object  | see values                            | External DB egress allow rules                |
+| `networkPolicy.egress.smtp.*`                 | object  | see values                            | SMTP egress allow rules                       |
+| `backup.enabled`                              | boolean | `false`                               | Enable SQLite backup CronJob                  |
+| `backup.schedule`                             | string  | `0 3 * * *`                           | Backup schedule                               |
+| `backup.images.archive.repository`            | string  | `docker.io/library/busybox`           | Archive image                                 |
+| `backup.images.uploader.repository`           | string  | `docker.io/helmforge/mc`              | HelmForge S3 uploader image                   |
+| `backup.s3.endpoint`                          | string  | `""`                                  | S3-compatible endpoint                        |
+| `backup.s3.bucket`                            | string  | `""`                                  | Backup bucket                                 |
+| `backup.s3.existingSecret`                    | string  | `""`                                  | S3 credential Secret                          |
+| `probes.*`                                    | object  | see values                            | Startup, liveness, readiness probes           |
+| `resources`                                   | object  | see values                            | Gophish container resources                   |
+| `podSecurityContext`                          | object  | see values                            | Pod security context                          |
+| `containerSecurityContext`                    | object  | see values                            | Container security context                    |
+| `nodeSelector`                                | object  | `{}`                                  | Node selector                                 |
+| `tolerations`                                 | array   | `[]`                                  | Pod tolerations                               |
+| `affinity`                                    | object  | `{}`                                  | Pod affinity                                  |
+| `topologySpreadConstraints`                   | array   | `[]`                                  | Pod spread constraints                        |
+| `priorityClassName`                           | string  | `""`                                  | PriorityClass name                            |
+| `podLabels`                                   | object  | `{}`                                  | Extra pod labels                              |
+| `podAnnotations`                              | object  | `{}`                                  | Extra pod annotations                         |
+| `extraEnv`                                    | array   | `[]`                                  | Extra container environment                   |
+| `extraVolumes`                                | array   | `[]`                                  | Extra pod volumes                             |
+| `extraVolumeMounts`                           | array   | `[]`                                  | Extra container volume mounts                 |
+| `extraManifests`                              | array   | `[]`                                  | Extra manifests rendered with the chart       |
+
+## Troubleshooting
+
+<Callout type="danger" title="Admin UI exposed unintentionally">
+  Disable `adminIngress.enabled` and use port-forward until trusted ingress, TLS, DNS, and
+  `gophish.adminServer.trustedOrigins` are reviewed.
+</Callout>
+
+<Callout type="tip" title="Initial password not found">
+  The generated password is emitted on first boot. If logs have rotated, reset the admin account through an
+  operator-approved Gophish recovery process.
+</Callout>
+
+- **Admin UI not reachable** — check the admin Service, port-forward command, ingress host, and TLS Secret.
+- **Phishing endpoint not reachable** — check `phishIngress`, DNS, ingress controller namespace policy, and the phish Service.
+- **SQLite PVC permission problems** — confirm the PVC is bound and the pod runs with the default `fsGroup`.
+- **MySQL DSN errors** — confirm the DSN Secret key and MySQL `sql_mode` compatibility.
+- **Ingress TLS mismatch** — align ingress TLS termination with native Gophish TLS settings.
+- **Trusted origins or CSRF errors** — add the external admin origin to `gophish.adminServer.trustedOrigins`.
+- **Backup failures** — inspect backup Job logs, S3 endpoint reachability, and the S3 credential Secret.
+- **Image pull errors** — confirm access to `docker.io/gophish/gophish:0.12.1` and the HelmForge uploader image.
+
+## More Information
+
+- [Gophish upstream](https://getgophish.com)
+- [Gophish source](https://github.com/gophish/gophish)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/gophish)
