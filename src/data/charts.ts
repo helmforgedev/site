@@ -274,6 +274,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Gophish',
+    slug: 'gophish',
+    description: 'Phishing awareness platform with separated admin and campaign traffic.',
+    maturity: 'beta',
+    backup: true,
+  },
+  {
     name: 'Homarr',
     slug: 'homarr',
     description: 'Modern dashboard with SQL options, integrations, and S3 backup.',
