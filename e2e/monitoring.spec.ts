@@ -12,6 +12,7 @@ test.describe('Blog monitoring', () => {
     await expect(page.getByText('Google Discover').first()).toBeVisible();
     await expect(page.locator('a[href="/sitemap-index.xml"]')).toContainText('sitemap-index.xml');
     await expect(page.locator('a[href="/blog/rss.xml"]')).toContainText('/blog/rss.xml');
+    await expect(page.locator('meta[property="og:type"]')).toHaveAttribute('content', 'website');
   });
 
   test('exposes analytics content groups in generated pages', async ({ page }) => {
