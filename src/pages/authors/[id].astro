@@ -1,0 +1,144 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import Container from '../../components/Container.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import { AUTHORS, getAuthorUrl, type AuthorProfile } from '../../data/authors';
+
+export function getStaticPaths() {
+  return Object.values(AUTHORS).map((author) => ({
+    params: { id: author.id },
+    props: { author },
+  }));
+}
+
+const { author } = Astro.props as { author: AuthorProfile };
+const authorUrl = `https://helmforge.dev${getAuthorUrl(author)}`;
+const sameAs = [author.github, author.linkedin, author.website].filter(Boolean);
+
+const personJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: author.name,
+  url: authorUrl,
+  jobTitle: author.role,
+  email: author.email ? `mailto:${author.email}` : undefined,
+  address: author.location
+    ? {
+        '@type': 'PostalAddress',
+        addressCountry: author.location,
+      }
+    : undefined,
+  affiliation: {
+    '@type': 'Organization',
+    name: author.affiliation,
+    url: 'https://helmforge.dev',
+  },
+  knowsAbout: author.expertise,
+  sameAs,
+};
+
+const profilePageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfilePage',
+  mainEntity: personJsonLd,
+  url: authorUrl,
+  name: `${author.name} - HelmForge Author Profile`,
+};
+---
+
+<BaseLayout
+  title={`${author.name} - Author Profile`}
+  description={`${author.name} is ${author.role} at HelmForge, focused on ${author.expertise.slice(0, 3).join(', ')}.`}
+>
+  <Header />
+  <script type="application/ld+json" set:html={JSON.stringify(personJsonLd)} />
+  <script type="application/ld+json" set:html={JSON.stringify(profilePageJsonLd)} />
+
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <SectionHeader label="Author" title={author.name} description={author.bio} />
+
+      <div class="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <section class="glass-panel rounded-2xl p-6 sm:p-8">
+          <div class="flex items-start gap-5">
+            <div
+              class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-bold text-primary-light"
+              aria-hidden="true"
+            >
+              {
+                author.name
+                  .split(' ')
+                  .map((part) => part[0])
+                  .join('')
+                  .slice(0, 2)
+              }
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold text-text-base heading-font">{author.name}</h1>
+              <p class="mt-1 text-sm text-text-muted">{author.role}</p>
+              {author.location && <p class="mt-2 text-sm text-text-muted">{author.location}</p>}
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-wrap gap-3 text-sm">
+            {
+              author.github && (
+                <a
+                  href={author.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex rounded-lg border border-border px-3 py-2 font-semibold text-text-base hover:border-primary/40 hover:text-primary-light transition-colors"
+                >
+                  GitHub
+                </a>
+              )
+            }
+            {
+              author.linkedin && (
+                <a
+                  href={author.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex rounded-lg border border-border px-3 py-2 font-semibold text-text-base hover:border-primary/40 hover:text-primary-light transition-colors"
+                >
+                  LinkedIn
+                </a>
+              )
+            }
+            {
+              author.email && (
+                <a
+                  href={`mailto:${author.email}`}
+                  class="inline-flex rounded-lg border border-border px-3 py-2 font-semibold text-text-base hover:border-primary/40 hover:text-primary-light transition-colors"
+                >
+                  Email
+                </a>
+              )
+            }
+          </div>
+        </section>
+
+        <section class="glass-panel rounded-2xl p-6 sm:p-8">
+          <h2 class="text-lg font-bold text-text-base heading-font">Expertise</h2>
+          <div class="mt-4 flex flex-wrap gap-2">
+            {
+              author.expertise.map((item) => (
+                <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-light">
+                  {item}
+                </span>
+              ))
+            }
+          </div>
+          <p class="mt-6 text-sm leading-relaxed text-text-muted">
+            HelmForge author profiles identify who writes and reviews technical material, what they work on, and where
+            readers can verify their open-source activity.
+          </p>
+        </section>
+      </div>
+    </Container>
+  </main>
+
+  <Footer />
+</BaseLayout>

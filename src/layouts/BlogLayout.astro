@@ -4,7 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import BlogHero from '../components/BlogHero.astro';
-import type { AuthorProfile } from '../data/authors';
+import { getAuthorUrl, type AuthorProfile } from '../data/authors';
 
 type ArticleSchemaType = 'Article' | 'BlogPosting' | 'NewsArticle';
 
@@ -44,10 +44,17 @@ const formattedDate = publishedDate.toLocaleDateString('en-US', {
   month: 'long',
   day: 'numeric',
 });
-const canonicalUrl = `https://helmforge.dev/blog/${postSlug}`;
 const modifiedDate = updatedAt ?? publishedDate;
+const formattedModifiedDate = modifiedDate.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+const canonicalUrl = `https://helmforge.dev/blog/${postSlug}`;
 const articleSection = tags[0] ?? 'Blog';
 const articleImage = new URL(coverImage, Astro.site).href;
+const authorUrl = new URL(getAuthorUrl(author), Astro.site).href;
+const showUpdatedDate = modifiedDate.valueOf() !== publishedDate.valueOf();
 
 const articleJsonLd = {
   '@context': 'https://schema.org',
@@ -61,8 +68,14 @@ const articleJsonLd = {
   author: {
     '@type': 'Person',
     name: author.name,
-    url: author.linkedin || author.github || 'https://helmforge.dev',
+    url: authorUrl,
     sameAs: [author.github, author.linkedin].filter(Boolean),
+    jobTitle: author.role,
+    affiliation: {
+      '@type': 'Organization',
+      name: author.affiliation,
+      url: 'https://helmforge.dev',
+    },
   },
   image: [articleImage],
   mainEntityOfPage: canonicalUrl,
@@ -127,9 +140,22 @@ const articleJsonLd = {
           </h1>
           <p class="mt-4 text-lg text-text-muted leading-relaxed">{description}</p>
           <div class="mt-6 flex flex-wrap items-center gap-3 text-sm text-text-muted">
-            <span>{author.name}</span>
+            <a
+              href={getAuthorUrl(author)}
+              class="font-semibold text-text-base hover:text-primary-light transition-colors">{author.name}</a
+            >
             <span class="text-border">|</span>
-            <time datetime={publishedDate.toISOString()}>{formattedDate}</time>
+            <span>Published <time datetime={publishedDate.toISOString()}>{formattedDate}</time></span>
+            {
+              showUpdatedDate && (
+                <>
+                  <span class="text-border">|</span>
+                  <span>
+                    Updated <time datetime={modifiedDate.toISOString()}>{formattedModifiedDate}</time>
+                  </span>
+                </>
+              )
+            }
             <span class="text-border">|</span>
             <span>{readingTime} min read</span>
           </div>
@@ -179,8 +205,12 @@ const articleJsonLd = {
         <div class="sticky top-24 space-y-4">
           <section class="glass-panel rounded-2xl p-5">
             <p class="text-xs uppercase tracking-wider text-text-muted mb-2">Written by</p>
-            <p class="text-lg font-semibold text-text-base">{author.name}</p>
+            <a
+              href={getAuthorUrl(author)}
+              class="text-lg font-semibold text-text-base hover:text-primary-light transition-colors">{author.name}</a
+            >
             <p class="text-sm text-text-muted mt-1">{author.role}</p>
+            <p class="text-sm text-text-muted mt-3 leading-relaxed">{author.bio}</p>
             <p class="text-sm text-text-muted mt-3">Follow the author:</p>
             <div class="mt-4 flex items-center gap-3">
               {

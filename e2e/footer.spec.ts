@@ -1,6 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-const pages = ['/', '/stack', '/blog', '/docs', '/playground', '/roadmap', '/community', '/changelog', '/request'];
+const pages = [
+  '/',
+  '/stack',
+  '/blog',
+  '/docs',
+  '/playground',
+  '/roadmap',
+  '/community',
+  '/changelog',
+  '/request',
+  '/about',
+  '/contact',
+  '/authors/maicon-berlofa',
+  '/editorial-policy',
+  '/corrections',
+];
 
 test.describe('Footer', () => {
   for (const path of pages) {
