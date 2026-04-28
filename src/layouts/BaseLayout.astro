@@ -53,6 +53,18 @@ const chartDisplay = chartSlug ? chartSlug.replace(/-/g, ' ') : null;
 // Determine og:type
 const resolvedOgType = ogType ?? (isBlogPost ? 'article' : 'website');
 const analyticsContentGroup = isBlogPage ? 'Blog' : isChartPage ? 'Chart docs' : isHomepage ? 'Home' : 'Site';
+const ga4InlineScript = `
+window.dataLayer = window.dataLayer || [];
+window.gtag = function gtag() {
+  window.dataLayer.push(arguments);
+};
+window.gtag('js', new Date());
+window.gtag('config', ${JSON.stringify(googleAnalyticsId)}, {
+  content_group: ${JSON.stringify(analyticsContentGroup)},
+  page_path: window.location.pathname,
+  page_title: document.title,
+});
+`;
 
 // Smart auto-keywords: chart pages get specific install/deploy keywords
 const autoKeywords = chartDisplay
@@ -193,18 +205,7 @@ const websiteJsonLd = isHomepage
 
     <!-- GA4 -->
     <script async src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}></script>
-    <script is:inline define:vars={{ googleAnalyticsId, analyticsContentGroup }}>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag('js', new Date());
-      gtag('config', googleAnalyticsId, {
-        content_group: analyticsContentGroup,
-        page_path: window.location.pathname,
-        page_title: document.title,
-      });
-    </script>
+    <script is:inline set:html={ga4InlineScript} />
 
     <!-- JSON-LD Structured Data for Organization -->
     <script type="application/ld+json" set:html={JSON.stringify(organizationJsonLd)} />

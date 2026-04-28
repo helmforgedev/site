@@ -17,6 +17,7 @@ test.describe('Blog monitoring', () => {
   test('exposes analytics content groups in generated pages', async ({ page }) => {
     await page.goto('/blog/kubernetes-1-34-image-short-names');
     await expect(page.locator('html')).toHaveAttribute('data-content-group', 'Blog');
+    await expect.poll(() => page.evaluate(() => typeof (window as any).gtag)).toBe('function');
 
     await page.goto('/docs/charts/postgresql');
     await expect(page.locator('html')).toHaveAttribute('data-content-group', 'Chart docs');
