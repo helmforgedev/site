@@ -1,0 +1,48 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import Container from '../../../components/Container.astro';
+import SectionHeader from '../../../components/SectionHeader.astro';
+import BlogPostCard from '../../../components/BlogPostCard.astro';
+import { BLOG_CATEGORIES, BLOG_CATEGORY_DETAILS, type BlogCategorySlug } from '../../../data/blog';
+import { getPostsByCategory } from '../../../lib/blogDiscovery';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return BLOG_CATEGORIES.map((category) => ({
+    params: { category },
+    props: {
+      category,
+      posts: getPostsByCategory(posts, category),
+    },
+  }));
+}
+
+const { category, posts } = Astro.props as {
+  category: BlogCategorySlug;
+  posts: Awaited<ReturnType<typeof getCollection<'blog'>>>;
+};
+const categoryDetails = BLOG_CATEGORY_DETAILS[category];
+---
+
+<BaseLayout
+  title={`${categoryDetails.label} Blog Posts`}
+  description={`${categoryDetails.description} Browse HelmForge articles in the ${categoryDetails.label} editorial section.`}
+>
+  <Header />
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <a href="/blog" class="mb-8 inline-flex text-sm text-text-muted transition-colors hover:text-primary-light">
+        Back to blog
+      </a>
+      <SectionHeader label="Category" as="h1" title={categoryDetails.label} description={categoryDetails.description} />
+
+      <div class="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {posts.map((post) => <BlogPostCard post={post} />)}
+      </div>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>

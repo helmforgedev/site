@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { CollectionEntry } from 'astro:content';
 import type { RSSFeedItem } from '@astrojs/rss';
 import { AUTHORS, DEFAULT_AUTHOR_ID } from '../data/authors';
+import { getBlogCategory } from '../data/blog';
 
 type BlogPost = CollectionEntry<'blog'>;
 
@@ -45,7 +46,7 @@ export function getBlogRssItems(posts: BlogPost[], site: URL): RSSFeedItem[] {
       description: post.data.description,
       link: canonicalUrl,
       pubDate: getPublishedDate(post),
-      categories: post.data.tags,
+      categories: [getBlogCategory(post.data.category).label, ...post.data.tags],
       author: author.name,
       enclosure: {
         url: imageUrl,

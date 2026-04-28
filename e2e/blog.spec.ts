@@ -29,6 +29,24 @@ test.describe('Blog', () => {
     await expect(actions.locator('a[aria-label="Subscribe via RSS"]')).toBeVisible();
   });
 
+  test('blog index exposes editorial sections, tags, and calendar', async ({ page }) => {
+    await page.goto('/blog');
+
+    const editorialSections = page.locator('section').filter({ hasText: 'Editorial sections' }).first();
+    await expect(editorialSections).toBeVisible();
+    await expect(editorialSections.locator('a[href="/blog/category/databases"]')).toContainText(
+      /Databases\s+\d+\s+posts/i,
+    );
+    await expect(editorialSections.locator('a[href="/blog/category/kubernetes"]')).toContainText(
+      /Kubernetes\s+\d+\s+posts/i,
+    );
+    await expect(page.locator('a[href="/blog/tag/postgresql"]').first()).toBeVisible();
+    await expect(page.locator('a[aria-label="Open editorial calendar"]')).toHaveAttribute(
+      'href',
+      '/blog/editorial-calendar',
+    );
+  });
+
   test('blog cards expose title, description, author, and date', async ({ page }) => {
     await page.goto('/blog');
 
@@ -47,7 +65,7 @@ test.describe('Blog', () => {
     expect(href).toBeTruthy();
 
     await page.goto(href!);
-    await expect(page.locator('article')).toBeVisible();
+    await expect(page.locator('article[data-pagefind-body]')).toBeVisible();
     // Reading time should be visible
     await expect(page.locator('text=/\\d+ min read/')).toBeVisible();
   });
@@ -58,14 +76,19 @@ test.describe('Blog', () => {
     const href = await firstPost.getAttribute('href');
     await page.goto(href!);
 
-    // Should have a time element
-    await expect(page.locator('time')).toBeVisible();
-    // Should have at least one tag
-    expect(
-      await page
-        .locator('[class*="tag"], [class*="badge"], span:has-text("helm"), span:has-text("kubernetes")')
-        .count(),
-    ).toBeGreaterThan(0);
+    await expect(page.locator('header time').first()).toBeVisible();
+    await expect(page.locator('a[href^="/blog/category/"]').first()).toBeVisible();
+    await expect(page.locator('a[href^="/blog/tag/"]').first()).toBeVisible();
+  });
+
+  test('category and tag pages render grouped posts', async ({ page }) => {
+    await page.goto('/blog/category/databases');
+    await expect(page.locator('h1')).toContainText('Databases');
+    await expect(page.locator('a[href="/blog/production-postgresql-kubernetes"]:has(h2)')).toBeVisible();
+
+    await page.goto('/blog/tag/postgresql');
+    await expect(page.locator('h1')).toContainText('Postgresql');
+    await expect(page.locator('a[href="/blog/production-postgresql-kubernetes"]:has(h2)')).toBeVisible();
   });
 
   test('blog post has share links', async ({ page }) => {
@@ -126,6 +149,26 @@ test.describe('Blog', () => {
     await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/blog/rss.xml');
   });
 
+  test('blog post includes discovery links to charts, related posts, latest posts, and read next', async ({ page }) => {
+    await page.goto('/blog/production-postgresql-kubernetes');
+
+    const relatedCharts = page.locator('aside section').filter({ hasText: 'Related chart docs' });
+    await expect(relatedCharts).toContainText('postgresql');
+    await expect(relatedCharts.locator('a[href="/docs/charts/postgresql"]')).toBeVisible();
+    await expect(page.getByText('Related analysis')).toBeVisible();
+    await expect(page.locator('aside section').filter({ hasText: 'Latest posts' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Read next/i })).toBeVisible();
+  });
+
+  test('editorial calendar publishes a 12 week content plan', async ({ page }) => {
+    await page.goto('/blog/editorial-calendar');
+
+    await expect(page.locator('h1')).toContainText('Consistent, useful Kubernetes and Helm coverage');
+    await expect(page.locator('section:has(time)')).toHaveCount(12);
+    await expect(page.getByText('Kubernetes release readiness')).toBeVisible();
+    await expect(page.getByText('CNCF ecosystem')).toBeVisible();
+  });
+
   test('newsletter page embeds listmonk form', async ({ page }) => {
     await page.goto('/newsletter');
     await expect(page).toHaveTitle(/Newsletter/i);
@@ -153,6 +196,7 @@ test.describe('Blog', () => {
     );
 
     expect(article).toBeTruthy();
+    expect(article.articleSection).toBe('Releases');
     expect(article.author).toMatchObject({
       '@type': 'Person',
       name: 'Maicon Berlofa',

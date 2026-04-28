@@ -1,0 +1,55 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import Container from '../../../components/Container.astro';
+import SectionHeader from '../../../components/SectionHeader.astro';
+import BlogPostCard from '../../../components/BlogPostCard.astro';
+import { formatBlogTag } from '../../../data/blog';
+import { getAllTags, getPostsByTag } from '../../../lib/blogDiscovery';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return getAllTags(posts).map(({ tag, slug }) => ({
+    params: { tag: slug },
+    props: {
+      tag,
+      slug,
+      posts: getPostsByTag(posts, slug),
+    },
+  }));
+}
+
+const { tag, posts } = Astro.props as {
+  tag: string;
+  slug: string;
+  posts: Awaited<ReturnType<typeof getCollection<'blog'>>>;
+};
+const label = formatBlogTag(tag);
+---
+
+<BaseLayout
+  title={`${label} Blog Posts`}
+  description={`HelmForge articles tagged ${label}, with practical Kubernetes and Helm operations guidance.`}
+>
+  <Header />
+  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+    <Container>
+      <a href="/blog" class="mb-8 inline-flex text-sm text-text-muted transition-colors hover:text-primary-light">
+        Back to blog
+      </a>
+      <SectionHeader
+        label="Tag"
+        as="h1"
+        title={label}
+        description={`Articles tagged ${label}, grouped for deeper topical discovery.`}
+      />
+
+      <div class="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {posts.map((post) => <BlogPostCard post={post} />)}
+      </div>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>

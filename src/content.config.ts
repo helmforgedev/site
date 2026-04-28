@@ -1,6 +1,7 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { AUTHORS } from './data/authors';
+import { BLOG_CATEGORIES } from './data/blog';
 
 const AUTHOR_IDS = Object.keys(AUTHORS) as [string, ...string[]];
 
@@ -13,7 +14,9 @@ const blog = defineCollection({
     publishDate: z.coerce.date().optional(),
     updatedAt: z.coerce.date().optional(),
     authorId: z.enum(AUTHOR_IDS),
+    category: z.enum(BLOG_CATEGORIES),
     tags: z.array(z.string()).default([]),
+    relatedCharts: z.array(z.string()).default([]),
     image: z.string().optional(),
     coverImage: z.string().min(1),
     coverAlt: z.string().min(24),

@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import BlogLayout from '../../layouts/BlogLayout.astro';
 import { AUTHORS, DEFAULT_AUTHOR_ID } from '../../data/authors';
+import { getAdjacentPosts, getLatestPosts, getRelatedPosts } from '../../lib/blogDiscovery';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog');
@@ -12,10 +13,14 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props;
+const posts = await getCollection('blog');
 const { Content } = await render(post);
 const author = AUTHORS[post.data.authorId] ?? AUTHORS[DEFAULT_AUTHOR_ID];
 const words = post.body.trim().split(/\s+/).filter(Boolean).length;
 const readingTime = Math.max(1, Math.ceil(words / 220));
+const relatedPosts = getRelatedPosts(post, posts);
+const latestPosts = getLatestPosts(posts, post);
+const { newerPost, olderPost } = getAdjacentPosts(post, posts);
 ---
 
 <BlogLayout
@@ -25,12 +30,18 @@ const readingTime = Math.max(1, Math.ceil(words / 220));
   publishDate={post.data.publishDate}
   updatedAt={post.data.updatedAt}
   author={author}
+  category={post.data.category}
   tags={post.data.tags}
+  relatedCharts={post.data.relatedCharts}
   readingTime={readingTime}
   postSlug={post.id}
   coverImage={post.data.coverImage}
   coverAlt={post.data.coverAlt}
   schemaType={post.data.schemaType}
+  relatedPosts={relatedPosts}
+  latestPosts={latestPosts}
+  newerPost={newerPost}
+  olderPost={olderPost}
 >
   <Content />
 </BlogLayout>

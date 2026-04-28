@@ -25,6 +25,7 @@ const OFFICIAL_REFERENCE_HOSTS = new Set([
   'prometheus.io',
   'grafana.com',
   'cncf.io',
+  'modelcontextprotocol.io',
 ]);
 
 const NON_OFFICIAL_BANNED_HOSTS = new Set(['replicated.com', 'knowledge.broadcom.com', 'medium.com']);
@@ -60,6 +61,69 @@ function getFrontmatterTags(frontmatter) {
         .toLowerCase(),
     )
     .filter(Boolean);
+}
+
+function validateCategory(frontmatter, filePath, errors) {
+  const allowedCategories = new Set([
+    'kubernetes',
+    'helm',
+    'cncf',
+    'security',
+    'databases',
+    'operations',
+    'releases',
+    'comparisons',
+  ]);
+  const category = getFrontmatterScalar(frontmatter, 'category');
+
+  if (!category) {
+    errors.push(`${filePath}: category is required for editorial discovery`);
+    return;
+  }
+  if (!allowedCategories.has(category)) {
+    errors.push(`${filePath}: category "${category}" is not an approved editorial section`);
+  }
+}
+
+function validateEditorialQuality(frontmatter, filePath, errors) {
+  const title = getFrontmatterScalar(frontmatter, 'title') ?? '';
+  const description = getFrontmatterScalar(frontmatter, 'description') ?? '';
+  const clickbaitPattern = /\b(shocking|secret|destroyed|panic|you won't believe|what happened next)\b/i;
+
+  if (clickbaitPattern.test(title) || clickbaitPattern.test(description)) {
+    errors.push(`${filePath}: title and description must avoid clickbait language`);
+  }
+  if (title.length < 24) {
+    errors.push(`${filePath}: title should capture the article angle clearly`);
+  }
+  if (description.length < 80) {
+    errors.push(`${filePath}: description should explain the practical value of the post`);
+  }
+}
+
+function isTechnicalPost(frontmatter, tags) {
+  const category = getFrontmatterScalar(frontmatter, 'category');
+  const isAnnouncement = tags.includes('announcement');
+  const technicalCategories = new Set(['kubernetes', 'helm', 'security', 'databases', 'operations', 'releases']);
+  const technicalTags = new Set([
+    'cri-o',
+    'database',
+    'docker',
+    'generic-chart',
+    'helm',
+    'images',
+    'kubernetes',
+    'migration',
+    'operations',
+    'postgresql',
+    'tutorial',
+  ]);
+
+  if (isAnnouncement) {
+    return false;
+  }
+
+  return technicalCategories.has(category) || tags.some((tag) => technicalTags.has(tag));
 }
 
 function getSignificantSlugTokens(filePath) {
@@ -125,10 +189,13 @@ function hostIsBanned(hostname) {
   return false;
 }
 
-function validateReferencesSection(body, filePath, errors) {
+function validateReferencesSection(body, filePath, errors, required) {
   const referencesHeading = /^##\s+References\s*$/im;
   const headingMatch = referencesHeading.exec(body);
   if (!headingMatch) {
+    if (required) {
+      errors.push(`${filePath}: technical posts must include a ## References section with official sources`);
+    }
     return;
   }
 
@@ -138,6 +205,11 @@ function validateReferencesSection(body, filePath, errors) {
   const section = nextHeading === -1 ? remaining : remaining.slice(0, nextHeading);
 
   const urls = [...section.matchAll(/\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1]);
+  if (required && urls.length === 0) {
+    errors.push(`${filePath}: technical posts must include at least one official source link in ## References`);
+    return;
+  }
+
   for (const rawUrl of urls) {
     try {
       const hostname = new URL(rawUrl).hostname;
@@ -272,9 +344,11 @@ function main() {
     const tags = getFrontmatterTags(frontmatter);
 
     validateAuthorId(frontmatter, fullPath, allowedAuthorIds, errors);
+    validateCategory(frontmatter, fullPath, errors);
+    validateEditorialQuality(frontmatter, fullPath, errors);
     validateCoverImage(frontmatter, fullPath, errors, warnings, seenCoverImages);
     validateTechnicalVisual(tags, body, fullPath, errors);
-    validateReferencesSection(body, fullPath, errors);
+    validateReferencesSection(body, fullPath, errors, isTechnicalPost(frontmatter, tags));
   }
 
   if (errors.length > 0) {
