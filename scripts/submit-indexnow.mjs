@@ -70,14 +70,34 @@ function urlsFromEnvironment() {
     .filter(Boolean);
 }
 
-function urlsFromSitemap() {
-  const sitemapPath = path.join('dist', 'sitemap-0.xml');
-  if (!fs.existsSync(sitemapPath)) return [];
+function getSitemapFiles() {
+  const sitemapIndexPath = path.join('dist', 'sitemap-index.xml');
+  const files = new Set();
 
-  const sitemap = fs.readFileSync(sitemapPath, 'utf8');
+  if (fs.existsSync(sitemapIndexPath)) {
+    const sitemapIndex = fs.readFileSync(sitemapIndexPath, 'utf8');
+    for (const match of sitemapIndex.matchAll(/<loc>([^<]+)<\/loc>/g)) {
+      const sitemapUrl = new URL(match[1]);
+      const fileName = path.basename(sitemapUrl.pathname);
+      if (/^sitemap-\d+\.xml$/.test(fileName)) files.add(path.join('dist', fileName));
+    }
+  }
+
+  for (const fileName of fs.readdirSync('dist').filter((file) => /^sitemap-\d+\.xml$/.test(file))) {
+    files.add(path.join('dist', fileName));
+  }
+
+  return [...files].filter((file) => fs.existsSync(file));
+}
+
+function urlsFromSitemap() {
   const escapedOrigin = site.origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const blogUrlPattern = new RegExp(`<loc>(${escapedOrigin}/blog/[^<]+)</loc>`, 'g');
-  return [...sitemap.matchAll(blogUrlPattern)].map((match) => match[1]).filter((url) => !url.endsWith('/blog'));
+
+  return getSitemapFiles().flatMap((sitemapPath) => {
+    const sitemap = fs.readFileSync(sitemapPath, 'utf8');
+    return [...sitemap.matchAll(blogUrlPattern)].map((match) => match[1]).filter((url) => !url.endsWith('/blog'));
+  });
 }
 
 function normalizeUrls(urls) {
