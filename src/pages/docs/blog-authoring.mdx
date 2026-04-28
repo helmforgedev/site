@@ -1,0 +1,216 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: Blog Authoring Guide — HelmForge
+description: Workflow for publishing discovery-ready HelmForge blog posts with required metadata, images, structured data, RSS, sitemap, IndexNow, and editorial review evidence.
+---
+
+# Blog Authoring Guide
+
+Use this guide for every post under `src/content/blog/`. It is the source of truth for publishing HelmForge blog articles that are ready for readers, RSS subscribers, Google Search, Google Discover eligibility, Bing, Microsoft Start, and internal monitoring.
+
+Discovery readiness does not guarantee appearance in Google Discover, Google News surfaces, Bing, or Microsoft Start. IndexNow notifies participating search engines about URL changes, but it does not guarantee indexing or ranking.
+
+## Publishing Workflow
+
+1. Create or update one MDX file under `src/content/blog/`.
+2. Add all required frontmatter fields.
+3. Add a unique article-specific hero image under `public/blog/`.
+4. Write the article with practical technical value, official references, and no misleading preview text.
+5. Run local checks before opening the PR.
+6. Review the built preview for metadata, image rendering, JSON-LD, RSS, sitemap, related/latest posts, and author profile links.
+7. Merge only when the article is final and ready to publish.
+
+## Required Frontmatter
+
+Use this template for new posts:
+
+```mdx
+---
+title: 'Kubernetes Backup Patterns for Helm Charts'
+description: 'How to validate Helm chart backup behavior with Kubernetes-native checks before production release.'
+date: 2026-04-28
+updatedAt: 2026-04-28
+authorId: 'maicon-berlofa'
+category: 'operations'
+tags: ['kubernetes', 'helm', 'backup']
+relatedCharts: ['velero', 'postgresql']
+coverImage: '/blog/2026-04-28-kubernetes-backup-patterns-hero.webp'
+coverAlt: 'Kubernetes backup workflow diagram for Helm chart validation'
+schemaType: 'BlogPosting'
+---
+```
+
+Field rules:
+
+| Field           | Required | Rule                                                                   |
+| --------------- | -------- | ---------------------------------------------------------------------- |
+| `title`         | Yes      | Specific, accurate, under 70 characters when possible, no clickbait.   |
+| `description`   | Yes      | Practical summary under 160 characters when possible.                  |
+| `date`          | Yes      | Original publication date in `YYYY-MM-DD` format.                      |
+| `updatedAt`     | Yes      | Same as `date` until a material update is made.                        |
+| `authorId`      | Yes      | Must match a real person in `src/data/authors.ts`.                     |
+| `category`      | Yes      | One of the approved values in `src/data/blog.ts`.                      |
+| `tags`          | Yes      | Lowercase topic tags used for discovery and related posts.             |
+| `relatedCharts` | Optional | Chart slugs when the article directly references charts.               |
+| `coverImage`    | Yes      | Local `/blog/YYYY-MM-DD-slug-hero.webp` path.                          |
+| `coverAlt`      | Yes      | Describes the image in article context, not a keyword list.            |
+| `schemaType`    | Yes      | Usually `BlogPosting`; use `NewsArticle` only for news-style coverage. |
+
+## Discovery Readiness Checklist
+
+Before opening a blog PR, confirm:
+
+- The title and description accurately summarize the article.
+- The post uses a real `authorId`; never use a team, bot, automation, or generic author.
+- The author profile page exists at `/authors/<authorId>`.
+- `date` and `updatedAt` are correct and not used to imply false freshness.
+- The cover image is unique to this post.
+- The cover image is at least 1200px wide; 1600x900 is preferred.
+- The cover image path starts with `/blog/` and ends with `-hero.webp`.
+- The cover filename includes the publish date and post topic tokens.
+- `coverAlt` is descriptive and useful.
+- Technical claims have a `## References` section with official sources.
+- The built page emits article-specific `og:image` and `twitter:image`.
+- The built page emits `max-image-preview:large`.
+- The built page emits Article JSON-LD with complete required fields.
+- The post appears in `/blog/rss.xml`.
+- The post appears in `sitemap-index.xml` output.
+- IndexNow was submitted for newly published or materially updated URLs after deploy when IndexNow is enabled.
+
+## Image Naming and Sizing
+
+Store hero images in `public/blog/` and reference them as `/blog/...`.
+
+Required pattern:
+
+```text
+public/blog/YYYY-MM-DD-descriptive-post-slug-hero.webp
+```
+
+Examples:
+
+```text
+public/blog/2026-04-28-kubernetes-backup-patterns-hero.webp
+public/blog/2026-04-28-fastmcp-server-production-runtime-hero.webp
+```
+
+Image requirements:
+
+- WebP format.
+- At least 1200px wide.
+- Preferred size: 1600x900.
+- Near 16:9 aspect ratio.
+- Unique to the article.
+- Not a generic HelmForge logo, default Open Graph image, placeholder, or unrelated illustration.
+- Text inside the image must not cover the main subject or become unreadable on social previews.
+
+Use inline images only when they help explain the article. Inline images need descriptive alt text and should live under `public/blog/` unless they are chart-specific assets.
+
+## Schema Type
+
+Use `BlogPosting` for standard HelmForge posts:
+
+- Tutorials
+- Operational guides
+- Comparisons
+- Release explanations
+- Technical commentary
+
+Use `NewsArticle` only when the article is time-sensitive news coverage:
+
+- CNCF status updates
+- Major project announcements
+- Security advisories
+- Breaking ecosystem events
+
+Use `Article` for evergreen reference material that is not written as a dated blog update.
+
+When `schemaType` changes, verify the built page emits the same JSON-LD `@type`.
+
+## Updating Existing Posts
+
+Do not change `date` when updating an old post. `date` is the original publication date.
+
+Use `updatedAt` only when the content materially changes:
+
+- New supported version or behavior.
+- Corrected technical guidance.
+- New migration step.
+- Updated compatibility information.
+- Significant section rewrite.
+
+Do not change `updatedAt` for typo fixes, formatting cleanup, internal link changes, or image compression. This avoids misleading freshness signals in search results and feeds.
+
+## References and Citations
+
+Technical and version-sensitive claims need official references. Prefer:
+
+1. Upstream project documentation.
+2. Official release notes and changelogs.
+3. Project GitHub repositories, issues, pull requests, KEPs, or design docs.
+4. CNCF, standards, or vendor documentation.
+5. HelmForge chart documentation or ArtifactHub pages for HelmForge-specific behavior.
+
+Add references under a `## References` heading:
+
+```mdx
+## References
+
+- [Kubernetes documentation](https://kubernetes.io/docs/home/)
+- [Helm documentation](https://helm.sh/docs/)
+```
+
+Avoid third-party blog posts as primary evidence for current behavior. They can be useful context, but they age quickly and often do not represent upstream policy.
+
+## CI Checklist for Blog PRs
+
+Run these before opening or merging a blog PR:
+
+```bash
+npm run lint
+npm run format:check
+npm run build
+npm run blog:performance-report -- --check
+```
+
+PR review must also verify:
+
+- Preview page renders correctly on desktop and mobile.
+- Cover image is visible and not cropped into meaningless content.
+- Author profile link works.
+- Related/latest posts block appears when implemented.
+- RSS and sitemap include the canonical URL after build.
+- IndexNow evidence is recorded after deploy for new or materially updated posts.
+- `validate_blog_discovery` MCP evidence agrees with the site checks when MCP validation is used.
+
+## PR Evidence Template
+
+Include this in the PR body when a blog file changes:
+
+```md
+## Blog Discovery Validation
+
+- Blog file:
+- Canonical URL:
+- Author profile:
+- Cover image path:
+- Cover image size:
+- Schema type:
+- RSS inclusion checked:
+- Sitemap inclusion checked:
+- IndexNow action:
+- Official references reviewed:
+
+## Commands
+
+- [ ] npm run lint
+- [ ] npm run format:check
+- [ ] npm run build
+- [ ] npm run blog:performance-report -- --check
+```
+
+## Related Workflows
+
+- Blog monitoring: [/blog/monitoring](/blog/monitoring)
+- Editorial policy: [/editorial-policy](/editorial-policy)
+- Corrections: [/corrections](/corrections)

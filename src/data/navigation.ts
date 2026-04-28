@@ -11,6 +11,7 @@ export const sidebarNav: NavItem[] = [
   { label: 'Getting Started', href: '/docs/getting-started' },
   { label: 'Charts Overview', href: '/docs/charts' },
   { label: 'Stack Examples', href: '/docs/stack-examples' },
+  { label: 'Blog Authoring', href: '/docs/blog-authoring' },
   { label: 'HelmForge vs Other Charts', href: '/docs/comparison' },
   { label: 'FAQ', href: '/docs/faq' },
   { label: 'Troubleshooting', href: '/docs/troubleshooting' },
