@@ -26,6 +26,7 @@ const OFFICIAL_REFERENCE_HOSTS = new Set([
   'grafana.com',
   'cncf.io',
   'modelcontextprotocol.io',
+  'keycloak.org',
 ]);
 
 const NON_OFFICIAL_BANNED_HOSTS = new Set(['replicated.com', 'knowledge.broadcom.com', 'medium.com']);
