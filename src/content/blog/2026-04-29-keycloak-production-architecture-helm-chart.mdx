@@ -1,0 +1,172 @@
+---
+title: 'Keycloak on Kubernetes Needed an Architecture Pass'
+description: 'The HelmForge Keycloak chart now treats identity as production infrastructure: explicit modes, safer rollouts, real database paths, routing choices, observability, and backup.'
+date: 2026-04-29
+publishDate: 2026-04-29
+updatedAt: 2026-04-29
+authorId: 'maicon-berlofa'
+category: 'operations'
+tags: ['keycloak', 'helm', 'kubernetes', 'security', 'operations']
+relatedCharts: ['keycloak', 'postgresql', 'mysql', 'authelia']
+coverImage: '/blog/2026-04-29-keycloak-production-architecture-helm-chart-hero.webp'
+coverAlt: 'Keycloak production architecture control plane rendered as a Kubernetes identity platform map'
+schemaType: 'BlogPosting'
+---
+
+Keycloak is not just another stateless web application with a login screen. In production, it becomes an identity control plane: every redirect, token refresh, admin operation, realm import, database migration, and proxy header belongs to the availability story of the platform.
+
+That is the architectural stance behind the refreshed HelmForge Keycloak chart.
+
+The chart now tracks `quay.io/keycloak/keycloak:26.6.1`, the current Keycloak download version verified from the official downloads page on April 29, 2026. Keycloak 26.6.1 is a patch release from April 15, 2026 with security fixes, bug fixes, CloudNativePG guidance updates, and database-at-rest-encryption work. It builds on the larger 26.6.0 release from April 8, 2026, which introduced important operational changes for Kubernetes teams: supported zero-downtime patch releases, graceful HTTP shutdown, simplified database operations, Kubernetes/OpenShift truststore initialization, better logging controls, and the `KCRAW_` environment variable prefix for literal values.
+
+Those upstream changes matter because a Helm chart should not merely expose container args. It should shape a deployment path that makes the right operational decisions easy to express and the dangerous shortcuts harder to hide.
+
+## The chart now has a stronger opinion
+
+The most important change is not a single value. It is the chart contract.
+
+There are now two explicit runtime modes:
+
+- `mode: dev` for local bootstrap and short-lived validation.
+- `mode: production` for real deployments with a hostname and a database-backed state model.
+
+That distinction sounds simple, but it removes a class of failures where a deployment "works" only because it silently relied on a development shortcut. Production mode fails fast when the hostname or database path is missing. Multi-replica dev mode is blocked. Production without a real database is blocked. An admin ingress without a production admin hostname is blocked.
+
+That is the right kind of friction. Identity infrastructure should fail during rendering or install, not after the first incident.
+
+## A practical architecture, not an operator cosplay
+
+The chart is intentionally production-aware without pretending to be the Keycloak Operator.
+
+It manages the Kubernetes resources expected from a Helm chart: Deployment, Services, Ingress, optional Gateway API `HTTPRoute`, Secrets or ExternalSecrets targets, ServiceMonitor, NetworkPolicy, PodDisruptionBudget, backup CronJob, and scheduling controls.
+
+It does not create a Gateway controller, a GatewayClass, an External Secrets backend, a SecretStore, a database operator, or a complete autoscaling policy. Those belong to the platform.
+
+That boundary is a feature. It keeps the chart useful across k3d, kind, bare metal, managed Kubernetes, ingress-controller stacks, and clusters that already standardize on Gateway API or External Secrets Operator.
+
+![Keycloak production architecture map showing traffic, identity, database, secrets, observability, backup, and rollout lanes.](/blog/2026-04-29-keycloak-production-architecture-flow.webp)
+
+_The useful unit is not "a Keycloak pod." It is the path from public traffic to identity state, with separate management, secret materialization, metrics, backup, and rollout controls._
+
+## The setup path is deliberately short
+
+The default path is still practical:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+
+helm install keycloak helmforge/keycloak \
+  --namespace identity \
+  --create-namespace \
+  --wait --timeout 10m
+```
+
+That gives teams a working development deployment. Moving to production is not a different product. It is the same chart with explicit values:
+
+```yaml
+mode: production
+
+hostname:
+  hostname: sso.example.com
+
+database:
+  external:
+    vendor: postgres
+    host: postgres-rw.databases.svc.cluster.local
+    name: keycloak
+    username: keycloak
+    existingSecret: keycloak-db
+    existingSecretPasswordKey: password
+
+ingress:
+  public:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - host: sso.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: keycloak-backups
+    existingSecret: keycloak-backup-s3
+```
+
+The operator still owns the hard decisions: DNS, certificates, database topology, S3 policy, secret manager, ingress class, and monitoring stack. The chart wires those decisions into a coherent runtime shape.
+
+## What changed architecturally
+
+The refreshed chart treats Keycloak as a set of lanes, each with a separate concern.
+
+The public lane serves browser and client traffic through public ingress or Gateway API. The admin lane can be split with its own ingress or route and is validated more strictly in production. The management lane stays private through a dedicated management service for health and metrics. The database lane is explicit: external PostgreSQL/MySQL-compatible targets or HelmForge subcharts, with database schema, pool, timeout, transaction, and TLS controls surfaced as values.
+
+The secret lane now supports two patterns. You can keep Kubernetes Secrets managed by the chart, or you can opt into External Secrets Operator when the cluster already has the operator and a SecretStore. The chart renders `ExternalSecret` resources and still consumes normal Kubernetes Secrets from the Deployment. That keeps the runtime contract stable while allowing platform teams to source credentials from their own secret backend.
+
+The rollout lane is now more deliberate: `RollingUpdate` defaults use `maxUnavailable: 0` and `maxSurge: 1`, probes can use a heavy-startup profile, termination grace is explicit, and lifecycle guidance follows the upstream 26.6.x push toward safer rolling updates and graceful shutdown.
+
+## The differences that matter under pressure
+
+The multi-replica fix is a good example of practical engineering. Kubernetes port names are not trivia; invalid names can break rendered workloads. The chart now uses `jgroups-fd` for the failure detector port, covers it with tests, and validates multi-replica scenarios.
+
+The chart also exposes production controls that operators previously had to push through generic escape hatches:
+
+- trusted reverse proxy addresses and mutually exclusive PROXY protocol behavior.
+- management health path and management-relative-path aware probes.
+- database pool sizing, schema, slow-query threshold, transaction timeout, and TLS settings.
+- Keycloak features, optimized startup, telemetry, tracing, access logs, and structured logging.
+- capacity profiles for small, medium, and large starting points without removing explicit `resources`.
+- optional dual-stack Service fields that stay omitted by default.
+- optional Gateway API routes for public and admin traffic without exposing the management service.
+- optional NetworkPolicy egress for DNS, database, and environment-specific destinations.
+- database-only backup to S3-compatible storage with on-demand Job execution guidance.
+
+None of these features is flashy on its own. Together they reduce the distance between "we installed Keycloak" and "we can operate Keycloak as identity infrastructure."
+
+## Why Keycloak 26.6.x fits this direction
+
+The 26.6.x upstream line is unusually relevant to chart design.
+
+Supported zero-downtime patch releases and graceful HTTP shutdown are only useful when Kubernetes readiness, termination, rollout strategy, proxy behavior, and database compatibility are modeled together. Automatic Kubernetes/OpenShift truststore initialization affects how ServiceAccount token mounting and cluster CA trust are documented. Database operation improvements are valuable only if the chart exposes enough database shape to let operators tune pool behavior, schema, TLS, and transaction settings.
+
+In other words, the chart should not hide upstream production semantics behind a small `extraEnv` bucket. `extraEnv` remains useful for edge cases, but stable production concerns deserve first-class values.
+
+## The backup boundary is honest
+
+The built-in backup is database-only by design.
+
+That is exactly what a Helm chart can safely automate: run `pg_dump` or `mysqldump`, compress the archive, and upload it to S3-compatible storage from a CronJob. It does not claim to back up external providers, themes, realm import source files, custom truststores, secret-manager contents, or the GitOps repository that defines the environment.
+
+That honesty matters. A restore plan for identity is not only a SQL file. It is database state plus externalized runtime inputs plus platform routing plus secret material. The chart automates the part it can own and documents the rest as source-of-truth responsibility.
+
+## A chart for platform teams
+
+The best part of this refresh is how boring the day-two posture becomes.
+
+A team can start with a short install, move to production by adding hostname and database values, then opt into the platform pieces they already operate: Gateway API, External Secrets, Prometheus Operator, NetworkPolicy, S3 backups, custom providers, custom themes, and capacity profiles.
+
+The chart is not trying to be magical. It is trying to be explicit enough that reviewers can read a values file and understand the identity architecture before it ships.
+
+That is the right bar for Keycloak on Kubernetes.
+
+## References
+
+- [Keycloak 26.6.1 release announcement](https://www.keycloak.org/2026/04/keycloak-2661-released)
+- [Keycloak 26.6.0 release announcement](https://www.keycloak.org/2026/04/keycloak-2660-released)
+- [Keycloak release notes](https://www.keycloak.org/docs/latest/release_notes/index.html)
+- [Keycloak downloads](https://www.keycloak.org/downloads)
+- [Keycloak container guide](https://www.keycloak.org/server/containers)
+- [Keycloak reverse proxy guide](https://www.keycloak.org/server/reverseproxy)
+- [Keycloak database guide](https://www.keycloak.org/server/db)
+- [Keycloak single-cluster HA guide](https://www.keycloak.org/high-availability/single-cluster/deploy-keycloak)
+- [Kubernetes Gateway API](https://kubernetes.io/docs/concepts/services-networking/gateway/)
+- [External Secrets Operator project](https://github.com/external-secrets/external-secrets)
