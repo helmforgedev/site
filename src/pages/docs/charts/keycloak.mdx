@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Keycloak Chart
-description: HelmForge Keycloak chart — Keycloak identity and access management for Kubernetes.
+description: HelmForge Keycloak chart — Keycloak 26.6.x identity and access management for Kubernetes with production mode, PostgreSQL/MySQL, Gateway API, External Secrets, metrics, and backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,27 +11,34 @@ import KeycloakDiagram from '../../../components/diagrams/KeycloakDiagram.astro'
 
 # Keycloak
 
-Production-ready Keycloak deployment for identity and access management, supporting SSO, OAuth 2.0, OIDC, and SAML.
+Deploy [Keycloak](https://www.keycloak.org/) on Kubernetes for identity and access management, SSO, OAuth 2.0,
+OpenID Connect, and SAML. The chart supports explicit `dev` and `production` modes, Keycloak `26.6.1`, bundled or
+external PostgreSQL/MySQL-compatible databases, optional Gateway API routes, External Secrets Operator integration,
+Prometheus metrics, S3-compatible database backup, and dual-stack Service fields.
 
 ## Key Features
 
-- **Identity management** — SSO, user federation, social login
-- **Protocol support** — OAuth 2.0, OpenID Connect, SAML 2.0
-- **External database** — PostgreSQL or MySQL backend support
-- **Ingress support** — Configurable with `ingressClassName` and TLS
-- **Metrics** — Prometheus metrics with ServiceMonitor
-- **Security** — Non-root containers, network policies, pod security
-- **Realm import** — Automatic realm configuration on startup
+- **Explicit runtime mode** — `mode: dev` for local testing and `mode: production` for hostname/database-backed deployments.
+- **Keycloak 26.6.x alignment** — image tag and app version use `quay.io/keycloak/keycloak:26.6.1`.
+- **Database choices** — embedded H2 for dev only, bundled PostgreSQL/MySQL subcharts, or external PostgreSQL/MySQL/MariaDB.
+- **HA-ready controls** — JDBC_PING cache stack, multi-replica scheduling defaults, PDB, rollout strategy, and capacity profiles.
+- **Routing options** — separate public/admin Ingress resources plus optional Gateway API `HTTPRoute` resources.
+- **Security integration** — non-root defaults, configurable ServiceAccount token mount, truststore controls, NetworkPolicy ingress and egress, and External Secrets Operator opt-in.
+- **Observability** — health probes, management service, metrics endpoint, ServiceMonitor, telemetry, tracing, and structured logging controls.
+- **Backup** — database-only PostgreSQL/MySQL dump CronJob uploaded to S3-compatible storage.
 
 ## Architecture
 
-<ArchitectureDiagram title="Basic" description="Single Keycloak instance behind an ingress with PostgreSQL backend.">
-  <KeycloakDiagram mode="basic" />
+<ArchitectureDiagram
+  title="Production"
+  description="Public traffic reaches the Keycloak application service through Ingress or Gateway API. Health and metrics stay on the private management service."
+>
+  <KeycloakDiagram mode="production" />
 </ArchitectureDiagram>
 
 <ArchitectureDiagram
   title="High Availability"
-  description="Multiple Keycloak replicas with cache synchronization and external database."
+  description="Multiple Keycloak pods share the same database, use JDBC_PING for cache discovery, and can expose optional backup and External Secrets flows."
 >
   <KeycloakDiagram mode="ha" />
 </ArchitectureDiagram>
@@ -43,45 +50,47 @@ Production-ready Keycloak deployment for identity and access management, support
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-keycloak helmforge/keycloak
+helm install keycloak helmforge/keycloak -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-keycloak oci://ghcr.io/helmforgedev/helm/keycloak
+helm install keycloak oci://ghcr.io/helmforgedev/helm/keycloak -f values.yaml
 ```
+
+<Callout type="warning" title="Production mode requires a hostname and a real database">
+  `mode: production` fails fast unless `hostname.hostname` is set and one database path is configured through
+  `postgresql.enabled`, `mysql.enabled`, or `database.external.host`.
+</Callout>
 
 ## Deployment Examples
 
-<DocsTabs tabs={[
-  { id: 'basic', label: 'Basic' },
-  { id: 'external-db', label: 'External Database' },
-  { id: 'ha', label: 'High Availability' },
-  { id: 'ingress', label: 'With Ingress + TLS' },
-]}>
+<DocsTabs
+  tabs={[
+    { id: 'dev', label: 'Dev' },
+    { id: 'external-db', label: 'External DB' },
+    { id: 'ha', label: 'HA' },
+    { id: 'ingress', label: 'Ingress' },
+    { id: 'observability', label: 'Observability + Backup' },
+    { id: 'gateway-secrets', label: 'Gateway + ExternalSecrets' },
+  ]}
+>
 
-<div data-tab-panel="basic">
+<div data-tab-panel="dev">
 
 ```yaml
-# values.yaml — Embedded H2 database (dev only)
-auth:
-  adminUser: admin
-  adminPassword: 'my-secret-password'
+# values.yaml - dev mode with embedded H2
+mode: dev
 
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: auth.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+admin:
+  username: admin
+  password: 'change-me'
 ```
 
-<Callout type="warning" title="H2 is for development only">
-  The embedded H2 database does not support clustering and will lose data if the pod restarts without persistence.
-  Always use an external database for production.
+<Callout type="warning" title="Embedded H2 is not a production database">
+  Dev mode is useful for local validation only. Use PostgreSQL, MySQL, MariaDB, or the PostgreSQL/MySQL subchart for
+  production.
 </Callout>
 
 </div>
@@ -89,27 +98,29 @@ ingress:
 <div data-tab-panel="external-db">
 
 ```yaml
-# values.yaml
-auth:
-  adminUser: admin
-  adminPassword: 'my-secret-password'
+# values.yaml - production with external PostgreSQL
+mode: production
+
+hostname:
+  hostname: https://sso.example.com
+
+admin:
+  existingSecret: keycloak-admin
 
 database:
-  vendor: postgres
-  hostname: postgresql.database.svc
-  port: 5432
-  database: keycloak
-  username: keycloak
-  password: 'db-password'
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: auth.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  external:
+    vendor: postgres
+    host: postgresql.database.svc.cluster.local
+    port: 5432
+    name: keycloak
+    username: keycloak
+    existingSecret: keycloak-db
+    existingSecretPasswordKey: db-password
+    pool:
+      initialSize: 5
+      minSize: 5
+      maxSize: 30
+    logSlowQueriesThreshold: 500ms
 ```
 
 </div>
@@ -117,36 +128,30 @@ ingress:
 <div data-tab-panel="ha">
 
 ```yaml
-# values.yaml — Multi-replica with external PostgreSQL
+# values.yaml - HA with PostgreSQL subchart
+mode: production
 replicaCount: 3
 
-auth:
-  adminUser: admin
-  adminPassword: 'my-secret-password'
+hostname:
+  hostname: https://sso.example.com
 
-database:
-  vendor: postgres
-  hostname: postgresql.database.svc
-  port: 5432
-  database: keycloak
-  username: keycloak
-  password: 'db-password'
-
-resources:
-  requests:
-    memory: 512Mi
-    cpu: 500m
-  limits:
-    memory: 1Gi
-
-ingress:
+postgresql:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: auth.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  auth:
+    database: keycloak
+    username: keycloak
+    password: 'strong-db-password'
+
+cache:
+  enabled: true
+  stack: jdbc-ping
+
+capacity:
+  profile: medium
+
+pdb:
+  enabled: true
+  minAvailable: 1
 ```
 
 </div>
@@ -154,86 +159,420 @@ ingress:
 <div data-tab-panel="ingress">
 
 ```yaml
-# values.yaml — Full ingress with TLS and cert-manager
-auth:
-  adminUser: admin
-  adminPassword: 'my-secret-password'
+# values.yaml - public and admin ingress
+mode: production
+
+hostname:
+  hostname: https://sso.example.com
+  admin: https://admin-sso.example.com
 
 database:
-  vendor: postgres
-  hostname: postgresql.database.svc
-  port: 5432
-  database: keycloak
-  username: keycloak
-  password: 'db-password'
+  external:
+    host: postgresql.database.svc.cluster.local
+    password: 'db-password'
+
+proxy:
+  headers: xforwarded
+  trustedAddresses: 10.0.0.0/8,192.168.0.0/16
 
 ingress:
+  public:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - host: sso.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: keycloak-tls
+        hosts:
+          - sso.example.com
+  admin:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - host: admin-sso.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="observability">
+
+```yaml
+# values.yaml - metrics, logs, backup, and network policy
+mode: production
+
+hostname:
+  hostname: https://sso.example.com
+
+postgresql:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: auth.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: keycloak-tls
-      hosts:
-        - auth.example.com
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+  auth:
+    database: keycloak
+    username: keycloak
+    password: 'strong-db-password'
+
+metrics:
+  enabled: true
+  userEvents: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+logging:
+  console:
+    output: json
+    jsonFormat: ecs
+  access:
+    enabled: true
+
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  s3:
+    endpoint: https://s3.example.com
+    bucket: keycloak-backups
+    existingSecret: keycloak-s3
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    databaseTo:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: database
+```
+
+</div>
+
+<div data-tab-panel="gateway-secrets">
+
+```yaml
+# values.yaml - Gateway API and External Secrets Operator
+mode: production
+
+hostname:
+  hostname: https://sso.example.com
+
+database:
+  external:
+    host: postgresql.database.svc.cluster.local
+    existingSecret: keycloak-db
+
+gateway:
+  public:
+    enabled: true
+    parentRefs:
+      - name: public-gateway
+        namespace: gateway-system
+    hostnames:
+      - sso.example.com
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  admin:
+    enabled: true
+    usernameRemoteRef:
+      key: keycloak/admin
+      property: username
+    passwordRemoteRef:
+      key: keycloak/admin
+      property: password
+  database:
+    enabled: true
+    passwordRemoteRef:
+      key: keycloak/database
+      property: password
 ```
 
 </div>
 
 </DocsTabs>
 
-## Key Values
+## Configuration Reference
 
-| Key                              | Type    | Default    | Description                                |
-| -------------------------------- | ------- | ---------- | ------------------------------------------ |
-| `auth.adminUser`                 | string  | `admin`    | Keycloak admin username                    |
-| `auth.adminPassword`             | string  | `""`       | Keycloak admin password                    |
-| `database.vendor`                | string  | `h2`       | Database vendor: `h2`, `postgres`, `mysql` |
-| `database.hostname`              | string  | `""`       | External database hostname                 |
-| `database.port`                  | integer | `5432`     | External database port                     |
-| `database.database`              | string  | `keycloak` | Database name                              |
-| `database.username`              | string  | `""`       | Database username                          |
-| `database.password`              | string  | `""`       | Database password                          |
-| `replicaCount`                   | integer | `1`        | Number of Keycloak replicas                |
-| `ingress.enabled`                | boolean | `false`    | Enable ingress                             |
-| `ingress.ingressClassName`       | string  | `traefik`  | Ingress class name                         |
-| `ingress.hosts`                  | array   | `[]`       | Ingress host rules                         |
-| `ingress.tls`                    | array   | `[]`       | TLS configuration                          |
-| `resources.requests.memory`      | string  | `256Mi`    | Memory request                             |
-| `resources.requests.cpu`         | string  | `250m`     | CPU request                                |
-| `metrics.enabled`                | boolean | `false`    | Enable Prometheus metrics                  |
-| `metrics.serviceMonitor.enabled` | boolean | `false`    | Create ServiceMonitor resource             |
-| `realmImport`                    | object  | `{}`       | Realm configuration to import on startup   |
+### Core and Image
 
-## Upgrade Notes
+| Parameter          | Type   | Default                     | Description                          |
+| ------------------ | ------ | --------------------------- | ------------------------------------ |
+| `mode`             | string | `dev`                       | Runtime mode: `dev` or `production`. |
+| `nameOverride`     | string | `""`                        | Override chart name.                 |
+| `fullnameOverride` | string | `""`                        | Override full release name.          |
+| `commonLabels`     | object | `{}`                        | Labels added to all resources.       |
+| `clusterDomain`    | string | `cluster.local`             | Kubernetes cluster DNS domain.       |
+| `image.repository` | string | `quay.io/keycloak/keycloak` | Keycloak image repository.           |
+| `image.tag`        | string | `"26.6.1"`                  | Keycloak image tag.                  |
+| `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                        | Pull secrets for private registries. |
 
-<Callout type="warning" title="Database migrations">
-  Keycloak runs database migrations automatically on startup. When upgrading to a new Keycloak version, ensure only one
-  replica starts first (scale to 1, upgrade, then scale back). Running migrations from multiple replicas simultaneously
-  can cause conflicts.
+### Bootstrap Admin
+
+| Parameter                         | Type   | Default          | Description                                                                   |
+| --------------------------------- | ------ | ---------------- | ----------------------------------------------------------------------------- |
+| `admin.username`                  | string | `admin`          | Bootstrap admin username.                                                     |
+| `admin.password`                  | string | `""`             | Bootstrap admin password. Generated when empty and no existing secret is set. |
+| `admin.existingSecret`            | string | `""`             | Existing Kubernetes Secret for bootstrap admin credentials.                   |
+| `admin.existingSecretUsernameKey` | string | `admin-username` | Username key in the admin secret.                                             |
+| `admin.existingSecretPasswordKey` | string | `admin-password` | Password key in the admin secret.                                             |
+
+### HTTP, Management, Hostname, and Proxy
+
+| Parameter                     | Type    | Default      | Description                                                             |
+| ----------------------------- | ------- | ------------ | ----------------------------------------------------------------------- |
+| `http.enabled`                | boolean | `true`       | Keep HTTP enabled inside the cluster.                                   |
+| `http.port`                   | integer | `8080`       | Application HTTP port.                                                  |
+| `http.managementPort`         | integer | `9000`       | Management interface port for health and metrics.                       |
+| `http.relativePath`           | string  | `/`          | Application relative path, for example `/auth`.                         |
+| `management.healthEnabled`    | boolean | `true`       | Serve health endpoints from the management interface.                   |
+| `management.relativePath`     | string  | `""`         | Optional management interface relative path.                            |
+| `hostname.hostname`           | string  | `""`         | Public Keycloak hostname or URL. Required in production.                |
+| `hostname.admin`              | string  | `""`         | Dedicated admin hostname or URL.                                        |
+| `hostname.strict`             | boolean | `true`       | Enforce strict hostname handling.                                       |
+| `hostname.backchannelDynamic` | boolean | `false`      | Enable dynamic backchannel URL resolution.                              |
+| `proxy.headers`               | string  | `xforwarded` | Proxy header mode: `xforwarded`, `forwarded`, or empty.                 |
+| `proxy.trustedAddresses`      | string  | `""`         | Trusted proxy IPs/CIDRs for `KC_PROXY_TRUSTED_ADDRESSES`.               |
+| `proxy.protocolEnabled`       | boolean | `false`      | Enable HAProxy PROXY protocol. Cannot be combined with `proxy.headers`. |
+
+### Database
+
+| Parameter                                     | Type           | Default       | Description                                                                     |
+| --------------------------------------------- | -------------- | ------------- | ------------------------------------------------------------------------------- |
+| `database.external.vendor`                    | string         | `postgres`    | External database vendor: `postgres`, `mysql`, or `mariadb`.                    |
+| `database.external.host`                      | string         | `""`          | External database host.                                                         |
+| `database.external.port`                      | string/integer | `""`          | External database port. Auto-detected from vendor when empty.                   |
+| `database.external.name`                      | string         | `keycloak`    | External database name.                                                         |
+| `database.external.username`                  | string         | `keycloak`    | External database username.                                                     |
+| `database.external.password`                  | string         | `""`          | External database password. Generated when empty and no existing secret is set. |
+| `database.external.existingSecret`            | string         | `""`          | Existing Secret containing database password.                                   |
+| `database.external.existingSecretPasswordKey` | string         | `db-password` | Password key in the existing Secret.                                            |
+| `database.external.jdbcParameters`            | string         | `""`          | Additional JDBC URL parameters.                                                 |
+| `database.external.schema`                    | string         | `""`          | Optional database schema passed to `KC_DB_SCHEMA`.                              |
+| `database.external.pool.initialSize`          | string/integer | `""`          | Initial DB connection pool size.                                                |
+| `database.external.pool.minSize`              | string/integer | `""`          | Minimum DB connection pool size.                                                |
+| `database.external.pool.maxSize`              | string/integer | `""`          | Maximum DB connection pool size.                                                |
+| `database.external.pool.maxLifetime`          | string         | `""`          | Maximum DB connection lifetime.                                                 |
+| `database.external.logSlowQueriesThreshold`   | string         | `""`          | Slow query log threshold.                                                       |
+| `database.external.transaction.xaEnabled`     | string/boolean | `""`          | Enable or disable XA transactions.                                              |
+| `database.external.transaction.timeout`       | string         | `""`          | Transaction timeout.                                                            |
+| `postgresql.enabled`                          | boolean        | `false`       | Enable the bundled PostgreSQL chart.                                            |
+| `postgresql.auth.database`                    | string         | `keycloak`    | PostgreSQL database name.                                                       |
+| `postgresql.auth.username`                    | string         | `keycloak`    | PostgreSQL username.                                                            |
+| `postgresql.auth.password`                    | string         | `""`          | PostgreSQL password. Required for deterministic subchart connections.           |
+| `mysql.enabled`                               | boolean        | `false`       | Enable the bundled MySQL chart.                                                 |
+| `mysql.auth.database`                         | string         | `keycloak`    | MySQL database name.                                                            |
+| `mysql.auth.username`                         | string         | `keycloak`    | MySQL username.                                                                 |
+| `mysql.auth.password`                         | string         | `""`          | MySQL password. Required for deterministic subchart connections.                |
+
+### Database TLS and Truststore
+
+| Parameter                               | Type    | Default                                 | Description                                                                    |
+| --------------------------------------- | ------- | --------------------------------------- | ------------------------------------------------------------------------------ |
+| `database.tls.enabled`                  | boolean | `false`                                 | Enable database TLS settings.                                                  |
+| `database.tls.mode`                     | string  | `""`                                    | Keycloak database TLS mode.                                                    |
+| `database.tls.sslMode`                  | string  | `verify-full`                           | PostgreSQL SSL mode.                                                           |
+| `database.tls.mountPath`                | string  | `/opt/keycloak/conf/db-certs`           | Mount path for DB TLS material.                                                |
+| `database.tls.rootCertFilename`         | string  | `ca.crt`                                | Root CA filename.                                                              |
+| `database.tls.existingSecret`           | string  | `""`                                    | Secret holding DB CA material.                                                 |
+| `database.tls.existingConfigMap`        | string  | `""`                                    | ConfigMap holding DB CA material.                                              |
+| `database.tls.trustStoreFile`           | string  | `""`                                    | DB TLS truststore file path.                                                   |
+| `database.tls.trustStorePasswordSecret` | string  | `""`                                    | Secret containing DB TLS truststore password.                                  |
+| `database.tls.trustStorePasswordKey`    | string  | `password`                              | Password key for DB TLS truststore.                                            |
+| `database.tls.trustStoreType`           | string  | `""`                                    | DB TLS truststore type.                                                        |
+| `truststore.enabled`                    | boolean | `false`                                 | Enable additional outbound TLS trust material.                                 |
+| `truststore.mountPath`                  | string  | `/opt/keycloak/conf/truststores/custom` | Custom truststore mount path.                                                  |
+| `truststore.existingSecret`             | string  | `""`                                    | Secret with PEM or unencrypted PKCS12 trust material.                          |
+| `truststore.existingConfigMap`          | string  | `""`                                    | ConfigMap with PEM or unencrypted PKCS12 trust material.                       |
+| `truststore.tlsHostnameVerifier`        | string  | `DEFAULT`                               | Outbound TLS hostname verifier mode.                                           |
+| `truststore.kubernetes.enabled`         | boolean | `true`                                  | Let Keycloak trust Kubernetes/OpenShift service account CA files when mounted. |
+
+### Runtime, HA, and Capacity
+
+| Parameter                                           | Type           | Default           | Description                                                                       |
+| --------------------------------------------------- | -------------- | ----------------- | --------------------------------------------------------------------------------- |
+| `replicaCount`                                      | integer        | `1`               | Number of Keycloak replicas.                                                      |
+| `cache.enabled`                                     | boolean        | `true`            | Enable distributed cache settings in production mode.                             |
+| `cache.stack`                                       | string         | `jdbc-ping`       | Cache stack used for multi-replica production deployments.                        |
+| `cache.multiReplicaDefaults.enabled`                | boolean        | `true`            | Apply scheduling defaults for multi-replica deployments.                          |
+| `cache.multiReplicaDefaults.podAntiAffinity`        | string         | `preferred`       | Automatic anti-affinity mode: `preferred`, `required`, or `none`.                 |
+| `cache.multiReplicaDefaults.topologySpread.enabled` | boolean        | `true`            | Apply automatic topology spread for multi-replica deployments.                    |
+| `features.enabled`                                  | array          | `[]`              | Keycloak features rendered as `KC_FEATURES`.                                      |
+| `features.disabled`                                 | array          | `[]`              | Keycloak features rendered as `KC_FEATURES_DISABLED`.                             |
+| `optimized.enabled`                                 | boolean        | `false`           | Add `--optimized`; use only with pre-built/custom optimized images in production. |
+| `deployment.strategy.type`                          | string         | `RollingUpdate`   | Deployment strategy: `RollingUpdate` or `Recreate`.                               |
+| `deployment.strategy.rollingUpdate.maxUnavailable`  | string/integer | `0`               | Maximum unavailable pods during rolling update.                                   |
+| `deployment.strategy.rollingUpdate.maxSurge`        | string/integer | `1`               | Maximum surge pods during rolling update.                                         |
+| `resources`                                         | object         | `{}`              | Custom container resources when `capacity.profile=custom`.                        |
+| `capacity.profile`                                  | string         | `custom`          | Resource profile: `custom`, `small`, `medium`, or `large`.                        |
+| `capacity.profiles`                                 | object         | built-in profiles | Profile definitions for `small`, `medium`, and `large`.                           |
+
+### Realm Import, Providers, and Themes
+
+| Parameter                                | Type    | Default | Description                                                  |
+| ---------------------------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `realmImport.enabled`                    | boolean | `false` | Enable startup realm import using `--import-realm`.          |
+| `realmImport.files`                      | object  | `{}`    | Inline realm JSON files written to a generated ConfigMap.    |
+| `realmImport.existingConfigMap`          | string  | `""`    | Existing ConfigMap mounted into `/opt/keycloak/data/import`. |
+| `extensions.providers.existingConfigMap` | string  | `""`    | ConfigMap mounted into `/opt/keycloak/providers`.            |
+| `extensions.providers.existingSecret`    | string  | `""`    | Secret mounted into `/opt/keycloak/providers`.               |
+| `extensions.providers.rolloutToken`      | string  | `""`    | Manual rollout token for provider changes.                   |
+| `extensions.themes.existingConfigMap`    | string  | `""`    | ConfigMap mounted into `/opt/keycloak/themes`.               |
+| `extensions.themes.existingSecret`       | string  | `""`    | Secret mounted into `/opt/keycloak/themes`.                  |
+| `extensions.themes.rolloutToken`         | string  | `""`    | Manual rollout token for theme changes.                      |
+
+### Services, Ingress, and Gateway API
+
+| Parameter                          | Type    | Default     | Description                                         |
+| ---------------------------------- | ------- | ----------- | --------------------------------------------------- |
+| `service.type`                     | string  | `ClusterIP` | Application Service type.                           |
+| `service.annotations`              | object  | `{}`        | Application Service annotations.                    |
+| `service.managementAnnotations`    | object  | `{}`        | Management Service annotations.                     |
+| `service.ipFamilyPolicy`           | string  | `""`        | Application Service IP family policy.               |
+| `service.ipFamilies`               | array   | `[]`        | Application Service IP families.                    |
+| `service.managementIpFamilyPolicy` | string  | `""`        | Management Service IP family policy.                |
+| `service.managementIpFamilies`     | array   | `[]`        | Management Service IP families.                     |
+| `ingress.public.enabled`           | boolean | `false`     | Create public Ingress.                              |
+| `ingress.public.ingressClassName`  | string  | `traefik`   | Public Ingress class.                               |
+| `ingress.public.hosts`             | array   | `[]`        | Public host/path rules.                             |
+| `ingress.public.tls`               | array   | `[]`        | Public TLS configuration.                           |
+| `ingress.admin.enabled`            | boolean | `false`     | Create admin Ingress.                               |
+| `ingress.admin.ingressClassName`   | string  | `traefik`   | Admin Ingress class.                                |
+| `ingress.admin.hosts`              | array   | `[]`        | Admin host/path rules.                              |
+| `ingress.admin.tls`                | array   | `[]`        | Admin TLS configuration.                            |
+| `gateway.public.enabled`           | boolean | `false`     | Create public Gateway API `HTTPRoute`.              |
+| `gateway.public.parentRefs`        | array   | `[]`        | Required parentRefs when public Gateway is enabled. |
+| `gateway.public.hostnames`         | array   | `[]`        | Public route hostnames.                             |
+| `gateway.admin.enabled`            | boolean | `false`     | Create admin Gateway API `HTTPRoute`.               |
+| `gateway.admin.parentRefs`         | array   | `[]`        | Required parentRefs when admin Gateway is enabled.  |
+| `gateway.admin.hostnames`          | array   | `[]`        | Admin route hostnames.                              |
+
+### Health, Metrics, Telemetry, and Logs
+
+| Parameter                                  | Type          | Default   | Description                                               |
+| ------------------------------------------ | ------------- | --------- | --------------------------------------------------------- |
+| `health.enabled`                           | boolean       | `true`    | Enable Keycloak health endpoints.                         |
+| `probes.profile`                           | string        | `default` | Probe profile: `default` or `heavy-startup`.              |
+| `probes.liveness.enabled`                  | boolean       | `true`    | Enable liveness probe.                                    |
+| `probes.readiness.enabled`                 | boolean       | `true`    | Enable readiness probe.                                   |
+| `probes.startup.enabled`                   | boolean       | `true`    | Enable startup probe.                                     |
+| `metrics.enabled`                          | boolean       | `false`   | Enable Keycloak metrics endpoint.                         |
+| `metrics.userEvents`                       | boolean       | `false`   | Enable user event metrics.                                |
+| `metrics.cacheHistograms`                  | boolean       | `false`   | Enable cache metrics histograms.                          |
+| `metrics.serviceMonitor.enabled`           | boolean       | `false`   | Create a ServiceMonitor targeting the management service. |
+| `metrics.serviceMonitor.interval`          | string        | `30s`     | ServiceMonitor scrape interval.                           |
+| `metrics.serviceMonitor.scrapeTimeout`     | string        | `""`      | Optional scrape timeout.                                  |
+| `metrics.serviceMonitor.relabelings`       | array         | `[]`      | Prometheus relabeling rules.                              |
+| `metrics.serviceMonitor.metricRelabelings` | array         | `[]`      | Prometheus metric relabeling rules.                       |
+| `telemetry.metricsEnabled`                 | boolean       | `false`   | Enable OpenTelemetry metrics export.                      |
+| `telemetry.endpoint`                       | string        | `""`      | General OpenTelemetry endpoint.                           |
+| `telemetry.metricsEndpoint`                | string        | `""`      | Metrics-specific OpenTelemetry endpoint.                  |
+| `tracing.enabled`                          | boolean       | `false`   | Enable OpenTelemetry tracing.                             |
+| `tracing.endpoint`                         | string        | `""`      | Tracing endpoint.                                         |
+| `tracing.samplerType`                      | string        | `""`      | Tracing sampler type.                                     |
+| `tracing.samplerRatio`                     | string/number | `""`      | Tracing sampler ratio.                                    |
+| `logging.level`                            | string        | `info`    | Global Keycloak log level.                                |
+| `logging.console.output`                   | string        | `default` | Console output mode: `default` or `json`.                 |
+| `logging.console.jsonFormat`               | string        | `default` | JSON log format: `default` or `ecs`.                      |
+| `logging.access.enabled`                   | boolean       | `false`   | Enable HTTP access logs.                                  |
+
+### Backup
+
+| Parameter                           | Type    | Default                                                            | Description                          |
+| ----------------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------ |
+| `backup.enabled`                    | boolean | `false`                                                            | Enable database backup CronJob.      |
+| `backup.schedule`                   | string  | `"0 3 * * *"`                                                      | Backup schedule.                     |
+| `backup.suspend`                    | boolean | `false`                                                            | Suspend scheduled execution.         |
+| `backup.concurrencyPolicy`          | string  | `Forbid`                                                           | CronJob concurrency policy.          |
+| `backup.archivePrefix`              | string  | `keycloak`                                                         | Prefix for generated archive names.  |
+| `backup.images.uploader.repository` | string  | `docker.io/helmforge/mc`                                           | S3 uploader image.                   |
+| `backup.images.uploader.tag`        | string  | `"1.0.0"`                                                          | S3 uploader image tag.               |
+| `backup.s3.endpoint`                | string  | `""`                                                               | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`                  | string  | `""`                                                               | Target bucket name.                  |
+| `backup.s3.prefix`                  | string  | `keycloak`                                                         | Object key prefix.                   |
+| `backup.s3.createBucketIfNotExists` | boolean | `true`                                                             | Create bucket when missing.          |
+| `backup.s3.existingSecret`          | string  | `""`                                                               | Existing Secret with S3 credentials. |
+| `backup.database.postgresDumpArgs`  | string  | `--clean --if-exists`                                              | Extra `pg_dump` arguments.           |
+| `backup.database.mysqlDumpArgs`     | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra `mysqldump` arguments.         |
+
+### Security, Scheduling, and Extension Points
+
+| Parameter                                     | Type    | Default           | Description                                                    |
+| --------------------------------------------- | ------- | ----------------- | -------------------------------------------------------------- |
+| `pdb.enabled`                                 | boolean | `false`           | Create PodDisruptionBudget.                                    |
+| `pdb.minAvailable`                            | integer | `1`               | Minimum available pods.                                        |
+| `pdb.maxUnavailable`                          | string  | `""`              | Maximum unavailable pods.                                      |
+| `networkPolicy.enabled`                       | boolean | `false`           | Create NetworkPolicy for Keycloak pods.                        |
+| `networkPolicy.ingress.allowSameNamespace`    | boolean | `true`            | Allow app traffic from the same namespace.                     |
+| `networkPolicy.management.allowSameNamespace` | boolean | `true`            | Allow management traffic from the same namespace.              |
+| `networkPolicy.clustering.enabled`            | boolean | `true`            | Allow Keycloak pod-to-pod cache transport when multi-replica.  |
+| `networkPolicy.egress.enabled`                | boolean | `false`           | Add egress rules.                                              |
+| `networkPolicy.egress.allowDns`               | boolean | `true`            | Allow TCP/UDP DNS egress.                                      |
+| `networkPolicy.egress.allowDatabase`          | boolean | `true`            | Allow DB egress when `databaseTo` is configured.               |
+| `networkPolicy.egress.databaseTo`             | array   | `[]`              | Egress destination peers for database traffic.                 |
+| `networkPolicy.egress.extraEgress`            | array   | `[]`              | Additional egress rules.                                       |
+| `serviceAccount.create`                       | boolean | `false`           | Create a ServiceAccount.                                       |
+| `serviceAccount.name`                         | string  | `""`              | ServiceAccount name override.                                  |
+| `serviceAccount.automountServiceAccountToken` | boolean | `true`            | Mount the Kubernetes ServiceAccount token and CA into the pod. |
+| `podSecurityContext`                          | object  | non-root defaults | Pod-level security context.                                    |
+| `securityContext`                             | object  | non-root defaults | Container-level security context.                              |
+| `nodeSelector`                                | object  | `{}`              | Node selector.                                                 |
+| `tolerations`                                 | array   | `[]`              | Pod tolerations.                                               |
+| `affinity`                                    | object  | `{}`              | Custom affinity.                                               |
+| `topologySpreadConstraints`                   | array   | `[]`              | Custom topology spread constraints.                            |
+| `priorityClassName`                           | string  | `""`              | PriorityClass name.                                            |
+| `terminationGracePeriodSeconds`               | integer | `120`             | Pod termination grace period.                                  |
+| `extraEnv`                                    | array   | `[]`              | Extra environment variables.                                   |
+| `extraEnvFrom`                                | array   | `[]`              | Extra envFrom sources.                                         |
+| `initContainers`                              | array   | `[]`              | Extra init containers.                                         |
+| `extraContainers`                             | array   | `[]`              | Extra sidecars.                                                |
+| `extraVolumes`                                | array   | `[]`              | Extra pod volumes.                                             |
+| `extraVolumeMounts`                           | array   | `[]`              | Extra Keycloak volume mounts.                                  |
+
+### External Secrets Operator
+
+| Parameter                             | Type    | Default                  | Description                                                                              |
+| ------------------------------------- | ------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret resources for clusters that already run External Secrets Operator. |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | ExternalSecret API version.                                                              |
+| `externalSecrets.refreshInterval`     | string  | `1h`                     | Refresh interval.                                                                        |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | Existing SecretStore or ClusterSecretStore name. Required when enabled.                  |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore`            | Store kind: `SecretStore` or `ClusterSecretStore`.                                       |
+| `externalSecrets.admin.enabled`       | boolean | `false`                  | Materialize bootstrap admin Secret through ESO.                                          |
+| `externalSecrets.database.enabled`    | boolean | `false`                  | Materialize database password Secret through ESO.                                        |
+| `externalSecrets.truststore.enabled`  | boolean | `false`                  | Materialize truststore Secret through ESO.                                               |
+
+<Callout type="info" title="External Secrets is optional">
+  The chart does not install External Secrets Operator and does not create `SecretStore` or `ClusterSecretStore`
+  resources. Enable this only on clusters where the operator and store already exist.
 </Callout>
 
-- Admin password changes in values only take effect on fresh installations
-- Realm import runs on every startup by default — use `realmImport.skipExisting: true` to avoid overwriting
-- Ingress annotations changes require a pod restart if the ingress controller caches configuration
+## Operational Notes
 
-## Common Issues
+- `Chart.yaml` pins PostgreSQL chart `1.9.13` and MySQL chart `1.8.7`.
+- `Chart.lock` is versioned for reproducible dependency builds.
+- Built-in backup is database-only. Back up providers, themes, realm import files, truststores, and external secret backends through their own source-of-truth.
+- The management service is private and should not be exposed through public ingress.
+- Gateway API routes target the application service only; they do not route the management service.
+- Dual-stack fields are optional and omitted by default so the cluster default remains authoritative.
+- `serviceAccount.automountServiceAccountToken=false` can harden the pod, but it also removes the default Kubernetes CA material used by Keycloak truststore auto-discovery.
 
-<Callout type="danger" title="Admin console returns 403 or redirect loop">
-  This usually means the proxy headers are not configured correctly. Ensure your ingress controller forwards
-  `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers. For Traefik, this is enabled by default.
-</Callout>
+## Official References
 
-<Callout type="tip" title="Slow startup with large realms">
-  Keycloak with many realms, clients, or users takes longer to start. Increase the `startupProbe.failureThreshold` and
-  `startupProbe.periodSeconds` values to prevent Kubernetes from killing the pod before it finishes initialization.
-</Callout>
-
-## More Information
-
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/keycloak) on GitHub.
+- [Keycloak downloads](https://www.keycloak.org/downloads)
+- [Keycloak production guide](https://www.keycloak.org/server/configuration-production)
+- [Keycloak reverse proxy guide](https://www.keycloak.org/server/reverseproxy)
+- [Keycloak distributed caches](https://www.keycloak.org/server/caching)
+- [Keycloak health checks](https://www.keycloak.org/observability/health)
+- [Keycloak management interface](https://www.keycloak.org/server/management-interface)
+- [Keycloak containers](https://www.keycloak.org/server/containers)
+- [Keycloak database guide](https://www.keycloak.org/server/db)
+- [Keycloak truststore guide](https://www.keycloak.org/server/keycloak-truststore)
+- [Keycloak single-cluster HA](https://www.keycloak.org/high-availability/single-cluster/deploy-keycloak)
+- [HelmForge Keycloak chart source](https://github.com/helmforgedev/charts/tree/main/charts/keycloak)
