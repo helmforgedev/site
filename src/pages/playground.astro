@@ -6,7 +6,7 @@ import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
 import { charts, chartIcon, FALLBACK_ICON } from '../data/charts';
 
-const stableCharts = charts.filter((c) => c.maturity === 'stable' || c.slug === 'gophish');
+const stableCharts = charts.filter((c) => c.maturity === 'stable' || c.slug === 'gophish' || c.slug === 'hoppscotch');
 
 // Field definition for playground configs
 interface PlaygroundField {
@@ -4177,6 +4177,77 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  hoppscotch: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Mode',
+          key: 'mode',
+          type: 'select',
+          default: 'dev',
+          options: ['dev', 'production'],
+          description: 'dev uses defaults; production requires a hostname',
+        },
+        {
+          label: 'Replica Count',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'App is stateless — horizontal scaling is safe',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.host',
+          type: 'text',
+          default: 'hoppscotch.example.com',
+          description: 'All VITE_* URLs are auto-derived from this host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.className',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      collapsible: true,
+      gateField: 'postgresql.enabled',
+      fields: [
+        {
+          label: 'Storage Size',
+          key: 'postgresql.primary.persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Persistent volume size for bundled PostgreSQL',
+        },
+      ],
+    },
+    {
+      name: 'Authentication',
+      collapsible: false,
+      fields: [
+        {
+          label: 'Providers',
+          key: 'auth.providers',
+          type: 'text',
+          default: 'EMAIL',
+          description: 'Comma-separated: EMAIL, GOOGLE, GITHUB, MICROSOFT',
+        },
+      ],
+    },
+  ],
 };
 
 // Pre-built scenarios per chart
@@ -4496,6 +4567,44 @@ const scenarios: Record<string, { label: string; description: string; values: Re
         'resources.limits.memory': '512Mi',
         'backup.enabled': 'true',
         'backup.schedule': '0 3 * * *',
+      },
+    },
+  ],
+  hoppscotch: [
+    {
+      label: 'Dev (default)',
+      description: 'Local development with bundled PostgreSQL, no TLS',
+      values: {
+        mode: 'dev',
+        'ingress.enabled': 'true',
+        'ingress.host': 'hoppscotch.local',
+        'postgresql.enabled': 'true',
+        'auth.providers': 'EMAIL',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'Production with TLS ingress and cert-manager',
+      values: {
+        mode: 'production',
+        'ingress.enabled': 'true',
+        'ingress.host': 'hoppscotch.example.com',
+        'ingress.className': 'nginx',
+        'postgresql.enabled': 'true',
+        'auth.providers': 'EMAIL',
+      },
+    },
+    {
+      label: 'Multi-auth',
+      description: 'Production with OAuth providers enabled',
+      values: {
+        mode: 'production',
+        'ingress.enabled': 'true',
+        'ingress.host': 'hoppscotch.example.com',
+        'ingress.className': 'nginx',
+        'postgresql.enabled': 'true',
+        'auth.providers': 'GOOGLE,GITHUB,EMAIL',
+        replicaCount: '2',
       },
     },
   ],
