@@ -176,26 +176,42 @@ ingress:
 
 ## Key Values
 
-| Key                                 | Type    | Default      | Description                                            |
-| ----------------------------------- | ------- | ------------ | ------------------------------------------------------ |
-| `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication` |
-| `auth.rootPassword`                 | string  | `""`         | MySQL root password                                    |
-| `auth.database`                     | string  | `""`         | Default database to create                             |
-| `auth.username`                     | string  | `""`         | Default user to create                                 |
-| `auth.password`                     | string  | `""`         | Password for default user                              |
-| `auth.replicationPassword`          | string  | `""`         | Password for replication user                          |
-| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                       |
-| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                          |
-| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                             |
-| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                |
-| `secondary.replicaCount`            | integer | `1`          | Number of read replicas                                |
-| `secondary.persistence.size`        | string  | `8Gi`        | Secondary PVC size                                     |
-| `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                               |
-| `backup.schedule`                   | string  | `0 3 * * *`  | Cron schedule for backups                              |
-| `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                             |
-| `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                         |
-| `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                |
-| `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                  |
+| Key                                 | Type    | Default      | Description                                                                                                  |
+| ----------------------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication`                                                       |
+| `auth.rootPassword`                 | string  | `""`         | MySQL root password                                                                                          |
+| `auth.database`                     | string  | `""`         | Default database to create                                                                                   |
+| `auth.username`                     | string  | `""`         | Default user to create                                                                                       |
+| `auth.password`                     | string  | `""`         | Password for default user                                                                                    |
+| `auth.replicationPassword`          | string  | `""`         | Password for replication user                                                                                |
+| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                                                                             |
+| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                                                                                |
+| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                                                                                   |
+| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                                                                      |
+| `secondary.replicaCount`            | integer | `1`          | Number of read replicas                                                                                      |
+| `secondary.persistence.size`        | string  | `8Gi`        | Secondary PVC size                                                                                           |
+| `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                                                                                     |
+| `backup.schedule`                   | string  | `0 3 * * *`  | Cron schedule for backups                                                                                    |
+| `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                                                                                   |
+| `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                                                                               |
+| `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                                                                      |
+| `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                                                                        |
+| `service.ipFamilyPolicy`            | string  | _omitted_    | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. Omit for cluster default. |
+| `service.ipFamilies`                | array   | _omitted_    | Ordered list of IP families (`IPv4`, `IPv6`). Omit for cluster default.                                      |
+
+## Dual-stack Networking
+
+MySQL Services accept Kubernetes [dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/) configuration. By default, both `service.ipFamilyPolicy` and `service.ipFamilies` are unset and the chart inherits whatever the cluster advertises (matching prior behavior). Setting them propagates to every chart-managed Service: client, source, replicas, metrics, and the headless StatefulSet services.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+`PreferDualStack` is the safer choice for clusters that may be single- or dual-stack: omit `ipFamilies` and the cluster auto-populates whatever it supports. Set `ipFamilies` explicitly only when the cluster is configured for both families — the Kubernetes API rejects an explicit family the cluster does not advertise. `RequireDualStack` enforces both.
 
 ## Upgrade Notes
 
