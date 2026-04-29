@@ -1,0 +1,401 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Hoppscotch Chart
+description: HelmForge Hoppscotch chart — deploy the open-source API development platform on Kubernetes with REST, GraphQL, and WebSocket support.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
+# Hoppscotch
+
+Hoppscotch is an open-source API development platform supporting REST, GraphQL, and WebSocket APIs. The HelmForge chart deploys the Community Edition All-in-One image (`2026.3.1`) with subpath-based routing, automatic Prisma migrations, optional OAuth providers, SMTP, ExternalSecrets Operator support, and a bundled HelmForge PostgreSQL subchart.
+
+## Key Features
+
+- **All-in-One image** — single Deployment, three services (frontend, backend, admin) via subpath routing
+- **Automatic URL derivation** — all `VITE_*` URLs derived from `ingress.host`
+- **Prisma migrations** — automatic via init container on every deploy
+- **OAuth providers** — GitHub, Google, Microsoft, EMAIL (magic links)
+- **SMTP support** — URL mode or field-by-field configuration
+- **ExternalSecrets Operator** — native support via `externalSecrets.enabled`
+- **Gateway API** — HTTPRoute via `gatewayAPI.enabled`
+- **Dual-stack networking** — `ipFamilyPolicy` and `ipFamilies` on Service
+- **Production hardening** — non-root execution, capability drop, PDB, NetworkPolicy
+- **Monitoring** — ServiceMonitor for Prometheus
+
+## Architecture
+
+Hoppscotch AIO uses subpath-based routing (`ENABLE_SUBPATH_BASED_ACCESS=true`):
+
+| Path       | Service                        |
+| ---------- | ------------------------------ |
+| `/`        | Frontend (main app)            |
+| `/backend` | REST API + GraphQL + WebSocket |
+| `/admin`   | Admin Dashboard                |
+
+All traffic goes through a single Ingress on port 80. Two init containers run before the main container:
+
+1. **`wait-for-db`** — polls until PostgreSQL is reachable
+2. **`migrate`** — runs `pnpm exec prisma migrate deploy` to apply schema migrations
+
+## Prerequisites
+
+- Kubernetes 1.26+
+- Helm 3.x
+- An ingress controller with WebSocket upgrade support (nginx, traefik, etc.)
+- PostgreSQL — bundled subchart (default) or external managed instance
+
+<a id="install"></a>
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install hoppscotch helmforge/hoppscotch --namespace hoppscotch --create-namespace
+```
+
+**OCI registry:**
+
+```bash
+helm install hoppscotch oci://ghcr.io/helmforgedev/helm/hoppscotch \
+  --version 0.1.0 \
+  --namespace hoppscotch --create-namespace
+```
+
+## Quick Start
+
+### Dev Mode (minimal)
+
+Default mode with PostgreSQL subchart. All `VITE_*` URLs derived from `ingress.host`:
+
+```yaml
+ingress:
+  enabled: true
+  host: hoppscotch.local
+```
+
+```bash
+helm install hoppscotch helmforge/hoppscotch \
+  --set ingress.enabled=true \
+  --set ingress.host=hoppscotch.local \
+  --namespace hoppscotch --create-namespace
+```
+
+### Production with TLS
+
+```yaml
+mode: production
+ingress:
+  enabled: true
+  className: nginx
+  host: hoppscotch.example.com
+  tls:
+    - secretName: hoppscotch-tls
+      hosts:
+        - hoppscotch.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+```
+
+<Callout type="warning" title="WebSocket annotations required">
+  Without the `proxy-read-timeout` and upgrade annotations, WebSocket connections will drop after 60 seconds, breaking
+  real-time collaboration features.
+</Callout>
+
+## First-time Setup
+
+The **first user to log in** via the Admin Dashboard becomes the administrator automatically. No seed or manual user creation is required.
+
+1. Navigate to `<host>/admin`
+2. Log in with your configured auth provider
+3. You are now the admin — configure server settings, invite users, generate InfraTokens
+
+## Database
+
+### Bundled PostgreSQL (default)
+
+```yaml
+postgresql:
+  enabled: true
+  auth:
+    database: hoppscotch
+    username: hoppscotch
+    password: '' # auto-generated
+  primary:
+    persistence:
+      size: 10Gi
+```
+
+### External PostgreSQL
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  external:
+    enabled: true
+    host: db.example.com
+    port: 5432
+    name: hoppscotch
+    username: hoppscotch
+    existingSecret: hoppscotch-db-secret
+    existingSecretPasswordKey: postgres-password
+```
+
+Migrations run automatically on each deploy via the `migrate` init container. For major version upgrades, run manually:
+
+```bash
+kubectl exec -n hoppscotch deploy/hoppscotch-hoppscotch -- \
+  sh -c "pnpm exec prisma migrate deploy"
+```
+
+## URL Configuration
+
+When `ingress.host` is set, all `VITE_*` variables are derived automatically:
+
+| Variable               | Derived value                    |
+| ---------------------- | -------------------------------- |
+| `VITE_BASE_URL`        | `https://<host>`                 |
+| `VITE_ADMIN_URL`       | `https://<host>/admin`           |
+| `VITE_BACKEND_GQL_URL` | `https://<host>/backend/graphql` |
+| `VITE_BACKEND_WS_URL`  | `wss://<host>/backend/graphql`   |
+| `VITE_BACKEND_API_URL` | `https://<host>/backend/v1`      |
+
+Override any URL individually:
+
+```yaml
+backendWsUrl: 'wss://realtime.example.com/graphql'
+```
+
+## Authentication
+
+### Email (Magic Links)
+
+Enabled by default. Users receive a magic link via SMTP (or from logs in dev mode).
+
+### OAuth Providers
+
+```yaml
+auth:
+  providers: 'EMAIL,GITHUB,GOOGLE'
+  github:
+    enabled: true
+    clientId: 'your-client-id'
+    clientSecret: 'your-client-secret'
+  google:
+    enabled: true
+    clientId: 'your-client-id'
+    clientSecret: 'your-client-secret'
+```
+
+OAuth callback URLs are auto-derived: `<backendApiUrl>/auth/<provider>/callback`
+
+Use `existingSecret` for production:
+
+```yaml
+auth:
+  github:
+    enabled: true
+    existingSecret: hoppscotch-oauth
+    existingSecretClientIdKey: github-client-id
+    existingSecretClientSecretKey: github-client-secret
+```
+
+## SMTP / Email
+
+```yaml
+mailer:
+  enabled: true
+  from: noreply@example.com
+  useCustomConfigs: false
+  smtpUrl: 'smtps://user:pass@smtp.example.com'
+```
+
+Or field-by-field:
+
+```yaml
+mailer:
+  enabled: true
+  from: noreply@example.com
+  useCustomConfigs: true
+  host: smtp.example.com
+  port: 587
+  secure: true
+  user: smtp-user
+  existingSecret: hoppscotch-smtp
+  existingSecretPasswordKey: smtp-password
+```
+
+## DATA_ENCRYPTION_KEY
+
+Hoppscotch encrypts sensitive data in PostgreSQL using a 32-character key. It is auto-generated on first install.
+
+<Callout type="warning" title="Never change after first install">
+  Changing `DATA_ENCRYPTION_KEY` after data has been written will corrupt all encrypted records. Store it in a secret
+  manager and use `encryption.existingSecret` in production.
+</Callout>
+
+```yaml
+encryption:
+  existingSecret: hoppscotch-secrets
+  existingSecretKey: data-encryption-key
+```
+
+Generate a secure key:
+
+```bash
+openssl rand -hex 16
+```
+
+## ExternalSecrets Operator
+
+```yaml
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  data:
+    - secretKey: database-url
+      remoteRef:
+        key: prod/hoppscotch
+        property: database-url
+    - secretKey: data-encryption-key
+      remoteRef:
+        key: prod/hoppscotch
+        property: data-encryption-key
+```
+
+## Gateway API
+
+```yaml
+gatewayAPI:
+  enabled: true
+  hostnames:
+    - hoppscotch.example.com
+  parentRefs:
+    - name: prod-gateway
+      namespace: gateway-system
+```
+
+## Dual-Stack Networking
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+## Multi-Replica
+
+Hoppscotch is fully stateless — all state lives in PostgreSQL. Horizontal scaling is safe:
+
+```yaml
+replicaCount: 3
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+```
+
+## Telemetry
+
+Hoppscotch collects anonymous usage data weekly (instance UUID, user count, workspace count, version). No API content or personal data is sent.
+
+**To disable:** Admin Dashboard → Settings → Data Sharing
+
+There is no environment variable to disable telemetry — configuration is only available via the Admin UI.
+
+## Monitoring
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+```
+
+## Validation Commands
+
+```bash
+# Check pods are ready
+kubectl get pods -n hoppscotch -l app.kubernetes.io/name=hoppscotch
+
+# Init container logs
+kubectl logs -n hoppscotch -l app.kubernetes.io/name=hoppscotch -c wait-for-db
+kubectl logs -n hoppscotch -l app.kubernetes.io/name=hoppscotch -c migrate
+
+# Backend health
+kubectl exec -n hoppscotch deploy/hoppscotch-hoppscotch -- \
+  sh -c "wget -qO- http://localhost/backend/v1"
+
+# Run helm test
+helm test hoppscotch -n hoppscotch
+```
+
+## Troubleshooting
+
+**Migration fails (`prisma migrate deploy`):**
+
+- Check `DATABASE_URL` in the secret
+- Ensure PostgreSQL pod is running: `kubectl get pods -n hoppscotch`
+- Check `migrate` init container logs
+
+**CORS errors:**
+
+- Ensure `ingress.host` matches the URL used to access the app
+- Or override `baseUrl`, `adminUrl`, `backendApiUrl` explicitly
+
+**WebSocket not connecting:**
+
+- Add `proxy-read-timeout` and connection upgrade annotations to ingress (see Quick Start)
+
+**Admin dashboard shows 403:**
+
+- Clear cookies and try again — first login always succeeds
+- Verify `VITE_ADMIN_URL` matches the actual URL
+
+**PostgreSQL "database does not exist":**
+
+- Ensure `postgresql.auth.database` is set correctly
+- If a stale PVC exists from a prior install, delete it and reinstall
+
+<a id="values"></a>
+
+## Parameters
+
+| Parameter                        | Description                               | Default    |
+| -------------------------------- | ----------------------------------------- | ---------- |
+| `mode`                           | Chart mode: `dev` or `production`         | `dev`      |
+| `image.tag`                      | Hoppscotch image tag                      | `2026.3.1` |
+| `replicaCount`                   | Number of replicas                        | `1`        |
+| `ingress.enabled`                | Enable Ingress                            | `false`    |
+| `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs) | `""`       |
+| `postgresql.enabled`             | Enable PostgreSQL subchart                | `true`     |
+| `database.external.enabled`      | Use external PostgreSQL                   | `false`    |
+| `encryption.key`                 | 32-char encryption key (auto-generated)   | `""`       |
+| `encryption.existingSecret`      | Existing secret with encryption key       | `""`       |
+| `auth.providers`                 | Comma-separated enabled auth providers    | `EMAIL`    |
+| `auth.github.enabled`            | Enable GitHub OAuth                       | `false`    |
+| `auth.google.enabled`            | Enable Google OAuth                       | `false`    |
+| `auth.microsoft.enabled`         | Enable Microsoft OAuth                    | `false`    |
+| `mailer.enabled`                 | Enable SMTP                               | `false`    |
+| `gatewayAPI.enabled`             | Enable HTTPRoute                          | `false`    |
+| `externalSecrets.enabled`        | Enable ExternalSecret                     | `false`    |
+| `networkPolicy.enabled`          | Enable NetworkPolicy                      | `false`    |
+| `podDisruptionBudget.enabled`    | Enable PDB                                | `false`    |
+| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor                     | `false`    |
+
+## Links
+
+- [Upstream documentation](https://docs.hoppscotch.io/documentation/self-host/community-edition/install-and-build)
+- [Hoppscotch GitHub](https://github.com/hoppscotch/hoppscotch)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/hoppscotch)

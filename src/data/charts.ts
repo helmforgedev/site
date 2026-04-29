@@ -455,6 +455,13 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: true,
   },
+  {
+    name: 'Hoppscotch',
+    slug: 'hoppscotch',
+    description: 'Open-source API development platform with REST, GraphQL, and WebSocket support.',
+    maturity: 'beta',
+    backup: false,
+  },
 ];
 
 export const chartCount = charts.length;
