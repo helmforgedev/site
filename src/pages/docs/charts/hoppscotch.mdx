@@ -28,11 +28,11 @@ Hoppscotch is an open-source API development platform supporting REST, GraphQL, 
 
 Hoppscotch AIO uses subpath-based routing (`ENABLE_SUBPATH_BASED_ACCESS=true`):
 
-| Path | Service |
-|------|---------|
-| `/` | Frontend (main app) |
+| Path       | Service                        |
+| ---------- | ------------------------------ |
+| `/`        | Frontend (main app)            |
 | `/backend` | REST API + GraphQL + WebSocket |
-| `/admin` | Admin Dashboard |
+| `/admin`   | Admin Dashboard                |
 
 All traffic goes through a single Ingress on port 80. Two init containers run before the main container:
 
@@ -97,13 +97,13 @@ ingress:
         - hoppscotch.example.com
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
 ```
 
 <Callout type="warning" title="WebSocket annotations required">
-  Without the `proxy-read-timeout` and upgrade annotations, WebSocket connections will drop after 60 seconds,
-  breaking real-time collaboration features.
+  Without the `proxy-read-timeout` and upgrade annotations, WebSocket connections will drop after 60 seconds, breaking
+  real-time collaboration features.
 </Callout>
 
 ## First-time Setup
@@ -124,7 +124,7 @@ postgresql:
   auth:
     database: hoppscotch
     username: hoppscotch
-    password: ""          # auto-generated
+    password: '' # auto-generated
   primary:
     persistence:
       size: 10Gi
@@ -157,18 +157,18 @@ kubectl exec -n hoppscotch deploy/hoppscotch-hoppscotch -- \
 
 When `ingress.host` is set, all `VITE_*` variables are derived automatically:
 
-| Variable | Derived value |
-|----------|---------------|
-| `VITE_BASE_URL` | `https://<host>` |
-| `VITE_ADMIN_URL` | `https://<host>/admin` |
+| Variable               | Derived value                    |
+| ---------------------- | -------------------------------- |
+| `VITE_BASE_URL`        | `https://<host>`                 |
+| `VITE_ADMIN_URL`       | `https://<host>/admin`           |
 | `VITE_BACKEND_GQL_URL` | `https://<host>/backend/graphql` |
-| `VITE_BACKEND_WS_URL` | `wss://<host>/backend/graphql` |
-| `VITE_BACKEND_API_URL` | `https://<host>/backend/v1` |
+| `VITE_BACKEND_WS_URL`  | `wss://<host>/backend/graphql`   |
+| `VITE_BACKEND_API_URL` | `https://<host>/backend/v1`      |
 
 Override any URL individually:
 
 ```yaml
-backendWsUrl: "wss://realtime.example.com/graphql"
+backendWsUrl: 'wss://realtime.example.com/graphql'
 ```
 
 ## Authentication
@@ -181,15 +181,15 @@ Enabled by default. Users receive a magic link via SMTP (or from logs in dev mod
 
 ```yaml
 auth:
-  providers: "EMAIL,GITHUB,GOOGLE"
+  providers: 'EMAIL,GITHUB,GOOGLE'
   github:
     enabled: true
-    clientId: "your-client-id"
-    clientSecret: "your-client-secret"
+    clientId: 'your-client-id'
+    clientSecret: 'your-client-secret'
   google:
     enabled: true
-    clientId: "your-client-id"
-    clientSecret: "your-client-secret"
+    clientId: 'your-client-id'
+    clientSecret: 'your-client-secret'
 ```
 
 OAuth callback URLs are auto-derived: `<backendApiUrl>/auth/<provider>/callback`
@@ -212,7 +212,7 @@ mailer:
   enabled: true
   from: noreply@example.com
   useCustomConfigs: false
-  smtpUrl: "smtps://user:pass@smtp.example.com"
+  smtpUrl: 'smtps://user:pass@smtp.example.com'
 ```
 
 Or field-by-field:
@@ -235,8 +235,8 @@ mailer:
 Hoppscotch encrypts sensitive data in PostgreSQL using a 32-character key. It is auto-generated on first install.
 
 <Callout type="warning" title="Never change after first install">
-  Changing `DATA_ENCRYPTION_KEY` after data has been written will corrupt all encrypted records.
-  Store it in a secret manager and use `encryption.existingSecret` in production.
+  Changing `DATA_ENCRYPTION_KEY` after data has been written will corrupt all encrypted records. Store it in a secret
+  manager and use `encryption.existingSecret` in production.
 </Callout>
 
 ```yaml
@@ -342,48 +342,53 @@ helm test hoppscotch -n hoppscotch
 ## Troubleshooting
 
 **Migration fails (`prisma migrate deploy`):**
+
 - Check `DATABASE_URL` in the secret
 - Ensure PostgreSQL pod is running: `kubectl get pods -n hoppscotch`
 - Check `migrate` init container logs
 
 **CORS errors:**
+
 - Ensure `ingress.host` matches the URL used to access the app
 - Or override `baseUrl`, `adminUrl`, `backendApiUrl` explicitly
 
 **WebSocket not connecting:**
+
 - Add `proxy-read-timeout` and connection upgrade annotations to ingress (see Quick Start)
 
 **Admin dashboard shows 403:**
+
 - Clear cookies and try again — first login always succeeds
 - Verify `VITE_ADMIN_URL` matches the actual URL
 
 **PostgreSQL "database does not exist":**
+
 - Ensure `postgresql.auth.database` is set correctly
 - If a stale PVC exists from a prior install, delete it and reinstall
 
 ## Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `mode` | Chart mode: `dev` or `production` | `dev` |
-| `image.tag` | Hoppscotch image tag | `2026.3.1` |
-| `replicaCount` | Number of replicas | `1` |
-| `ingress.enabled` | Enable Ingress | `false` |
-| `ingress.host` | Hostname (auto-derives all VITE_* URLs) | `""` |
-| `postgresql.enabled` | Enable PostgreSQL subchart | `true` |
-| `database.external.enabled` | Use external PostgreSQL | `false` |
-| `encryption.key` | 32-char encryption key (auto-generated) | `""` |
-| `encryption.existingSecret` | Existing secret with encryption key | `""` |
-| `auth.providers` | Comma-separated enabled auth providers | `EMAIL` |
-| `auth.github.enabled` | Enable GitHub OAuth | `false` |
-| `auth.google.enabled` | Enable Google OAuth | `false` |
-| `auth.microsoft.enabled` | Enable Microsoft OAuth | `false` |
-| `mailer.enabled` | Enable SMTP | `false` |
-| `gatewayAPI.enabled` | Enable HTTPRoute | `false` |
-| `externalSecrets.enabled` | Enable ExternalSecret | `false` |
-| `networkPolicy.enabled` | Enable NetworkPolicy | `false` |
-| `podDisruptionBudget.enabled` | Enable PDB | `false` |
-| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor | `false` |
+| Parameter                        | Description                               | Default    |
+| -------------------------------- | ----------------------------------------- | ---------- |
+| `mode`                           | Chart mode: `dev` or `production`         | `dev`      |
+| `image.tag`                      | Hoppscotch image tag                      | `2026.3.1` |
+| `replicaCount`                   | Number of replicas                        | `1`        |
+| `ingress.enabled`                | Enable Ingress                            | `false`    |
+| `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs) | `""`       |
+| `postgresql.enabled`             | Enable PostgreSQL subchart                | `true`     |
+| `database.external.enabled`      | Use external PostgreSQL                   | `false`    |
+| `encryption.key`                 | 32-char encryption key (auto-generated)   | `""`       |
+| `encryption.existingSecret`      | Existing secret with encryption key       | `""`       |
+| `auth.providers`                 | Comma-separated enabled auth providers    | `EMAIL`    |
+| `auth.github.enabled`            | Enable GitHub OAuth                       | `false`    |
+| `auth.google.enabled`            | Enable Google OAuth                       | `false`    |
+| `auth.microsoft.enabled`         | Enable Microsoft OAuth                    | `false`    |
+| `mailer.enabled`                 | Enable SMTP                               | `false`    |
+| `gatewayAPI.enabled`             | Enable HTTPRoute                          | `false`    |
+| `externalSecrets.enabled`        | Enable ExternalSecret                     | `false`    |
+| `networkPolicy.enabled`          | Enable NetworkPolicy                      | `false`    |
+| `podDisruptionBudget.enabled`    | Enable PDB                                | `false`    |
+| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor                     | `false`    |
 
 ## Links
 
