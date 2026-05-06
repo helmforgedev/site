@@ -1,6 +1,6 @@
 # HelmForge Blog Performance Report
 
-Content snapshot: 2026-04-28
+Content snapshot: 2026-05-06
 
 Use this report as the recurring Phase 7 review artifact after Search Console, Bing Webmaster Tools, and analytics have enough data. Fill the empty metric columns during weekly and monthly reviews.
 
@@ -31,6 +31,8 @@ Use this report as the recurring Phase 7 review artifact after Search Console, B
 
 | URL | Title | Category | Published | Updated | Google clicks | Impressions | CTR | Avg position | Discover clicks | Bing clicks | CWV notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+[/blog/2026-05-06-wordpress-production-kubernetes-helmforge](https://helmforge.dev/blog/2026-05-06-wordpress-production-kubernetes-helmforge) | WordPress on Kubernetes Needs More Than a Pod | operations | 2026-05-06 | 2026-05-06 |  |  |  |  |  |  |
+[/blog/2026-04-29-keycloak-production-architecture-helm-chart](https://helmforge.dev/blog/2026-04-29-keycloak-production-architecture-helm-chart) | Keycloak on Kubernetes Needed an Architecture Pass | operations | 2026-04-29 | 2026-04-29 |  |  |  |  |  |  |
 [/blog/2026-04-28-kubernetes-1-36-haru-production-upgrade](https://helmforge.dev/blog/2026-04-28-kubernetes-1-36-haru-production-upgrade) | Kubernetes 1.36 Haru: Spring Cleaning for Production Clusters | releases | 2026-04-28 | 2026-04-28 |  |  |  |  |  |  |
 [/blog/migration-generic-breaking-platform-contract](https://helmforge.dev/blog/migration-generic-breaking-platform-contract) | Migrating to the Generic Chart Breaking Platform Contract | helm | 2026-04-27 | - |  |  |  |  |  |  |
 [/blog/fastmcp-server-deploy-mcp-anywhere](https://helmforge.dev/blog/fastmcp-server-deploy-mcp-anywhere) | Deploy MCP Servers Anywhere with FastMCP Server | operations | 2026-04-05 | - |  |  |  |  |  |  |

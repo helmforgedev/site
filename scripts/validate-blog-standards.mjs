@@ -27,6 +27,9 @@ const OFFICIAL_REFERENCE_HOSTS = new Set([
   'cncf.io',
   'modelcontextprotocol.io',
   'keycloak.org',
+  'wordpress.org',
+  'external-secrets.io',
+  'helmforge.dev',
 ]);
 
 const NON_OFFICIAL_BANNED_HOSTS = new Set(['replicated.com', 'knowledge.broadcom.com', 'medium.com']);
