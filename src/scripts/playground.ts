@@ -451,7 +451,11 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 }
 
 function buildSetFlags(): string[] {
-  return getChangedValues().map((c) => `--set ${c.key}=${c.value}`);
+  return getChangedValues().map((c) => `--set ${c.key}=${quoteSetValue(c.value)}`);
+}
+
+function quoteSetValue(value: string): string {
+  return /\s/.test(value) ? `'${value.replace(/'/g, "'\\''")}'` : value;
 }
 
 function generateHelmOutput(): string {

@@ -23,12 +23,12 @@ test.describe('Playground', () => {
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
 
     // Change storage size
-    const storageInput = page.locator('input[data-field-key="persistence.size"]');
+    const storageInput = page.locator('input[data-field-key="standalone.persistence.size"]');
     await storageInput.clear();
     await storageInput.fill('20Gi');
 
     const code = page.locator('#playground-code');
-    await expect(code).toContainText('persistence.size=20Gi');
+    await expect(code).toContainText('standalone.persistence.size=20Gi');
   });
 
   test('values.yaml output mode works', async ({ page }) => {
@@ -36,7 +36,7 @@ test.describe('Playground', () => {
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
 
     // Change a value first
-    const storageInput = page.locator('input[data-field-key="persistence.size"]');
+    const storageInput = page.locator('input[data-field-key="standalone.persistence.size"]');
     await storageInput.clear();
     await storageInput.fill('20Gi');
 
@@ -55,7 +55,7 @@ test.describe('Playground', () => {
     if ((await prodBtn.count()) > 0) {
       await prodBtn.click();
       const code = page.locator('#playground-code');
-      await expect(code).toContainText('replicaCount');
+      await expect(code).toContainText('replication.slots.enabled=true');
     }
   });
 
@@ -83,9 +83,9 @@ test.describe('Playground', () => {
   });
 
   test('loads state from URL params', async ({ page }) => {
-    await page.goto('/playground?chart=postgresql&persistence.size=50Gi');
+    await page.goto('/playground?chart=postgresql&standalone.persistence.size=50Gi');
     await expect(page.locator('#playground-chart-title')).toContainText('PostgreSQL');
-    await expect(page.locator('#playground-code')).toContainText('persistence.size=50Gi');
+    await expect(page.locator('#playground-code')).toContainText('standalone.persistence.size=50Gi');
   });
 
   test('search filter works', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-diff')).toBeHidden();
 
     // Change a value
-    const storageInput = page.locator('input[data-field-key="persistence.size"]');
+    const storageInput = page.locator('input[data-field-key="standalone.persistence.size"]');
     await storageInput.clear();
     await storageInput.fill('20Gi');
 
@@ -138,22 +138,21 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
 
-    // Expand resources
-    await page.locator('[data-section-toggle="Resources"]').click();
+    // Expand production security
+    await page.locator('[data-section-toggle="Production Security"]').click();
     await page.waitForTimeout(300);
 
-    // Change CPU request
-    const cpuInput = page.locator('input[data-field-key="resources.requests.cpu"]');
-    await cpuInput.clear();
-    await cpuInput.fill('500m');
-    await expect(page.locator('#playground-code')).toContainText('resources.requests.cpu=500m');
+    // Enable replication slots
+    const slotsToggle = page.locator('button[data-field-key="replication.slots.enabled"]');
+    await slotsToggle.click();
+    await expect(page.locator('#playground-code')).toContainText('replication.slots.enabled=true');
 
-    // Collapse resources — values should reset
-    await page.locator('[data-section-toggle="Resources"]').click();
+    // Collapse production security - values should reset
+    await page.locator('[data-section-toggle="Production Security"]').click();
     await page.waitForTimeout(300);
 
-    // Output should no longer contain resources
-    await expect(page.locator('#playground-code')).not.toContainText('resources.requests.cpu');
+    // Output should no longer contain replication slots
+    await expect(page.locator('#playground-code')).not.toContainText('replication.slots.enabled');
   });
 
   test('scenario auto-expands collapsible sections', async ({ page }) => {
@@ -164,9 +163,9 @@ test.describe('Playground', () => {
     await page.locator('.playground-scenario-btn:has-text("Production")').click();
     await page.waitForTimeout(300);
 
-    // Backup and Resources sections should auto-expand
+    // Backup and production security sections should auto-expand
     await expect(page.locator('input[data-field-key="backup.schedule"]')).toBeVisible();
-    await expect(page.locator('input[data-field-key="resources.requests.cpu"]')).toBeVisible();
+    await expect(page.locator('button[data-field-key="replication.slots.enabled"]')).toBeVisible();
 
     // Output should contain backup and resources values
     await expect(page.locator('#playground-code')).toContainText('backup.enabled=true');
