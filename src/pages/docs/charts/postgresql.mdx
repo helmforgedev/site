@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: PostgreSQL Chart
-description: HelmForge PostgreSQL chart — PostgreSQL with standalone and streaming replication for Kubernetes.
+description: HelmForge PostgreSQL chart - PostgreSQL standalone and streaming replication with TLS, structured pg_hba CIDRs, External Secrets, dual-stack Services, replication slots, NetworkPolicy controls, and S3 backups.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,7 +11,8 @@ import PostgresqlDiagram from '../../../components/diagrams/PostgresqlDiagram.as
 
 # PostgreSQL
 
-Production-ready PostgreSQL deployment with support for standalone and streaming replication architectures.
+Production-ready PostgreSQL deployment with support for standalone and streaming replication architectures, structured
+access controls, TLS, External Secrets Operator, optional replication slots, and production hardening controls.
 
 ## Key Features
 
@@ -19,7 +20,9 @@ Production-ready PostgreSQL deployment with support for standalone and streaming
 - **Automatic initialization** — Init scripts, extensions, and custom configuration
 - **S3 backup** — Scheduled backups to S3-compatible storage via CronJob
 - **Metrics** — Prometheus exporter with ServiceMonitor
-- **Security** — Non-root containers, network policies, TLS support
+- **Security** — Non-root containers, TLS support with private-key permission normalization, structured `pg_hba.conf` CIDRs, NetworkPolicy controls, and ServiceAccount token control
+- **Replication slots** — Optional physical slots with WAL retention limits for safer replica catch-up behavior
+- **External Secrets Operator** — Optional `external-secrets.io/v1` resources for auth, TLS, and backup credentials
 - **Persistent storage** — Configurable PVCs with storage class selection
 
 ## Architecture
@@ -61,6 +64,8 @@ helm install my-pg oci://ghcr.io/helmforgedev/helm/postgresql
   { id: 'replication', label: 'Replication' },
   { id: 'backup', label: 'With Backup' },
   { id: 'tls', label: 'With TLS' },
+  { id: 'production', label: 'Production' },
+  { id: 'external-secrets', label: 'External Secrets' },
 ]}>
 
 <div data-tab-panel="standalone">
@@ -161,11 +166,164 @@ tls:
   enabled: true
   existingSecret: postgresql-tls
   sslMode: require
+  volumePermissions:
+    enabled: true
 ```
 
 </div>
 
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml - production baseline with replication, TLS, slots, backup, and policies
+architecture: replication
+
+auth:
+  existingSecret: postgresql-auth
+  database: app
+  username: app
+
+config:
+  localAuthMethod: scram-sha-256
+  allowedClientCIDRs:
+    - 10.42.0.0/16
+  allowedReplicationCIDRs:
+    - 10.42.0.0/16
+
+replication:
+  primary:
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: '2'
+        memory: 2Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      size: 100Gi
+  wal:
+    keepSize: 2GB
+    maxReplicationSlots: 10
+    maxSlotWalKeepSize: 8GB
+    walSenderTimeout: 60s
+  slots:
+    enabled: true
+
+tls:
+  enabled: true
+  existingSecret: postgresql-tls
+  sslMode: require
+  volumePermissions:
+    enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespacePostgreSQL: true
+    allowHTTPS: true
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.example.com
+    bucket: postgresql-backups
+    existingSecret: postgresql-backup
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml - render ExternalSecret resources for existing ESO clusters
+auth:
+  existingSecret: postgresql-auth
+
+tls:
+  enabled: true
+  existingSecret: postgresql-tls
+
+backup:
+  enabled: true
+  s3:
+    existingSecret: postgresql-backup
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  auth:
+    enabled: true
+    targetName: postgresql-auth
+    postgresPasswordRemoteRef:
+      key: prod/postgresql
+      property: postgres-password
+    userPasswordRemoteRef:
+      key: prod/postgresql
+      property: user-password
+    replicationPasswordRemoteRef:
+      key: prod/postgresql
+      property: replication-password
+  tls:
+    enabled: true
+    targetName: postgresql-tls
+    certRemoteRef:
+      key: prod/postgresql-tls
+      property: tls.crt
+    keyRemoteRef:
+      key: prod/postgresql-tls
+      property: tls.key
+    caRemoteRef:
+      key: prod/postgresql-tls
+      property: ca.crt
+  backup:
+    enabled: true
+    targetName: postgresql-backup
+    accessKeyRemoteRef:
+      key: prod/postgresql-backup
+      property: access-key
+    secretKeyRemoteRef:
+      key: prod/postgresql-backup
+      property: secret-key
+```
+
+<Callout type="info" title="External Secrets Operator is optional">
+  The chart does not install External Secrets Operator and does not create a `SecretStore` or `ClusterSecretStore`.
+  Enable this only when the operator and referenced store already exist.
+</Callout>
+
+</div>
+
 </DocsTabs>
+
+## Production Path
+
+The default install remains intentionally suitable for local development and disposable test clusters. A production
+deployment should explicitly set existing Secrets or External Secrets, storage, resources, `config.allowedClientCIDRs`,
+`config.allowedReplicationCIDRs`, TLS, metrics, backup, and NetworkPolicy behavior.
+
+Use the structured CIDR lists first. `config.pgHbaEntries` and raw `config.pgHba` remain escape hatches for advanced
+cases, but production baselines should not depend on a full raw `pg_hba.conf` override.
+
+Replication slots are disabled by default for compatibility. If `replication.slots.enabled=true`, also set WAL limits
+such as `replication.wal.maxSlotWalKeepSize` so a stalled replica cannot retain unbounded WAL.
 
 ## Operational Notes
 
@@ -228,24 +386,28 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### PostgreSQL Configuration
 
-| Parameter             | Type   | Default | Description                                                               |
-| --------------------- | ------ | ------- | ------------------------------------------------------------------------- |
-| `config.preset`       | string | `none`  | Optional PostgreSQL tuning preset: `none`, `small`, `medium`, or `large`. |
-| `config.postgresql`   | string | `""`    | Raw `postgresql.conf` content appended after generated settings.          |
-| `config.pgHbaEntries` | array  | `[]`    | Structured `pg_hba.conf` entries appended after generated defaults.       |
-| `config.pgHba`        | string | `""`    | Raw `pg_hba.conf` content appended after generated rules.                 |
+| Parameter                        | Type   | Default                 | Description                                                               |
+| -------------------------------- | ------ | ----------------------- | ------------------------------------------------------------------------- |
+| `config.localAuthMethod`         | string | `scram-sha-256`         | Authentication method for local Unix-socket connections.                  |
+| `config.allowedClientCIDRs`      | array  | `["0.0.0.0/0", "::/0"]` | CIDRs allowed to connect to regular PostgreSQL databases.                 |
+| `config.allowedReplicationCIDRs` | array  | `["0.0.0.0/0", "::/0"]` | CIDRs allowed to connect to the replication pseudo-database.              |
+| `config.preset`                  | string | `none`                  | Optional PostgreSQL tuning preset: `none`, `small`, `medium`, or `large`. |
+| `config.postgresql`              | string | `""`                    | Raw `postgresql.conf` content appended after generated settings.          |
+| `config.pgHbaEntries`            | array  | `[]`                    | Structured `pg_hba.conf` entries appended after generated defaults.       |
+| `config.pgHba`                   | string | `""`                    | Raw `pg_hba.conf` content appended after generated rules.                 |
 
 ### TLS
 
-| Parameter                | Type    | Default   | Description                                                        |
-| ------------------------ | ------- | --------- | ------------------------------------------------------------------ |
-| `tls.enabled`            | boolean | `false`   | Enable TLS for PostgreSQL and internal clients.                    |
-| `tls.existingSecret`     | string  | `""`      | Existing secret containing server TLS material.                    |
-| `tls.certFilename`       | string  | `tls.crt` | Certificate filename inside the TLS secret.                        |
-| `tls.keyFilename`        | string  | `tls.key` | Private key filename inside the TLS secret.                        |
-| `tls.caFilename`         | string  | `ca.crt`  | CA certificate filename inside the TLS secret.                     |
-| `tls.sslMode`            | string  | `require` | libpq SSL mode used by internal probes, replication, and exporter. |
-| `tls.minProtocolVersion` | string  | `TLSv1.2` | Minimum accepted PostgreSQL TLS protocol version.                  |
+| Parameter                       | Type    | Default   | Description                                                                      |
+| ------------------------------- | ------- | --------- | -------------------------------------------------------------------------------- |
+| `tls.enabled`                   | boolean | `false`   | Enable TLS for PostgreSQL and internal clients.                                  |
+| `tls.existingSecret`            | string  | `""`      | Existing secret containing server TLS material.                                  |
+| `tls.certFilename`              | string  | `tls.crt` | Certificate filename inside the TLS secret.                                      |
+| `tls.keyFilename`               | string  | `tls.key` | Private key filename inside the TLS secret.                                      |
+| `tls.caFilename`                | string  | `ca.crt`  | CA certificate filename inside the TLS secret.                                   |
+| `tls.sslMode`                   | string  | `require` | libpq SSL mode used by internal probes, replication, and exporter.               |
+| `tls.minProtocolVersion`        | string  | `TLSv1.2` | Minimum accepted PostgreSQL TLS protocol version.                                |
+| `tls.volumePermissions.enabled` | boolean | `false`   | Copy TLS material to an owned `emptyDir` and restrict the private key to `0600`. |
 
 ### Initialization
 
@@ -297,6 +459,10 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | `replication.wal.keepSize`                            | string  | `512MB`                  | WAL retention kept locally for replicas and recovery workflows.  |
 | `replication.wal.maxSenders`                          | integer | `10`                     | Maximum WAL sender processes.                                    |
 | `replication.wal.maxReplicationSlots`                 | integer | `10`                     | Maximum replication slots.                                       |
+| `replication.wal.maxSlotWalKeepSize`                  | string  | `""`                     | Maximum WAL retained by replication slots before invalidation.   |
+| `replication.wal.idleReplicationSlotTimeout`          | string  | `""`                     | Timeout for inactive replication slots before invalidation.      |
+| `replication.slots.enabled`                           | boolean | `false`                  | Use deterministic physical replication slots for read replicas.  |
+| `replication.slots.namePrefix`                        | string  | `replica`                | Prefix used to build per-replica slot names.                     |
 | `replication.pdb.enabled`                             | boolean | `true`                   | Enable a PodDisruptionBudget by default in replication mode.     |
 | `replication.pdb.minAvailable`                        | integer | `1`                      | Minimum available pods for the replication PDB.                  |
 | `replication.pdb.maxUnavailable`                      | string  | `""`                     | Maximum unavailable pods for the replication PDB.                |
@@ -364,11 +530,16 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### NetworkPolicy
 
-| Parameter                                  | Type    | Default | Description                                                       |
-| ------------------------------------------ | ------- | ------- | ----------------------------------------------------------------- |
-| `networkPolicy.enabled`                    | boolean | `false` | Create an ingress-only NetworkPolicy for PostgreSQL pods.         |
-| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow ingress from the same namespace.                            |
-| `networkPolicy.ingress.extraFrom`          | array   | `[]`    | Additional ingress `from` rules appended to the generated policy. |
+| Parameter                                           | Type    | Default | Description                                                       |
+| --------------------------------------------------- | ------- | ------- | ----------------------------------------------------------------- |
+| `networkPolicy.enabled`                             | boolean | `false` | Create a NetworkPolicy for PostgreSQL pods.                       |
+| `networkPolicy.ingress.allowSameNamespace`          | boolean | `true`  | Allow ingress from the same namespace.                            |
+| `networkPolicy.ingress.extraFrom`                   | array   | `[]`    | Additional ingress `from` rules appended to the generated policy. |
+| `networkPolicy.egress.enabled`                      | boolean | `false` | Add explicit egress rules to the NetworkPolicy.                   |
+| `networkPolicy.egress.allowDNS`                     | boolean | `true`  | Allow DNS egress on TCP/UDP 53.                                   |
+| `networkPolicy.egress.allowSameNamespacePostgreSQL` | boolean | `true`  | Allow PostgreSQL egress to same-namespace pods.                   |
+| `networkPolicy.egress.allowHTTPS`                   | boolean | `true`  | Allow HTTPS egress for S3-compatible backup endpoints.            |
+| `networkPolicy.egress.extraTo`                      | array   | `[]`    | Additional egress `to` rules appended to the policy.              |
 
 ### Pod Disruption Budget
 
@@ -380,11 +551,12 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                                |
-| ---------------------------- | ------- | ------- | ------------------------------------------ |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.         |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.          |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations applied to the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                                                     |
+| --------------------------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                              |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                               |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations applied to the ServiceAccount.                      |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount Kubernetes API credentials into workload and backup pods. |
 
 ### Probes
 
@@ -436,6 +608,18 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | `extraEnv`          | array | `[]`    | Extra environment variables injected into PostgreSQL containers. |
 | `extraVolumes`      | array | `[]`    | Extra volumes appended to PostgreSQL pods.                       |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts appended to PostgreSQL containers.           |
+
+### External Secrets Operator
+
+| Parameter                             | Type    | Default                  | Description                                         |
+| ------------------------------------- | ------- | ------------------------ | --------------------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret resources.                    |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | ExternalSecret API version.                         |
+| `externalSecrets.refreshInterval`     | string  | `1h`                     | Refresh interval used by rendered ExternalSecrets.  |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | Existing SecretStore or ClusterSecretStore name.    |
+| `externalSecrets.auth.enabled`        | boolean | `false`                  | Manage the PostgreSQL auth Secret through ESO.      |
+| `externalSecrets.tls.enabled`         | boolean | `false`                  | Manage the TLS Secret through ESO.                  |
+| `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage the backup S3 credential Secret through ESO. |
 
 ## Upgrade Notes
 

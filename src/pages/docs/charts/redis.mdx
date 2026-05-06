@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Redis Chart
-description: HelmForge Redis chart — Redis standalone, replication, Sentinel HA, and cluster modes with official redis image, existingSecret auth, TLS, maxmemory config, Prometheus exporter, PodDisruptionBudget, and non-root security context.
+description: HelmForge Redis chart - Redis standalone, replication, Sentinel HA, and cluster modes with official Redis image, existingSecret auth, External Secrets, TLS, dual-stack Services, maxmemory config, Prometheus exporter, PodDisruptionBudget, and non-root security context.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -13,7 +13,9 @@ import RedisDiagram from '../../../components/diagrams/RedisDiagram.astro';
 
 Deploy [Redis](https://redis.io/) on Kubernetes using the official `redis` Docker image. Supports
 four architectures: standalone (single instance), replication (primary + replicas), Sentinel
-(automatic HA failover), and cluster (horizontal sharding).
+(automatic HA failover), and cluster (horizontal sharding). The chart keeps simple defaults for development while
+exposing production controls for authentication, TLS, persistence, memory limits, dual-stack Services, and External
+Secrets Operator integration.
 
 <Callout
   type="danger"
@@ -61,6 +63,8 @@ four architectures: standalone (single instance), replication (primary + replica
 - **Cluster mode** — 6 nodes by default (3 master + 3 replica), auto-initialized via init Job
 - **TLS encryption** — mutual TLS for all Redis connections
 - **`existingSecret`** — keep credentials out of the values file
+- **External Secrets Operator** — optional `external-secrets.io/v1` resource for Redis auth Secret materialization
+- **Dual-stack Services** — optional Service `ipFamilyPolicy` and `ipFamilies` across Redis, Sentinel, cluster, and metrics Services
 - **`config.redis`** — custom `redis.conf` lines (maxmemory, eviction policy, etc.)
 - **Prometheus exporter** — `oliver006/redis_exporter` sidecar with ServiceMonitor
 - **Non-root** — runs as UID/GID 999 by default
@@ -89,6 +93,7 @@ helm install my-redis oci://ghcr.io/helmforgedev/helm/redis -f values.yaml
     { id: 'sentinel', label: 'Sentinel HA' },
     { id: 'cluster', label: 'Cluster' },
     { id: 'cache', label: 'Cache Only (no persistence)' },
+    { id: 'external-secrets', label: 'External Secrets' },
   ]}
 >
 
@@ -248,7 +253,48 @@ config:
 
 </div>
 
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml - auth Secret managed by External Secrets Operator
+auth:
+  enabled: true
+  existingSecret: redis-credentials
+  existingSecretPasswordKey: redis-password
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  refreshInterval: 1h
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: redis-password
+      remoteRef:
+        key: prod/redis
+        property: password
+```
+
+<Callout type="info" title="External Secrets Operator is optional">
+  The chart renders the Redis auth `ExternalSecret` only when `externalSecrets.enabled=true`. It does not install the
+  operator or create the referenced SecretStore.
+</Callout>
+
+</div>
+
 </DocsTabs>
+
+## Production Path
+
+Use defaults for local development, cache experiments, and disposable clusters. For production, choose the topology first:
+`sentinel` for automatic failover of a single logical dataset, or `cluster` when the dataset must be sharded across
+multiple masters.
+
+Always set `resources.limits.memory` and `config.redis` `maxmemory` together. Keep `maxmemory` below the memory limit so
+Redis has room for client buffers, persistence buffers, Lua, and allocator overhead. Use existing Secrets or External
+Secrets for credentials, enable TLS when traffic crosses a trust boundary, and enable PodDisruptionBudget for Sentinel or
+clustered deployments.
 
 ## Configuration Reference
 
@@ -257,7 +303,7 @@ config:
 | Parameter          | Type   | Default                   | Description  |
 | ------------------ | ------ | ------------------------- | ------------ |
 | `image.repository` | string | `docker.io/library/redis` | Redis image. |
-| `image.tag`        | string | `"8.6.0"`                 | Image tag.   |
+| `image.tag`        | string | `"8.6.2"`                 | Image tag.   |
 
 ### Authentication
 
@@ -270,10 +316,13 @@ config:
 
 ### TLS
 
-| Parameter            | Type    | Default | Description                                                 |
-| -------------------- | ------- | ------- | ----------------------------------------------------------- |
-| `tls.enabled`        | boolean | `false` | Enable TLS. Requires `tls.existingSecret` with cert/key/CA. |
-| `tls.existingSecret` | string  | `""`    | Secret with `tls.crt`, `tls.key`, `ca.crt`.                 |
+| Parameter            | Type    | Default   | Description                                                 |
+| -------------------- | ------- | --------- | ----------------------------------------------------------- |
+| `tls.enabled`        | boolean | `false`   | Enable TLS. Requires `tls.existingSecret` with cert/key/CA. |
+| `tls.existingSecret` | string  | `""`      | Secret with `tls.crt`, `tls.key`, `ca.crt`.                 |
+| `tls.certFilename`   | string  | `tls.crt` | Certificate filename in the TLS Secret.                     |
+| `tls.keyFilename`    | string  | `tls.key` | Private key filename in the TLS Secret.                     |
+| `tls.caFilename`     | string  | `ca.crt`  | CA filename in the TLS Secret.                              |
 
 ### Standalone
 
@@ -312,22 +361,52 @@ config:
 
 ### Configuration and Metrics
 
-| Parameter                        | Type    | Default | Description                                                               |
-| -------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
-| `config.redis`                   | string  | `""`    | Extra lines appended to `redis.conf` (maxmemory, save, appendonly, etc.). |
-| `config.sentinel`                | string  | `""`    | Extra lines appended to `sentinel.conf`.                                  |
-| `metrics.enabled`                | boolean | `false` | Deploy `redis_exporter` Prometheus sidecar.                               |
-| `metrics.serviceMonitor.enabled` | boolean | `false` | Create Prometheus ServiceMonitor resource.                                |
-| `pdb.enabled`                    | boolean | `false` | Enable PodDisruptionBudget.                                               |
-| `service.ports.redis`            | integer | `6379`  | Redis client port.                                                        |
-| `service.ports.sentinel`         | integer | `26379` | Sentinel client port.                                                     |
-| `extraManifests`                 | array   | `[]`    | Extra Kubernetes manifests.                                               |
+| Parameter                        | Type    | Default   | Description                                                                        |
+| -------------------------------- | ------- | --------- | ---------------------------------------------------------------------------------- |
+| `config.redis`                   | string  | `""`      | Extra lines appended to `redis.conf` (maxmemory, save, appendonly, etc.).          |
+| `config.sentinel`                | string  | `""`      | Extra lines appended to `sentinel.conf`.                                           |
+| `metrics.enabled`                | boolean | `false`   | Deploy `redis_exporter` Prometheus sidecar.                                        |
+| `metrics.image.tag`              | string  | `v1.69.0` | `redis_exporter` image tag.                                                        |
+| `metrics.serviceMonitor.enabled` | boolean | `false`   | Create Prometheus ServiceMonitor resource.                                         |
+| `pdb.enabled`                    | boolean | `false`   | Enable PodDisruptionBudget.                                                        |
+| `service.ports.redis`            | integer | `6379`    | Redis client port.                                                                 |
+| `service.ports.sentinel`         | integer | `26379`   | Sentinel client port.                                                              |
+| `service.ipFamilyPolicy`         | string  | _omitted_ | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. |
+| `service.ipFamilies`             | array   | `[]`      | Ordered Service IP families (`IPv4`, `IPv6`). Empty uses cluster default.          |
+| `extraManifests`                 | array   | `[]`      | Extra Kubernetes manifests.                                                        |
+
+### External Secrets Operator
+
+| Parameter                             | Type    | Default                  | Description                                      |
+| ------------------------------------- | ------- | ------------------------ | ------------------------------------------------ |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret for the Redis auth Secret. |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | ExternalSecret API version.                      |
+| `externalSecrets.refreshInterval`     | string  | `"0"`                    | ExternalSecret refresh interval.                 |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | Existing SecretStore or ClusterSecretStore name. |
+| `externalSecrets.data`                | array   | `[]`                     | Remote references mapped to Redis password keys. |
 
 <Callout type="tip" title="Set maxmemory to ~80% of resources.limits.memory">
   Redis needs headroom above `maxmemory` for internal overhead (AOF buffers, client output buffers, Lua, etc.). A safe
   rule: set `maxmemory` to 80–85% of `resources.limits.memory`. For example, a pod with `limits.memory: 1Gi` should use
   `maxmemory 820mb`.
 </Callout>
+
+## Dual-stack Networking
+
+Redis Services accept Kubernetes dual-stack settings. By default `service.ipFamilyPolicy` is omitted and
+`service.ipFamilies` is empty, so the cluster default remains authoritative. Set these only when the target cluster
+supports the requested IP families.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+`PreferDualStack` is the safest explicit policy for clusters that may be single-stack or dual-stack. Use
+`RequireDualStack` only when both IPv4 and IPv6 are guaranteed.
 
 ## Upgrade Notes
 

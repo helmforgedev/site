@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: MySQL Chart
-description: HelmForge MySQL chart — MySQL with standalone and source-replica replication architectures for Kubernetes.
+description: HelmForge MySQL chart - standalone and source-replica topologies with TLS, External Secrets, dual-stack Services, NetworkPolicy controls, metrics, and S3 backups.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,29 +11,34 @@ import MysqlDiagram from '../../../components/diagrams/MysqlDiagram.astro';
 
 # MySQL
 
-Production-ready MySQL deployment with support for standalone and source-replica replication architectures.
+Deploy MySQL on Kubernetes using the official `mysql` image. The chart supports `standalone` and `replication`
+architectures, S3-compatible backups, Prometheus metrics, TLS, dual-stack Services, External Secrets Operator, and
+production hardening controls that can be enabled without changing the development-friendly defaults.
 
 ## Key Features
 
-- **Standalone and replication** — Single instance or source-replica topology
-- **Automatic initialization** — Init scripts and custom configuration
-- **Backup support** — Configurable backup CronJobs to S3-compatible storage
-- **Metrics** — Prometheus exporter with ServiceMonitor
-- **Security** — Non-root containers, network policies, TLS support
-- **Persistent storage** — Configurable PVCs with storage class selection
+- **Standalone and source-replica** - Single instance or source with read replicas.
+- **Official MySQL image** - Uses `docker.io/library/mysql:9.7.0` by default.
+- **Deterministic credentials** - Inline values for development or existing Secrets/External Secrets for production.
+- **TLS** - Server TLS, optional secure transport requirement, internal client TLS, and private-key permission normalization.
+- **NetworkPolicy** - Optional ingress rules plus explicit egress for DNS, same-namespace MySQL, HTTPS, and custom targets.
+- **S3 backup** - Scheduled `mysqldump` CronJobs with existing Secret support for object storage credentials.
+- **Observability** - `mysqld-exporter` sidecar with optional ServiceMonitor.
+- **Dual-stack Services** - Optional `ipFamilyPolicy` and `ipFamilies` across chart-managed Services.
+- **Least privilege** - Non-root containers, dropped capabilities, and opt-in ServiceAccount token mounting.
 
 ## Architecture
 
 <ArchitectureDiagram
   title="Standalone"
-  description="Single MySQL instance with persistent storage and optional S3 backup."
+  description="Single MySQL pod with persistent storage, metrics, optional TLS, and optional backup CronJob."
 >
   <MysqlDiagram mode="standalone" />
 </ArchitectureDiagram>
 
 <ArchitectureDiagram
   title="Source-Replica"
-  description="Source (read-write) with binary log replication to read-only replicas."
+  description="Writable source pod with binary log retention and read-only replicas behind a replica Service."
 >
   <MysqlDiagram mode="replication" />
 </ArchitectureDiagram>
@@ -45,28 +50,37 @@ Production-ready MySQL deployment with support for standalone and source-replica
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install my-mysql helmforge/mysql
+helm install my-mysql helmforge/mysql -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install my-mysql oci://ghcr.io/helmforgedev/helm/mysql
+helm install my-mysql oci://ghcr.io/helmforgedev/helm/mysql -f values.yaml
 ```
+
+<Callout type="warning" title="Defaults are for development and smoke tests">
+  The chart can run with generated credentials and small storage defaults, but production installs should pin
+  credentials in an existing Secret or External Secrets backend, size PVCs/resources explicitly, and enable backup
+  before storing critical data.
+</Callout>
 
 ## Deployment Examples
 
-<DocsTabs tabs={[
-  { id: 'standalone', label: 'Standalone' },
-  { id: 'replication', label: 'Replication' },
-  { id: 'backup', label: 'With Backup' },
-  { id: 'ingress', label: 'With Ingress' },
-]}>
+<DocsTabs
+  tabs={[
+    { id: 'standalone', label: 'Standalone' },
+    { id: 'replication', label: 'Replication' },
+    { id: 'backup', label: 'Backup' },
+    { id: 'production', label: 'Production' },
+    { id: 'external-secrets', label: 'External Secrets' },
+  ]}
+>
 
 <div data-tab-panel="standalone">
 
 ```yaml
-# values.yaml
+# values.yaml - standalone development or small workload
 architecture: standalone
 
 auth:
@@ -75,7 +89,7 @@ auth:
   username: myuser
   password: 'user-password'
 
-primary:
+standalone:
   persistence:
     size: 20Gi
 
@@ -90,7 +104,7 @@ metrics:
 <div data-tab-panel="replication">
 
 ```yaml
-# values.yaml
+# values.yaml - source with two read replicas
 architecture: replication
 
 auth:
@@ -100,14 +114,14 @@ auth:
   password: 'user-password'
   replicationPassword: 'repl-password'
 
-primary:
-  persistence:
-    size: 20Gi
-
-secondary:
-  replicaCount: 2
-  persistence:
-    size: 20Gi
+replication:
+  source:
+    persistence:
+      size: 20Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      size: 20Gi
 ```
 
 </div>
@@ -115,14 +129,15 @@ secondary:
 <div data-tab-panel="backup">
 
 ```yaml
-# values.yaml
+# values.yaml - backup credentials from an existing Secret
 architecture: standalone
 
 auth:
-  rootPassword: 'my-secret-password'
+  existingSecret: mysql-auth
   database: myapp
+  username: myapp
 
-primary:
+standalone:
   persistence:
     size: 20Gi
 
@@ -132,76 +147,251 @@ backup:
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: my-mysql-backups
-    accessKey: AKIAIOSFODNN7EXAMPLE
-    secretKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-  retention:
-    days: 30
+    prefix: mysql
+    existingSecret: mysql-backup
 ```
 
 </div>
 
-<div data-tab-panel="ingress">
+<div data-tab-panel="production">
 
 ```yaml
-# values.yaml — Use with phpMyAdmin or a web-based management tool
-architecture: standalone
+# values.yaml - production baseline with replication, TLS, backup, and policies
+architecture: replication
 
 auth:
-  rootPassword: 'my-secret-password'
+  existingSecret: mysql-auth
   database: myapp
+  username: myapp
 
-primary:
-  persistence:
-    size: 20Gi
+replication:
+  source:
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: '2'
+        memory: 2Gi
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 768Mi
+      limits:
+        cpu: '1'
+        memory: 1536Mi
 
-ingress:
+tls:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: phpmyadmin.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: phpmyadmin-tls
-      hosts:
-        - phpmyadmin.example.com
-  # annotations:
-  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+  existingSecret: mysql-tls
+  requireSecureTransport: true
+  volumePermissions:
+    enabled: true
+  client:
+    enabled: true
+    sslMode: REQUIRED
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceMySQL: true
+    allowHTTPS: true
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.example.com
+    bucket: mysql-backups
+    existingSecret: mysql-backup
 ```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml - render ExternalSecret resources for existing ESO clusters
+auth:
+  existingSecret: mysql-auth
+
+tls:
+  enabled: true
+  existingSecret: mysql-tls
+
+backup:
+  enabled: true
+  s3:
+    existingSecret: mysql-backup
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  auth:
+    enabled: true
+    targetName: mysql-auth
+    rootPasswordRemoteRef:
+      key: prod/mysql
+      property: root-password
+    userPasswordRemoteRef:
+      key: prod/mysql
+      property: user-password
+    replicationPasswordRemoteRef:
+      key: prod/mysql
+      property: replication-password
+  tls:
+    enabled: true
+    targetName: mysql-tls
+    caRemoteRef:
+      key: prod/mysql-tls
+      property: ca.crt
+    certRemoteRef:
+      key: prod/mysql-tls
+      property: tls.crt
+    keyRemoteRef:
+      key: prod/mysql-tls
+      property: tls.key
+  backup:
+    enabled: true
+    targetName: mysql-backup
+    accessKeyRemoteRef:
+      key: prod/mysql-backup
+      property: access-key
+    secretKeyRemoteRef:
+      key: prod/mysql-backup
+      property: secret-key
+```
+
+<Callout type="info" title="External Secrets Operator is optional">
+  The chart does not install External Secrets Operator and does not create a `SecretStore` or `ClusterSecretStore`.
+  Enable this only when the operator and referenced store already exist.
+</Callout>
 
 </div>
 
 </DocsTabs>
 
-## Key Values
+## Production Path
 
-| Key                                 | Type    | Default      | Description                                                                                                  |
-| ----------------------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
-| `architecture`                      | string  | `standalone` | Deployment architecture: `standalone` or `replication`                                                       |
-| `auth.rootPassword`                 | string  | `""`         | MySQL root password                                                                                          |
-| `auth.database`                     | string  | `""`         | Default database to create                                                                                   |
-| `auth.username`                     | string  | `""`         | Default user to create                                                                                       |
-| `auth.password`                     | string  | `""`         | Password for default user                                                                                    |
-| `auth.replicationPassword`          | string  | `""`         | Password for replication user                                                                                |
-| `primary.persistence.size`          | string  | `8Gi`        | Primary PVC size                                                                                             |
-| `primary.persistence.storageClass`  | string  | `""`         | Storage class for primary PVC                                                                                |
-| `primary.resources.requests.memory` | string  | `256Mi`      | Memory request for primary                                                                                   |
-| `primary.resources.requests.cpu`    | string  | `250m`       | CPU request for primary                                                                                      |
-| `secondary.replicaCount`            | integer | `1`          | Number of read replicas                                                                                      |
-| `secondary.persistence.size`        | string  | `8Gi`        | Secondary PVC size                                                                                           |
-| `backup.enabled`                    | boolean | `false`      | Enable S3 backup CronJob                                                                                     |
-| `backup.schedule`                   | string  | `0 3 * * *`  | Cron schedule for backups                                                                                    |
-| `metrics.enabled`                   | boolean | `false`      | Enable Prometheus exporter                                                                                   |
-| `metrics.serviceMonitor.enabled`    | boolean | `false`      | Create ServiceMonitor resource                                                                               |
-| `networkPolicy.enabled`             | boolean | `false`      | Enable network policies                                                                                      |
-| `tls.enabled`                       | boolean | `false`      | Enable TLS encryption                                                                                        |
-| `service.ipFamilyPolicy`            | string  | _omitted_    | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. Omit for cluster default. |
-| `service.ipFamilies`                | array   | _omitted_    | Ordered list of IP families (`IPv4`, `IPv6`). Omit for cluster default.                                      |
+Keep defaults for local development, CI smoke tests, and disposable environments. For production, make these decisions
+explicitly:
+
+- Store `auth.*Password`, TLS material, and backup credentials in existing Secrets or External Secrets.
+- Size `replication.source.persistence`, `replication.readReplicas.persistence`, and resources for the actual workload.
+- Enable `tls.requireSecureTransport` when clients should be forced to use encrypted TCP connections.
+- Enable metrics and backup before accepting durable workload traffic.
+- Enable NetworkPolicy only after modelling required ingress and egress paths.
+
+### TLS private key permissions
+
+Some MySQL versions reject private keys projected from Secrets when mode or ownership is too permissive for the runtime
+user. `tls.volumePermissions.enabled` copies TLS material into an `emptyDir`, normalizes ownership for UID/GID 999, and
+restricts the private key before `mysqld` starts.
+
+### NetworkPolicy egress
+
+`networkPolicy.egress.enabled=false` preserves default CNI egress behavior. When enabled, use the structured switches for
+DNS, same-namespace MySQL replication/internal clients, HTTPS to object storage or external secret backends, and
+`networkPolicy.egress.extraTo` for platform-specific destinations.
+
+### ServiceAccount token mount
+
+`serviceAccount.automountServiceAccountToken` defaults to `false`. Keep it disabled unless a sidecar, extension, or
+platform integration inside the pod needs Kubernetes API credentials.
+
+## Configuration Reference
+
+### Core and Image
+
+| Parameter          | Type   | Default                   | Description                                             |
+| ------------------ | ------ | ------------------------- | ------------------------------------------------------- |
+| `architecture`     | string | `standalone`              | Deployment architecture: `standalone` or `replication`. |
+| `image.repository` | string | `docker.io/library/mysql` | MySQL runtime image repository.                         |
+| `image.tag`        | string | `"9.7.0"`                 | MySQL runtime image tag.                                |
+| `clusterDomain`    | string | `cluster.local`           | Kubernetes cluster DNS domain.                          |
+| `commonLabels`     | object | `{}`                      | Extra labels added to all resources.                    |
+
+### Authentication
+
+| Parameter                                   | Type   | Default                      | Description                                                |
+| ------------------------------------------- | ------ | ---------------------------- | ---------------------------------------------------------- |
+| `auth.rootPassword`                         | string | `""`                         | Root password when no existing Secret is used.             |
+| `auth.database`                             | string | `app`                        | Application database created on first bootstrap.           |
+| `auth.username`                             | string | `app`                        | Application user created on first bootstrap.               |
+| `auth.password`                             | string | `""`                         | Application user password when no existing Secret is used. |
+| `auth.replicationUsername`                  | string | `replicator`                 | Replication user used by read replicas.                    |
+| `auth.replicationPassword`                  | string | `""`                         | Replication password when no existing Secret is used.      |
+| `auth.existingSecret`                       | string | `""`                         | Existing Secret containing MySQL passwords.                |
+| `auth.existingSecretRootPasswordKey`        | string | `mysql-root-password`        | Secret key for the root password.                          |
+| `auth.existingSecretUserPasswordKey`        | string | `mysql-user-password`        | Secret key for the application user password.              |
+| `auth.existingSecretReplicationPasswordKey` | string | `mysql-replication-password` | Secret key for the replication password.                   |
+
+### Replication, Persistence, and Backup
+
+| Parameter                                   | Type    | Default          | Description                                      |
+| ------------------------------------------- | ------- | ---------------- | ------------------------------------------------ |
+| `standalone.persistence.size`               | string  | `8Gi`            | PVC size for standalone mode.                    |
+| `replication.source.persistence.size`       | string  | `20Gi`           | PVC size for the source pod.                     |
+| `replication.readReplicas.replicaCount`     | integer | `2`              | Number of read replica pods.                     |
+| `replication.readReplicas.persistence.size` | string  | `20Gi`           | PVC size for each read replica.                  |
+| `replication.binlog.retentionDays`          | integer | `7`              | Binary log retention in whole days.              |
+| `replication.pdb.enabled`                   | boolean | `true`           | Enable a PDB by default in replication mode.     |
+| `backup.enabled`                            | boolean | `false`          | Enable the built-in backup CronJob.              |
+| `backup.schedule`                           | string  | `"0 3 * * *"`    | Backup schedule.                                 |
+| `backup.s3.existingSecret`                  | string  | `""`             | Existing Secret with S3 access and secret keys.  |
+| `backup.database.mysqldumpArgs`             | string  | See chart values | Extra arguments passed before `--all-databases`. |
+
+### TLS, Services, Metrics, and Policies
+
+| Parameter                                     | Type    | Default     | Description                                                                                                  |
+| --------------------------------------------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `tls.enabled`                                 | boolean | `false`     | Enable MySQL server TLS.                                                                                     |
+| `tls.existingSecret`                          | string  | `""`        | Existing Secret containing TLS material.                                                                     |
+| `tls.requireSecureTransport`                  | boolean | `false`     | Require encrypted TCP client connections.                                                                    |
+| `tls.volumePermissions.enabled`               | boolean | `false`     | Normalize copied TLS private-key ownership and permissions before MySQL starts.                              |
+| `tls.client.enabled`                          | boolean | `false`     | Enable TLS for chart-managed internal TCP clients.                                                           |
+| `service.ipFamilyPolicy`                      | string  | _omitted_   | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. Omit for cluster default. |
+| `service.ipFamilies`                          | array   | _omitted_   | Ordered list of IP families (`IPv4`, `IPv6`). Omit for cluster default.                                      |
+| `metrics.enabled`                             | boolean | `false`     | Enable `mysqld-exporter`.                                                                                    |
+| `metrics.image.tag`                           | string  | `"v0.17.2"` | `mysqld-exporter` image tag.                                                                                 |
+| `networkPolicy.enabled`                       | boolean | `false`     | Create a NetworkPolicy for MySQL pods.                                                                       |
+| `networkPolicy.egress.enabled`                | boolean | `false`     | Add explicit egress rules to the NetworkPolicy.                                                              |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount Kubernetes API credentials into workload pods.                                                         |
+
+### External Secrets Operator
+
+| Parameter                             | Type    | Default                  | Description                                          |
+| ------------------------------------- | ------- | ------------------------ | ---------------------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret resources.                     |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | ExternalSecret API version.                          |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | Existing SecretStore or ClusterSecretStore name.     |
+| `externalSecrets.auth.enabled`        | boolean | `false`                  | Manage the MySQL auth Secret through ESO.            |
+| `externalSecrets.tls.enabled`         | boolean | `false`                  | Manage the MySQL TLS Secret through ESO.             |
+| `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage the backup object-storage Secret through ESO. |
 
 ## Dual-stack Networking
 
-MySQL Services accept Kubernetes [dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/) configuration. By default, both `service.ipFamilyPolicy` and `service.ipFamilies` are unset and the chart inherits whatever the cluster advertises (matching prior behavior). Setting them propagates to every chart-managed Service: client, source, replicas, metrics, and the headless StatefulSet services.
+By default, `service.ipFamilyPolicy` and `service.ipFamilies` are unset and the cluster default remains authoritative.
+Set them only when your cluster supports the requested families.
 
 ```yaml
 service:
@@ -211,31 +401,34 @@ service:
     - IPv6
 ```
 
-`PreferDualStack` is the safer choice for clusters that may be single- or dual-stack: omit `ipFamilies` and the cluster auto-populates whatever it supports. Set `ipFamilies` explicitly only when the cluster is configured for both families — the Kubernetes API rejects an explicit family the cluster does not advertise. `RequireDualStack` enforces both.
+Use `PreferDualStack` for mixed environments. `RequireDualStack` should be reserved for clusters where both IPv4 and
+IPv6 are guaranteed.
 
 ## Upgrade Notes
 
 <Callout type="warning" title="Password persistence">
-  MySQL stores the root password during initial setup. On upgrade, ensure `auth.rootPassword` matches the original value
-  or the pod will fail to start with an authentication error.
+  MySQL stores credentials during initial setup. On upgrade, ensure the provided Secret values match the existing data
+  directory or the pod can fail authentication during startup.
 </Callout>
 
-- When enabling replication on an existing standalone instance, a full re-initialization is required
-- Backup CronJob changes take effect on the next scheduled run
-- Secondary replicas are read-only; write attempts return an error
+- Switching from `standalone` to `replication` requires a planned migration or re-initialization.
+- Backup CronJob changes take effect on the next scheduled run.
+- Read replicas are read-only; write traffic must target the source/client Service.
 
 ## Common Issues
 
 <Callout type="danger" title="Pod stuck in CrashLoopBackOff after upgrade">
-  If the root password in values doesn't match the existing data directory, MySQL refuses to start.
-  Check logs with `kubectl logs <pod>` and verify the password matches.
+  The most common cause is credentials that do not match the existing data directory. Check pod logs and verify the
+  Secret values before deleting PVCs.
 </Callout>
 
 <Callout type="tip" title="Replication lag monitoring">
-  Enable metrics and monitor `mysql_slave_status_seconds_behind_master`. Values consistently above 0 indicate the
-  replica cannot keep up — consider increasing replica resources or reducing write load.
+  Enable metrics and monitor replica lag. Persistent lag usually means replicas need more CPU, memory, storage IOPS, or
+  a reduced write workload.
 </Callout>
 
 ## More Information
 
-See the [source code and full values reference](https://github.com/helmforgedev/charts/tree/main/charts/mysql) on GitHub.
+- [MySQL Official Documentation](https://dev.mysql.com/doc/)
+- [MySQL Docker Official Image](https://hub.docker.com/_/mysql)
+- [HelmForge MySQL Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/mysql)
