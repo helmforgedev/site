@@ -248,7 +248,7 @@ export const charts: Chart[] = [
   {
     name: 'phpMyAdmin',
     slug: 'phpmyadmin',
-    description: 'Web-based MySQL and MariaDB administration with multi-server support.',
+    description: 'MySQL and MariaDB administration with Gateway API, External Secrets, and NetworkPolicy controls.',
     maturity: 'stable',
     backup: false,
   },
