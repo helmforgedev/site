@@ -1,0 +1,389 @@
+---
+title: 'WordPress on Kubernetes Needs More Than a Pod'
+description: 'A production WordPress setup on Kubernetes needs Redis, backup, secrets, routing, storage decisions, and chart-level operational guardrails.'
+date: 2026-05-06
+publishDate: 2026-05-06
+updatedAt: 2026-05-06
+authorId: 'maicon-berlofa'
+category: 'operations'
+tags: ['wordpress', 'kubernetes', 'helm', 'redis', 'backup']
+relatedCharts: ['wordpress', 'mysql', 'redis']
+coverImage: '/blog/2026-05-06-wordpress-production-kubernetes-helmforge-hero.webp'
+coverAlt: 'Merged HelmForge, Kubernetes, and WordPress logos over a production WordPress architecture map'
+schemaType: 'BlogPosting'
+---
+
+Most WordPress-on-Kubernetes tutorials stop at the point where the site answers HTTP.
+
+That is useful for a demo, but it is not the point where WordPress becomes operable. A production setup has to answer harder questions: where does mutable content live, how are plugins installed without manual dashboard drift, how does object cache survive pod restarts, how are database and `wp-content` backed up together, and how do secrets flow from the platform into the chart without placing passwords directly in `values.yaml`.
+
+The HelmForge WordPress chart was shaped around that operational contract. The default path is still intentionally small for development, but the production path exposes the decisions you need to make explicit.
+
+![HelmForge, Kubernetes, and WordPress logos merged into a production WordPress architecture map.](/blog/2026-05-06-wordpress-production-kubernetes-helmforge-hero.webp)
+
+## What is different from a generic setup
+
+The common Kubernetes version of WordPress is a Deployment, a Service, a PVC, and a MySQL database. That is only the runtime skeleton.
+
+The useful unit is larger:
+
+- WordPress running from the official Apache image.
+- MySQL from the HelmForge subchart or an external MySQL/MariaDB service.
+- A persistent volume for `/var/www/html`.
+- Optional Redis Object Cache with the official `redis-cache` plugin.
+- A post-install/post-upgrade plugin installer Job for official WordPress.org plugin slugs.
+- S3-compatible backup that exports both the database and `wp-content`.
+- Ingress or Gateway API routing.
+- Optional External Secrets Operator resources for admin, database, backup, and Redis credentials.
+- Optional NetworkPolicy, ServiceAccount token controls, HPA, PDB, `wp-cron` CronJob, metrics, and dual-stack Service fields.
+
+That sounds like more YAML, but it removes a lot of manual state from the WordPress dashboard and makes the deployment reviewable before it reaches a cluster.
+
+## Start with a development install
+
+The default install is deliberately convenient:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+
+helm install wordpress helmforge/wordpress \
+  --namespace wordpress \
+  --create-namespace \
+  --wait --timeout 10m
+```
+
+That gives you one WordPress pod, a bundled HelmForge MySQL database, generated credentials, and a persistent WordPress volume.
+
+For local access:
+
+```bash
+kubectl port-forward -n wordpress svc/wordpress 8080:80
+```
+
+This is the right shape for development, demos, and chart validation. It is not the final production shape, because generated credentials, default resources, single-replica RWO storage, and dashboard-managed plugins are not enough for a managed service.
+
+## Make the production contract explicit
+
+A production-oriented values file should start by deciding the URL, secrets, database, storage, routing, and backup path:
+
+```yaml
+wordpress:
+  siteUrl: https://blog.example.com
+  siteTitle: Engineering Blog
+  adminEmail: platform@example.com
+  forceSSLAdmin: true
+  disallowFileEdit: true
+  disableWpCron: true
+  memoryLimit: 256M
+  maxMemoryLimit: 512M
+
+admin:
+  existingSecret: wordpress-admin
+  existingSecretPasswordKey: admin-password
+
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql-primary.wordpress.svc.cluster.local
+    port: 3306
+    name: wordpress
+    username: wordpress
+    existingSecret: wordpress-db
+    existingSecretPasswordKey: password
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteMany
+  storageClass: nfs-rwx
+  size: 50Gi
+
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - blog.example.com
+
+networkPolicy:
+  enabled: true
+  ingress:
+    extraFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: gateway-system
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceDatabase: true
+    allowHTTPS: true
+
+wpCron:
+  cronJob:
+    enabled: true
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: '1'
+    memory: 1Gi
+```
+
+This values file says what the platform owns and what the chart wires into the workload. The Gateway, certificate automation, secret backend, external database, DNS, storage class, and S3 bucket are still platform concerns. The chart consumes them consistently.
+
+## Redis is not just another sidecar
+
+WordPress has an in-memory object cache during a single request, but a persistent object cache needs a backend and a drop-in. Redis matters because it moves repeated query and transient lookups out of MySQL, which is especially useful for WooCommerce, large admin screens, multisite, ACF-heavy sites, and traffic with repeated anonymous reads.
+
+The chart uses the official Redis Object Cache plugin path:
+
+- install and activate `redis-cache`.
+- create the `wp-content/object-cache.php` drop-in.
+- set the WordPress Redis constants.
+- point WordPress to either a HelmForge Redis subchart or an external Redis service.
+- share Redis credentials with the WordPress pod and the installer Job when auth is enabled.
+
+Using the HelmForge Redis subchart:
+
+```yaml
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+    activeDeadlineSeconds: 60
+
+objectCache:
+  enabled: true
+  redis:
+    mode: subchart
+    subchart:
+      enabled: true
+
+redis:
+  architecture: standalone
+  auth:
+    existingSecret: wordpress-redis-auth
+    existingSecretPasswordKey: redis-password
+```
+
+Using an external Redis:
+
+```yaml
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+
+objectCache:
+  enabled: true
+  redis:
+    mode: external
+    external:
+      host: redis.cache.svc.cluster.local
+      port: 6379
+    auth:
+      existingSecret: wordpress-redis
+      existingSecretPasswordKey: redis-password
+```
+
+The important validation is not only "the Redis pod is running." The real check is that WordPress installed the plugin, created the drop-in, connected to Redis, and can write cache keys.
+
+```bash
+kubectl logs -n wordpress job/wordpress-plugin-installer
+
+kubectl exec -n wordpress deploy/wordpress -- \
+  wp redis status --path=/var/www/html --allow-root
+```
+
+If Redis is unavailable, the object cache drop-in becomes part of the availability story. That is why Redis credentials, DNS, NetworkPolicy egress, and plugin activation have to be treated as one path, not separate toggles.
+
+## Plugin installation belongs in the chart when the volume is persistent
+
+Manual plugin installation through `wp-admin` is easy, but it creates invisible drift. A second environment, a recreated PVC, or a disaster recovery run will not necessarily have the same plugin state.
+
+The chart can install official WordPress.org plugin slugs through an idempotent Job:
+
+```yaml
+persistence:
+  enabled: true
+
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+    activeDeadlineSeconds: 60
+    backoffLimit: 1
+    preferWordPressPodNode: true
+  items:
+    - slug: classic-editor
+      activate: true
+      skipIfInstalled: true
+    - slug: contact-form-7
+      activate: true
+      skipIfInstalled: true
+```
+
+The storage requirement is intentional. The installer writes into the same WordPress files that the web pod serves. With a ReadWriteOnce volume, the Job also has to run in a way that respects where the PVC can attach. That is why the chart supports a node preference for the existing WordPress pod and keeps the installer timeout short by default.
+
+For production, treat plugin lists as part of your release process. The chart can install plugins, but it cannot decide whether a plugin is safe, maintained, compatible with your WordPress/PHP version, or acceptable for your security policy.
+
+## Backup must include database and content
+
+WordPress state is split. Posts, options, users, and plugin settings live in MySQL/MariaDB. Uploads, themes, plugin files, and object-cache drop-ins live under `/var/www/html`, especially `wp-content`.
+
+A database-only backup is not a WordPress restore plan. A filesystem-only backup is not a WordPress restore plan either.
+
+The chart's backup CronJob exports both:
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  archivePrefix: wordpress
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: wordpress-backups
+    existingSecret: wordpress-s3
+    existingSecretAccessKeyKey: access-key
+    existingSecretSecretKeyKey: secret-key
+  database:
+    mysqldumpArgs: '--single-transaction --quick --skip-lock-tables --no-tablespaces'
+```
+
+The output is two artifacts: a compressed database dump and a compressed `wp-content` archive.
+
+Run an on-demand backup before you trust the schedule:
+
+```bash
+kubectl create job -n wordpress \
+  --from=cronjob/wordpress-backup \
+  wordpress-backup-manual
+
+kubectl logs -n wordpress job/wordpress-backup-manual -f
+```
+
+Then test restore. The backup job can prove it uploaded files. Only restore proves those files are sufficient.
+
+## External Secrets keeps values files clean
+
+Many charts support `existingSecret`, and that is still the runtime contract. External Secrets Operator adds the missing platform workflow: credentials can live in AWS Secrets Manager, Vault, Azure Key Vault, GCP Secret Manager, or another backend, while the chart consumes ordinary Kubernetes Secrets.
+
+```yaml
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  admin:
+    enabled: true
+    passwordRemoteRef:
+      key: prod/wordpress
+      property: admin-password
+  database:
+    enabled: true
+    passwordRemoteRef:
+      key: prod/wordpress
+      property: database-password
+  backup:
+    enabled: true
+    accessKeyRemoteRef:
+      key: prod/wordpress-backup
+      property: access-key
+    secretKeyRemoteRef:
+      key: prod/wordpress-backup
+      property: secret-key
+```
+
+That separation is useful in GitOps. The values file can describe which secret is needed without carrying the secret value.
+
+## Scaling WordPress is mostly a storage question
+
+It is tempting to set `replicaCount: 3` or enable HPA and call the setup highly available. For WordPress, that is only correct when the content layer supports it.
+
+The default `ReadWriteOnce` PVC is right for a single pod. Multiple WordPress pods need one of these strategies:
+
+- ReadWriteMany storage for `/var/www/html`.
+- a custom immutable image with plugins/themes baked in and uploads handled elsewhere.
+- object-storage media integration outside the chart.
+- a careful split where only safe paths are shared and writable paths are externalized.
+
+Without that decision, multiple pods can disagree about plugins, themes, uploads, and drop-ins. The chart exposes HPA and PDB, but production operators should enable them only after the storage architecture is ready.
+
+## The production validation checklist
+
+Before calling the install production-ready, validate the behavior from Kubernetes and WordPress:
+
+```bash
+kubectl get pods,pvc,svc,httproute,networkpolicy -n wordpress
+kubectl get externalsecret,secret -n wordpress
+kubectl describe pod -n wordpress -l app.kubernetes.io/name=wordpress
+kubectl logs -n wordpress deploy/wordpress
+```
+
+Check the application path:
+
+```bash
+kubectl exec -n wordpress deploy/wordpress -- \
+  wp core version --path=/var/www/html --allow-root
+
+kubectl exec -n wordpress deploy/wordpress -- \
+  wp plugin list --path=/var/www/html --allow-root
+
+kubectl exec -n wordpress deploy/wordpress -- \
+  wp redis status --path=/var/www/html --allow-root
+```
+
+Check backup:
+
+```bash
+kubectl get cronjob,job -n wordpress
+kubectl logs -n wordpress job/wordpress-backup-manual -f
+```
+
+Check routing:
+
+```bash
+kubectl get httproute -n wordpress
+kubectl get gateway -A
+curl -I https://blog.example.com
+```
+
+Those checks catch the failures that a simple Helm render cannot: PVC attachment, plugin writes, Redis connectivity, route attachment, ExternalSecret reconciliation, and backup upload permissions.
+
+## A good chart should make the tradeoffs visible
+
+The goal is not to pretend WordPress becomes stateless because it runs in Kubernetes. It does not.
+
+The goal is to make the state boundaries visible: database, content volume, object cache, plugins, secrets, routing, backup, and scheduled jobs. Once those are visible in values, production review becomes practical. You can ask whether Redis is local or external, whether the backup includes both domains, whether plugins are part of release management, whether NetworkPolicy still allows Redis and MySQL, and whether the storage class can support the number of replicas requested.
+
+That is where Helm adds value. Not by hiding WordPress behind a single command, but by turning the production shape into something the platform can review, test, repeat, and restore.
+
+## References
+
+- [HelmForge WordPress chart documentation](https://helmforge.dev/docs/charts/wordpress)
+- [WordPress documentation](https://wordpress.org/documentation/)
+- [WordPress Docker official image](https://hub.docker.com/_/wordpress)
+- [Redis Object Cache plugin](https://wordpress.org/plugins/redis-cache/)
+- [WP-CLI plugin install command](https://developer.wordpress.org/cli/commands/plugin/install/)
+- [Kubernetes Gateway API documentation](https://kubernetes.io/docs/concepts/services-networking/gateway/)
+- [Kubernetes dual-stack Services](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)
+- [Kubernetes NetworkPolicy documentation](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [External Secrets Operator API specification](https://external-secrets.io/main/api/spec/)
