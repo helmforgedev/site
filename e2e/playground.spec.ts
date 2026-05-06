@@ -46,6 +46,18 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText('persistence');
   });
 
+  test('helm output escapes comma-separated set values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="phpmyadmin"]').click();
+
+    await page.locator('[data-section-toggle="Multi-Server"]').click();
+    await expect(page.locator('#playground-code')).toContainText(
+      String.raw`phpmyadmin.hosts=mysql-primary.svc\,mysql-replica.svc`,
+    );
+    await expect(page.locator('#playground-code')).toContainText(String.raw`phpmyadmin.ports=3306\,3306`);
+    await expect(page.locator('#playground-code')).toContainText(String.raw`phpmyadmin.verboses=Primary\,Replica`);
+  });
+
   test('scenario buttons apply values', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();

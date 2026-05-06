@@ -455,7 +455,8 @@ function buildSetFlags(): string[] {
 }
 
 function quoteSetValue(value: string): string {
-  return /\s/.test(value) ? `'${value.replace(/'/g, "'\\''")}'` : value;
+  const helmEscaped = value.replace(/,/g, '\\,');
+  return /\s/.test(helmEscaped) ? `'${helmEscaped.replace(/'/g, "'\\''")}'` : helmEscaped;
 }
 
 function generateHelmOutput(): string {
