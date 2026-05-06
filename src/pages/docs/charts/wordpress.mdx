@@ -1,34 +1,55 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: WordPress Chart
-description: HelmForge WordPress chart — official Apache image with MySQL subchart or external database, configExtra for wp-config.php, PHP ini tuning, mysqldump + wp-content S3 backup, Apache Prometheus exporter, and TLS ingress for Kubernetes.
+description: HelmForge WordPress chart - official Apache image with HelmForge MySQL or external database, Gateway API, External Secrets, dual-stack Services, NetworkPolicy, Redis Object Cache, plugin installer, S3 backup, metrics, and production controls.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
 import Callout from '../../../components/Callout.astro';
+import ArchitectureDiagram from '../../../components/ArchitectureDiagram.astro';
+import WordPressDiagram from '../../../components/diagrams/WordPressDiagram.astro';
 
 # WordPress
 
-Deploy WordPress on Kubernetes using the official [wordpress](https://hub.docker.com/_/wordpress)
-Docker image (Apache variant). Supports MySQL subchart or external MySQL/MariaDB, scheduled backups
-of both the database and `wp-content`, PHP ini tuning, and Prometheus metrics via an Apache exporter
-sidecar.
+Deploy [WordPress](https://wordpress.org/) on Kubernetes with the official
+`docker.io/library/wordpress:6.9.4-apache` image. The chart keeps the default install useful for
+development while exposing explicit production controls for database selection, secrets, routing,
+storage, backup, network policy, metrics, WordPress cron, plugin installation, and Redis Object Cache.
 
-<Callout type="warning" title="Default PHP upload limit is 2 MB — increase before uploading media">
-  The official WordPress Apache image ships with `upload_max_filesize = 2M` and `post_max_size = 8M`. Any image, video,
-  or plugin upload over 2 MB will fail silently or with a generic error. Configure `php.ini` via the chart to raise
-  these limits before installing themes or uploading content.
+<Callout type="info" title="Defaults are for fast development, not a full production baseline">
+  A default install creates one WordPress pod, a HelmForge MySQL subchart, generated credentials, and a ReadWriteOnce
+  PVC. Production deployments should opt in to explicit secrets, TLS routing, resources, backup, NetworkPolicy, and a
+  storage/database strategy that matches the required availability target.
 </Callout>
 
 ## Key Features
 
-- **Official Apache image** — PHP + Apache, compatible with all WordPress plugins and themes
-- **MySQL subchart** — bundled MySQL or external MySQL/MariaDB via `database.external`
-- **`configExtra`** — inject arbitrary PHP into `wp-config.php` (`WP_MEMORY_LIMIT`, cron, etc.)
-- **PHP ini tuning** — custom `php.ini` via ConfigMap for upload limits and memory
-- **Dual S3 backup** — mysqldump (database) + tar (wp-content) in a single scheduled CronJob
-- **Apache exporter** — Prometheus metrics via sidecar with optional ServiceMonitor
-- **Ingress with TLS** — cert-manager integration
+- **Official image alignment** - uses the upstream WordPress Apache image, with PHP configuration exposed through values.
+- **Database choices** - HelmForge MySQL subchart by default, or external MySQL/MariaDB through structured values.
+- **Secrets paths** - generated Kubernetes Secrets, existing Secrets, or optional External Secrets Operator resources.
+- **Routing** - classic Ingress and native Gateway API `HTTPRoute`.
+- **Networking** - dual-stack Service fields and optional NetworkPolicy ingress/egress rules.
+- **Production controls** - ServiceAccount token mount control, resources, HPA, PDB, deterministic WordPress cron, probes, and scheduling.
+- **Backups** - S3-compatible CronJob that exports both the database and `wp-content`.
+- **Plugins** - idempotent post-install/post-upgrade installer for official WordPress.org plugin slugs.
+- **Redis Object Cache** - optional `redis-cache` plugin and drop-in using HelmForge Redis or external Redis.
+- **Extensibility** - extra env, envFrom, init containers, sidecars, volumes, mounts, and raw extra manifests.
+
+## Architecture
+
+<ArchitectureDiagram
+  title="Production"
+  description="Traffic reaches WordPress through Ingress or Gateway API. Credentials can come from Kubernetes Secrets or External Secrets Operator. Backups export both database and content artifacts."
+>
+  <WordPressDiagram mode="production" />
+</ArchitectureDiagram>
+
+<ArchitectureDiagram
+  title="Redis Object Cache"
+  description="Redis Object Cache is enabled by installing the official plugin, creating the object-cache.php drop-in, and pointing WordPress at a subchart or external Redis endpoint."
+>
+  <WordPressDiagram mode="cache" />
+</ArchitectureDiagram>
 
 ## Installation
 
@@ -46,112 +67,71 @@ helm install wordpress helmforge/wordpress -f values.yaml
 helm install wordpress oci://ghcr.io/helmforgedev/helm/wordpress -f values.yaml
 ```
 
+For local access without Ingress or Gateway API:
+
+```bash
+kubectl port-forward svc/wordpress 8080:80
+```
+
+## Development vs Production
+
+Use the default install for local validation, demos, and development. It gives you a working
+WordPress instance quickly with a bundled MySQL database and persistent WordPress files.
+
+For production, make the choices explicit:
+
+- Use existing Secrets or External Secrets Operator for admin, database, backup, and Redis credentials.
+- Set `wordpress.siteUrl`, `wordpress.forceSSLAdmin`, `wordpress.disallowFileEdit`, and `wordpress.disableWpCron`.
+- Use Gateway API or Ingress with TLS and route-aware NetworkPolicy ingress rules.
+- Set CPU and memory requests, limits, PDB, and HPA only after storage is safe for multiple pods.
+- Use `ReadWriteMany` storage or an immutable media/plugin strategy before running multiple replicas.
+- Enable the Kubernetes `wpCron` CronJob when `DISABLE_WP_CRON` is set.
+- Test backup and restore, not only backup creation.
+
+<Callout type="warning" title="Horizontal scaling requires a content strategy">
+  WordPress writes uploads, plugins, themes, and drop-ins under `/var/www/html`. Keep one replica with the default
+  ReadWriteOnce PVC. Use ReadWriteMany storage or a custom immutable image/object-storage media strategy before enabling
+  HPA or setting `replicaCount` above 1.
+</Callout>
+
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'basic', label: 'Basic' },
-    { id: 'external-db', label: 'External MySQL' },
-    { id: 'production', label: 'Production (Full)' },
-    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'dev', label: 'Dev' },
+    { id: 'production', label: 'Production' },
+    { id: 'external-db', label: 'External DB' },
+    { id: 'gateway-secrets', label: 'Gateway + ESO' },
+    { id: 'redis', label: 'Redis Cache' },
+    { id: 'plugins', label: 'Plugins' },
+    { id: 'backup', label: 'Backup' },
   ]}
 >
 
-<div data-tab-panel="basic">
+<div data-tab-panel="dev">
 
 ```yaml
-# values.yaml — WordPress with bundled MySQL, PHP tuning, and TLS
+# values.yaml - development install with bundled MySQL
 wordpress:
-  siteTitle: 'My Blog'
+  siteTitle: My Blog
   adminUser: admin
-  adminPassword: 'change-me'
+  adminPassword: change-me
   adminEmail: admin@example.com
 
-  # Inject extra PHP into wp-config.php
-  configExtra: |
-    define('WP_MEMORY_LIMIT', '256M');
-    define('WP_POST_REVISIONS', 5);
-    define('DISABLE_WP_CRON', true);
+mysql:
+  enabled: true
+  auth:
+    password: db-password
 
-# Custom PHP ini — raise upload limits (default 2M is too low)
+persistence:
+  enabled: true
+  size: 10Gi
+
 php:
   ini: |
     upload_max_filesize = 64M
     post_max_size = 64M
     memory_limit = 256M
-    max_execution_time = 300
-
-mysql:
-  enabled: true
-  auth:
-    password: 'db-password'
-
-persistence:
-  enabled: true
-  size: 10Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: blog.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: wordpress-tls
-      hosts:
-        - blog.example.com
-```
-
-</div>
-
-<div data-tab-panel="external-db">
-
-```yaml
-# values.yaml — WordPress with external MySQL and existingSecret
-wordpress:
-  siteUrl: 'https://blog.example.com'
-  siteTitle: 'My Blog'
-  adminUser: admin
-  adminEmail: admin@example.com
-
-admin:
-  existingSecret: wordpress-admin-credentials
-  existingSecretPasswordKey: admin-password
-
-mysql:
-  enabled: false
-
-database:
-  mode: auto
-  external:
-    host: mysql.database.svc.cluster.local
-    port: 3306
-    name: wordpress
-    username: wordpress
-    existingSecret: wordpress-db-credentials
-    existingSecretPasswordKey: database-password
-
-php:
-  ini: |
-    upload_max_filesize = 64M
-    post_max_size = 64M
-
-persistence:
-  enabled: true
-  size: 10Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: blog.example.com
-      paths:
-        - path: /
-          pathType: Prefix
 ```
 
 </div>
@@ -159,287 +139,496 @@ ingress:
 <div data-tab-panel="production">
 
 ```yaml
-# values.yaml — Production WordPress with metrics and hardened config
+# values.yaml - production-oriented baseline
 wordpress:
-  siteUrl: 'https://blog.example.com'
-  siteTitle: 'My Blog'
-  adminUser: admin
+  siteUrl: https://blog.example.com
+  siteTitle: My Blog
   adminEmail: admin@example.com
-  configExtra: |
-    define('WP_MEMORY_LIMIT', '512M');
-    define('WP_POST_REVISIONS', 10);
-    define('DISABLE_WP_CRON', true);
-    define('WP_DEBUG', false);
-    define('WP_DEBUG_LOG', false);
+  forceSSLAdmin: true
+  disallowFileEdit: true
+  disableWpCron: true
+  memoryLimit: 256M
+  maxMemoryLimit: 512M
 
 admin:
-  existingSecret: wordpress-admin-credentials
+  existingSecret: wordpress-admin
 
 mysql:
-  enabled: true
-  auth:
-    password: 'strong-db-password'
-    rootPassword: 'strong-root-password'
-  primary:
-    persistence:
-      enabled: true
-      size: 20Gi
+  enabled: false
 
-php:
-  ini: |
-    upload_max_filesize = 64M
-    post_max_size = 64M
-    memory_limit = 512M
-    max_execution_time = 300
+database:
+  external:
+    host: mysql.example.com
+    port: 3306
+    name: wordpress
+    username: wordpress
+    existingSecret: wordpress-db
+    existingSecretPasswordKey: password
 
 persistence:
   enabled: true
+  accessMode: ReadWriteMany
+  storageClass: nfs-rwx
   size: 20Gi
+
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - blog.example.com
+
+networkPolicy:
+  enabled: true
+  ingress:
+    extraFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: gateway-system
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceDatabase: false
+    allowHTTPS: true
+
+wpCron:
+  cronJob:
+    enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+
+pdb:
+  enabled: true
+  minAvailable: 1
 
 resources:
   requests:
-    memory: 256Mi
-    cpu: 200m
+    cpu: 250m
+    memory: 512Mi
   limits:
-    memory: 1Gi
     cpu: '1'
-
-metrics:
-  enabled: true
-  serviceMonitor:
-    enabled: true
-    interval: 30s
-    labels:
-      release: prometheus
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: blog.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: wordpress-tls
-      hosts:
-        - blog.example.com
+    memory: 1Gi
 ```
+
+</div>
+
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml - external MySQL or MariaDB
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    port: 3306
+    name: wordpress
+    username: wordpress
+    existingSecret: wordpress-db
+    existingSecretPasswordKey: database-password
+
+admin:
+  existingSecret: wordpress-admin
+  existingSecretPasswordKey: admin-password
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: wordpress-backups
+    existingSecret: wordpress-s3
+```
+
+</div>
+
+<div data-tab-panel="gateway-secrets">
+
+```yaml
+# values.yaml - Gateway API with External Secrets Operator
+mysql:
+  enabled: false
+
+database:
+  external:
+    host: mysql.example.com
+    name: wordpress
+    username: wordpress
+    existingSecretPasswordKey: database-password
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  admin:
+    enabled: true
+    passwordRemoteRef:
+      key: prod/wordpress
+      property: admin-password
+  database:
+    enabled: true
+    passwordRemoteRef:
+      key: prod/wordpress
+      property: database-password
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - blog.example.com
+```
+
+</div>
+
+<div data-tab-panel="redis">
+
+```yaml
+# values.yaml - Redis Object Cache using HelmForge Redis subchart
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+
+objectCache:
+  enabled: true
+  redis:
+    mode: subchart
+    subchart:
+      enabled: true
+
+redis:
+  architecture: standalone
+  auth:
+    existingSecret: wordpress-redis-auth
+    existingSecretPasswordKey: redis-password
+```
+
+```yaml
+# values.yaml - Redis Object Cache using external Redis
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+
+objectCache:
+  enabled: true
+  redis:
+    mode: external
+    external:
+      host: redis.example.com
+    auth:
+      existingSecret: wordpress-redis
+      existingSecretPasswordKey: redis-password
+```
+
+</div>
+
+<div data-tab-panel="plugins">
+
+```yaml
+# values.yaml - install official WordPress.org plugins
+persistence:
+  enabled: true
+
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+    activeDeadlineSeconds: 60
+  items:
+    - slug: classic-editor
+      activate: true
+      skipIfInstalled: true
+    - slug: contact-form-7
+      activate: true
+      skipIfInstalled: true
+```
+
+<Callout type="warning" title="The plugin installer requires persistent storage">
+  The installer Job writes files into the WordPress volume. It fails validation when `plugins.installer.enabled=true`
+  and `persistence.enabled=false`, because an isolated Job `emptyDir` would not be visible to the WordPress pod.
+</Callout>
 
 </div>
 
 <div data-tab-panel="backup">
 
 ```yaml
-# values.yaml — WordPress with daily S3 backup (DB + wp-content)
-# The backup CronJob creates:
-#   1. mysqldump of the database
-#   2. tar archive of /var/www/html/wp-content
-# Both are uploaded to S3.
-
-wordpress:
-  siteUrl: 'https://blog.example.com'
-
-mysql:
-  enabled: true
-  auth:
-    password: 'db-password'
-
-persistence:
-  enabled: true
-  size: 10Gi
-
+# values.yaml - S3-compatible backup of database and wp-content
 backup:
   enabled: true
   schedule: '0 3 * * *'
   archivePrefix: wordpress
   s3:
     endpoint: https://s3.amazonaws.com
-    bucket: my-wordpress-backups
-    existingSecret: wordpress-s3-credentials
+    bucket: wordpress-backups
+    existingSecret: wordpress-s3
     existingSecretAccessKeyKey: access-key
     existingSecretSecretKeyKey: secret-key
   database:
     mysqldumpArgs: '--single-transaction --quick --skip-lock-tables --no-tablespaces'
 ```
 
+With External Secrets Operator-managed backup credentials:
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: wordpress-backups
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  backup:
+    enabled: true
+    accessKeyRemoteRef:
+      key: prod/wordpress-backup
+      property: access-key
+    secretKeyRemoteRef:
+      key: prod/wordpress-backup
+      property: secret-key
+```
+
 </div>
 
 </DocsTabs>
 
+## Operational Notes
+
+### Database Mode
+
+When `database.mode: auto`, the chart resolves the database path in this order:
+
+1. `database.external.host` or `database.external.existingSecret` selects an external database.
+2. `mysql.enabled: true` selects the HelmForge MySQL subchart.
+3. Rendering fails because WordPress requires MySQL or MariaDB.
+
+### WordPress Cron
+
+Set `wordpress.disableWpCron: true` and enable `wpCron.cronJob.enabled` when you want deterministic
+cron execution from Kubernetes instead of request-driven `wp-cron.php`.
+
+### Redis Object Cache
+
+The chart installs the official `redis-cache` plugin, writes the `object-cache.php` drop-in, and sets
+`WP_CACHE` plus `WP_REDIS_*` constants. Redis is only functionally validated when WordPress can create
+cache keys in Redis; a running Redis pod alone is not enough.
+
+If the Redis subchart is used and `redis.auth.enabled=false`, WordPress does not reference a Redis
+password Secret. If the subchart uses `redis.auth.existingSecret`, WordPress and the plugin installer
+read the same Secret and key.
+
+### NetworkPolicy
+
+`networkPolicy.enabled` isolates application ingress. Add `networkPolicy.ingress.extraFrom` for an
+Ingress controller or Gateway controller that runs outside the WordPress namespace. Egress rules are
+opt-in; list DNS, database, HTTPS, SMTP, or custom destinations before enabling restrictive egress.
+
+### Backups and Restore
+
+The backup CronJob writes two artifacts:
+
+- A compressed database dump from `mysqldump`.
+- A compressed archive of `/var/www/html/wp-content`.
+
+Production users should test restore procedures, object storage retention, object lock, and database
+consistency. A successful backup upload is not a complete disaster recovery validation.
+
 ## Configuration Reference
 
-### Core
+### Core and Image
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter          | Type    | Default                       | Description                              |
+| ------------------ | ------- | ----------------------------- | ---------------------------------------- |
+| `nameOverride`     | string  | `""`                          | Override chart name.                     |
+| `fullnameOverride` | string  | `""`                          | Override full release name.              |
+| `commonLabels`     | object  | `{}`                          | Labels added to every rendered resource. |
+| `replicaCount`     | integer | `1`                           | WordPress replicas when HPA is disabled. |
+| `image.repository` | string  | `docker.io/library/wordpress` | WordPress image repository.              |
+| `image.tag`        | string  | `6.9.4-apache`                | Image tag.                               |
+| `image.pullPolicy` | string  | `IfNotPresent`                | Image pull policy.                       |
+| `imagePullSecrets` | array   | `[]`                          | Pull secrets for private registries.     |
 
-### Image
+### WordPress
 
-| Parameter          | Type   | Default                       | Description                          |
-| ------------------ | ------ | ----------------------------- | ------------------------------------ |
-| `image.repository` | string | `docker.io/library/wordpress` | WordPress container image.           |
-| `image.tag`        | string | `"6.9.4-apache"`              | Image tag. Apache variant.           |
-| `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
+| Parameter                    | Type    | Default             | Description                                      |
+| ---------------------------- | ------- | ------------------- | ------------------------------------------------ |
+| `wordpress.siteUrl`          | string  | `""`                | Full external site URL.                          |
+| `wordpress.siteTitle`        | string  | `WordPress`         | Site title.                                      |
+| `wordpress.adminUser`        | string  | `admin`             | Initial admin user.                              |
+| `wordpress.adminPassword`    | string  | `""`                | Initial admin password, generated when empty.    |
+| `wordpress.adminEmail`       | string  | `admin@example.com` | Initial admin email.                             |
+| `wordpress.tablePrefix`      | string  | `wp_`               | Database table prefix.                           |
+| `wordpress.debug`            | boolean | `false`             | Enables `WP_DEBUG`.                              |
+| `wordpress.forceSSLAdmin`    | boolean | `false`             | Sets `FORCE_SSL_ADMIN`.                          |
+| `wordpress.disallowFileEdit` | boolean | `false`             | Sets `DISALLOW_FILE_EDIT`.                       |
+| `wordpress.disableWpCron`    | boolean | `false`             | Sets `DISABLE_WP_CRON`.                          |
+| `wordpress.memoryLimit`      | string  | `""`                | Sets `WP_MEMORY_LIMIT`.                          |
+| `wordpress.maxMemoryLimit`   | string  | `""`                | Sets `WP_MAX_MEMORY_LIMIT`.                      |
+| `wordpress.configExtra`      | string  | `""`                | Extra PHP appended to `wp-config.php`.           |
+| `wordpress.extraEnv`         | array   | `[]`                | Extra container environment variables.           |
+| `wordpress.extraEnvFrom`     | array   | `[]`                | Extra `envFrom` sources.                         |
+| `php.ini`                    | string  | `""`                | Custom PHP ini settings mounted into Apache PHP. |
 
-### WordPress Configuration
+### Credentials and External Secrets
 
-| Parameter                 | Type    | Default             | Description                                                                      |
-| ------------------------- | ------- | ------------------- | -------------------------------------------------------------------------------- |
-| `wordpress.siteUrl`       | string  | `""`                | Full public URL. Auto-detected from Ingress if empty. Set explicitly with HTTPS. |
-| `wordpress.siteTitle`     | string  | `WordPress`         | Site title shown in admin and browser tabs.                                      |
-| `wordpress.adminUser`     | string  | `admin`             | Admin username for initial setup.                                                |
-| `wordpress.adminPassword` | string  | `""`                | Admin password. Auto-generated if empty and no `existingSecret`.                 |
-| `wordpress.adminEmail`    | string  | `admin@example.com` | Admin email address.                                                             |
-| `wordpress.tablePrefix`   | string  | `wp_`               | MySQL table prefix.                                                              |
-| `wordpress.debug`         | boolean | `false`             | Enable `WP_DEBUG` mode.                                                          |
-| `wordpress.configExtra`   | string  | `""`                | Extra PHP injected into `wp-config.php` via `WORDPRESS_CONFIG_EXTRA`.            |
-| `wordpress.extraEnv`      | array   | `[]`                | Extra environment variables for the container.                                   |
+| Parameter                             | Type    | Default                  | Description                                 |
+| ------------------------------------- | ------- | ------------------------ | ------------------------------------------- |
+| `admin.existingSecret`                | string  | `""`                     | Existing admin Secret.                      |
+| `admin.existingSecretPasswordKey`     | string  | `admin-password`         | Admin password key.                         |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret resources.            |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | External Secrets Operator API version.      |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | SecretStore or ClusterSecretStore name.     |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore`            | Store kind.                                 |
+| `externalSecrets.admin.enabled`       | boolean | `false`                  | Manage admin password with ESO.             |
+| `externalSecrets.database.enabled`    | boolean | `false`                  | Manage external database password with ESO. |
+| `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage backup S3 credentials with ESO.      |
 
-<Callout type="tip" title="Use configExtra for WordPress constants">
-  `wordpress.configExtra` is the cleanest way to set WordPress PHP constants without building a custom image. Common
-  uses: `WP_MEMORY_LIMIT`, `DISABLE_WP_CRON` (use Kubernetes CronJob instead), `WP_POST_REVISIONS`, `WP_CACHE`, and
-  `FORCE_SSL_ADMIN`.
-</Callout>
+### Database and MySQL Subchart
 
-### Admin Credentials
+| Parameter                                     | Type    | Default             | Description                        |
+| --------------------------------------------- | ------- | ------------------- | ---------------------------------- |
+| `database.mode`                               | string  | `auto`              | `auto`, `external`, or `mysql`.    |
+| `database.external.host`                      | string  | `""`                | External database hostname.        |
+| `database.external.port`                      | integer | `3306`              | External database port.            |
+| `database.external.name`                      | string  | `wordpress`         | Database name.                     |
+| `database.external.username`                  | string  | `wordpress`         | Database username.                 |
+| `database.external.password`                  | string  | `""`                | Inline external database password. |
+| `database.external.existingSecret`            | string  | `""`                | Existing database password Secret. |
+| `database.external.existingSecretPasswordKey` | string  | `database-password` | Password key in Secret.            |
+| `mysql.enabled`                               | boolean | `true`              | Deploy HelmForge MySQL subchart.   |
+| `mysql.architecture`                          | string  | `standalone`        | MySQL architecture.                |
+| `mysql.auth.database`                         | string  | `wordpress`         | Subchart database name.            |
+| `mysql.auth.username`                         | string  | `wordpress`         | Subchart database user.            |
+| `mysql.auth.password`                         | string  | `""`                | Subchart user password.            |
+| `mysql.auth.rootPassword`                     | string  | `""`                | Subchart root password.            |
+| `mysql.primary.persistence.enabled`           | boolean | `true`              | Enable MySQL PVC.                  |
+| `mysql.primary.persistence.size`              | string  | `8Gi`               | MySQL PVC size.                    |
 
-| Parameter                         | Type   | Default          | Description                                      |
-| --------------------------------- | ------ | ---------------- | ------------------------------------------------ |
-| `admin.existingSecret`            | string | `""`             | Existing secret with admin credentials.          |
-| `admin.existingSecretPasswordKey` | string | `admin-password` | Key inside the existing secret for the password. |
+### Storage, Service, and Routing
 
-### Database
+| Parameter                   | Type    | Default                        | Description                                              |
+| --------------------------- | ------- | ------------------------------ | -------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`                         | Create PVC for `/var/www/html`.                          |
+| `persistence.storageClass`  | string  | `""`                           | StorageClass name.                                       |
+| `persistence.accessMode`    | string  | `ReadWriteOnce`                | PVC access mode.                                         |
+| `persistence.size`          | string  | `5Gi`                          | WordPress PVC size.                                      |
+| `persistence.existingClaim` | string  | `""`                           | Use an existing PVC.                                     |
+| `service.type`              | string  | `ClusterIP`                    | Service type.                                            |
+| `service.port`              | integer | `80`                           | HTTP Service port.                                       |
+| `service.ipFamilyPolicy`    | string  | `""`                           | `SingleStack`, `PreferDualStack`, or `RequireDualStack`. |
+| `service.ipFamilies`        | array   | `[]`                           | Ordered IP families, for example `["IPv4", "IPv6"]`.     |
+| `ingress.enabled`           | boolean | `false`                        | Create Ingress.                                          |
+| `ingress.ingressClassName`  | string  | `""`                           | Ingress class.                                           |
+| `ingress.hosts`             | array   | `[]`                           | Ingress host rules.                                      |
+| `ingress.tls`               | array   | `[]`                           | Ingress TLS entries.                                     |
+| `gatewayAPI.enabled`        | boolean | `false`                        | Create Gateway API HTTPRoute.                            |
+| `gatewayAPI.apiVersion`     | string  | `gateway.networking.k8s.io/v1` | HTTPRoute API version.                                   |
+| `gatewayAPI.parentRefs`     | array   | `[]`                           | Parent Gateway references.                               |
+| `gatewayAPI.hostnames`      | array   | `[]`                           | HTTPRoute hostnames.                                     |
+| `gatewayAPI.matches`        | array   | Path prefix `/`                | HTTPRoute matches.                                       |
 
-**Auto-detection precedence** (`database.mode: auto`):
+### Production Controls
 
-1. `database.external.host` or `database.external.existingSecret` → external DB
-2. `mysql.enabled: true` → MySQL subchart
-3. No fallback — WordPress requires a database
+| Parameter                                     | Type    | Default       | Description                                  |
+| --------------------------------------------- | ------- | ------------- | -------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false`       | Create a dedicated ServiceAccount.           |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`       | Mount Kubernetes API token into pods.        |
+| `autoscaling.enabled`                         | boolean | `false`       | Create HPA.                                  |
+| `autoscaling.minReplicas`                     | integer | `2`           | HPA minimum replicas.                        |
+| `autoscaling.maxReplicas`                     | integer | `5`           | HPA maximum replicas.                        |
+| `pdb.enabled`                                 | boolean | `false`       | Create PodDisruptionBudget.                  |
+| `pdb.minAvailable`                            | integer | `1`           | Minimum available pods.                      |
+| `wpCron.cronJob.enabled`                      | boolean | `false`       | Create Kubernetes CronJob for `wp-cron.php`. |
+| `wpCron.cronJob.schedule`                     | string  | `*/5 * * * *` | WordPress cron schedule.                     |
+| `resources`                                   | object  | `{}`          | WordPress container requests and limits.     |
+| `podSecurityContext`                          | object  | `{}`          | Pod security context.                        |
+| `securityContext`                             | object  | `{}`          | Container security context.                  |
 
-| Parameter                                     | Type    | Default             | Description                                    |
-| --------------------------------------------- | ------- | ------------------- | ---------------------------------------------- |
-| `database.mode`                               | string  | `auto`              | Database mode: `auto`, `external`, or `mysql`. |
-| `database.external.host`                      | string  | `""`                | External database hostname.                    |
-| `database.external.port`                      | integer | `3306`              | External database port.                        |
-| `database.external.name`                      | string  | `wordpress`         | Database name.                                 |
-| `database.external.username`                  | string  | `wordpress`         | Database username.                             |
-| `database.external.password`                  | string  | `""`                | Database password (prefer `existingSecret`).   |
-| `database.external.existingSecret`            | string  | `""`                | Existing secret with database password.        |
-| `database.external.existingSecretPasswordKey` | string  | `database-password` | Key inside the existing secret.                |
+### Plugins and Redis Object Cache
 
-### MySQL Subchart
+| Parameter                                  | Type    | Default       | Description                                              |
+| ------------------------------------------ | ------- | ------------- | -------------------------------------------------------- |
+| `plugins.enabled`                          | boolean | `false`       | Enable plugin installer support.                         |
+| `plugins.installer.enabled`                | boolean | `false`       | Create post-install/post-upgrade installer Job.          |
+| `plugins.installer.activeDeadlineSeconds`  | integer | `60`          | Installer timeout.                                       |
+| `plugins.installer.backoffLimit`           | integer | `1`           | Installer retry limit.                                   |
+| `plugins.installer.preferWordPressPodNode` | boolean | `true`        | Prefer node with WordPress pod for RWO PVCs.             |
+| `plugins.items`                            | array   | `[]`          | Official WordPress.org plugin slugs.                     |
+| `objectCache.enabled`                      | boolean | `false`       | Enable object cache integration.                         |
+| `objectCache.provider`                     | string  | `redis-cache` | Supported provider.                                      |
+| `objectCache.installPlugin`                | boolean | `true`        | Install and activate `redis-cache`.                      |
+| `objectCache.enableDropIn`                 | boolean | `true`        | Create `wp-content/object-cache.php`.                    |
+| `objectCache.redis.mode`                   | string  | `subchart`    | `subchart` or `external`.                                |
+| `objectCache.redis.subchart.enabled`       | boolean | `false`       | Deploy HelmForge Redis dependency.                       |
+| `objectCache.redis.external.host`          | string  | `""`          | External Redis hostname.                                 |
+| `objectCache.redis.port`                   | integer | `6379`        | Redis port.                                              |
+| `objectCache.redis.database`               | integer | `0`           | Redis database number.                                   |
+| `objectCache.redis.auth.enabled`           | boolean | `true`        | Use Redis password when effective Redis auth is enabled. |
+| `objectCache.redis.auth.existingSecret`    | string  | `""`          | Existing Redis password Secret.                          |
 
-| Parameter                           | Type    | Default      | Description                                 |
-| ----------------------------------- | ------- | ------------ | ------------------------------------------- |
-| `mysql.enabled`                     | boolean | `true`       | Deploy the bundled MySQL subchart.          |
-| `mysql.architecture`                | string  | `standalone` | MySQL deployment architecture.              |
-| `mysql.auth.database`               | string  | `wordpress`  | Database name created on first run.         |
-| `mysql.auth.username`               | string  | `wordpress`  | Database username.                          |
-| `mysql.auth.password`               | string  | `""`         | Database password. Auto-generated if empty. |
-| `mysql.auth.rootPassword`           | string  | `""`         | Root password. Auto-generated if empty.     |
-| `mysql.primary.persistence.enabled` | boolean | `true`       | Enable PVC for MySQL data.                  |
-| `mysql.primary.persistence.size`    | string  | `8Gi`        | PVC size for MySQL.                         |
+### NetworkPolicy, Metrics, and Backup
 
-### Persistence
+| Parameter                                         | Type    | Default                                                            | Description                          |
+| ------------------------------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------ |
+| `networkPolicy.enabled`                           | boolean | `false`                                                            | Create NetworkPolicy.                |
+| `networkPolicy.ingress.allowSameNamespace`        | boolean | `true`                                                             | Allow same namespace ingress.        |
+| `networkPolicy.ingress.extraFrom`                 | array   | `[]`                                                               | Extra application ingress sources.   |
+| `networkPolicy.metrics.enabled`                   | boolean | `false`                                                            | Add metrics ingress rule.            |
+| `networkPolicy.egress.enabled`                    | boolean | `false`                                                            | Manage egress allow list.            |
+| `networkPolicy.egress.allowDNS`                   | boolean | `true`                                                             | Allow DNS egress.                    |
+| `networkPolicy.egress.allowSameNamespaceDatabase` | boolean | `true`                                                             | Allow same-namespace DB egress.      |
+| `networkPolicy.egress.allowHTTPS`                 | boolean | `false`                                                            | Allow HTTPS egress.                  |
+| `networkPolicy.egress.allowSMTP`                  | boolean | `false`                                                            | Allow SMTP egress.                   |
+| `metrics.enabled`                                 | boolean | `false`                                                            | Enable Apache exporter sidecar.      |
+| `metrics.serviceMonitor.enabled`                  | boolean | `false`                                                            | Create ServiceMonitor.               |
+| `backup.enabled`                                  | boolean | `false`                                                            | Create S3-compatible backup CronJob. |
+| `backup.schedule`                                 | string  | `0 3 * * *`                                                        | Backup schedule.                     |
+| `backup.s3.endpoint`                              | string  | `""`                                                               | S3 endpoint URL.                     |
+| `backup.s3.bucket`                                | string  | `""`                                                               | Backup bucket.                       |
+| `backup.s3.existingSecret`                        | string  | `""`                                                               | Existing S3 credentials Secret.      |
+| `backup.database.mysqldumpArgs`                   | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra `mysqldump` arguments.         |
 
-| Parameter                   | Type    | Default         | Description                                                        |
-| --------------------------- | ------- | --------------- | ------------------------------------------------------------------ |
-| `persistence.enabled`       | boolean | `true`          | Enable PVC for `/var/www/html` (all WordPress files + wp-content). |
-| `persistence.size`          | string  | `5Gi`           | PVC size. Size for media-heavy sites.                              |
-| `persistence.storageClass`  | string  | `""`            | StorageClass for the PVC.                                          |
-| `persistence.accessMode`    | string  | `ReadWriteOnce` | PVC access mode.                                                   |
-| `persistence.existingClaim` | string  | `""`            | Use an existing PVC.                                               |
+### Scheduling and Extensions
 
-### PHP Configuration
-
-<Callout type="warning" title="Default upload limit is 2 MB — too low for any real content">
-  Always set `php.ini` upload limits before allowing editors to upload content. The Apache image defaults
-  (`upload_max_filesize = 2M`, `post_max_size = 8M`) will block plugin installs, theme uploads, and media over 2 MB.
-  Recommended minimums: `64M` upload, `64M` post, `256M` memory.
-</Callout>
-
-| Parameter | Type   | Default | Description                                                             |
-| --------- | ------ | ------- | ----------------------------------------------------------------------- |
-| `php.ini` | string | `""`    | Custom `php.ini` content injected via ConfigMap. Applied to Apache PHP. |
-
-### Backup
-
-The backup CronJob creates two archives per run and uploads both to S3:
-
-- **Database**: `mysqldump` using `docker.io/library/mysql:8.4`
-- **Files**: `tar` of `/var/www/html/wp-content` using Alpine
-
-| Parameter                           | Type    | Default                            | Description                                                      |
-| ----------------------------------- | ------- | ---------------------------------- | ---------------------------------------------------------------- |
-| `backup.enabled`                    | boolean | `false`                            | Enable scheduled S3 backup CronJob.                              |
-| `backup.schedule`                   | string  | `"0 3 * * *"`                      | Cron schedule.                                                   |
-| `backup.suspend`                    | boolean | `false`                            | Suspend CronJob without deleting it.                             |
-| `backup.concurrencyPolicy`          | string  | `Forbid`                           | CronJob concurrency policy.                                      |
-| `backup.successfulJobsHistoryLimit` | integer | `3`                                | Successful job records to keep.                                  |
-| `backup.failedJobsHistoryLimit`     | integer | `3`                                | Failed job records to keep.                                      |
-| `backup.backoffLimit`               | integer | `1`                                | Job retry limit.                                                 |
-| `backup.archivePrefix`              | string  | `wordpress`                        | Prefix for backup archive filenames.                             |
-| `backup.images.worker`              | string  | `docker.io/library/mysql:8.4`      | Image providing `mysqldump`.                                     |
-| `backup.images.archiver`            | string  | `docker.io/library/alpine:3.22`    | Image providing `tar` for wp-content archive.                    |
-| `backup.images.uploader`            | string  | `docker.io/helmforge/mc:1.0.0`     | Image providing MinIO client for S3 upload.                      |
-| `backup.s3.endpoint`                | string  | `""`                               | S3-compatible endpoint URL.                                      |
-| `backup.s3.bucket`                  | string  | `""`                               | Target bucket name.                                              |
-| `backup.s3.existingSecret`          | string  | `""`                               | Existing secret with S3 credentials.                             |
-| `backup.database.host`              | string  | `""`                               | Override DB host for backup (inherits app credentials if empty). |
-| `backup.database.mysqldumpArgs`     | string  | `--single-transaction --quick ...` | Extra arguments for `mysqldump`.                                 |
-
-### Metrics (Apache Exporter)
-
-| Parameter                         | Type    | Default                                | Description                                  |
-| --------------------------------- | ------- | -------------------------------------- | -------------------------------------------- |
-| `metrics.enabled`                 | boolean | `false`                                | Enable Apache exporter sidecar on port 9117. |
-| `metrics.image.repository`        | string  | `docker.io/lusotycoon/apache-exporter` | Apache exporter image.                       |
-| `metrics.image.tag`               | string  | `v1.0.8`                               | Exporter image tag.                          |
-| `metrics.port`                    | integer | `9117`                                 | Prometheus metrics port.                     |
-| `metrics.serviceMonitor.enabled`  | boolean | `false`                                | Create a Prometheus Operator ServiceMonitor. |
-| `metrics.serviceMonitor.interval` | string  | `30s`                                  | Scrape interval.                             |
-| `metrics.serviceMonitor.labels`   | object  | `{}`                                   | Extra labels for the ServiceMonitor.         |
-
-### Probes
-
-| Parameter                          | Type    | Default | Description                                      |
-| ---------------------------------- | ------- | ------- | ------------------------------------------------ |
-| `startupProbe.enabled`             | boolean | `true`  | Enable startup probe on `/wp-admin/install.php`. |
-| `startupProbe.initialDelaySeconds` | integer | `15`    | Startup probe initial delay.                     |
-| `startupProbe.failureThreshold`    | integer | `30`    | Startup probe failure threshold.                 |
-| `livenessProbe.enabled`            | boolean | `true`  | Enable liveness probe on `/wp-login.php`.        |
-| `livenessProbe.periodSeconds`      | integer | `15`    | Liveness probe period.                           |
-| `readinessProbe.enabled`           | boolean | `true`  | Enable readiness probe on `/wp-login.php`.       |
-| `readinessProbe.periodSeconds`     | integer | `10`    | Readiness probe period.                          |
-
-### Service, Ingress, Scheduling, and Extra
-
-| Parameter                       | Type    | Default     | Description                         |
-| ------------------------------- | ------- | ----------- | ----------------------------------- |
-| `service.type`                  | string  | `ClusterIP` | Service type.                       |
-| `service.port`                  | integer | `80`        | Service port.                       |
-| `ingress.enabled`               | boolean | `false`     | Enable an Ingress resource.         |
-| `ingress.ingressClassName`      | string  | `""`        | Ingress class name.                 |
-| `ingress.annotations`           | object  | `{}`        | Ingress annotations.                |
-| `ingress.hosts`                 | array   | `[]`        | Host and path rules.                |
-| `ingress.tls`                   | array   | `[]`        | TLS configuration.                  |
-| `resources`                     | object  | `{}`        | CPU and memory requests and limits. |
-| `nodeSelector`                  | object  | `{}`        | Node selector for scheduling.       |
-| `tolerations`                   | array   | `[]`        | Tolerations for scheduling.         |
-| `terminationGracePeriodSeconds` | integer | `30`        | Termination grace period.           |
-| `extraVolumes`                  | array   | `[]`        | Extra volumes.                      |
-| `extraVolumeMounts`             | array   | `[]`        | Extra volume mounts.                |
-| `extraManifests`                | array   | `[]`        | Extra Kubernetes manifests.         |
+| Parameter                       | Type    | Default | Description                    |
+| ------------------------------- | ------- | ------- | ------------------------------ |
+| `nodeSelector`                  | object  | `{}`    | Node selector.                 |
+| `tolerations`                   | array   | `[]`    | Pod tolerations.               |
+| `affinity`                      | object  | `{}`    | Pod affinity.                  |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
+| `priorityClassName`             | string  | `""`    | PriorityClass name.            |
+| `terminationGracePeriodSeconds` | integer | `30`    | Pod termination grace period.  |
+| `podLabels`                     | object  | `{}`    | Extra pod labels.              |
+| `podAnnotations`                | object  | `{}`    | Extra pod annotations.         |
+| `extraVolumeMounts`             | array   | `[]`    | Extra WordPress volume mounts. |
+| `extraVolumes`                  | array   | `[]`    | Extra pod volumes.             |
+| `extraInitContainers`           | array   | `[]`    | Additional init containers.    |
+| `extraContainers`               | array   | `[]`    | Additional sidecars.           |
+| `extraManifests`                | array   | `[]`    | Extra Kubernetes manifests.    |
 
 ## More Information
 
-- [WordPress Official Documentation](https://wordpress.org/documentation/)
-- [WordPress Docker Image](https://hub.docker.com/_/wordpress)
-- [HelmForge WordPress Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/wordpress)
+- [WordPress official documentation](https://wordpress.org/documentation/)
+- [WordPress Docker image](https://hub.docker.com/_/wordpress)
+- [Redis Object Cache plugin](https://wordpress.org/plugins/redis-cache/)
+- [HelmForge WordPress chart source](https://github.com/helmforgedev/charts/tree/main/charts/wordpress)
