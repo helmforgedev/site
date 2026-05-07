@@ -115,6 +115,18 @@ mysql:
 
 <div data-tab-panel="production">
 
+Create the Secrets referenced by the production values before installing or upgrading the release:
+
+```bash
+kubectl create namespace discount-bandit
+kubectl create secret generic discount-bandit-app -n discount-bandit \
+  --from-literal=app-key="base64:$(openssl rand -base64 32)"
+kubectl create secret generic discount-bandit-mysql -n discount-bandit \
+  --from-literal=mysql-root-password="$(openssl rand -base64 24)" \
+  --from-literal=mysql-user-password="$(openssl rand -base64 24)" \
+  --from-literal=mysql-replication-password="$(openssl rand -base64 24)"
+```
+
 ```yaml
 discountBandit:
   appUrl: https://deals.example.com
