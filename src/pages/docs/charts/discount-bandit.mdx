@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Discount Bandit Chart
-description: HelmForge Discount Bandit chart — self-hosted price tracker and deal aggregator for Amazon, eBay, AliExpress, and more, with SQLite persistence and Laravel backend for Kubernetes.
+description: HelmForge Discount Bandit chart for Kubernetes with HelmForge MySQL, external MySQL, SQLite dev mode, Gateway API, External Secrets, NetworkPolicy, and dual-stack Service support.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,18 +9,54 @@ import Callout from '../../../components/Callout.astro';
 
 # Discount Bandit
 
-Self-hosted price tracker and deal aggregator. Discount Bandit monitors product prices across Amazon, eBay,
-AliExpress, and other stores, records price history, and notifies you when prices drop to your target. Built
-with Laravel and SQLite — no external database required.
+Self-hosted price tracker for products across multiple stores. Discount Bandit provides a Laravel and FrankenPHP web UI,
+scheduled crawling, price history, currency conversion, user management, and notification integrations such as email,
+Ntfy, Telegram, and Gotify.
+
+The HelmForge chart defaults to the HelmForge MySQL subchart for a Kubernetes-friendly database lifecycle. SQLite remains
+available for development and small single-replica installs.
 
 ## Key Features
 
-- **Multi-store tracking** — monitor prices on Amazon, eBay, AliExpress, and more
-- **Price history** — track price changes over time with historical charts
-- **Deal alerts** — notifications when prices drop below your target
-- **Laravel backend** — auto-generated application key for session and cookie encryption
-- **SQLite storage** — embedded database, no external database required
-- **Persistent storage** — PVC for the SQLite database and application data
+- **HelmForge MySQL by default** — primary database path with persistence and chart-managed credentials
+- **External MySQL or MariaDB** — connect to an operator-managed or platform-managed database
+- **SQLite dev mode** — single-replica setup with a focused PVC mount for local or personal testing
+- **Gateway API and Ingress** — native `HTTPRoute` support plus classic Kubernetes Ingress
+- **External Secrets Operator v1** — manage `APP_KEY`, exchange-rate API key, and external database passwords
+- **Service dual-stack fields** — optional `ipFamilyPolicy` and `ipFamilies`
+- **NetworkPolicy and PDB** — optional production controls for ingress, crawler egress, database egress, and disruption
+- **Supervisor hardening** — removes the upstream unauthenticated Supervisor HTTP endpoint from the generated config
+
+## Architecture
+
+```text
+Users
+  |
+  v
+Gateway API HTTPRoute or Ingress
+  |
+  v
+Service discount-bandit
+  |
+  v
+Deployment discount-bandit
+  |-- FrankenPHP web UI
+  |-- Laravel scheduler
+  |-- Laravel queue worker
+  |-- Chromium crawler runtime
+  |
+  v
+Service <release>-mysql
+  |
+  v
+StatefulSet mysql
+  |
+  v
+PVC MySQL data
+```
+
+For production, use the bundled MySQL subchart or an external MySQL/MariaDB service. SQLite is intentionally documented as
+a development path because it is single-writer and normally uses `ReadWriteOnce` storage.
 
 ## Installation
 
@@ -29,85 +65,50 @@ with Laravel and SQLite — no external database required.
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install discount-bandit helmforge/discount-bandit
+helm install discount-bandit helmforge/discount-bandit -n discount-bandit --create-namespace
 ```
 
 **OCI registry:**
 
 ```bash
-helm install discount-bandit oci://ghcr.io/helmforgedev/helm/discount-bandit
+helm install discount-bandit oci://ghcr.io/helmforgedev/helm/discount-bandit -n discount-bandit --create-namespace
 ```
+
+Default values deploy Discount Bandit with HelmForge MySQL.
+
+## Access
+
+```bash
+kubectl port-forward -n discount-bandit svc/discount-bandit 8080:80
+```
+
+Open `http://localhost:8080` and create the first admin account.
 
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'basic', label: 'Basic' },
-    { id: 'notifications', label: 'With Notifications' },
-    { id: 'production', label: 'Production (TLS)' },
+    { id: 'default', label: 'Default MySQL' },
+    { id: 'production', label: 'Production' },
+    { id: 'external', label: 'External DB' },
+    { id: 'sqlite', label: 'SQLite Dev' },
+    { id: 'secrets', label: 'External Secrets' },
   ]}
 >
 
-<div data-tab-panel="basic">
+<div data-tab-panel="default">
 
 ```yaml
-# values.yaml — Discount Bandit with Traefik ingress
-discountBandit:
-  appUrl: 'https://deals.example.com'
-
-persistence:
+# values.yaml - default path, shown explicitly
+mysql:
   enabled: true
-  size: 5Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: deals.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-```
-
-</div>
-
-<div data-tab-panel="notifications">
-
-```yaml
-# values.yaml — Discount Bandit with email (SMTP) notifications
-discountBandit:
-  appUrl: 'https://deals.example.com'
-  extraEnv:
-    - name: MAIL_MAILER
-      value: smtp
-    - name: MAIL_HOST
-      value: smtp.example.com
-    - name: MAIL_PORT
-      value: '587'
-    - name: MAIL_USERNAME
-      value: deals@example.com
-    - name: MAIL_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: discount-bandit-smtp
-          key: password
-    - name: MAIL_FROM_ADDRESS
-      value: deals@example.com
-    - name: MAIL_FROM_NAME
-      value: 'Discount Bandit'
-
-persistence:
-  enabled: true
-  size: 5Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: deals.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  auth:
+    database: discount_bandit
+    username: discount_bandit
+  standalone:
+    persistence:
+      enabled: true
+      size: 8Gi
 ```
 
 </div>
@@ -115,36 +116,123 @@ ingress:
 <div data-tab-panel="production">
 
 ```yaml
-# values.yaml — Production setup with TLS
 discountBandit:
-  appUrl: 'https://deals.example.com'
+  appUrl: https://deals.example.com
+  assetUrl: https://deals.example.com
+  timezone: UTC
+  themeColor: Stone
+  cron: '*/10 * * * *'
+  existingSecret: discount-bandit-app
+
+mysql:
+  enabled: true
+  auth:
+    database: discount_bandit
+    username: discount_bandit
+    existingSecret: discount-bandit-mysql
+  standalone:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - deals.example.com
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowHTTPS: true
+    allowSameNamespaceDatabase: true
 
 resources:
   requests:
-    memory: 128Mi
-    cpu: 50m
-  limits:
+    cpu: 250m
     memory: 512Mi
-    cpu: 500m
+  limits:
+    memory: 1Gi
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    type: mysql
+    host: mysql.example.internal
+    port: 3306
+    name: discount_bandit
+    username: discount_bandit
+    existingSecret: discount-bandit-db
+    existingSecretPasswordKey: database-password
+```
+
+</div>
+
+<div data-tab-panel="sqlite">
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: sqlite
+  sqlite:
+    enabled: true
 
 persistence:
-  enabled: true
-  size: 5Gi
+  database:
+    enabled: true
+    size: 5Gi
 
-ingress:
+replicaCount: 1
+```
+
+</div>
+
+<div data-tab-panel="secrets">
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql.example.internal
+    name: discount_bandit
+    username: discount_bandit
+
+externalSecrets:
   enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: deals.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: discount-bandit-tls
-      hosts:
-        - deals.example.com
+  secretStoreRef:
+    name: production-secrets
+    kind: ClusterSecretStore
+  app:
+    enabled: true
+    appKeyRemoteRef:
+      key: apps/discount-bandit
+      property: app-key
+    exchangeRateApiKeyRemoteRef:
+      key: apps/discount-bandit
+      property: exchange-rate-api-key
+  database:
+    enabled: true
+    passwordRemoteRef:
+      key: databases/discount-bandit
+      property: password
 ```
 
 </div>
@@ -153,153 +241,89 @@ ingress:
 
 ## Configuration Reference
 
-### Core
+### Database
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter                          | Default           | Description                                              |
+| ---------------------------------- | ----------------- | -------------------------------------------------------- |
+| `database.mode`                    | `auto`            | Database mode: `auto`, `mysql`, `external`, or `sqlite`. |
+| `mysql.enabled`                    | `true`            | Deploy HelmForge MySQL as the primary database.          |
+| `mysql.auth.database`              | `discount_bandit` | MySQL database created by the subchart.                  |
+| `mysql.auth.username`              | `discount_bandit` | MySQL application user.                                  |
+| `database.external.host`           | `""`              | External MySQL or MariaDB hostname.                      |
+| `database.external.existingSecret` | `""`              | Secret containing the external database password.        |
+| `database.sqlite.enabled`          | `false`           | Enable SQLite development mode.                          |
 
-### Image
+### Application
 
-| Parameter          | Type   | Default                               | Description                          |
-| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
-| `image.repository` | string | `docker.io/cybrarist/discount-bandit` | Discount Bandit container image.     |
-| `image.tag`        | string | `"v4.0.3"`                            | Image tag.                           |
-| `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
+| Parameter                           | Default       | Description                                                                      |
+| ----------------------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `discountBandit.appUrl`             | `""`          | Public application URL (`APP_URL`).                                              |
+| `discountBandit.assetUrl`           | `""`          | Public asset URL (`ASSET_URL`). Defaults to `appUrl` when empty.                 |
+| `discountBandit.timezone`           | `UTC`         | Application timezone.                                                            |
+| `discountBandit.themeColor`         | `Stone`       | UI theme color.                                                                  |
+| `discountBandit.cron`               | `*/5 * * * *` | Product crawl schedule.                                                          |
+| `discountBandit.existingSecret`     | `""`          | Existing Secret for `APP_KEY` and optional exchange-rate key.                    |
+| `discountBandit.exchangeRateApiKey` | `""`          | ExchangeRate API key. Prefer a Secret or ExternalSecret in production.           |
+| `discountBandit.extraEnv`           | `[]`          | Extra environment variables for mail, notifications, or advanced Laravel config. |
 
-### Discount Bandit Configuration
+### Networking
 
-| Parameter                 | Type   | Default | Description                                                                    |
-| ------------------------- | ------ | ------- | ------------------------------------------------------------------------------ |
-| `discountBandit.appUrl`   | string | `""`    | Public URL of the instance (e.g. `https://deals.example.com`).                 |
-| `discountBandit.extraEnv` | array  | `[]`    | Extra environment variables for SMTP notifications and advanced configuration. |
+| Parameter                      | Default     | Description                                                              |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------ |
+| `service.type`                 | `ClusterIP` | Kubernetes Service type.                                                 |
+| `service.port`                 | `80`        | Service HTTP port.                                                       |
+| `service.ipFamilyPolicy`       | `""`        | Optional Service IP family policy.                                       |
+| `service.ipFamilies`           | `[]`        | Optional Service IP families for dual-stack clusters.                    |
+| `ingress.enabled`              | `false`     | Render classic Kubernetes Ingress.                                       |
+| `gatewayAPI.enabled`           | `false`     | Render Gateway API `HTTPRoute`.                                          |
+| `gatewayAPI.parentRefs`        | `[]`        | Platform-owned Gateway references. Required when Gateway API is enabled. |
+| `networkPolicy.enabled`        | `false`     | Render NetworkPolicy.                                                    |
+| `networkPolicy.egress.enabled` | `false`     | Restrict egress when enabled.                                            |
 
-<Callout type="warning" title="Set appUrl to your actual public URL">
-  Discount Bandit is a Laravel application. `appUrl` sets the `APP_URL` environment variable used for session cookie
-  domain binding, URL generation, and notification links. If not set correctly, price alert notifications will contain
-  incorrect links and session cookies may not work across pages.
+### Runtime and Operations
+
+| Parameter                                     | Default | Description                                                                |
+| --------------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| `serviceAccount.create`                       | `true`  | Create a dedicated ServiceAccount.                                         |
+| `serviceAccount.automountServiceAccountToken` | `false` | Avoid mounting Kubernetes API credentials into the app pod.                |
+| `externalSecrets.enabled`                     | `false` | Render External Secrets Operator resources using `external-secrets.io/v1`. |
+| `pdb.enabled`                                 | `false` | Render a PodDisruptionBudget.                                              |
+| `persistence.database.enabled`                | `true`  | SQLite data PVC. Used only in SQLite mode.                                 |
+| `persistence.logs.enabled`                    | `false` | Persist `/logs` instead of using container-local logs.                     |
+| `supervisor.configMap.enabled`                | `true`  | Mount a sanitized Supervisor base config.                                  |
+| `resources`                                   | `{}`    | CPU and memory requests/limits.                                            |
+
+## Production Guidance
+
+<Callout type="tip" title="Use MySQL for production">
+  Discount Bandit supports SQLite, but Kubernetes production installs should use HelmForge MySQL or an external
+  MySQL/MariaDB database. SQLite is best kept for development and small single-user testing.
 </Callout>
 
-<Callout type="tip" title="Configure email notifications via extraEnv">
-  Discount Bandit sends price drop alerts via email. Configure SMTP by setting the standard Laravel mail environment
-  variables (`MAIL_MAILER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`) via
-  `discountBandit.extraEnv`. See the "With Notifications" tab for a complete example.
+<Callout type="warning" title="Plan crawler egress before enabling strict NetworkPolicy">
+  Discount Bandit crawls public store pages and may call notification providers or exchange-rate APIs. Start with open
+  egress, identify required destinations, then enable NetworkPolicy rules that match your environment.
 </Callout>
 
-<Callout type="info" title="Price tracking depends on public store availability">
-  Discount Bandit scrapes product prices from store websites. Amazon, eBay, and similar sites may implement
-  anti-scraping measures that block requests. If price tracking stops working for a specific store, check the
-  application logs for HTTP errors. Some stores may require additional configuration or may stop working after policy
-  changes.
+<Callout type="info" title="External Secrets are optional">
+  The chart can render `external-secrets.io/v1` resources, but it does not install the External Secrets Operator or a
+  SecretStore. Install and validate those platform components before enabling `externalSecrets.enabled` in production.
 </Callout>
-
-### Persistence
-
-Discount Bandit stores its SQLite database and application data in the PVC. Without persistence, all tracked
-products and price history are lost when the pod restarts.
-
-| Parameter                   | Type    | Default             | Description                                                |
-| --------------------------- | ------- | ------------------- | ---------------------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for the SQLite database and application data. |
-| `persistence.size`          | string  | `5Gi`               | PVC size.                                                  |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                  |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                          |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.               |
-
-### Service
-
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
-
-### Ingress
-
-| Parameter                  | Type    | Default   | Description                                      |
-| -------------------------- | ------- | --------- | ------------------------------------------------ |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
-| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
-| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
-
-### Probes
-
-| Parameter                              | Type    | Default | Description                        |
-| -------------------------------------- | ------- | ------- | ---------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
-| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
-| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
-
-### Resources and Security
-
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
-
-### Service Account
-
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
-
-### Scheduling
-
-| Parameter                       | Type    | Default | Description                    |
-| ------------------------------- | ------- | ------- | ------------------------------ |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
-| `affinity`                      | object  | `{}`    | Affinity rules.                |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
-
-### Extra
-
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Common Issues
 
-<Callout type="danger" title="All tracked products lost after pod restart without persistence">
-  If `persistence.enabled` is `false` or the PVC is not correctly mounted, the SQLite database is stored in the
-  container's ephemeral filesystem and will be lost when the pod restarts. Always enable persistence and verify the PVC
-  is bound before adding products to track.
+<Callout type="danger" title="SQLite data hidden by an incorrect mount">
+  SQLite mode mounts only `/app/database/sqlite` so upstream migrations and seeders under `/app/database` remain
+  visible. Do not replace this with a broad `/app/database` mount.
 </Callout>
 
 <Callout type="tip" title="Prices not updating">
-  Price updates are triggered by Discount Bandit's internal scheduler. If prices stop updating, check the application
-  logs (`kubectl logs`) for HTTP errors from the target stores. Some stores may require a longer interval between price
-  checks to avoid rate limiting.
+  Price updates are driven by the Laravel scheduler and queue worker inside the container. Check pod logs and confirm
+  outbound access to target stores, notification providers, and exchange-rate APIs.
 </Callout>
 
 ## More Information
 
-- [Discount Bandit Official Website](https://discount-bandit.cybrarist.com)
-- [Discount Bandit GitHub Repository](https://github.com/Cybrarist/Discount-Bandit)
-- [HelmForge Discount Bandit Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/discount-bandit)
+- [Discount Bandit documentation](https://discount-bandit.cybrarist.com)
+- [Discount Bandit GitHub repository](https://github.com/Cybrarist/Discount-Bandit)
+- [HelmForge Discount Bandit chart source](https://github.com/helmforgedev/charts/tree/main/charts/discount-bandit)
