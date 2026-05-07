@@ -337,7 +337,7 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
-    name: 'Strava Statistics',
+    name: 'Statistics for Strava',
     slug: 'strava-statistics',
     description: 'Self-hosted fitness dashboard with SQLite and Strava OAuth integration.',
     maturity: 'stable',
