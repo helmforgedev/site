@@ -31,6 +31,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'MongoDB', href: '/docs/charts/mongodb', maturity: 'stable' },
       { label: 'MariaDB', href: '/docs/charts/mariadb', maturity: 'stable' },
       { label: 'Redis', href: '/docs/charts/redis', maturity: 'stable' },
+      { label: 'Memcached', href: '/docs/charts/memcached', maturity: 'beta' },
     ],
   },
   {
