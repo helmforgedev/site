@@ -42,6 +42,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Memcached',
+    slug: 'memcached',
+    description: 'Distributed memory cache with TLS, SASL/ASCII auth, extstore, metrics, dual-stack Services, and ESO.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'MongoDB',
     slug: 'mongodb',
     description: 'MongoDB with standalone and replica set configurations.',

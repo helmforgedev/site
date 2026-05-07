@@ -1,0 +1,352 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Memcached Chart
+description: HelmForge Memcached chart - official Memcached 1.6.41 for Kubernetes with standalone and distributed cache topologies, TLS, ASCII/SASL auth, extstore, metrics, dual-stack Services, External Secrets, NetworkPolicy, HPA, and PDB.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+import ArchitectureDiagram from '../../../components/ArchitectureDiagram.astro';
+import MemcachedDiagram from '../../../components/diagrams/MemcachedDiagram.astro';
+
+# Memcached
+
+Deploy [Memcached](https://memcached.org/) on Kubernetes as a fast, volatile object cache for applications that
+need to reduce database, API, or page-rendering load. The chart uses the official
+`docker.io/library/memcached:1.6.41` image and supports a small development cache as well as a production path with
+distributed pods, TLS, authentication, metrics, NetworkPolicy, HPA, PDB, dual-stack Services, extstore, and External
+Secrets Operator integration.
+
+<Callout type="warning" title="Memcached is cache, not durable storage">
+  Memcached does not replicate entries and does not persist application data. Distributed mode creates independent cache
+  nodes; use client-side hashing or an application library that understands multiple nodes.
+</Callout>
+
+## Key Features
+
+- **Official image alignment** - defaults to `docker.io/library/memcached:1.6.41`, the current stable upstream release.
+- **Two topologies** - `standalone` for development and `distributed` for multi-pod production caches.
+- **Stable Kubernetes networking** - client Service, headless Service for pod-aware clients, optional LoadBalancer, and dual-stack Service fields.
+- **IPv6-aware binding** - when `service.ipFamilies` includes `IPv6` and the default listen address is kept, Memcached starts with `0.0.0.0,::`.
+- **Authentication options** - ASCII auth file mode or SASL mode with a prepared SASL Secret and binary protocol.
+- **TLS support** - existing Kubernetes TLS Secret, optional CA file, safe private-key permissions, and TLS-aware metrics scraping.
+- **Extstore** - optional local file-backed cache extension with ephemeral or PVC-backed storage.
+- **Observability** - optional Prometheus memcached exporter, ServiceMonitor, PrometheusRule, and `helm test` connectivity checks.
+- **Production controls** - NetworkPolicy ingress/egress, PDB, HPA, topology spread, hardened pod security context, and disabled ServiceAccount token mount by default.
+- **Secret management** - optional External Secrets Operator `external-secrets.io/v1` resource for auth files or SASL material.
+
+## Architecture
+
+<ArchitectureDiagram
+  title="Standalone Cache"
+  description="A single Memcached pod behind the client Service. This is the simplest path for development, CI, and small non-critical caches."
+>
+  <MemcachedDiagram mode="standalone" />
+</ArchitectureDiagram>
+
+<ArchitectureDiagram
+  title="Distributed Cache"
+  description="Multiple independent pods expose stable DNS and a shared Service. The application or client library owns sharding and cache-key distribution."
+>
+  <MemcachedDiagram mode="distributed" />
+</ArchitectureDiagram>
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install memcached helmforge/memcached -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install memcached oci://ghcr.io/helmforgedev/helm/memcached -f values.yaml
+```
+
+## Development vs Production
+
+Defaults are intentionally development-friendly: one pod, no authentication, no TLS, no persistence, and no metrics.
+That makes quick local and CI installs simple, but it is not a production profile.
+
+For production, start from the chart's `examples/production.yaml` and adapt the memory, connection, and scheduling
+settings to the real application. Production installs should usually enable distributed mode, resource requests,
+NetworkPolicy, PDB, metrics, alerts, explicit Service exposure, and either trusted private networking or
+authentication/TLS.
+
+<Callout type="danger" title="Do not expose Memcached directly to the internet">
+  Upstream Memcached documentation explicitly warns that the server is not designed to defend itself from untrusted
+  internet clients. Keep it private, restrict it with NetworkPolicy and firewalling, and use auth/TLS only as additional
+  controls.
+</Callout>
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'dev', label: 'Dev' },
+    { id: 'distributed', label: 'Distributed' },
+    { id: 'tls', label: 'TLS' },
+    { id: 'auth', label: 'Auth + SASL' },
+    { id: 'extstore', label: 'Extstore' },
+    { id: 'production', label: 'Production' },
+    { id: 'external-secrets', label: 'External Secrets' },
+  ]}
+>
+
+<div data-tab-panel="dev">
+
+```yaml
+architecture: standalone
+replicaCount: 1
+
+memcached:
+  memoryLimitMB: 64
+  maxConnections: 1024
+```
+
+</div>
+
+<div data-tab-panel="distributed">
+
+```yaml
+architecture: distributed
+replicaCount: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 192Mi
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+```
+
+</div>
+
+<div data-tab-panel="tls">
+
+```yaml
+tls:
+  enabled: true
+  existingSecret: memcached-tls
+  certKey: tls.crt
+  keyKey: tls.key
+  caKey: ''
+  verifyMode: '0'
+  minVersion: '2'
+```
+
+When TLS is enabled, the chart omits TCP liveness and readiness probes because kubelet TCP probes do not perform a TLS
+handshake and can create noisy `accept()` log entries.
+
+</div>
+
+<div data-tab-panel="auth">
+
+```yaml
+auth:
+  enabled: true
+  mode: ascii
+  username: app
+  password: change-me
+```
+
+SASL requires a prepared Secret with both a SASL config file and a sasldb file:
+
+```yaml
+auth:
+  enabled: true
+  mode: sasl
+  existingSecret: memcached-sasl
+  sasl:
+    configKey: memcached.conf
+    databaseKey: memcachedsasldb
+
+memcached:
+  protocol: binary
+```
+
+</div>
+
+<div data-tab-panel="extstore">
+
+```yaml
+extstore:
+  enabled: true
+  size: 4G
+```
+
+PVC-backed extstore is also available:
+
+```yaml
+extstore:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+architecture: distributed
+replicaCount: 3
+
+memcached:
+  memoryLimitMB: 256
+  maxConnections: 2048
+  disableFlushAll: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 320Mi
+  limits:
+    memory: 384Mi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: true
+  egress:
+    enabled: true
+    allowDNS: true
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+auth:
+  enabled: true
+  existingSecret: memcached-auth
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: authfile
+      remoteRef:
+        key: memcached/auth
+        property: authfile
+```
+
+External Secrets is only valid with `auth.enabled=true`; the chart fails fast if credentials are managed externally but
+Memcached authentication is disabled.
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+| Value                                         | Default                       | Description                                                                   |
+| --------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `architecture`                                | `standalone`                  | `standalone` or `distributed`.                                                |
+| `replicaCount`                                | `1`                           | Number of Memcached pods. Standalone requires exactly one pod.                |
+| `image.repository`                            | `docker.io/library/memcached` | Official Memcached image repository.                                          |
+| `image.tag`                                   | `1.6.41`                      | Pinned Memcached image tag.                                                   |
+| `memcached.memoryLimitMB`                     | `64`                          | Item memory limit passed to `-m`.                                             |
+| `memcached.maxConnections`                    | `1024`                        | Connection limit passed to `-c`.                                              |
+| `memcached.threads`                           | `4`                           | Worker thread count passed to `-t`.                                           |
+| `memcached.maxItemSize`                       | `1m`                          | Maximum item size passed to `-I`.                                             |
+| `memcached.disableFlushAll`                   | `false`                       | Disables the `flush_all` command when enabled.                                |
+| `auth.enabled`                                | `false`                       | Enables ASCII or SASL authentication.                                         |
+| `auth.mode`                                   | `ascii`                       | `ascii` or `sasl`.                                                            |
+| `tls.enabled`                                 | `false`                       | Adds Memcached TLS extended options from an existing Secret.                  |
+| `extstore.enabled`                            | `false`                       | Enables Memcached extstore cache extension.                                   |
+| `metrics.enabled`                             | `false`                       | Adds a Prometheus memcached exporter sidecar and metrics Service.             |
+| `metrics.memcachedTLS.enabled`                | `false`                       | Uses TLS between the exporter and local Memcached process.                    |
+| `networkPolicy.enabled`                       | `false`                       | Renders NetworkPolicy rules for cache and metrics access.                     |
+| `networkPolicy.egress.enabled`                | `false`                       | Adds optional egress policy rules.                                            |
+| `autoscaling.enabled`                         | `false`                       | Enables HPA for distributed mode only.                                        |
+| `pdb.enabled`                                 | `false`                       | Renders a PodDisruptionBudget.                                                |
+| `service.type`                                | `ClusterIP`                   | Client Service type; use `LoadBalancer` if external TCP exposure is required. |
+| `service.ipFamilyPolicy`                      | `""`                          | Optional Kubernetes dual-stack policy.                                        |
+| `service.ipFamilies`                          | `[]`                          | Optional ordered IP family list such as `IPv4`, `IPv6`.                       |
+| `externalSecrets.enabled`                     | `false`                       | Renders External Secrets Operator v1 resource.                                |
+| `serviceAccount.automountServiceAccountToken` | `false`                       | Keeps the Kubernetes API token unmounted by default.                          |
+
+## Operations
+
+Validate the running configuration from inside the cluster:
+
+```bash
+kubectl run memcached-client --rm -it --restart=Never \
+  --image=docker.io/library/busybox:1.37.0 -- \
+  sh -ec "printf 'stats settings\r\nquit\r\n' | nc memcached 11211"
+```
+
+Scale a distributed cache:
+
+```bash
+helm upgrade memcached helmforge/memcached \
+  --reuse-values \
+  --set architecture=distributed \
+  --set replicaCount=5
+```
+
+Inspect endpoints and logs:
+
+```bash
+kubectl get endpoints memcached
+kubectl get pods -l app.kubernetes.io/name=memcached
+kubectl logs statefulset/memcached -c memcached --tail=100
+```
+
+## Design Notes
+
+- Memcached distributed mode is not a replicated cluster. Cache placement belongs to the application or client library.
+- Gateway API is intentionally not rendered for Memcached. Expose TCP with a Service, usually `ClusterIP` or `LoadBalancer`.
+- Extstore is cache extension storage, not durable data. Do not treat PVC-backed extstore as a backup strategy.
+- HPA requires distributed mode and resource requests for utilization metrics.
+- Metrics and auth are intentionally blocked together because the upstream exporter does not support Memcached authentication.
+- TLS metrics require a certificate SAN that matches `metrics.memcachedTLS.serverName`; the chart defaults that name to the Service DNS.
+- `Chart.lock` is not used because this chart has no dependencies.
+
+## Validation
+
+The chart PR was validated with:
+
+- `helm lint` and `helm lint --strict`
+- `helm unittest`
+- `helm template` for defaults and every `charts/memcached/ci/*.yaml` scenario
+- `kubeconform -strict -ignore-missing-schemas`
+- K3D installs with `--wait --timeout 90s` across standalone, distributed, auth, SASL, TLS, metrics, NetworkPolicy, extstore, HPA, LoadBalancer, dual-stack rendering, production, and External Secrets scenarios
+- Runtime log and event scans for `accept()`, `accept4()`, warnings, failures, backoff, restarts, and unhealthy events
+
+## References
+
+- [Memcached homepage](https://memcached.org/)
+- [Memcached configuring guide](https://docs.memcached.org/serverguide/configuring/)
+- [Official Memcached Docker image](https://hub.docker.com/_/memcached)
+- [Memcached source repository](https://github.com/memcached/memcached)
+- [Kubernetes dual-stack Services](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)
+- [External Secrets Operator](https://external-secrets.io/)
