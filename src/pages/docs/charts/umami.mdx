@@ -1,27 +1,52 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Umami Chart
-description: HelmForge Umami chart — privacy-first, open-source web analytics with PostgreSQL backend, tracker script customization, and S3 backup for Kubernetes.
+description: HelmForge Umami chart - Umami 3.1.0 privacy-first analytics for Kubernetes with PostgreSQL, Gateway API, External Secrets, dual-stack Services, NetworkPolicy, PDB, and S3 backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
 import Callout from '../../../components/Callout.astro';
+import ArchitectureDiagram from '../../../components/ArchitectureDiagram.astro';
+import UmamiDiagram from '../../../components/diagrams/UmamiDiagram.astro';
 
 # Umami
 
-Privacy-first, open-source web analytics platform. Umami collects page views, sessions, and custom events without
-cookies or personally identifiable information. A lightweight JavaScript snippet on your website sends analytics data
-to your self-hosted Umami instance backed by PostgreSQL.
+Deploy [Umami](https://umami.is/) on Kubernetes as a privacy-first web analytics platform. The chart uses the official
+`ghcr.io/umami-software/umami:3.1.0` image and supports a quick bundled PostgreSQL install as well as production
+setups with external PostgreSQL, Gateway API or Ingress, External Secrets Operator, dual-stack Service fields,
+NetworkPolicy, PodDisruptionBudget, S3-compatible backups, and structured Umami runtime options.
+
+Umami tracks page views, sessions, events, Web Vitals, boards, shares, and session replay data without requiring
+third-party analytics services. The application stores its state in PostgreSQL and exposes a lightweight tracker script
+that your websites load from the Umami instance.
 
 ## Key Features
 
-- **Cookie-free tracking** — GDPR-compliant by design, no consent banners required
-- **Custom tracker script name** — rename `umami.js` to bypass ad-blockers
-- **PostgreSQL backend** — bundled subchart or external database with `pgcrypto` extension
-- **App secret management** — hashing secret managed via Kubernetes Secret
-- **Telemetry disabled** — upstream telemetry is off by default in the chart
-- **S3 backup** — scheduled `pg_dump` of the analytics database to S3-compatible storage
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Umami 3.1.0** - aligned with the current HelmForge chart `appVersion`, including Umami 3.x analytics features.
+- **PostgreSQL first** - bundled HelmForge PostgreSQL subchart for quick starts or external PostgreSQL for production.
+- **External database preparation** - optional init container can run `CREATE EXTENSION IF NOT EXISTS pgcrypto;` with an admin Secret.
+- **Structured runtime settings** - telemetry, updates, bot detection, SSL, client IP header, collect endpoint, CORS, frame allowlists, and tracker script name.
+- **Secret management** - inline values, existing Kubernetes Secrets, or `external-secrets.io/v1` resources for APP_SECRET, database password, and S3 credentials.
+- **Routing choices** - Ingress or Kubernetes Gateway API `HTTPRoute`.
+- **Dual-stack Service** - optional `ipFamilyPolicy` and `ipFamilies` fields.
+- **Production controls** - NetworkPolicy, PodDisruptionBudget, scheduling controls, resource settings, and disabled ServiceAccount token mount by default.
+- **S3 backup** - scheduled PostgreSQL `pg_dump` uploaded to S3-compatible object storage.
+
+## Architecture
+
+<ArchitectureDiagram
+  title="Production Request Flow"
+  description="Website tracker requests reach Umami through Gateway API or Ingress, then the Service routes to one or more Umami pods backed by PostgreSQL."
+>
+  <UmamiDiagram mode="production" />
+</ArchitectureDiagram>
+
+<ArchitectureDiagram
+  title="Secrets and Backup Flow"
+  description="External Secrets can materialize runtime credentials, while the backup CronJob dumps PostgreSQL data and uploads the archive to S3-compatible storage."
+>
+  <UmamiDiagram mode="secrets-backup" />
+</ArchitectureDiagram>
 
 ## Installation
 
@@ -30,46 +55,122 @@ to your self-hosted Umami instance backed by PostgreSQL.
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install umami helmforge/umami
+helm install umami helmforge/umami --namespace umami --create-namespace
 ```
 
 **OCI registry:**
 
 ```bash
-helm install umami oci://ghcr.io/helmforgedev/helm/umami
+helm install umami oci://ghcr.io/helmforgedev/helm/umami --namespace umami --create-namespace
 ```
+
+Default local access:
+
+```bash
+kubectl port-forward -n umami svc/umami-umami 3000:80
+```
+
+Open `http://localhost:3000/` and sign in with Umami's upstream initial credentials:
+
+- Username: `admin`
+- Password: `umami`
+
+<Callout type="warning" title="Change the initial password">
+  Change the default `admin` password immediately after the first login. The chart does not replace Umami's initial
+  bootstrap credentials for you.
+</Callout>
+
+## Development vs Production
+
+The default chart values are intentionally simple and development-friendly:
+
+- `postgresql.enabled=true`
+- `replicaCount=1`
+- generated APP_SECRET and PostgreSQL password
+- ClusterIP Service only
+- no public ingress or Gateway API route
+- no NetworkPolicy or PDB
+- telemetry and update checks disabled
+
+This is useful for local clusters, demos, and CI smoke tests. For production, use a stable APP_SECRET, external or
+operator-managed PostgreSQL, TLS termination, resource requests and limits, backup or database-native backup, and
+NetworkPolicy rules aligned with your cluster networking.
 
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'embedded-db', label: 'Embedded PostgreSQL' },
+    { id: 'quickstart', label: 'Quickstart' },
+    { id: 'production', label: 'Production' },
     { id: 'external-db', label: 'External PostgreSQL' },
-    { id: 'adblocker', label: 'Ad-blocker Bypass' },
-    { id: 'backup', label: 'With S3 Backup' },
+    { id: 'gateway', label: 'Gateway API' },
+    { id: 'external-secrets', label: 'External Secrets' },
+    { id: 'backup', label: 'S3 Backup' },
   ]}
 >
 
-<div data-tab-panel="embedded-db">
+<div data-tab-panel="quickstart">
 
 ```yaml
-# values.yaml — Umami with bundled PostgreSQL subchart (default)
-umami:
-  appSecret: 'a-random-secret-key-change-me'
-
+# values.yaml - development install with bundled PostgreSQL
 postgresql:
   enabled: true
-  auth:
-    password: 'postgres-password'
 
-ingress:
+umami:
+  appSecret: 'replace-with-a-stable-secret'
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+replicaCount: 2
+
+umami:
+  existingSecret: umami-app
+  existingSecretKey: app-secret
+  forceSSL: true
+  clientIpHeader: x-forwarded-for
+  trackerScriptName: stats
+  collectApiEndpoint: /api/send
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgres-primary.database.svc.cluster.local
+    port: '5432'
+    name: umami
+    username: umami
+    existingSecret: umami-db
+    existingSecretPasswordKey: database-password
+    init:
+      enabled: true
+      adminUsername: postgres
+      adminExistingSecret: postgres-admin
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+pdb:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: analytics.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceDatabase: true
+    allowHTTPS: true
 ```
 
 </div>
@@ -77,56 +178,76 @@ ingress:
 <div data-tab-panel="external-db">
 
 ```yaml
-# values.yaml — Umami with an existing PostgreSQL instance
-# NOTE: The external database must have the pgcrypto extension enabled.
-umami:
-  appSecret: 'a-random-secret-key-change-me'
-
 postgresql:
   enabled: false
 
 database:
   external:
-    host: postgresql.database.svc
+    host: postgres-primary.database.svc.cluster.local
     port: '5432'
     name: umami
     username: umami
-    password: 'db-password'
+    existingSecret: umami-db
+    existingSecretPasswordKey: database-password
+    init:
+      enabled: true
+      image: docker.io/library/postgres:18-alpine
+      adminUsername: postgres
+      adminExistingSecret: postgres-admin
+      adminExistingSecretPasswordKey: postgres-password
+      sql: |
+        CREATE EXTENSION IF NOT EXISTS pgcrypto;
+```
 
-ingress:
+<Callout type="info" title="pgcrypto is required">
+  The bundled PostgreSQL path creates `pgcrypto` through the subchart init script. For external databases, enable
+  `database.external.init.enabled` when the Umami application user cannot create extensions.
+</Callout>
+
+</div>
+
+<div data-tab-panel="gateway">
+
+```yaml
+gatewayAPI:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: analytics.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - analytics.example.com
+
+umami:
+  forceSSL: true
+  clientIpHeader: x-forwarded-for
 ```
 
 </div>
 
-<div data-tab-panel="adblocker">
+<div data-tab-panel="external-secrets">
 
 ```yaml
-# values.yaml — Rename the tracker script to bypass ad-blockers
-# Your tracking snippet becomes: <script src="https://analytics.example.com/script.js" ...>
-umami:
-  appSecret: 'a-random-secret-key-change-me'
-  trackerScriptName: 'script'
-
 postgresql:
-  enabled: true
-  auth:
-    password: 'postgres-password'
+  enabled: false
 
-ingress:
+externalSecrets:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: analytics.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+  apiVersion: external-secrets.io/v1
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  app:
+    enabled: true
+    targetName: umami-app
+    appSecretRemoteRef:
+      key: prod/umami/app
+      property: appSecret
+  database:
+    enabled: true
+    targetName: umami-db
+    passwordRemoteRef:
+      key: prod/umami/database
+      property: password
 ```
 
 </div>
@@ -134,24 +255,37 @@ ingress:
 <div data-tab-panel="backup">
 
 ```yaml
-# values.yaml — Daily backup of the Umami analytics database to S3
-umami:
-  appSecret: 'a-random-secret-key-change-me'
-
-postgresql:
-  enabled: true
-  auth:
-    password: 'postgres-password'
-
 backup:
   enabled: true
   schedule: '0 3 * * *'
   s3:
-    endpoint: https://s3.amazonaws.com
-    bucket: my-umami-backups
-    accessKey: '<set-me>'
-    secretKey: '<set-me>'
+    endpoint: https://s3.example.com
+    bucket: umami-backups
+    prefix: production
+    existingSecret: umami-backup-s3
+```
 
+</div>
+
+</DocsTabs>
+
+## Routing
+
+Use Gateway API when your cluster has a Gateway controller and shared listeners:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - analytics.example.com
+```
+
+Use Ingress when your platform standardizes on `networking.k8s.io/v1` Ingress:
+
+```yaml
 ingress:
   enabled: true
   ingressClassName: traefik
@@ -160,218 +294,246 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: umami-tls
+      hosts:
+        - analytics.example.com
 ```
 
-</div>
+## Service Dual Stack
 
-</DocsTabs>
+The Service supports Kubernetes dual-stack fields:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+Dual stack only works when the cluster, CNI, and Service CIDRs are configured for IPv4 and IPv6.
+
+## Umami Runtime Settings
+
+| Value                      | Env Var                | Default | Purpose                                                                  |
+| -------------------------- | ---------------------- | ------- | ------------------------------------------------------------------------ |
+| `umami.disableTelemetry`   | `DISABLE_TELEMETRY`    | `true`  | Disables upstream telemetry.                                             |
+| `umami.disableUpdates`     | `DISABLE_UPDATES`      | `true`  | Disables upstream update checks.                                         |
+| `umami.disableBotCheck`    | `DISABLE_BOT_CHECK`    | `false` | Disables bot filtering when required for controlled tests.               |
+| `umami.cloudMode`          | `CLOUD_MODE`           | `false` | Hides users, teams, and websites settings pages for managed deployments. |
+| `umami.forceSSL`           | `FORCE_SSL`            | `false` | Trusts proxy HTTPS and emits secure URLs.                                |
+| `umami.clientIpHeader`     | `CLIENT_IP_HEADER`     | `""`    | Header used to resolve client IP behind proxies.                         |
+| `umami.collectApiEndpoint` | `COLLECT_API_ENDPOINT` | `""`    | Custom collect endpoint for tracker requests.                            |
+| `umami.corsMaxAge`         | `CORS_MAX_AGE`         | `""`    | CORS preflight cache duration.                                           |
+| `umami.allowedFrameUrls`   | `ALLOWED_FRAME_URLS`   | `""`    | Space-delimited frame allowlist.                                         |
+| `umami.debug`              | `DEBUG`                | `""`    | Debug namespaces, for example `umami:prisma`.                            |
+| `umami.trackerScriptName`  | `TRACKER_SCRIPT_NAME`  | `""`    | Custom tracker script file name.                                         |
+
+Use `umami.extraEnv` for upstream settings that are not yet modeled directly by the chart.
+
+<Callout type="tip" title="Custom tracker and collect endpoint">
+  `trackerScriptName` and `collectApiEndpoint` can reduce ad-blocker false positives. Update the website snippet after
+  changing either value.
+</Callout>
+
+<Callout type="warning" title="Sub-path hosting">
+  Umami's `BASE_PATH` is a build-time setting for the upstream application image. The HelmForge chart does not set it as
+  a runtime value for the stock image.
+</Callout>
+
+## Secrets
+
+The chart can create generated Secrets, consume existing Kubernetes Secrets, or render External Secrets Operator
+resources. For production, prefer a stable APP_SECRET stored outside the Helm release:
+
+```yaml
+umami:
+  existingSecret: umami-app
+  existingSecretKey: app-secret
+```
+
+<Callout type="danger" title="Keep APP_SECRET stable">
+  Changing APP_SECRET invalidates active sessions and tokens. Do not rely on generated secrets for production upgrades
+  or disaster recovery.
+</Callout>
+
+## NetworkPolicy
+
+NetworkPolicy is opt-in because egress needs vary by platform:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceDatabase: true
+    databasePort: 5432
+    allowHTTPS: true
+```
+
+When PostgreSQL, S3, OIDC, or other integrations live outside the namespace, add explicit `extraTo` peers for your CNI
+and network model.
+
+## Backup
+
+The backup CronJob runs `pg_dump` against the Umami PostgreSQL database and uploads the archive to S3-compatible
+storage. It protects Umami users, websites, dashboards, events, session replay data, shares, and related PostgreSQL
+state.
+
+| Value                              | Default                                | Description                                        |
+| ---------------------------------- | -------------------------------------- | -------------------------------------------------- |
+| `backup.enabled`                   | `false`                                | Render the backup CronJob.                         |
+| `backup.schedule`                  | `"0 3 * * *"`                          | Cron schedule.                                     |
+| `backup.concurrencyPolicy`         | `Forbid`                               | Prevent overlapping backups by default.            |
+| `backup.archivePrefix`             | `umami`                                | Archive filename prefix.                           |
+| `backup.images.postgresql`         | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                          |
+| `backup.images.uploader`           | `docker.io/helmforge/mc:1.0.0`         | MinIO client image used for upload.                |
+| `backup.s3.endpoint`               | `""`                                   | S3-compatible endpoint.                            |
+| `backup.s3.bucket`                 | `""`                                   | Target bucket.                                     |
+| `backup.s3.existingSecret`         | `""`                                   | Existing Secret with S3 credentials.               |
+| `backup.database.existingSecret`   | `""`                                   | Optional backup-specific database password Secret. |
+| `backup.database.postgresDumpArgs` | `""`                                   | Extra `pg_dump` arguments.                         |
+
+<Callout type="warning" title="Backups require restore tests">
+  A scheduled dump is not enough for production readiness. Test restore into a separate PostgreSQL database and verify
+  Umami can start against the restored data.
+</Callout>
 
 ## Configuration Reference
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter          | Type    | Default | Description                                                             |
+| ------------------ | ------- | ------- | ----------------------------------------------------------------------- |
+| `nameOverride`     | string  | `""`    | Override the chart name.                                                |
+| `fullnameOverride` | string  | `""`    | Override the full release name.                                         |
+| `commonLabels`     | object  | `{}`    | Extra labels added to chart resources.                                  |
+| `replicaCount`     | integer | `1`     | Number of Umami pods. Use external PostgreSQL before scaling above one. |
 
 ### Image
 
-| Parameter          | Type   | Default                        | Description                                              |
-| ------------------ | ------ | ------------------------------ | -------------------------------------------------------- |
-| `image.repository` | string | `ghcr.io/umami-software/umami` | Umami container image (PostgreSQL variant).              |
-| `image.tag`        | string | `"postgresql-v2.17.0"`         | Image tag. Prefixed with `postgresql-` for the PG build. |
-| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                                       |
-| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries.                     |
+| Parameter          | Type   | Default                        | Description                          |
+| ------------------ | ------ | ------------------------------ | ------------------------------------ |
+| `image.repository` | string | `ghcr.io/umami-software/umami` | Umami container image repository.    |
+| `image.tag`        | string | `3.1.0`                        | Umami image tag.                     |
+| `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
+| `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
-<Callout type="info" title="PostgreSQL image variant">
-  Umami publishes separate Docker images for PostgreSQL and MySQL backends. This chart always uses the `postgresql-`
-  prefixed tag (e.g. `postgresql-v2.17.0`). Do not replace it with a tag without the prefix — those images target MySQL
-  and are not compatible with this chart.
-</Callout>
+### Database
 
-### Umami Configuration
+| Parameter                                                | Type    | Default                                    | Description                                                           |
+| -------------------------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------------------------------- |
+| `postgresql.enabled`                                     | boolean | `true`                                     | Deploy bundled HelmForge PostgreSQL.                                  |
+| `postgresql.architecture`                                | string  | `standalone`                               | PostgreSQL subchart architecture.                                     |
+| `postgresql.auth.database`                               | string  | `umami`                                    | Database created by the subchart.                                     |
+| `postgresql.auth.username`                               | string  | `umami`                                    | Application database user.                                            |
+| `postgresql.auth.password`                               | string  | `""`                                       | PostgreSQL password, generated when empty.                            |
+| `postgresql.serviceAccount.automountServiceAccountToken` | boolean | `false`                                    | Disable API token mount in PostgreSQL pods by default.                |
+| `database.external.host`                                 | string  | `""`                                       | External PostgreSQL host.                                             |
+| `database.external.port`                                 | string  | `"5432"`                                   | External PostgreSQL port.                                             |
+| `database.external.name`                                 | string  | `umami`                                    | External database name.                                               |
+| `database.external.username`                             | string  | `umami`                                    | External database user.                                               |
+| `database.external.password`                             | string  | `""`                                       | Inline external database password. Prefer Secret or External Secrets. |
+| `database.external.existingSecret`                       | string  | `""`                                       | Existing Secret with the database password.                           |
+| `database.external.existingSecretPasswordKey`            | string  | `password`                                 | Password key in the existing Secret.                                  |
+| `database.external.init.enabled`                         | boolean | `false`                                    | Run external database preparation before Umami starts.                |
+| `database.external.init.image`                           | string  | `docker.io/library/postgres:18-alpine`     | PostgreSQL client image for init.                                     |
+| `database.external.init.adminUsername`                   | string  | `postgres`                                 | Admin user used only by init.                                         |
+| `database.external.init.adminExistingSecret`             | string  | `""`                                       | Secret containing the admin password.                                 |
+| `database.external.init.sql`                             | string  | `CREATE EXTENSION IF NOT EXISTS pgcrypto;` | SQL executed by the init container.                                   |
 
-| Parameter                 | Type    | Default      | Description                                                                |
-| ------------------------- | ------- | ------------ | -------------------------------------------------------------------------- |
-| `umami.port`              | integer | `3000`       | Internal HTTP port for the Umami container.                                |
-| `umami.appSecret`         | string  | `""`         | Secret key used for hashing user sessions and tokens.                      |
-| `umami.existingSecret`    | string  | `""`         | Existing Kubernetes Secret containing the app secret.                      |
-| `umami.existingSecretKey` | string  | `app-secret` | Key inside the existing secret holding the app secret value.               |
-| `umami.disableTelemetry`  | boolean | `true`       | Disable upstream Umami telemetry. Enabled by default in this chart.        |
-| `umami.trackerScriptName` | string  | `""`         | Custom name for the tracker script (e.g. `script` serves as `/script.js`). |
-| `umami.extraEnv`          | array   | `[]`         | Extra environment variables injected into the Umami container.             |
+### Service, Ingress, Gateway, and PDB
 
-<Callout type="danger" title="Always set appSecret explicitly">
-  If `umami.appSecret` is empty, the chart auto-generates one. If the pod is ever recreated without a persistent secret,
-  **all active user sessions are invalidated** — users are logged out immediately. Always set an explicit secret or use
-  `umami.existingSecret`.
-</Callout>
+| Parameter                  | Type    | Default         | Description                          |
+| -------------------------- | ------- | --------------- | ------------------------------------ |
+| `service.type`             | string  | `ClusterIP`     | Kubernetes Service type.             |
+| `service.port`             | integer | `80`            | Service port.                        |
+| `service.annotations`      | object  | `{}`            | Service annotations.                 |
+| `service.ipFamilyPolicy`   | string  | `""`            | Optional Service IP family policy.   |
+| `service.ipFamilies`       | array   | `[]`            | Optional Service IP families.        |
+| `ingress.enabled`          | boolean | `false`         | Render Ingress.                      |
+| `ingress.ingressClassName` | string  | `traefik`       | Ingress class name.                  |
+| `ingress.hosts`            | array   | `[]`            | Host/path rules.                     |
+| `ingress.tls`              | array   | `[]`            | TLS entries.                         |
+| `gatewayAPI.enabled`       | boolean | `false`         | Render Gateway API HTTPRoute.        |
+| `gatewayAPI.parentRefs`    | array   | `[]`            | HTTPRoute parent references.         |
+| `gatewayAPI.hostnames`     | array   | `[]`            | HTTPRoute hostnames.                 |
+| `gatewayAPI.matches`       | array   | path prefix `/` | HTTPRoute path matches.              |
+| `gatewayAPI.filters`       | array   | `[]`            | Optional HTTPRoute filters.          |
+| `pdb.enabled`              | boolean | `false`         | Render PodDisruptionBudget.          |
+| `pdb.minAvailable`         | integer | `1`             | Minimum available pods when enabled. |
+| `pdb.maxUnavailable`       | string  | `""`            | Alternative disruption budget value. |
 
-<Callout type="tip" title="Bypass ad-blockers with trackerScriptName">
-  Many ad-blockers block requests to `umami.js` by filename. Set `umami.trackerScriptName: 'script'` and your tracking
-  snippet will be served at `/script.js` instead, which most blockers do not target.
-</Callout>
+### External Secrets
 
-### Database — Embedded Subchart
+| Parameter                             | Type    | Default                  | Description                                              |
+| ------------------------------------- | ------- | ------------------------ | -------------------------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`                  | Render ExternalSecret resources.                         |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | External Secrets API version.                            |
+| `externalSecrets.refreshInterval`     | string  | `1h`                     | Reconciliation refresh interval.                         |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | SecretStore or ClusterSecretStore name.                  |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore`            | Store kind.                                              |
+| `externalSecrets.app.enabled`         | boolean | `false`                  | Manage APP_SECRET with External Secrets.                 |
+| `externalSecrets.database.enabled`    | boolean | `false`                  | Manage external database password with External Secrets. |
+| `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage S3 backup credentials with External Secrets.      |
 
-| Parameter                  | Type    | Default      | Description                                     |
-| -------------------------- | ------- | ------------ | ----------------------------------------------- |
-| `postgresql.enabled`       | boolean | `true`       | Deploy a bundled PostgreSQL subchart for Umami. |
-| `postgresql.architecture`  | string  | `standalone` | PostgreSQL deployment architecture.             |
-| `postgresql.auth.database` | string  | `umami`      | Database name created by the subchart.          |
-| `postgresql.auth.username` | string  | `umami`      | Database username created by the subchart.      |
-| `postgresql.auth.password` | string  | `""`         | Database password (auto-generated if empty).    |
+### Probes, Security, and Scheduling
 
-### Database — External
-
-| Parameter                                     | Type   | Default    | Description                                                      |
-| --------------------------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
-| `database.external.host`                      | string | `""`       | External PostgreSQL hostname or IP.                              |
-| `database.external.port`                      | string | `"5432"`   | External PostgreSQL port.                                        |
-| `database.external.name`                      | string | `umami`    | Database name on the external server.                            |
-| `database.external.username`                  | string | `umami`    | Username for the external database.                              |
-| `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
-| `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
-| `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
-
-<Callout type="warning" title="pgcrypto extension required on external databases">
-  The bundled PostgreSQL subchart automatically creates the `pgcrypto` extension via an init script. If you use an
-  external PostgreSQL instance, you must create this extension manually before deploying Umami:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-```
-
-</Callout>
-
-### Service
-
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
-
-### Ingress
-
-| Parameter                  | Type    | Default   | Description                                      |
-| -------------------------- | ------- | --------- | ------------------------------------------------ |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
-| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
-| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
-
-### Probes
-
-| Parameter                              | Type    | Default | Description                                   |
-| -------------------------------------- | ------- | ------- | --------------------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe (uses `/api/heartbeat`). |
-| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.                  |
-| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.                         |
-| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.                        |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.              |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.                        |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.                 |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.                        |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.                       |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.             |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.                       |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.                |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.                       |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.                      |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold.            |
-
-### Backup
-
-The backup CronJob runs `pg_dump` against the Umami PostgreSQL database and uploads the archive to S3. This protects
-all collected analytics data, website configurations, and user accounts.
-
-| Parameter                                   | Type    | Default                                | Description                                                        |
-| ------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------ |
-| `backup.enabled`                            | boolean | `false`                                | Enable scheduled S3 backup CronJob.                                |
-| `backup.schedule`                           | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                         |
-| `backup.suspend`                            | boolean | `false`                                | Suspend the CronJob without deleting it.                           |
-| `backup.concurrencyPolicy`                  | string  | `Forbid`                               | CronJob concurrency policy.                                        |
-| `backup.successfulJobsHistoryLimit`         | integer | `3`                                    | Number of successful Job records to keep.                          |
-| `backup.failedJobsHistoryLimit`             | integer | `3`                                    | Number of failed Job records to keep.                              |
-| `backup.backoffLimit`                       | integer | `1`                                    | Job retry limit.                                                   |
-| `backup.archivePrefix`                      | string  | `umami`                                | Prefix for backup archive filenames.                               |
-| `backup.images.postgresql`                  | string  | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                                          |
-| `backup.images.uploader`                    | string  | `docker.io/helmforge/mc:1.0.0`         | Image used for S3 upload.                                          |
-| `backup.resources`                          | object  | `{}`                                   | Resources for backup containers.                                   |
-| `backup.s3.endpoint`                        | string  | `""`                                   | S3-compatible endpoint URL.                                        |
-| `backup.s3.bucket`                          | string  | `""`                                   | Target bucket name.                                                |
-| `backup.s3.prefix`                          | string  | `umami`                                | Key prefix within the bucket.                                      |
-| `backup.s3.createBucketIfNotExists`         | boolean | `true`                                 | Create the bucket automatically if it does not exist.              |
-| `backup.s3.existingSecret`                  | string  | `""`                                   | Existing secret containing S3 access and secret keys.              |
-| `backup.s3.existingSecretAccessKeyKey`      | string  | `access-key`                           | Key in the existing secret for the S3 access key.                  |
-| `backup.s3.existingSecretSecretKeyKey`      | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.                  |
-| `backup.s3.accessKey`                       | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set).       |
-| `backup.s3.secretKey`                       | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set).       |
-| `backup.database.host`                      | string  | `""`                                   | Override database host for backup (uses app credentials if empty). |
-| `backup.database.port`                      | string  | `""`                                   | Override database port for backup.                                 |
-| `backup.database.name`                      | string  | `""`                                   | Override database name for backup.                                 |
-| `backup.database.username`                  | string  | `""`                                   | Override database username for backup.                             |
-| `backup.database.password`                  | string  | `""`                                   | Override database password for backup.                             |
-| `backup.database.existingSecret`            | string  | `""`                                   | Existing secret containing backup database credentials.            |
-| `backup.database.existingSecretPasswordKey` | string  | `password`                             | Key in the existing secret for the backup database password.       |
-| `backup.database.postgresDumpArgs`          | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
-
-### Resources and Security
-
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
-
-### Service Account
-
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
-
-### Scheduling
-
-| Parameter                       | Type    | Default | Description                    |
-| ------------------------------- | ------- | ------- | ------------------------------ |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
-| `affinity`                      | object  | `{}`    | Affinity rules.                |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
-
-### Extra
-
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+| Parameter                                     | Type    | Default          | Description                                 |
+| --------------------------------------------- | ------- | ---------------- | ------------------------------------------- |
+| `probes.startup.path`                         | string  | `/api/heartbeat` | Startup probe path.                         |
+| `probes.startup.initialDelaySeconds`          | integer | `30`             | Startup probe initial delay.                |
+| `probes.liveness.path`                        | string  | `/api/heartbeat` | Liveness probe path.                        |
+| `probes.readiness.path`                       | string  | `/api/heartbeat` | Readiness probe path.                       |
+| `resources`                                   | object  | `{}`             | Container resource requests and limits.     |
+| `podSecurityContext`                          | object  | `{}`             | Pod-level security context.                 |
+| `securityContext`                             | object  | `{}`             | Container security context.                 |
+| `serviceAccount.create`                       | boolean | `false`          | Create a dedicated ServiceAccount.          |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`          | Mount API token into Umami and backup pods. |
+| `nodeSelector`                                | object  | `{}`             | Node selector.                              |
+| `tolerations`                                 | array   | `[]`             | Tolerations.                                |
+| `affinity`                                    | object  | `{}`             | Affinity rules.                             |
+| `topologySpreadConstraints`                   | array   | `[]`             | Topology spread constraints.                |
+| `priorityClassName`                           | string  | `""`             | PriorityClass name.                         |
+| `podLabels`                                   | object  | `{}`             | Extra pod labels.                           |
+| `podAnnotations`                              | object  | `{}`             | Extra pod annotations.                      |
+| `extraVolumes`                                | array   | `[]`             | Extra volumes.                              |
+| `extraVolumeMounts`                           | array   | `[]`             | Extra volume mounts.                        |
+| `extraManifests`                              | array   | `[]`             | Additional Kubernetes manifests.            |
 
 ## Common Issues
 
-<Callout type="danger" title="Users logged out after pod restart">
-  If `umami.appSecret` is not set explicitly, the chart auto-generates a secret. Any pod restart generates a new secret,
-  invalidating all active sessions. Set a stable, explicit `umami.appSecret` or use `umami.existingSecret`.
+<Callout type="danger" title="Users logged out after restart or upgrade">
+  This usually means APP_SECRET changed. Set `umami.appSecret`, `umami.existingSecret`, or
+  `externalSecrets.app.enabled=true` with a durable external secret source.
 </Callout>
 
-<Callout type="tip" title="Tracking script blocked by browsers or extensions">
-  If you notice missing analytics data, your tracker script (`umami.js`) may be blocked. Set `umami.trackerScriptName`
-  to a neutral name like `stats` or `collect` and update your website tracking snippet accordingly.
+<Callout type="warning" title="External database startup fails on pgcrypto">
+  Enable `database.external.init.enabled` with an admin Secret or create the extension manually before installing the
+  chart.
 </Callout>
+
+<Callout type="tip" title="Tracking script blocked">
+  Set `umami.trackerScriptName` to a neutral name such as `stats` and optionally set `umami.collectApiEndpoint`. Update
+  website snippets after changing these values.
+</Callout>
+
+## Upgrade Notes
+
+Umami 3.x includes schema migrations for newer analytics features such as Boards, Shares, Web Vitals, and Session
+Replay. Back up PostgreSQL before upgrading live deployments, especially when moving from Umami 2.x.
+
+The chart version `2.0.0` is a breaking modernization release. Review production values for renamed or newly structured
+settings, External Secrets behavior, Gateway API, NetworkPolicy, and backup credentials before upgrading.
 
 ## More Information
 
 - [Umami Official Website](https://umami.is)
 - [Umami Documentation](https://umami.is/docs)
+- [Umami Environment Variables](https://umami.is/docs/environment-variables)
 - [Umami GitHub Repository](https://github.com/umami-software/umami)
 - [HelmForge Umami Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/umami)

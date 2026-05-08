@@ -304,7 +304,7 @@ export const charts: Chart[] = [
   {
     name: 'Umami',
     slug: 'umami',
-    description: 'Privacy-focused web analytics with PostgreSQL and auto-generated app secret.',
+    description: 'Privacy analytics with PostgreSQL, Gateway API, External Secrets, dual-stack Services, and backup.',
     maturity: 'stable',
     backup: true,
   },
