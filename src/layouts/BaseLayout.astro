@@ -15,6 +15,8 @@ interface Props {
   articleModifiedTime?: string;
   articleSection?: string;
   articleTags?: string[];
+  robots?: string;
+  includeBreadcrumbSchema?: boolean;
 }
 
 const {
@@ -24,18 +26,19 @@ const {
   imageAlt,
   imageWidth,
   imageHeight,
-  url = Astro.url.href,
+  url,
   ogType,
   articlePublishedTime,
   articleModifiedTime,
   articleSection,
   articleTags = [],
+  robots = 'index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1',
+  includeBreadcrumbSchema = true,
 } = Astro.props;
 
 const siteName = 'HelmForge';
 const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
 const imageUrl = new URL(image, Astro.site).href;
-const robotsContent = 'index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1';
 const googleAnalyticsId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-5PD0B83HRE';
 const googleSiteVerification = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
 const bingSiteVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
@@ -43,6 +46,8 @@ const bingSiteVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 // Detect page type from path
 const pathname = Astro.url.pathname;
 const pathSegments = pathname.split('/').filter(Boolean);
+const normalizedPathname = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
+const canonicalUrl = url ?? new URL(normalizedPathname, Astro.site).href;
 const isHomepage = pathname === '/' || pathname === '';
 const isChartPage = pathSegments[0] === 'docs' && pathSegments[1] === 'charts' && !!pathSegments[2];
 const isBlogPage = pathSegments[0] === 'blog';
@@ -164,7 +169,7 @@ const websiteJsonLd = isHomepage
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <meta name="keywords" content={autoKeywords} />
-    <meta name="robots" content={robotsContent} />
+    <meta name="robots" content={robots} />
     {googleSiteVerification && <meta name="google-site-verification" content={googleSiteVerification} />}
     {bingSiteVerification && <meta name="msvalidate.01" content={bingSiteVerification} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -172,13 +177,13 @@ const websiteJsonLd = isHomepage
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#7c3aed" />
-    <link rel="canonical" href={url} />
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="alternate" type="application/rss+xml" title="HelmForge Feed" href="/rss.xml" />
     {isBlogPage && <link rel="alternate" type="application/rss+xml" title="HelmForge Blog" href="/blog/rss.xml" />}
 
     <!-- Open Graph -->
     <meta property="og:type" content={resolvedOgType} />
-    <meta property="og:url" content={url} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={imageUrl} />
@@ -235,7 +240,11 @@ const websiteJsonLd = isHomepage
     {websiteJsonLd && <script type="application/ld+json" set:html={JSON.stringify(websiteJsonLd)} />}
 
     <!-- BreadcrumbList JSON-LD -->
-    {pathSegments.length > 0 && <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />}
+    {
+      includeBreadcrumbSchema && pathSegments.length > 0 && (
+        <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
+      )
+    }
 
     <!-- Global CSS -->
     <style is:global>
