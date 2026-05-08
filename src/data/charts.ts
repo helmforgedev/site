@@ -234,7 +234,7 @@ export const charts: Chart[] = [
   {
     name: 'Discount Bandit',
     slug: 'discount-bandit',
-    description: 'Self-hosted price tracker and deal aggregator with SQLite persistence.',
+    description: 'Self-hosted price tracker with MySQL, Gateway API, External Secrets, and SQLite dev mode.',
     maturity: 'stable',
     backup: false,
   },
