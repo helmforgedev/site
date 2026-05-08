@@ -12,7 +12,7 @@ export async function GET(context: APIContext) {
     description: 'Kubernetes, Helm, and HelmForge operations guides, announcements, and technical analysis.',
     site: new URL('/blog', context.site!),
     items: getBlogRssItems(posts, context.site!),
-    trailingSlash: false,
+    trailingSlash: true,
     xmlns: {
       atom: 'http://www.w3.org/2005/Atom',
       dc: 'http://purl.org/dc/elements/1.1/',

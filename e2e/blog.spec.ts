@@ -14,6 +14,7 @@ test.describe('Blog', () => {
     const newsletter = page.locator('a[aria-label="Open newsletter page"]').first();
     await expect(newsletter).toBeVisible();
     await expect(newsletter).toHaveAttribute('href', '/newsletter');
+    await expect(newsletter).not.toHaveAttribute('target', '_blank');
 
     const subscribe = page.locator('a[aria-label="Subscribe via RSS"]').first();
     await expect(subscribe).toBeVisible();
@@ -136,6 +137,10 @@ test.describe('Blog', () => {
       'href',
       '/newsletter',
     );
+    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).not.toHaveAttribute(
+      'target',
+      '_blank',
+    );
     await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute(
       'href',
       '/blog/rss.xml',
@@ -148,6 +153,7 @@ test.describe('Blog', () => {
     const ctaSection = page.locator('article section').filter({ hasText: 'Get the next post in your inbox' }).first();
     await expect(ctaSection).toBeVisible();
     await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
+    await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).not.toHaveAttribute('target', '_blank');
     await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/blog/rss.xml');
   });
 

@@ -20,7 +20,7 @@ function pageUrl(filePath) {
   const relative = path.relative(distDir, filePath).replaceAll(path.sep, '/');
   if (relative === '404.html') return null;
   if (relative === 'index.html') return SITE_URL;
-  return `${SITE_URL}/${relative.replace(/\/index\.html$/, '')}`;
+  return `${SITE_URL}/${relative.replace(/\/index\.html$/, '/')}`;
 }
 
 if (!fs.existsSync(sitemapPath)) {
