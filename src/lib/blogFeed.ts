@@ -38,7 +38,7 @@ export function getSortedBlogPosts(posts: BlogPost[]) {
 export function getBlogRssItems(posts: BlogPost[], site: URL): RSSFeedItem[] {
   return getSortedBlogPosts(posts).map((post) => {
     const author = AUTHORS[post.data.authorId] ?? AUTHORS[DEFAULT_AUTHOR_ID];
-    const canonicalUrl = new URL(`/blog/${post.id}`, site).toString();
+    const canonicalUrl = new URL(`/blog/${post.id}/`, site).toString();
     const imageUrl = new URL(post.data.coverImage, site).toString();
 
     return {

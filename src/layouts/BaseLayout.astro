@@ -43,11 +43,20 @@ const googleAnalyticsId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-5PD0B83
 const googleSiteVerification = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
 const bingSiteVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 
+function normalizePageUrl(value: string | URL): string {
+  const resolved = new URL(value, Astro.site);
+  const hasFileExtension = /\.[a-z0-9]+$/i.test(resolved.pathname);
+  if (resolved.pathname !== '/' && !hasFileExtension && !resolved.pathname.endsWith('/')) {
+    resolved.pathname += '/';
+  }
+  return resolved.href;
+}
+
 // Detect page type from path
 const pathname = Astro.url.pathname;
 const pathSegments = pathname.split('/').filter(Boolean);
-const normalizedPathname = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
-const canonicalUrl = url ?? new URL(normalizedPathname, Astro.site).href;
+const normalizedPathname = pathname === '/' ? '/' : pathname.endsWith('/') ? pathname : `${pathname}/`;
+const canonicalUrl = normalizePageUrl(url ?? normalizedPathname);
 const isHomepage = pathname === '/' || pathname === '';
 const isChartPage = pathSegments[0] === 'docs' && pathSegments[1] === 'charts' && !!pathSegments[2];
 const isBlogPage = pathSegments[0] === 'blog';
@@ -90,7 +99,7 @@ let accumulated = '';
 for (const seg of pathSegments) {
   accumulated += `/${seg}`;
   const name = seg.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  breadcrumbItems.push({ name, url: `https://helmforge.dev${accumulated}` });
+  breadcrumbItems.push({ name, url: `https://helmforge.dev${accumulated}/` });
 }
 const breadcrumbJsonLd = {
   '@context': 'https://schema.org',

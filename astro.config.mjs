@@ -36,7 +36,7 @@ function getBlogSitemapMetadata() {
           getFrontmatterScalar(frontmatter, 'date');
 
         return [
-          `${SITE_URL}/blog/${slug}`,
+          `${SITE_URL}/blog/${slug}/`,
           {
             coverImage,
             coverAlt,
@@ -53,6 +53,15 @@ let blogSitemapMetadata;
 function getCachedBlogSitemapMetadata() {
   blogSitemapMetadata ??= getBlogSitemapMetadata();
   return blogSitemapMetadata;
+}
+
+function normalizeSitemapUrl(url) {
+  const resolved = new URL(url);
+  const hasFileExtension = /\.[a-z0-9]+$/i.test(resolved.pathname);
+  if (resolved.pathname !== '/' && !hasFileExtension && !resolved.pathname.endsWith('/')) {
+    resolved.pathname += '/';
+  }
+  return resolved.href;
 }
 
 // https://astro.build/config
@@ -80,57 +89,58 @@ export default defineConfig({
         image: true,
       },
       serialize(item) {
-        const url = item.url;
+        const url = normalizeSitemapUrl(item.url);
+        const sitemapItem = { ...item, url };
 
         // Homepage
         if (url === 'https://helmforge.dev' || url === 'https://helmforge.dev/') {
-          return { ...item, priority: 1.0, changefreq: 'weekly' };
+          return { ...sitemapItem, priority: 1.0, changefreq: 'weekly' };
         }
 
         // Individual chart pages — highest priority (most searched)
-        const chartMatch = url.match(/\/docs\/charts\/([a-z0-9-]+)$/);
+        const chartMatch = url.match(/\/docs\/charts\/([a-z0-9-]+)\/?$/);
         if (chartMatch) {
           const slug = chartMatch[1];
-          /** @type {any} */ (item).img = [
+          /** @type {any} */ (sitemapItem).img = [
             {
               url: `https://helmforge.dev/icons/charts/${slug}.png`,
               title: `${slug} Helm chart icon`,
             },
           ];
-          return { ...item, priority: 0.9, changefreq: 'monthly' };
+          return { ...sitemapItem, priority: 0.9, changefreq: 'monthly' };
         }
 
         // Charts index and comparison — very high priority
         if (url.includes('/docs/charts') || url.includes('/docs/comparison')) {
-          return { ...item, priority: 0.9, changefreq: 'monthly' };
+          return { ...sitemapItem, priority: 0.9, changefreq: 'monthly' };
         }
 
         // Core docs pages
         if (url.includes('/docs/')) {
-          return { ...item, priority: 0.8, changefreq: 'monthly' };
+          return { ...sitemapItem, priority: 0.8, changefreq: 'monthly' };
         }
 
         // Blog posts
-        if (url.match(/\/blog\/[a-z0-9-]+$/)) {
-          const metadata = getCachedBlogSitemapMetadata().get(url.replace(/\/$/, ''));
+        if (url.match(/\/blog\/[a-z0-9-]+\/?$/)) {
+          const metadata = getCachedBlogSitemapMetadata().get(url.endsWith('/') ? url : `${url}/`);
           if (metadata?.coverImage) {
-            /** @type {any} */ (item).img = [
+            /** @type {any} */ (sitemapItem).img = [
               {
                 url: `${SITE_URL}${metadata.coverImage}`,
                 title: metadata.coverAlt,
               },
             ];
           }
-          return { ...item, lastmod: metadata?.lastmod, priority: 0.7, changefreq: 'never' };
+          return { ...sitemapItem, lastmod: metadata?.lastmod, priority: 0.7, changefreq: 'never' };
         }
 
         // Blog index, changelog, roadmap
         if (url.includes('/blog') || url.includes('/changelog') || url.includes('/roadmap')) {
-          return { ...item, priority: 0.6, changefreq: 'weekly' };
+          return { ...sitemapItem, priority: 0.6, changefreq: 'weekly' };
         }
 
         // Secondary pages (community, request, stack, newsletter)
-        return { ...item, priority: 0.5, changefreq: 'monthly' };
+        return { ...sitemapItem, priority: 0.5, changefreq: 'monthly' };
       },
     }),
   ],

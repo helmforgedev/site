@@ -21,7 +21,7 @@ export async function GET(context: APIContext) {
     description: 'Production-ready Helm charts for Kubernetes. The open-source alternative to Bitnami.',
     site: context.site!,
     items: [...blogItems, ...chartItems],
-    trailingSlash: false,
+    trailingSlash: true,
     xmlns: {
       atom: 'http://www.w3.org/2005/Atom',
       dc: 'http://purl.org/dc/elements/1.1/',
