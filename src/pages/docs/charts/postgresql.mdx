@@ -330,6 +330,7 @@ such as `replication.wal.maxSlotWalKeepSize` so a stalled replica cannot retain 
 - The chart keeps internal health checks, metrics, and built-in backup on PostgreSQL's standard `postgres` database.
 - If a reused PVC contains a valid data directory but is missing the default `postgres` database, the primary pod repairs that database during startup before normal readiness checks rely on it.
 - `auth.database` remains the application bootstrap database. It is created only on first initialization of a fresh data directory.
+- Set `initdb.runDefaultScript=false` when custom or externally managed init scripts should run without the chart-generated application and replication user bootstrap script.
 - `docker-entrypoint-initdb.d` scripts only run when the data directory is empty. Existing PVCs keep their current roles and databases during upgrades.
 
 ## Dual-stack Networking
@@ -411,10 +412,11 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### Initialization
 
-| Parameter                  | Type   | Default | Description                                                   |
-| -------------------------- | ------ | ------- | ------------------------------------------------------------- |
-| `initdb.scripts`           | object | `{}`    | Additional scripts written into `docker-entrypoint-initdb.d`. |
-| `initdb.existingConfigMap` | string | `""`    | Existing ConfigMap mounted into `docker-entrypoint-initdb.d`. |
+| Parameter                  | Type    | Default | Description                                                                  |
+| -------------------------- | ------- | ------- | ---------------------------------------------------------------------------- |
+| `initdb.runDefaultScript`  | boolean | `true`  | Run the chart-generated app database, app user, and replication user script. |
+| `initdb.scripts`           | object  | `{}`    | Additional scripts written into `docker-entrypoint-initdb.d`.                |
+| `initdb.existingConfigMap` | string  | `""`    | Existing ConfigMap mounted into `docker-entrypoint-initdb.d`.                |
 
 ### Standalone
 
