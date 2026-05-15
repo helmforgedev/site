@@ -22,6 +22,9 @@ data source credentials) in a PostgreSQL database.
 - **JVM tuning** — configurable Java memory options and timezone
 - **S3 backup** — scheduled `pg_dump` of the Metabase metadata database to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Gateway API support** — optional HTTPRoute for Kubernetes-native traffic routing
+- **Dual-stack ready Service** — optional `ipFamilyPolicy` and `ipFamilies`
+- **External Secrets support** — ESO integration for the Metabase encryption key
 
 ## Installation
 
@@ -198,7 +201,7 @@ ingress:
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/metabase/metabase` | Metabase container image.            |
-| `image.tag`        | string | `"v0.54.5"`                   | Image tag.                           |
+| `image.tag`        | string | `"v0.60.4"`                   | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
@@ -211,6 +214,7 @@ ingress:
 | `metabase.existingSecret`      | string  | `""`                    | Existing secret containing the encryption key.                        |
 | `metabase.existingSecretKey`   | string  | `encryption-secret-key` | Key inside the existing secret holding the encryption value.          |
 | `metabase.siteUrl`             | string  | `""`                    | Public URL of the Metabase instance. Used for email links and embeds. |
+| `metabase.aiFeaturesEnabled`   | boolean | `false`                 | Enable Metabase AI features after configuring a supported provider.   |
 | `metabase.javaTimezone`        | string  | `UTC`                   | JVM timezone (`TZ` environment variable).                             |
 | `metabase.javaOpts`            | string  | `""`                    | JVM options for memory tuning (e.g. `-Xms512m -Xmx1g`).               |
 | `metabase.extraEnv`            | array   | `[]`                    | Extra environment variables injected into the Metabase container.     |
@@ -251,11 +255,23 @@ ingress:
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                | Type        | Default     | Description                          |
+| ------------------------ | ----------- | ----------- | ------------------------------------ |
+| `service.type`           | string      | `ClusterIP` | Kubernetes service type.             |
+| `service.port`           | integer     | `80`        | Service port exposed to the cluster. |
+| `service.annotations`    | object      | `{}`        | Annotations for the Service.         |
+| `service.ipFamilyPolicy` | string/null | `null`      | Service IP family policy.            |
+| `service.ipFamilies`     | array       | `[]`        | Ordered Service IP families.         |
+
+#### Dual-Stack Service
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
 
 ### Ingress
 
@@ -266,6 +282,31 @@ ingress:
 | `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
 | `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Gateway API
+
+Set `gatewayAPI.enabled` to render a Kubernetes Gateway API `HTTPRoute` for Metabase. The chart expects an existing
+Gateway and does not create shared Gateway infrastructure.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  gatewayName: shared-gateway
+  gatewayNamespace: gateway-system
+  hostnames:
+    - metabase.example.com
+```
+
+| Parameter                     | Type    | Default      | Description                                   |
+| ----------------------------- | ------- | ------------ | --------------------------------------------- |
+| `gatewayAPI.enabled`          | boolean | `false`      | Render a Gateway API HTTPRoute.               |
+| `gatewayAPI.gatewayName`      | string  | `""`         | Existing Gateway name, required when enabled. |
+| `gatewayAPI.gatewayNamespace` | string  | `""`         | Namespace of the parent Gateway.              |
+| `gatewayAPI.hostnames`        | array   | `[]`         | HTTPRoute hostnames.                          |
+| `gatewayAPI.path`             | string  | `/`          | HTTPRoute path match value.                   |
+| `gatewayAPI.pathType`         | string  | `PathPrefix` | HTTPRoute path match type.                    |
+
+The older `gateway` block remains supported as a compatibility alias.
 
 ### Probes
 
@@ -324,6 +365,38 @@ S3-compatible storage. This protects dashboards, saved questions, users, and dat
 | `backup.database.existingSecret`            | string  | `""`                                   | Existing secret containing backup database credentials.            |
 | `backup.database.existingSecretPasswordKey` | string  | `password`                             | Key in the existing secret for the backup database password.       |
 | `backup.database.postgresDumpArgs`          | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
+
+### External Secrets
+
+Set `externalSecrets.enabled` when External Secrets Operator manages the Metabase application secret. The chart requires
+`metabase.existingSecret` so ESO is the only writer for the encryption key.
+
+```yaml
+metabase:
+  existingSecret: metabase-app-secret
+  existingSecretKey: encryption-secret-key
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: encryption-secret-key
+      remoteRef:
+        key: metabase/credentials
+        property: encryption-secret-key
+```
+
+| Parameter                               | Type    | Default                  | Description                             |
+| --------------------------------------- | ------- | ------------------------ | --------------------------------------- |
+| `externalSecrets.enabled`               | boolean | `false`                  | Render an ExternalSecret resource.      |
+| `externalSecrets.apiVersion`            | string  | `external-secrets.io/v1` | ExternalSecret API version.             |
+| `externalSecrets.refreshInterval`       | string  | `"0"`                    | ExternalSecret refresh interval.        |
+| `externalSecrets.secretStoreRef.name`   | string  | `""`                     | SecretStore or ClusterSecretStore name. |
+| `externalSecrets.secretStoreRef.kind`   | string  | `SecretStore`            | Secret store kind.                      |
+| `externalSecrets.target.creationPolicy` | string  | `Owner`                  | Target Secret creation policy.          |
+| `externalSecrets.data`                  | array   | `[]`                     | Remote key mappings for the app Secret. |
 
 ### Resources and Security
 
