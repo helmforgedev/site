@@ -42,8 +42,12 @@ for BI dashboards and real-time data exploration.
 - **6 independent Deployments** — each component scales and tunes independently
 - **Deep storage** — local (dev) or S3/MinIO (production)
 - **Two persistent volumes** — historical (segment cache) and middlemanager (task storage)
-- **ZooKeeper** — bundled subchart or external connection string
+- **ZooKeeper** — bundled native StatefulSet or external connection string
 - **PostgreSQL metadata** — bundled subchart or external PostgreSQL/MySQL
+- **Gateway API** — optional native Kubernetes `HTTPRoute` for the router/web console
+- **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` for IPv4/IPv6 clusters
+- **External Secrets Operator** — optional `ExternalSecret` resources for metadata and S3 credentials
+- **NetworkPolicy** — optional ingress and egress controls for compatible CNIs
 
 ## Installation
 
@@ -256,7 +260,14 @@ zookeeper:
 | Parameter          | Type   | Default                  | Description  |
 | ------------------ | ------ | ------------------------ | ------------ |
 | `image.repository` | string | `docker.io/apache/druid` | Druid image. |
-| `image.tag`        | string | `"36.0.0"`               | Image tag.   |
+| `image.tag`        | string | `"37.0.0"`               | Image tag.   |
+
+<Callout type="warning" title="Review Apache Druid 37.0.0 upgrade notes before upgrading persistent clusters">
+  Apache Druid 37.0.0 removes Hadoop-based ingestion, moves S3 integrations to AWS SDK v2, and enables Broker segment
+  metadata cache by default. Review the upstream [release
+  notes](https://druid.apache.org/docs/latest/release-info/release-notes/) and [upgrade
+  notes](https://druid.apache.org/docs/latest/release-info/upgrade-notes/) before upgrading production deployments.
+</Callout>
 
 ### Components
 
@@ -302,24 +313,145 @@ Historical and middlemanager also have:
 | `postgresql.auth.password`         | string  | `""`       | Password. Auto-generated if empty.                  |
 | `zookeeperConfig.mode`             | string  | `subchart` | Mode: `subchart` or `external`.                     |
 | `zookeeperConfig.external.hosts`   | string  | `""`       | External ZooKeeper hosts (`host1:port,host2:port`). |
-| `zookeeper.enabled`                | boolean | `true`     | Deploy the bundled ZooKeeper subchart.              |
+| `zookeeper.enabled`                | boolean | `true`     | Deploy the bundled ZooKeeper StatefulSet.           |
 | `zookeeper.replicaCount`           | integer | `1`        | ZooKeeper replicas (3 for production HA).           |
 | `zookeeper.persistence.size`       | string  | `2Gi`      | ZooKeeper data PVC size.                            |
 
 ### Service and Ingress
 
-| Parameter                     | Type    | Default     | Description                                         |
-| ----------------------------- | ------- | ----------- | --------------------------------------------------- |
-| `service.type`                | string  | `ClusterIP` | Service type (routes to router/web console).        |
-| `service.port`                | integer | `80`        | Service port.                                       |
-| `ingress.enabled`             | boolean | `false`     | Enable Ingress (routes to router on port 8888).     |
-| `ingress.ingressClassName`    | string  | `traefik`   | Ingress class name.                                 |
-| `druid.extraCommonProperties` | string  | `""`        | Extra runtime properties applied to all components. |
-| `druid.extraEnv`              | array   | `[]`        | Extra environment variables for all components.     |
-| `extraManifests`              | array   | `[]`        | Extra Kubernetes manifests.                         |
+| Parameter                      | Type    | Default     | Description                                         |
+| ------------------------------ | ------- | ----------- | --------------------------------------------------- |
+| `service.type`                 | string  | `ClusterIP` | Service type (routes to router/web console).        |
+| `service.port`                 | integer | `80`        | Service port.                                       |
+| `service.ipFamilyPolicy`       | string  | omitted     | Optional Service IP family policy.                  |
+| `service.ipFamilies`           | array   | omitted     | Optional ordered Service IP families.               |
+| `ingress.enabled`              | boolean | `false`     | Enable Ingress (routes to router on port 8888).     |
+| `ingress.ingressClassName`     | string  | `traefik`   | Ingress class name.                                 |
+| `druid.extraCommonProperties`  | string  | `""`        | Extra runtime properties applied to all components. |
+| `druid.extraEnv`               | array   | `[]`        | Extra environment variables for all components.     |
+| `podSecurityContext.fsGroup`   | integer | `1000`      | Shared filesystem group for Druid volumes.          |
+| `securityContext.runAsNonRoot` | boolean | `true`      | Run Druid containers as a non-root user.            |
+| `networkPolicy.enabled`        | boolean | `false`     | Render NetworkPolicy resources.                     |
+| `extraManifests`               | array   | `[]`        | Extra Kubernetes manifests.                         |
+
+Dual-stack fields are omitted by default so Services inherit the cluster defaults. Set them only when your
+cluster has IPv6 or dual-stack networking enabled:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+### Gateway API
+
+The chart can render a native Kubernetes Gateway API `HTTPRoute` for the Druid router. It intentionally does not
+create a `Gateway`; reference the shared Gateway provided by your cluster platform.
+
+| Parameter                | Type    | Default | Description                                     |
+| ------------------------ | ------- | ------- | ----------------------------------------------- |
+| `gatewayAPI.enabled`     | boolean | `false` | Render an `HTTPRoute` for the router Service.   |
+| `gatewayAPI.parentRefs`  | array   | `[]`    | Gateway parent references.                      |
+| `gatewayAPI.hostnames`   | array   | `[]`    | Route hostnames.                                |
+| `gatewayAPI.paths`       | array   | `/`     | HTTP path matches routed to the router Service. |
+| `gatewayAPI.annotations` | object  | `{}`    | Extra annotations on the `HTTPRoute`.           |
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - druid.example.com
+  paths:
+    - type: PathPrefix
+      value: /
+```
+
+### External Secrets
+
+When [External Secrets Operator](https://external-secrets.io/latest/) is installed, the chart can render
+`ExternalSecret` resources for metadata and S3 credentials. Set the chart `existingSecret` values to the same Secret
+names ESO will create so workloads consume externally managed credentials.
+
+| Parameter                             | Type    | Default                  | Description                              |
+| ------------------------------------- | ------- | ------------------------ | ---------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`                  | Enable ExternalSecret rendering.         |
+| `externalSecrets.apiVersion`          | string  | `external-secrets.io/v1` | ExternalSecret API version.              |
+| `externalSecrets.secretStoreRef.name` | string  | `""`                     | SecretStore or ClusterSecretStore name.  |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore`            | Store kind.                              |
+| `externalSecrets.metadata.enabled`    | boolean | `false`                  | Render metadata database ExternalSecret. |
+| `externalSecrets.deepStorage.enabled` | boolean | `false`                  | Render S3 deep storage ExternalSecret.   |
+
+```yaml
+metadata:
+  mode: external
+  external:
+    existingSecret: druid-metadata
+
+deepStorage:
+  type: s3
+  s3:
+    bucket: druid-segments
+    existingSecret: druid-s3
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  metadata:
+    enabled: true
+    data:
+      - secretKey: password
+        remoteRef:
+          key: druid/metadata
+          property: password
+  deepStorage:
+    enabled: true
+    data:
+      - secretKey: access-key
+        remoteRef:
+          key: druid/s3
+          property: access-key
+      - secretKey: secret-key
+        remoteRef:
+          key: druid/s3
+          property: secret-key
+```
+
+### Security Context
+
+Druid workload containers run as UID/GID `1000` by default with privilege escalation disabled, all Linux capabilities
+dropped, and the runtime default seccomp profile. The `prepare-dirs` init container runs as root only to create and
+chown writable Druid directories.
+
+### NetworkPolicy
+
+NetworkPolicy is opt-in because enforcement depends on the cluster CNI. When enabled, ingress defaults to
+same-namespace traffic on Druid component ports. Egress rules are optional and can allow DNS, same-namespace
+dependencies, HTTP, HTTPS, and extra peers:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: true
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespace: true
+    allowHTTPS: true
+```
 
 ## More Information
 
 - [Apache Druid Official Documentation](https://druid.apache.org/docs/latest/)
 - [Apache Druid GitHub Repository](https://github.com/apache/druid)
+- [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/)
+- [Kubernetes IPv4/IPv6 dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)
 - [HelmForge Druid Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/druid)
