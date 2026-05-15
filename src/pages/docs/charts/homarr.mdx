@@ -221,7 +221,7 @@ ingress:
 | Parameter          | Type   | Default                      | Description        |
 | ------------------ | ------ | ---------------------------- | ------------------ |
 | `image.repository` | string | `ghcr.io/homarr-labs/homarr` | Homarr image.      |
-| `image.tag`        | string | `"v1.57.1"`                  | Image tag.         |
+| `image.tag`        | string | `"v1.61.0"`                  | Image tag.         |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy. |
 
 ### Homarr Configuration
@@ -300,11 +300,53 @@ ingress:
 | -------------------------- | ------- | ----------- | ---------------------------- |
 | `service.type`             | string  | `ClusterIP` | Service type.                |
 | `service.port`             | integer | `7575`      | Service port (non-standard). |
+| `service.ipFamilyPolicy`   | string  | `null`      | Service IP family policy.    |
+| `service.ipFamilies`       | array   | `[]`        | Ordered Service IP families. |
 | `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource.  |
 | `ingress.ingressClassName` | string  | `""`        | Ingress class name.          |
 | `ingress.annotations`      | object  | `{}`        | Ingress annotations.         |
 | `ingress.hosts`            | array   | `[]`        | Host and path rules.         |
 | `ingress.tls`              | array   | `[]`        | TLS configuration.           |
+
+### Gateway API
+
+Use `gatewayAPI.enabled` to render a native Kubernetes
+[Gateway API](https://gateway-api.sigs.k8s.io/) `HTTPRoute` for Homarr. Ingress stays disabled by default and can coexist
+with the route when a migration needs both objects.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - dash.example.com
+  paths:
+    - type: PathPrefix
+      value: /
+```
+
+| Parameter                | Type    | Default | Description                |
+| ------------------------ | ------- | ------- | -------------------------- |
+| `gatewayAPI.enabled`     | boolean | `false` | Render an HTTPRoute.       |
+| `gatewayAPI.parentRefs`  | array   | `[]`    | Parent Gateway references. |
+| `gatewayAPI.hostnames`   | array   | `[]`    | HTTPRoute hostnames.       |
+| `gatewayAPI.paths`       | array   | `/`     | HTTPRoute path matches.    |
+| `gatewayAPI.annotations` | object  | `{}`    | HTTPRoute annotations.     |
+
+### Dual-Stack Networking
+
+Homarr's Service supports Kubernetes
+[dual-stack networking](https://kubernetes.io/docs/concepts/services-networking/dual-stack/) through optional
+`service.ipFamilyPolicy` and `service.ipFamilies` values. Defaults omit both fields so existing installs inherit cluster
+defaults.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
 
 ### Backup
 
@@ -322,6 +364,39 @@ MySQL uses `mysqldump`.
 | `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.       |
 | `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra arguments for `mysqldump`.     |
 | `extraManifests`                   | array   | `[]`                       | Extra Kubernetes manifests.          |
+
+### External Secrets
+
+Homarr can render an [External Secrets Operator](https://external-secrets.io/latest/) `ExternalSecret` that projects
+`SECRET_ENCRYPTION_KEY` and `AUTH_SECRET` into the Kubernetes Secret configured by `encryption.existingSecret`.
+
+```yaml
+encryption:
+  existingSecret: homarr-encryption
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: secret-encryption-key
+      remoteRef:
+        key: homarr/credentials
+        property: secret-encryption-key
+    - secretKey: auth-secret
+      remoteRef:
+        key: homarr/credentials
+        property: auth-secret
+```
+
+| Parameter                             | Type    | Default       | Description                          |
+| ------------------------------------- | ------- | ------------- | ------------------------------------ |
+| `externalSecrets.enabled`             | boolean | `false`       | Render an ExternalSecret.            |
+| `externalSecrets.secretStoreRef.name` | string  | `""`          | SecretStore or ClusterSecretStore.   |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore` | Secret store kind.                   |
+| `externalSecrets.refreshInterval`     | string  | `"0"`         | ExternalSecret refresh interval.     |
+| `externalSecrets.data`                | array   | `[]`          | Remote key mappings for Secret data. |
 
 ## More Information
 
