@@ -29,7 +29,7 @@ cross-play, mod and plugin management, Aikar-optimized JVM flags, and RCON-backe
 - **Mod/plugin management** — Modrinth, CurseForge, Spiget, and direct URL downloads
 - **Resource packs** — configure server-side resource packs with SHA-1 verification
 - **Prometheus metrics** — mc-monitor sidecar with optional ServiceMonitor
-- **Java version pinning** — `image.tag: java25` for Minecraft 1.21.5+, `java21` for older
+- **Pinned upstream image** — defaults to `2026.5.2`, with Java-specific tags available when needed
 
 ## Installation
 
@@ -47,14 +47,15 @@ helm install minecraft oci://ghcr.io/helmforgedev/helm/minecraft --set server.eu
 
 ## Java Version Compatibility
 
-| Minecraft Version | Required Java | `image.tag`        |
-| ----------------- | ------------- | ------------------ |
-| 1.21.5+           | Java 25       | `java25` (default) |
-| 1.20.x – 1.21.4   | Java 21       | `java21`           |
-| 1.17.x – 1.19.x   | Java 17       | `java17`           |
+| Minecraft Version | Required Java | Example `image.tag` |
+| ----------------- | ------------- | ------------------- |
+| 1.21.5+           | Java 25       | `2026.5.2`          |
+| 1.20.x - 1.21.4   | Java 21       | `2026.5.2-java21`   |
+| 1.17.x - 1.19.x   | Java 17       | `2026.5.2-java17`   |
 
-The chart defaults to `java25`, which is required for Minecraft 1.21.5+. Pin `image.tag` to the Java
-version that matches your Minecraft release.
+The chart defaults to the dated upstream image tag `2026.5.2`. Pin `image.tag`
+to a Java-specific variant, such as `2026.5.2-java21`, when running older
+Minecraft versions or modpacks that require a specific Java runtime.
 
 ## Server Type Reference
 
@@ -295,7 +296,7 @@ service:
 | Parameter          | Type   | Default                           | Description                                                         |
 | ------------------ | ------ | --------------------------------- | ------------------------------------------------------------------- |
 | `image.repository` | string | `docker.io/itzg/minecraft-server` | Minecraft server container image.                                   |
-| `image.tag`        | string | `"java25"`                        | Java base image tag. Use `java21` for Minecraft 1.20.x and earlier. |
+| `image.tag`        | string | `"2026.5.2"`                      | Image tag. Use Java-specific variants for older Minecraft versions. |
 | `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                                                  |
 | `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries.                                |
 
@@ -426,29 +427,29 @@ service:
 The backup CronJob uses RCON to run `save-all` and `save-off` before archiving, then `save-on` after
 upload — ensuring the world is in a consistent state before the backup is taken.
 
-| Parameter                              | Type    | Default                        | Description                                                  |
-| -------------------------------------- | ------- | ------------------------------ | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                        | Enable scheduled S3 backup CronJob.                          |
-| `backup.schedule`                      | string  | `"0 4 * * *"`                  | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                        | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                       | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                            | Successful job records to keep.                              |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                            | Failed job records to keep.                                  |
-| `backup.backoffLimit`                  | integer | `1`                            | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `minecraft`                    | Prefix for backup archive filenames.                         |
-| `backup.excludes`                      | string  | `"*.jar cache logs"`           | Space-separated patterns excluded from the archive.          |
-| `backup.images.worker`                 | string  | `itzg/minecraft-server:java25` | Image for RCON and tar operations.                           |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0` | Image for S3 upload.                                         |
-| `backup.resources`                     | object  | `{}`                           | Resources for backup containers.                             |
-| `backup.s3.endpoint`                   | string  | `""`                           | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                           | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `minecraft`                    | Key prefix within the bucket.                                |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                         | Create the bucket if it does not exist.                      |
-| `backup.s3.existingSecret`             | string  | `""`                           | Existing secret with S3 access and secret keys.              |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                   | Key for S3 access key.                                       |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                   | Key for S3 secret key.                                       |
-| `backup.s3.accessKey`                  | string  | `""`                           | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                           | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                              | Type    | Default                                    | Description                                                  |
+| -------------------------------------- | ------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                                    | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                      | string  | `"0 4 * * *"`                              | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                                    | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                                   | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                        | Successful job records to keep.                              |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                        | Failed job records to keep.                                  |
+| `backup.backoffLimit`                  | integer | `1`                                        | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `minecraft`                                | Prefix for backup archive filenames.                         |
+| `backup.excludes`                      | string  | `"*.jar cache logs"`                       | Space-separated patterns excluded from the archive.          |
+| `backup.images.worker`                 | string  | `docker.io/itzg/minecraft-server:2026.5.2` | Image for RCON and tar operations.                           |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`             | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                                       | Resources for backup containers.                             |
+| `backup.s3.endpoint`                   | string  | `""`                                       | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                                       | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `minecraft`                                | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                     | Create the bucket if it does not exist.                      |
+| `backup.s3.existingSecret`             | string  | `""`                                       | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                               | Key for S3 access key.                                       |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                               | Key for S3 secret key.                                       |
+| `backup.s3.accessKey`                  | string  | `""`                                       | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                                       | Inline S3 secret key (ignored when `existingSecret` is set). |
 
 ### Metrics (mc-monitor)
 
@@ -503,6 +504,13 @@ upload — ensuring the world is in a consistent state before the backup is take
 | `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Upgrade Notes
+
+`docker.io/itzg/minecraft-server:2026.5.2` is an upstream image update from
+`2026.4.2`. Review the upstream release notes before upgrading production
+servers, take a world backup, and verify plugins, mods, datapacks, and pinned
+`server.version` values in a staging environment before reusing existing PVCs.
 
 ## More Information
 
