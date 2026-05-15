@@ -21,6 +21,8 @@ location enrichment — lives in a local DuckDB file on a persistent volume.
 - **GeoIP enrichment** — automatic IP-to-location lookup stored alongside DuckDB data
 - **Cookie-free tracking** — JavaScript snippet embeddable on any site
 - **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Gateway API support** — optional HTTPRoute for native Kubernetes routing
+- **Dual-stack ready Service** — optional `ipFamilyPolicy` and `ipFamilies`
 - **Non-root by default** — `runAsNonRoot: true` and `fsGroup: 1000` preconfigured
 
 ## Installation
@@ -169,7 +171,7 @@ persistence:
 | Parameter          | Type   | Default                         | Description                          |
 | ------------------ | ------ | ------------------------------- | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/explodingcamera/liwan` | Liwan container image.               |
-| `image.tag`        | string | `"1.4.0"`                       | Image tag.                           |
+| `image.tag`        | string | `"1.5.0"`                       | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
@@ -202,11 +204,47 @@ GeoIP data is downloaded automatically on first startup and adds approximately 1
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                | Type        | Default     | Description                          |
+| ------------------------ | ----------- | ----------- | ------------------------------------ |
+| `service.type`           | string      | `ClusterIP` | Kubernetes service type.             |
+| `service.port`           | integer     | `80`        | Service port exposed to the cluster. |
+| `service.annotations`    | object      | `{}`        | Annotations for the Service.         |
+| `service.ipFamilyPolicy` | string/null | `null`      | Service IP family policy.            |
+| `service.ipFamilies`     | array       | `[]`        | Ordered Service IP families.         |
+
+#### Dual-Stack Service
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+### Gateway API
+
+Use `gatewayAPI.enabled` to render a native Kubernetes `HTTPRoute` for Liwan. This requires Gateway API CRDs and a
+compatible Gateway controller in the cluster.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - analytics.example.com
+```
+
+| Parameter                | Type   | Default                              | Description                |
+| ------------------------ | ------ | ------------------------------------ | -------------------------- |
+| `gatewayAPI.enabled`     | bool   | `false`                              | Render an HTTPRoute.       |
+| `gatewayAPI.parentRefs`  | array  | `[]`                                 | Parent Gateway references. |
+| `gatewayAPI.hostnames`   | array  | `[]`                                 | HTTPRoute hostnames.       |
+| `gatewayAPI.paths`       | array  | `[{ type: PathPrefix, value: "/" }]` | HTTPRoute path matches.    |
+| `gatewayAPI.annotations` | object | `{}`                                 | HTTPRoute annotations.     |
 
 ### Ingress
 
