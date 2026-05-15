@@ -1173,12 +1173,14 @@ clientTrafficPolicy:
 
 ### Global Values
 
-| Parameter          | Description                               | Default  |
-| ------------------ | ----------------------------------------- | -------- |
-| `profile`          | Profile preset (dev/production-ha/custom) | `custom` |
-| `nameOverride`     | Override chart name                       | `""`     |
-| `fullnameOverride` | Override full name                        | `""`     |
-| `imagePullSecrets` | Image pull secrets                        | `[]`     |
+| Parameter                | Description                               | Default  |
+| ------------------------ | ----------------------------------------- | -------- |
+| `profile`                | Profile preset (dev/production-ha/custom) | `custom` |
+| `nameOverride`           | Override chart name                       | `""`     |
+| `fullnameOverride`       | Override full name                        | `""`     |
+| `imagePullSecrets`       | Image pull secrets                        | `[]`     |
+| `service.ipFamilyPolicy` | Controller Service IP policy              | `null`   |
+| `service.ipFamilies`     | Controller Service families               | `[]`     |
 
 ### Controller Configuration
 
@@ -1186,7 +1188,7 @@ clientTrafficPolicy:
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.7.1`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.7.3`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -1200,10 +1202,11 @@ clientTrafficPolicy:
 
 | Parameter                         | Description                                                     | Default                      |
 | --------------------------------- | --------------------------------------------------------------- | ---------------------------- |
+| `proxy.ipFamily`                  | EnvoyProxy IP family                                            | `""`                         |
 | `proxy.kind`                      | EG proxy kind: Deployment or DaemonSet (managed by EG operator) | `Deployment`                 |
 | `proxy.replicaCount`              | Number of proxy replicas (Deployment only)                      | `1`                          |
 | `proxy.image.repository`          | Proxy image                                                     | `docker.io/envoyproxy/envoy` |
-| `proxy.image.tag`                 | Proxy image tag                                                 | `distroless-v1.33.0`         |
+| `proxy.image.tag`                 | Proxy image tag                                                 | `distroless-v1.37.0`         |
 | `proxy.resources.requests.cpu`    | CPU request                                                     | `100m`                       |
 | `proxy.resources.requests.memory` | Memory request                                                  | `128Mi`                      |
 | `proxy.resources.limits.cpu`      | CPU limit                                                       | `1000m`                      |
@@ -1231,7 +1234,7 @@ clientTrafficPolicy:
 
 | Parameter           | Description       | Default  |
 | ------------------- | ----------------- | -------- |
-| `certgen.image.tag` | Certgen image tag | `v1.7.1` |
+| `certgen.image.tag` | Certgen image tag | `v1.7.3` |
 
 ### SecurityPolicy
 
@@ -1319,6 +1322,17 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 | --------------------- | ------------------- | --------------- |
 | `gatewayClass.name`   | GatewayClass name   | `envoy-gateway` |
 | `gatewayClass.create` | Create GatewayClass | `true`          |
+
+---
+
+## Upgrade Notes
+
+`docker.io/envoyproxy/gateway:v1.7.3` is the upstream patch update from
+`v1.7.2`. The upstream image tag is published with the `v` prefix, so the chart
+keeps `v1.7.3` even though the automated update issue referenced `1.7.3`.
+Review the upstream Envoy Gateway `v1.7.3` release notes, verify Gateway API and
+Envoy Gateway CRDs in staging, and test existing Gateway, HTTPRoute, EnvoyProxy,
+and policy resources before upgrading production controllers.
 
 ---
 
@@ -2116,7 +2130,7 @@ The following issues were discovered and fixed during k3d functional validation:
 
 ### Version 1.0.0
 
-Complete architectural redesign for EG v1.7.1 with operator-managed proxy provisioning and new policy CRDs.
+Complete architectural redesign for EG v1.7.3 with operator-managed proxy provisioning and new policy CRDs.
 
 **Breaking Changes**:
 
@@ -2136,8 +2150,8 @@ Complete architectural redesign for EG v1.7.1 with operator-managed proxy provis
 
 **Versions Updated**:
 
-- EG: v1.7.1 (was v1.0.0)
-- Envoy: distroless-v1.33.0 (was v1.29.0)
+- EG: v1.7.3 (was v1.0.0)
+- Envoy: distroless-v1.37.0 (was v1.29.0)
 - Redis: helmforge/redis subchart v1.6.9 (replaces inline StatefulSet)
 - Gateway API CRDs: v1.2.1 (was v1.0.0)
 - PrometheusRule: 6 alerts (was 7)
@@ -2237,7 +2251,7 @@ First stable release with complete P1 (MVP) and P2 (Production) features.
 | Field                  | Value      |
 | ---------------------- | ---------- |
 | **Chart Version**      | 1.3.0      |
-| **App Version**        | v1.7.1     |
+| **App Version**        | v1.7.3     |
 | **Kubernetes Version** | >= 1.24    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |
