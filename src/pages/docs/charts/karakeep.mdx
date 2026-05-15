@@ -249,16 +249,20 @@ ingress:
 | Parameter          | Type   | Default                         | Description                          |
 | ------------------ | ------ | ------------------------------- | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/karakeep-app/karakeep` | Karakeep container image.            |
-| `image.tag`        | string | `"0.31.0"`                      | Image tag.                           |
+| `image.tag`        | string | `"0.32.0"`                      | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
 ### Karakeep Configuration
 
-| Parameter              | Type   | Default | Description                                                                      |
-| ---------------------- | ------ | ------- | -------------------------------------------------------------------------------- |
-| `karakeep.nextAuthUrl` | string | `""`    | Public URL of the instance. Used as `NEXTAUTH_URL` for authentication callbacks. |
-| `karakeep.extraEnv`    | array  | `[]`    | Extra environment variables for AI integration and advanced configuration.       |
+| Parameter                               | Type   | Default            | Description                                                                      |
+| --------------------------------------- | ------ | ------------------ | -------------------------------------------------------------------------------- |
+| `karakeep.nextAuthUrl`                  | string | `""`               | Public URL of the instance. Used as `NEXTAUTH_URL` for authentication callbacks. |
+| `karakeep.browserConnectOnDemand`       | bool   | `true`             | Connect to Chromium only when crawling needs it.                                 |
+| `karakeep.existingSecret`               | string | `""`               | Existing secret with `nextauth-secret` and `meili-master-key`.                   |
+| `karakeep.existingSecretNextAuthKey`    | string | `nextauth-secret`  | Key for `NEXTAUTH_SECRET`.                                                       |
+| `karakeep.existingSecretMeiliMasterKey` | string | `meili-master-key` | Key for `MEILI_MASTER_KEY`.                                                      |
+| `karakeep.extraEnv`                     | array  | `[]`               | Extra environment variables for AI integration and advanced configuration.       |
 
 <Callout type="warning" title="nextAuthUrl must match your exact public URL">
   Karakeep uses Next.js authentication (NextAuth). The `NEXTAUTH_URL` must exactly match the URL your users use to
@@ -288,6 +292,7 @@ ingress:
 | Parameter                   | Type    | Default                        | Description                                                |
 | --------------------------- | ------- | ------------------------------ | ---------------------------------------------------------- |
 | `chromium.enabled`          | boolean | `true`                         | Enable the Chromium sidecar for screenshots and archiving. |
+| `chromium.port`             | integer | `9222`                         | Internal Chromium sidecar HTTP port.                       |
 | `chromium.image.repository` | string  | `ghcr.io/browserless/chromium` | Chromium container image.                                  |
 | `chromium.image.tag`        | string  | `"v2.46.0"`                    | Chromium image tag.                                        |
 | `chromium.image.pullPolicy` | string  | `IfNotPresent`                 | Chromium image pull policy.                                |
@@ -308,11 +313,13 @@ all stored within this volume.
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                | Type    | Default     | Description                          |
+| ------------------------ | ------- | ----------- | ------------------------------------ |
+| `service.type`           | string  | `ClusterIP` | Kubernetes service type.             |
+| `service.port`           | integer | `80`        | Service port exposed to the cluster. |
+| `service.annotations`    | object  | `{}`        | Annotations for the Service.         |
+| `service.ipFamilyPolicy` | string  | `null`      | Service IP family policy.            |
+| `service.ipFamilies`     | array   | `[]`        | Ordered Service IP families.         |
 
 ### Ingress
 
@@ -323,6 +330,46 @@ all stored within this volume.
 | `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
 | `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Gateway API
+
+Use `gatewayAPI.enabled` to render a native Kubernetes
+[Gateway API](https://gateway-api.sigs.k8s.io/) `HTTPRoute` for Karakeep. Ingress stays disabled by default and can
+coexist with the route during migrations.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - karakeep.example.com
+  paths:
+    - type: PathPrefix
+      value: /
+```
+
+| Parameter                | Type    | Default | Description                |
+| ------------------------ | ------- | ------- | -------------------------- |
+| `gatewayAPI.enabled`     | boolean | `false` | Render an HTTPRoute.       |
+| `gatewayAPI.parentRefs`  | array   | `[]`    | Parent Gateway references. |
+| `gatewayAPI.hostnames`   | array   | `[]`    | HTTPRoute hostnames.       |
+| `gatewayAPI.paths`       | array   | `/`     | HTTPRoute path matches.    |
+| `gatewayAPI.annotations` | object  | `{}`    | HTTPRoute annotations.     |
+
+### Dual-Stack Networking
+
+Karakeep's Service supports Kubernetes
+[dual-stack networking](https://kubernetes.io/docs/concepts/services-networking/dual-stack/) through optional
+`service.ipFamilyPolicy` and `service.ipFamilies` values. Defaults omit both fields so existing installs inherit cluster
+defaults.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
 
 ### Probes
 
@@ -383,6 +430,39 @@ for the sidecars.
 | `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+### External Secrets
+
+Karakeep can render an [External Secrets Operator](https://external-secrets.io/latest/) `ExternalSecret` that projects
+`NEXTAUTH_SECRET` and `MEILI_MASTER_KEY` into the Kubernetes Secret configured by `karakeep.existingSecret`.
+
+```yaml
+karakeep:
+  existingSecret: karakeep-app-secret
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: nextauth-secret
+      remoteRef:
+        key: karakeep/credentials
+        property: nextauth-secret
+    - secretKey: meili-master-key
+      remoteRef:
+        key: karakeep/credentials
+        property: meili-master-key
+```
+
+| Parameter                             | Type    | Default       | Description                          |
+| ------------------------------------- | ------- | ------------- | ------------------------------------ |
+| `externalSecrets.enabled`             | boolean | `false`       | Render an ExternalSecret.            |
+| `externalSecrets.secretStoreRef.name` | string  | `""`          | SecretStore or ClusterSecretStore.   |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore` | Secret store kind.                   |
+| `externalSecrets.refreshInterval`     | string  | `"0"`         | ExternalSecret refresh interval.     |
+| `externalSecrets.data`                | array   | `[]`          | Remote key mappings for Secret data. |
 
 ## Common Issues
 
