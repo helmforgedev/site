@@ -220,7 +220,7 @@ config:
 | Parameter          | Type   | Default                   | Description    |
 | ------------------ | ------ | ------------------------- | -------------- |
 | `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
-| `image.tag`        | string | `"8.2.6"`                 | Image tag.     |
+| `image.tag`        | string | `"8.3.1"`                 | Image tag.     |
 
 ### Authentication
 
@@ -297,6 +297,13 @@ Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
 | `extraManifests`                | array   | `[]`          | Extra Kubernetes manifests.             |
 
 ## Upgrade Notes
+
+MongoDB `8.3.1` is an upstream minor release update from `8.2.7`. Review the
+MongoDB 8.3 release notes before upgrading production clusters, take a backup,
+and verify existing PVC data files are compatible with the target `mongod`
+version. Keep replica set keyFiles and root credentials stable across
+`helm upgrade`; rotate them with MongoDB administrative commands instead of
+changing chart values.
 
 <Callout type="warning" title="Switching from standalone to replicaset requires a full dump and restore">
   MongoDB cannot automatically convert a standalone instance to a replica set with data. You must:
