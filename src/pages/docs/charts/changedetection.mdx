@@ -212,7 +212,7 @@ ingress:
 | Parameter          | Type   | Default                               | Description                          |
 | ------------------ | ------ | ------------------------------------- | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/dgtlmoon/changedetection.io` | changedetection.io container image.  |
-| `image.tag`        | string | `"0.54.7"`                            | Image tag.                           |
+| `image.tag`        | string | `"0.55.5"`                            | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
 
@@ -225,6 +225,7 @@ ingress:
 | `changedetection.fetchWorkers`              | integer | `10`    | Number of concurrent fetch workers. Reduce when using the browser sidecar. |
 | `changedetection.minimumSecondsRecheckTime` | string  | `""`    | Minimum interval between rechecks in seconds. Empty means no minimum.      |
 | `changedetection.timezone`                  | string  | `""`    | Container timezone for scheduling and display.                             |
+| `changedetection.locale`                    | string  | `C`     | Locale assigned to `LANG` and `LC_ALL`.                                    |
 | `changedetection.extraEnv`                  | array   | `[]`    | Extra environment variables for advanced configuration.                    |
 
 <Callout type="tip" title="Reduce fetchWorkers when enabling the browser sidecar">
@@ -319,11 +320,14 @@ changedetection.io stores its SQLite database and all page snapshots (HTML conte
 `resources` applies to the main changedetection.io container only. Set `browser.resources` separately for the
 Chromium sidecar when `browser.enabled: true`.
 
-| Parameter            | Type   | Default | Description                                          |
-| -------------------- | ------ | ------- | ---------------------------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory for the changedetection.io container. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.                          |
-| `securityContext`    | object | `{}`    | Container-level security context.                    |
+| Parameter                                  | Type    | Default | Description                                                          |
+| ------------------------------------------ | ------- | ------- | -------------------------------------------------------------------- |
+| `resources.requests.cpu`                   | string  | `100m`  | Default CPU request for the changedetection.io container.            |
+| `resources.requests.memory`                | string  | `256Mi` | Default memory request for the changedetection.io container.         |
+| `resources.limits`                         | object  | unset   | Optional CPU and memory limits for the changedetection.io container. |
+| `podSecurityContext`                       | object  | `{}`    | Pod-level security context.                                          |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false` | Prevent privilege escalation in the main container.                  |
+| `securityContext.capabilities.drop`        | array   | `[ALL]` | Drop Linux capabilities by default.                                  |
 
 ### Service Account
 
