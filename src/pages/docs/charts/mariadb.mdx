@@ -337,6 +337,16 @@ standalone:
 | `metrics.serviceMonitor.enabled`  | boolean | `false`                          | Create a Prometheus Operator ServiceMonitor. |
 | `metrics.serviceMonitor.interval` | string  | `30s`                            | Scrape interval.                             |
 
+When metrics are enabled, the chart writes a locked-down mysqld-exporter client config from the same MariaDB Secret used
+by the database container. This avoids exposing the root password through `DATA_SOURCE_NAME` and keeps TLS client settings
+aligned with the MariaDB pod.
+
+To inspect exporter startup issues:
+
+```bash
+kubectl logs -n mariadb mariadb-0 -c mysqld-exporter
+```
+
 ### NetworkPolicy
 
 | Parameter                                  | Type    | Default | Description                                    |

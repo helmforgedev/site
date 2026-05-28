@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Cloudflare Tunnel Chart
-description: Cloudflare Tunnel Helm chart for Kubernetes with outbound-only access, HA replicas, PodDisruptionBudget, Prometheus metrics, and ServiceMonitor.
+description: Cloudflare Tunnel Helm chart for Kubernetes with outbound-only access, HA replicas, PodDisruptionBudget, Prometheus metrics, ServiceMonitor, External Secrets, quick tunnel mode, and dual-stack Service support.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -30,6 +30,9 @@ connection for high availability.
 - **Prometheus metrics** — `/ready` and `/metrics` endpoint on port 2000, enabled by default
 - **ServiceMonitor** — optional Prometheus Operator integration
 - **Existing Secret support** — bring your own Secret for the tunnel token
+- **External Secrets Operator** — optionally render an `ExternalSecret` for the tunnel token
+- **Quick tunnel mode** — ephemeral tunnel mode for demos and smoke tests
+- **Dual-stack Service fields** — optional `ipFamilyPolicy` and `ipFamilies`
 
 ## Quick Start
 
@@ -67,6 +70,8 @@ helm install cloudflared oci://ghcr.io/helmforgedev/helm/cloudflared -f values.y
   tabs={[
     { id: 'basic', label: 'Basic' },
     { id: 'production', label: 'Production (Secret + Metrics)' },
+    { id: 'external-secrets', label: 'External Secrets' },
+    { id: 'quick-tunnel', label: 'Quick Tunnel' },
     { id: 'single', label: 'Single Replica (Dev)' },
   ]}
 >
@@ -122,6 +127,44 @@ serviceMonitor:
 
 </div>
 
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — External Secrets Operator generates the Kubernetes Secret
+tunnel:
+  existingSecret: cloudflared-tunnel-token
+  existingSecretKey: token
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: token
+      remoteRef:
+        key: cloudflared/tunnel
+        property: token
+```
+
+</div>
+
+<div data-tab-panel="quick-tunnel">
+
+```yaml
+# values.yaml — ephemeral quick tunnel for demos and smoke tests only
+tunnel:
+  quickTunnel:
+    enabled: true
+    helloWorld: true
+
+replicaCount: 1
+pdb:
+  enabled: false
+```
+
+</div>
+
 <div data-tab-panel="single">
 
 ```yaml
@@ -155,17 +198,20 @@ pdb:
 | Parameter          | Type   | Default                            | Description                          |
 | ------------------ | ------ | ---------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/cloudflare/cloudflared` | cloudflared container image.         |
-| `image.tag`        | string | `"2026.3.0"`                       | Image tag.                           |
+| `image.tag`        | string | `"2026.5.2"`                       | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                     | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                               | Pull secrets for private registries. |
 
 ### Tunnel
 
-| Parameter                  | Type   | Default | Description                                                                        |
-| -------------------------- | ------ | ------- | ---------------------------------------------------------------------------------- |
-| `tunnel.token`             | string | `""`    | Tunnel token from the Cloudflare dashboard. Prefer `existingSecret` in production. |
-| `tunnel.existingSecret`    | string | `""`    | Existing Kubernetes Secret containing the tunnel token.                            |
-| `tunnel.existingSecretKey` | string | `token` | Key inside the existing Secret for the token value.                                |
+| Parameter                       | Type    | Default                 | Description                                                                        |
+| ------------------------------- | ------- | ----------------------- | ---------------------------------------------------------------------------------- |
+| `tunnel.token`                  | string  | `""`                    | Tunnel token from the Cloudflare dashboard. Prefer `existingSecret` in production. |
+| `tunnel.existingSecret`         | string  | `""`                    | Existing Kubernetes Secret containing the tunnel token.                            |
+| `tunnel.existingSecretKey`      | string  | `token`                 | Key inside the existing Secret for the token value.                                |
+| `tunnel.quickTunnel.enabled`    | boolean | `false`                 | Run an ephemeral quick tunnel without a managed tunnel token.                      |
+| `tunnel.quickTunnel.helloWorld` | boolean | `true`                  | Use cloudflared's built-in hello-world origin in quick tunnel mode.                |
+| `tunnel.quickTunnel.url`        | string  | `http://localhost:8080` | Origin URL when quick tunnel mode does not use hello-world.                        |
 
 <Callout type="danger" title="Do not store the tunnel token inline in values.yaml for production">
   Setting `tunnel.token` inline exposes the token in `helm get values` and Helm release history. Use
@@ -204,11 +250,22 @@ pdb:
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                  |
-| --------------------- | ------- | ----------- | ---------------------------- |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.     |
-| `service.port`        | integer | `2000`      | Metrics service port.        |
-| `service.annotations` | object  | `{}`        | Annotations for the Service. |
+| Parameter                | Type    | Default     | Description                                       |
+| ------------------------ | ------- | ----------- | ------------------------------------------------- |
+| `service.type`           | string  | `ClusterIP` | Kubernetes service type.                          |
+| `service.port`           | integer | `2000`      | Metrics service port.                             |
+| `service.annotations`    | object  | `{}`        | Annotations for the Service.                      |
+| `service.ipFamilyPolicy` | string  | `""`        | Optional Service IP family policy for dual-stack. |
+| `service.ipFamilies`     | array   | `[]`        | Optional ordered Service IP families.             |
+
+### External Secrets
+
+| Parameter                             | Type    | Default       | Description                                             |
+| ------------------------------------- | ------- | ------------- | ------------------------------------------------------- |
+| `externalSecrets.enabled`             | boolean | `false`       | Render an External Secrets Operator `ExternalSecret`.   |
+| `externalSecrets.secretStoreRef.name` | string  | `""`          | SecretStore or ClusterSecretStore name.                 |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore` | Secret store kind.                                      |
+| `externalSecrets.data`                | array   | `[]`          | Data mappings used to populate the tunnel token Secret. |
 
 ### Metrics
 
@@ -224,7 +281,7 @@ pdb:
 | Parameter                              | Type    | Default | Description                         |
 | -------------------------------------- | ------- | ------- | ----------------------------------- |
 | `probes.startup.enabled`               | boolean | `true`  | Enable startup probe on `/ready`.   |
-| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.        |
+| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.        |
 | `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.               |
 | `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.              |
 | `probes.startup.failureThreshold`      | integer | `12`    | Startup probe failure threshold.    |
@@ -241,11 +298,14 @@ pdb:
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                   | Type   | Default                     | Description                       |
+| --------------------------- | ------ | --------------------------- | --------------------------------- |
+| `resources.requests.cpu`    | string | `50m`                       | Default CPU request.              |
+| `resources.requests.memory` | string | `64Mi`                      | Default memory request.           |
+| `resources.limits.cpu`      | string | `250m`                      | Default CPU limit.                |
+| `resources.limits.memory`   | string | `128Mi`                     | Default memory limit.             |
+| `podSecurityContext`        | object | non-root seccomp defaults   | Pod-level security context.       |
+| `securityContext`           | object | non-root read-only defaults | Container-level security context. |
 
 ### Service Account
 
