@@ -23,9 +23,13 @@ Helm chart for deploying [FastMCP Server](https://github.com/helmforgedev/fastmc
 - **Built-in Web UI** — dashboard at `/ui` with tools/resources/prompts explorer (Alpine.js + Tailwind CDN)
 - **Prometheus metrics** — tool call counts, durations, errors, source sync status at `/metrics`
 - **Structured JSON logging** — `LOG_FORMAT=json` for Loki, ELK, CloudWatch, Datadog
-- **Dedicated health endpoints** — `/healthz` (liveness), `/readyz` (readiness), `/startupz` (startup)
+- **Dedicated health endpoints** — `/healthz` (liveness/readiness by default), `/readyz`, `/startupz`
 - **Diagnostic endpoint** — `GET /debug/info` with full server introspection
 - **Init container pattern** — pre-sync sources before server starts via `initSync.enabled`
+- **Gateway API HTTPRoute** — expose the MCP endpoint through existing Gateway listeners
+- **Dual-stack Service controls** — optional `service.ipFamilyPolicy` and `service.ipFamilies`
+- **Namespace override** — deploy chart-managed resources into a target namespace while keeping the Helm release separate
+- **Restricted runtime defaults** — non-root UID/GID 1000, seccomp RuntimeDefault, dropped Linux capabilities, and no service account token automount
 - **Strict loading** — `MCP_STRICT_LOADING=true` fails on boot if any tool/resource has errors
 - **Hot reload** — automatic tool/resource reload on filesystem changes via `MCP_HOT_RELOAD=true`
 - **Periodic sync** — poll S3/Git sources for changes at configurable intervals
@@ -265,6 +269,40 @@ server:
 
 `GET /debug/info` returns server version, FastMCP version, uptime, registered components, source status, auth type, and configuration.
 
+## Gateway API and Networking
+
+Use `gatewayAPI.enabled` when an existing Gateway controller owns ingress traffic and the FastMCP chart should only render an HTTPRoute:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - mcp.example.com
+  paths:
+    - type: PathPrefix
+      value: /mcp
+```
+
+For clusters running IPv4/IPv6 dual-stack, set the Service family fields explicitly:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+If you need the Helm release metadata in one namespace and the FastMCP workload in another, create the target namespace first and set `namespaceOverride`:
+
+```yaml
+namespaceOverride: fastmcp-runtime
+```
+
 ## Rate Limiting
 
 ```yaml
@@ -330,8 +368,9 @@ pdb:
 
 | Key                                           | Default                              | Description                                       |
 | --------------------------------------------- | ------------------------------------ | ------------------------------------------------- |
+| `namespaceOverride`                           | `""`                                 | Override namespace for chart-managed resources    |
 | `image.repository`                            | `docker.io/helmforge/fastmcp-server` | Container image                                   |
-| `image.tag`                                   | `0.11.0`                             | Image tag                                         |
+| `image.tag`                                   | `0.11.2`                             | Image tag                                         |
 | `server.name`                                 | `fastmcp-server`                     | Server name in MCP responses                      |
 | `server.version`                              | `""`                                 | Server version env; empty uses chart appVersion   |
 | `server.environment`                          | `dev`                                | Runtime environment (`MCP_ENV`)                   |
@@ -406,8 +445,13 @@ pdb:
 | `extraPipPackages`                            | `[]`                                 | Extra pip packages to install at startup          |
 | `initSync.enabled`                            | `false`                              | Run source sync as init container                 |
 | `persistence.enabled`                         | `false`                              | Enable persistent workspace volume                |
-| `serviceAccount.create`                       | `true`                               | Create a dedicated Kubernetes ServiceAccount      |
+| `serviceAccount.create`                       | `false`                              | Create a dedicated Kubernetes ServiceAccount      |
 | `serviceAccount.automountServiceAccountToken` | `false`                              | Automount Kubernetes API token                    |
+| `service.ipFamilyPolicy`                      | `""`                                 | Optional Service IP family policy                 |
+| `service.ipFamilies`                          | `[]`                                 | Optional Service IP families                      |
+| `gatewayAPI.enabled`                          | `false`                              | Create Gateway API HTTPRoute                      |
+| `gatewayAPI.parentRefs`                       | `[]`                                 | Parent Gateway references                         |
+| `gatewayAPI.hostnames`                        | `[]`                                 | Hostnames attached to the HTTPRoute               |
 | `networkPolicy.enabled`                       | `false`                              | Create NetworkPolicy                              |
 | `networkPolicy.ingress`                       | `[]`                                 | Custom ingress rules; empty uses service port     |
 | `networkPolicy.egress`                        | `[]`                                 | Custom egress rules; empty allows outbound sync   |
@@ -428,7 +472,7 @@ pdb:
 - The `extraPipPackages` list installs before tools load — use it when tools import external libraries
 - The Web UI auto-refreshes every 15 seconds and requires no external dependencies
 - Init container pattern (`initSync.enabled`) separates source syncing from server startup for better Kubernetes readiness semantics
-- Default readiness requires at least one loaded tool, resource, prompt, or knowledge file
+- Readiness uses `/healthz` by default so empty starter deployments become ready; use `/readyz` only when you want readiness gated on loaded content
 
 ## More Information
 

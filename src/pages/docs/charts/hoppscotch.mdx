@@ -9,7 +9,7 @@ import Callout from '../../../components/Callout.astro';
 
 # Hoppscotch
 
-Hoppscotch is an open-source API development platform supporting REST, GraphQL, and WebSocket APIs. The HelmForge chart deploys the Community Edition All-in-One image (`2026.3.1`) with subpath-based routing, automatic Prisma migrations, optional OAuth providers, SMTP, ExternalSecrets Operator support, and a bundled HelmForge PostgreSQL subchart.
+Hoppscotch is an open-source API development platform supporting REST, GraphQL, and WebSocket APIs. The HelmForge chart deploys the Community Edition All-in-One image (`2026.4.1`) with subpath-based routing, automatic Prisma migrations, optional OAuth providers, SMTP, ExternalSecrets Operator support, and a bundled HelmForge PostgreSQL subchart.
 
 ## Key Features
 
@@ -21,6 +21,7 @@ Hoppscotch is an open-source API development platform supporting REST, GraphQL, 
 - **ExternalSecrets Operator** — native support via `externalSecrets.enabled`
 - **Gateway API** — HTTPRoute via `gatewayAPI.enabled`
 - **Dual-stack networking** — `ipFamilyPolicy` and `ipFamilies` on Service
+- **Namespace override** — run chart-managed objects in a dedicated namespace when using an external PostgreSQL database
 - **Production hardening** — non-root execution, capability drop, PDB, NetworkPolicy
 - **Monitoring** — ServiceMonitor for Prometheus
 
@@ -153,6 +154,21 @@ Migrations run automatically on each deploy via the `migrate` init container. Fo
 ```bash
 kubectl exec -n hoppscotch deploy/hoppscotch-hoppscotch -- \
   sh -c "pnpm exec prisma migrate deploy"
+```
+
+### Namespace Override
+
+Use `namespaceOverride` when Helm release metadata must remain in one namespace while the Hoppscotch workload runs in another. This is supported with an external database; the bundled PostgreSQL subchart remains tied to the release namespace.
+
+```yaml
+namespaceOverride: hoppscotch-runtime
+
+postgresql:
+  enabled: false
+database:
+  external:
+    enabled: true
+    host: postgres.example.com
 ```
 
 ## URL Configuration
@@ -372,27 +388,28 @@ helm test hoppscotch -n hoppscotch
 
 ## Parameters
 
-| Parameter                        | Description                               | Default    |
-| -------------------------------- | ----------------------------------------- | ---------- |
-| `mode`                           | Chart mode: `dev` or `production`         | `dev`      |
-| `image.tag`                      | Hoppscotch image tag                      | `2026.3.1` |
-| `replicaCount`                   | Number of replicas                        | `1`        |
-| `ingress.enabled`                | Enable Ingress                            | `false`    |
-| `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs) | `""`       |
-| `postgresql.enabled`             | Enable PostgreSQL subchart                | `true`     |
-| `database.external.enabled`      | Use external PostgreSQL                   | `false`    |
-| `encryption.key`                 | 32-char encryption key (auto-generated)   | `""`       |
-| `encryption.existingSecret`      | Existing secret with encryption key       | `""`       |
-| `auth.providers`                 | Comma-separated enabled auth providers    | `EMAIL`    |
-| `auth.github.enabled`            | Enable GitHub OAuth                       | `false`    |
-| `auth.google.enabled`            | Enable Google OAuth                       | `false`    |
-| `auth.microsoft.enabled`         | Enable Microsoft OAuth                    | `false`    |
-| `mailer.enabled`                 | Enable SMTP                               | `false`    |
-| `gatewayAPI.enabled`             | Enable HTTPRoute                          | `false`    |
-| `externalSecrets.enabled`        | Enable ExternalSecret                     | `false`    |
-| `networkPolicy.enabled`          | Enable NetworkPolicy                      | `false`    |
-| `podDisruptionBudget.enabled`    | Enable PDB                                | `false`    |
-| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor                     | `false`    |
+| Parameter                        | Description                                    | Default    |
+| -------------------------------- | ---------------------------------------------- | ---------- |
+| `mode`                           | Chart mode: `dev` or `production`              | `dev`      |
+| `namespaceOverride`              | Override namespace for chart-managed resources | `""`       |
+| `image.tag`                      | Hoppscotch image tag                           | `2026.4.1` |
+| `replicaCount`                   | Number of replicas                             | `1`        |
+| `ingress.enabled`                | Enable Ingress                                 | `false`    |
+| `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs)      | `""`       |
+| `postgresql.enabled`             | Enable PostgreSQL subchart                     | `true`     |
+| `database.external.enabled`      | Use external PostgreSQL                        | `false`    |
+| `encryption.key`                 | 32-char encryption key (auto-generated)        | `""`       |
+| `encryption.existingSecret`      | Existing secret with encryption key            | `""`       |
+| `auth.providers`                 | Comma-separated enabled auth providers         | `EMAIL`    |
+| `auth.github.enabled`            | Enable GitHub OAuth                            | `false`    |
+| `auth.google.enabled`            | Enable Google OAuth                            | `false`    |
+| `auth.microsoft.enabled`         | Enable Microsoft OAuth                         | `false`    |
+| `mailer.enabled`                 | Enable SMTP                                    | `false`    |
+| `gatewayAPI.enabled`             | Enable HTTPRoute                               | `false`    |
+| `externalSecrets.enabled`        | Enable ExternalSecret                          | `false`    |
+| `networkPolicy.enabled`          | Enable NetworkPolicy                           | `false`    |
+| `podDisruptionBudget.enabled`    | Enable PDB                                     | `false`    |
+| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor                          | `false`    |
 
 ## Links
 

@@ -20,6 +20,9 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
 - **Optional Karaf SSH console** for administrative access to the OSGi runtime
+- **Namespace override** for GitOps workflows where Helm release metadata and runtime objects live in separate namespaces
+- **Dual-stack service controls** for HTTP and optional Karaf Services on IPv4/IPv6 clusters
+- **Gateway API HTTPRoute** for shared Gateway deployments
 - **Fail-fast validation** with clear error messages for common misconfigurations
 
 ## Installation
@@ -651,24 +654,57 @@ kubectl scale statefulset my-openhab -n openhab --replicas=1
 | Parameter          | Description      | Default                     |
 | ------------------ | ---------------- | --------------------------- |
 | `image.repository` | Image repository | `docker.io/openhab/openhab` |
-| `image.tag`        | Image tag        | `4.2.2`                     |
+| `image.tag`        | Image tag        | `5.1.4`                     |
 | `image.pullPolicy` | Pull policy      | `IfNotPresent`              |
 
 ### Workload
 
-| Parameter                       | Description                            | Default |
-| ------------------------------- | -------------------------------------- | ------- |
-| `replicaCount`                  | Must be `1` — clustering not supported | `1`     |
-| `podSecurityContext.runAsUser`  | UID (required by openHAB image)        | `9001`  |
-| `podSecurityContext.runAsGroup` | GID (required by openHAB image)        | `9001`  |
-| `podSecurityContext.fsGroup`    | fsGroup for PVC ownership              | `9001`  |
+| Parameter                                     | Description                                    | Default |
+| --------------------------------------------- | ---------------------------------------------- | ------- |
+| `replicaCount`                                | Must be `1` — clustering not supported         | `1`     |
+| `podSecurityContext.fsGroup`                  | fsGroup for PVC ownership after privilege drop | `9001`  |
+| `namespaceOverride`                           | Override chart-managed object namespace        | `""`    |
+| `serviceAccount.create`                       | Create a dedicated ServiceAccount              | `true`  |
+| `serviceAccount.automountServiceAccountToken` | Mount Kubernetes API token into pods           | `false` |
+
+### Namespace Override
+
+Create the target namespace first, then set `namespaceOverride` when the Helm release namespace and openHAB workload namespace must be different:
+
+```yaml
+namespaceOverride: home-automation
+```
 
 ### Service
 
-| Parameter      | Description  | Default     |
-| -------------- | ------------ | ----------- |
-| `service.type` | Service type | `ClusterIP` |
-| `service.port` | HTTP port    | `8080`      |
+| Parameter                      | Description                                | Default     |
+| ------------------------------ | ------------------------------------------ | ----------- |
+| `service.type`                 | Service type                               | `ClusterIP` |
+| `service.port`                 | HTTP port                                  | `8080`      |
+| `service.ipFamilyPolicy`       | Optional Service IP family policy          | `""`        |
+| `service.ipFamilies`           | Optional ordered Service IP families       | `[]`        |
+| `karaf.service.ipFamilyPolicy` | Optional Karaf Service IP family policy    | `""`        |
+| `karaf.service.ipFamilies`     | Optional Karaf ordered Service IP families | `[]`        |
+
+### Gateway API
+
+Use `gateway.enabled` when an existing Gateway controller owns ingress traffic and the chart should render an HTTPRoute for openHAB:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: home-gateway
+      namespace: gateway-system
+  hostnames:
+    - openhab.example.com
+```
+
+| Parameter            | Description               | Default           |
+| -------------------- | ------------------------- | ----------------- |
+| `gateway.enabled`    | Enable HTTPRoute creation | `false`           |
+| `gateway.hostnames`  | HTTPRoute hostnames       | `[openhab.local]` |
+| `gateway.parentRefs` | Parent Gateway references | `[]`              |
 
 ### Persistence
 

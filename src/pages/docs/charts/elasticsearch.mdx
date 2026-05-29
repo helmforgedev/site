@@ -20,6 +20,9 @@ Deploy production-ready Elasticsearch clusters on Kubernetes with a single `clus
 - **Security by default** — X-Pack enabled, auto-generated passwords, cert-manager TLS integration
 - **Monitoring** — Prometheus exporter sidecar, ServiceMonitor, PrometheusRule (5 alerts), and Grafana dashboards
 - **Optional Kibana** — auto-connected with shared TLS, Ingress support
+- **Namespace override** — place chart-managed namespaced resources in a target namespace when the namespace already exists
+- **Dual-stack Services** — apply IP family policy and families consistently to HTTP and headless Services
+- **Restricted service account defaults** — service account creation is opt-in and token automount stays disabled by default
 - **PodDisruptionBudgets** — node maintenance safety for HA deployments
 
 ## Installation
@@ -293,27 +296,41 @@ monitoring:
 
 ## Key Values
 
-| Key                                | Default                     | Description                                       |
-| ---------------------------------- | --------------------------- | ------------------------------------------------- |
-| `clusterProfile`                   | `dev`                       | Cluster preset: `dev`, `staging`, `production-ha` |
-| `clusterName`                      | `helmforge-cluster`         | Elasticsearch cluster name                        |
-| `image.tag`                        | `9.4.0`                     | Elasticsearch version                             |
-| `master.replicaCount`              | profile-driven              | Number of master-eligible nodes (must be odd)     |
-| `master.heapSize`                  | auto (50% mem)              | JVM heap for master nodes                         |
-| `data.replicaCount`                | profile-driven              | Number of data nodes                              |
-| `data.heapSize`                    | auto (50% mem)              | JVM heap for data nodes                           |
-| `coordinating.replicaCount`        | profile-driven              | Number of coordinating nodes                      |
-| `security.enabled`                 | `false` (`true` in prod-ha) | Enable X-Pack security                            |
-| `security.tls.certManager.enabled` | `false`                     | Auto-issue TLS via cert-manager                   |
-| `backup.enabled`                   | `false`                     | Enable S3 snapshot CronJob                        |
-| `backup.schedule`                  | `"0 2 * * *"`               | Cron schedule for snapshots                       |
-| `ilm.logs.enabled`                 | `false`                     | Enable logs ILM policy                            |
-| `ilm.metrics.enabled`              | `false`                     | Enable metrics ILM policy                         |
-| `dataTiers.hot.enabled`            | `false`                     | Enable dedicated hot tier nodes                   |
-| `dataTiers.warm.enabled`           | `false`                     | Enable dedicated warm tier nodes                  |
-| `monitoring.enabled`               | `false`                     | Enable Prometheus exporter sidecar                |
-| `kibana.enabled`                   | `false`                     | Deploy optional Kibana                            |
-| `kibana.image.tag`                 | `9.4.0`                     | Kibana version aligned with Elasticsearch         |
+| Key                                           | Default                     | Description                                              |
+| --------------------------------------------- | --------------------------- | -------------------------------------------------------- |
+| `namespaceOverride`                           | `""`                        | Override namespace for chart-managed resources           |
+| `clusterProfile`                              | `dev`                       | Cluster preset: `dev`, `staging`, `production-ha`        |
+| `clusterName`                                 | `helmforge-cluster`         | Elasticsearch cluster name                               |
+| `image.tag`                                   | `9.4.1`                     | Elasticsearch version                                    |
+| `master.replicaCount`                         | profile-driven              | Number of master-eligible nodes (must be odd)            |
+| `master.heapSize`                             | auto (50% mem)              | JVM heap for master nodes                                |
+| `data.replicaCount`                           | profile-driven              | Number of data nodes                                     |
+| `data.heapSize`                               | auto (50% mem)              | JVM heap for data nodes                                  |
+| `coordinating.replicaCount`                   | profile-driven              | Number of coordinating nodes                             |
+| `security.enabled`                            | `false` (`true` in prod-ha) | Enable X-Pack security                                   |
+| `security.tls.certManager.enabled`            | `false`                     | Auto-issue TLS via cert-manager                          |
+| `backup.enabled`                              | `false`                     | Enable S3 snapshot CronJob                               |
+| `backup.schedule`                             | `"0 2 * * *"`               | Cron schedule for snapshots                              |
+| `ilm.logs.enabled`                            | `false`                     | Enable logs ILM policy                                   |
+| `ilm.metrics.enabled`                         | `false`                     | Enable metrics ILM policy                                |
+| `dataTiers.hot.enabled`                       | `false`                     | Enable dedicated hot tier nodes                          |
+| `dataTiers.warm.enabled`                      | `false`                     | Enable dedicated warm tier nodes                         |
+| `monitoring.enabled`                          | `false`                     | Enable Prometheus exporter sidecar                       |
+| `kibana.enabled`                              | `false`                     | Deploy optional Kibana                                   |
+| `kibana.image.tag`                            | `9.4.1`                     | Kibana version aligned with Elasticsearch                |
+| `service.ipFamilyPolicy`                      | `null`                      | Service dual-stack policy for HTTP and headless Services |
+| `service.ipFamilies`                          | `[]`                        | Service IP families for HTTP and headless Services       |
+| `serviceAccount.create`                       | `false`                     | Create a dedicated ServiceAccount                        |
+| `serviceAccount.name`                         | `""`                        | ServiceAccount name override                             |
+| `serviceAccount.automountServiceAccountToken` | `false`                     | Mount Kubernetes API token into pods                     |
+
+## Namespace Override
+
+Create the target namespace first, then set `namespaceOverride` when the Helm release namespace and Elasticsearch workload namespace must be different:
+
+```yaml
+namespaceOverride: search-runtime
+```
 
 ## Upgrade Notes
 
