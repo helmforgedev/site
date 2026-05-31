@@ -30,6 +30,645 @@ interface PlaygroundGroup {
 type ChartConfig = PlaygroundGroup[];
 
 const chartConfigs: Record<string, ChartConfig> = {
+  apache: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '2', description: 'Apache pod count' },
+        {
+          label: 'Server Name',
+          key: 'serverName',
+          type: 'text',
+          default: 'localhost',
+          description: 'Apache ServerName',
+        },
+      ],
+    },
+    {
+      name: 'Exposure',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'apache.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Metrics',
+      collapsible: true,
+      gateField: 'metrics.enabled',
+      fields: [
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create ServiceMonitor',
+        },
+      ],
+    },
+  ],
+  immich: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Server Replicas',
+          key: 'server.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Immich server replicas',
+        },
+        {
+          label: 'Upload Storage',
+          key: 'server.persistence.size',
+          type: 'text',
+          default: '50Gi',
+          description: 'Upload library PVC size',
+        },
+        {
+          label: 'Machine Learning',
+          key: 'machineLearning.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy ML service',
+        },
+      ],
+    },
+    {
+      name: 'Dependencies',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge PostgreSQL',
+        },
+        {
+          label: 'Cache Subchart',
+          key: 'valkey.internal.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy Redis-compatible cache',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'immich.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
+  jenkins: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Controller pod count' },
+        {
+          label: 'Home Storage',
+          key: 'persistence.size',
+          type: 'text',
+          default: '8Gi',
+          description: 'Jenkins home PVC size',
+        },
+      ],
+    },
+    {
+      name: 'Bootstrap',
+      collapsible: true,
+      fields: [
+        {
+          label: 'JCasC',
+          key: 'jcasC.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable Configuration as Code',
+        },
+        {
+          label: 'Plugin Install',
+          key: 'plugins.install.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Install pinned plugins before startup',
+        },
+        {
+          label: 'Agent RBAC',
+          key: 'rbac.create',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create Kubernetes agent RBAC',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'jenkins.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
+  jupyterhub: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Hub Replicas',
+          key: 'hub.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Keep one with default SQLite',
+        },
+        {
+          label: 'Hub Storage',
+          key: 'hub.persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Hub PVC size',
+        },
+        {
+          label: 'Singleuser Storage',
+          key: 'singleuser.storage.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create per-user PVCs',
+        },
+      ],
+    },
+    {
+      name: 'Notebook',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Image',
+          key: 'singleuser.image.name',
+          type: 'text',
+          default: 'quay.io/jupyter/base-notebook',
+          description: 'Single-user image',
+        },
+        {
+          label: 'Tag',
+          key: 'singleuser.image.tag',
+          type: 'text',
+          default: '2026-05-26',
+          description: 'Single-user image tag',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'singleuser.memory.limit',
+          type: 'text',
+          default: '2G',
+          description: 'Notebook memory limit',
+        },
+      ],
+    },
+  ],
+  kibana: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Kibana pod count' },
+        {
+          label: 'Image Flavor',
+          key: 'image.flavor',
+          type: 'select',
+          default: 'default',
+          options: ['default', 'wolfi'],
+          description: 'Elastic image flavor',
+        },
+        {
+          label: 'Bundled Elasticsearch',
+          key: 'bundledElasticsearch.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy HelmForge Elasticsearch',
+        },
+      ],
+    },
+    {
+      name: 'Elasticsearch',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Host',
+          key: 'elasticsearch.hosts[0]',
+          type: 'text',
+          default: 'http://elasticsearch:9200',
+          description: 'Elasticsearch URL',
+        },
+        {
+          label: 'Auth Type',
+          key: 'elasticsearch.auth.type',
+          type: 'select',
+          default: 'none',
+          options: ['none', 'basic', 'serviceAccountToken'],
+          description: 'Elasticsearch auth mode',
+        },
+      ],
+    },
+  ],
+  'metrics-server': [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Metrics Server replicas',
+        },
+        {
+          label: 'Resolution',
+          key: 'metricsServer.metricResolution',
+          type: 'text',
+          default: '15s',
+          description: 'Metrics collection interval',
+        },
+        {
+          label: 'Kubelet Insecure TLS',
+          key: 'metricsServer.kubelet.insecureTLS',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use only for local clusters',
+        },
+      ],
+    },
+    {
+      name: 'High Availability',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PDB',
+          key: 'pdb.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create PodDisruptionBudget',
+        },
+        {
+          label: 'Host Network',
+          key: 'hostNetwork.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use host networking',
+        },
+      ],
+    },
+  ],
+  'oauth2-proxy': [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '2', description: 'Proxy pod count' },
+        {
+          label: 'Provider',
+          key: 'config.provider',
+          type: 'text',
+          default: 'oidc',
+          description: 'OAuth2/OIDC provider',
+        },
+        {
+          label: 'Redirect URL',
+          key: 'config.redirectUrl',
+          type: 'text',
+          default: 'https://auth.example.com/oauth2/callback',
+          description: 'OAuth callback URL',
+        },
+      ],
+    },
+    {
+      name: 'Reverse Proxy',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Trust Headers',
+          key: 'config.reverseProxy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Trust reverse proxy headers',
+        },
+        {
+          label: 'Trusted CIDR',
+          key: 'config.reverseProxy.trustedProxyIps[0]',
+          type: 'text',
+          default: '10.42.0.0/16',
+          description: 'Trusted proxy CIDR',
+        },
+      ],
+    },
+  ],
+  opencut: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'OpenCut pod count' },
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge PostgreSQL',
+        },
+        {
+          label: 'Redis Subchart',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge Redis',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'opencut.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
+  'openreel-video': [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Application pod count' },
+        {
+          label: 'Temp Volume',
+          key: 'tmpVolume.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Mount writable temporary storage',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'video.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
+  sonarqube: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'SonarQube pod count' },
+        {
+          label: 'Database Mode',
+          key: 'sonarqube.databaseMode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'embedded', 'postgresql', 'external'],
+          description: 'Database mode',
+        },
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy HelmForge PostgreSQL',
+        },
+      ],
+    },
+    {
+      name: 'Plugins',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Plugin Init',
+          key: 'plugins.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable plugin downloads',
+        },
+        {
+          label: 'Branch Plugin',
+          key: 'communityBranchPlugin.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable community branch plugin',
+        },
+      ],
+    },
+  ],
+  tomcat: [
+    {
+      name: 'General',
+      fields: [
+        { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Tomcat pod count' },
+        {
+          label: 'Default ROOT',
+          key: 'webapps.defaultRoot.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Enable health webapp',
+        },
+        {
+          label: 'Copy Image Webapps',
+          key: 'webapps.copyImageContent.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Copy image-baked apps',
+        },
+      ],
+    },
+    {
+      name: 'JMX',
+      collapsible: true,
+      gateField: 'jmx.enabled',
+      fields: [
+        {
+          label: 'JMX Hostname',
+          key: 'jmx.hostname',
+          type: 'text',
+          default: 'tomcat.example.local',
+          description: 'JMX advertised hostname',
+        },
+      ],
+    },
+  ],
+  valkey: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Architecture',
+          key: 'architecture',
+          type: 'select',
+          default: 'standalone',
+          options: ['standalone', 'replication', 'sentinel', 'cluster'],
+          description: 'Valkey topology',
+        },
+        {
+          label: 'Auth',
+          key: 'auth.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Enable password authentication',
+        },
+        { label: 'TLS', key: 'tls.enabled', type: 'toggle', default: 'false', description: 'Enable TLS wiring' },
+      ],
+    },
+    {
+      name: 'Topology',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replication.replicaCount',
+          type: 'number',
+          default: '2',
+          description: 'Replication replica count',
+        },
+        {
+          label: 'Sentinels',
+          key: 'sentinel.replicaCount',
+          type: 'number',
+          default: '3',
+          description: 'Sentinel pod count',
+        },
+        {
+          label: 'Cluster Nodes',
+          key: 'cluster.nodes',
+          type: 'number',
+          default: '6',
+          description: 'Valkey Cluster node count',
+        },
+      ],
+    },
+  ],
+  zookeeper: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '3',
+          description: 'ZooKeeper ensemble size',
+        },
+        {
+          label: 'Persistence',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Persist ZooKeeper data',
+        },
+        {
+          label: 'Even Replicas',
+          key: 'allowEvenReplicas',
+          type: 'toggle',
+          default: 'false',
+          description: 'Allow even replica count deliberately',
+        },
+      ],
+    },
+    {
+      name: 'Security and Metrics',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Client SASL',
+          key: 'auth.client.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable SASL client authentication',
+        },
+        {
+          label: 'Client TLS',
+          key: 'tls.client.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable secure client port',
+        },
+        {
+          label: 'Metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable Prometheus metrics provider',
+        },
+      ],
+    },
+  ],
   postgresql: [
     {
       name: 'General',

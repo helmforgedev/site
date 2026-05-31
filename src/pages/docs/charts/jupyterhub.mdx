@@ -1,0 +1,83 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: JupyterHub Chart
+description: JupyterHub Helm chart with configurable-http-proxy, KubeSpawner, user PVCs, Gateway API, RBAC, metrics, and secure Kubernetes defaults.
+---
+
+# JupyterHub
+
+JupyterHub provides multi-user notebook servers for teams, classrooms, and research platforms. The HelmForge chart deploys the Hub and configurable-http-proxy with KubeSpawner-oriented defaults.
+
+## Key Features
+
+- Hub and configurable-http-proxy workloads with managed proxy token Secret
+- KubeSpawner configuration for user notebook pods
+- Optional user PVCs and single-user image profiles
+- Namespaced RBAC for user pods
+- Ingress, Gateway API, dual-stack Service fields, NetworkPolicy, ServiceMonitor, PDB, and External Secrets
+- Guardrails for Hub replica count, persistence, and cookie secret behavior
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install jupyterhub helmforge/jupyterhub --namespace jupyterhub --create-namespace
+```
+
+```bash
+helm install jupyterhub oci://ghcr.io/helmforgedev/helm/jupyterhub --namespace jupyterhub --create-namespace
+```
+
+## Examples
+
+Single-user image:
+
+```yaml
+singleuser:
+  image:
+    name: quay.io/jupyter/scipy-notebook
+    tag: '2026-05-26'
+```
+
+Profiles:
+
+```yaml
+singleuser:
+  profiles:
+    - display_name: Standard
+      slug: standard
+      default: true
+      kubespawner_override:
+        cpu_limit: 1
+        mem_limit: 2G
+```
+
+## Operations
+
+Keep the default SQLite Hub database to a single Hub replica. For HA Hub deployments, configure an external database, provide a shared cookie secret, and avoid single-writer PVC modes for shared Hub state.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                        | Default                         | Description                               |
+| -------------------------------- | ------------------------------- | ----------------------------------------- |
+| `hub.replicaCount`               | `1`                             | Number of Hub replicas.                   |
+| `hub.persistence.enabled`        | `true`                          | Persist Hub state.                        |
+| `proxy.secretToken`              | `""`                            | Inline proxy token, generated when empty. |
+| `proxy.existingSecret`           | `""`                            | Existing Secret for proxy token.          |
+| `singleuser.image.name`          | `quay.io/jupyter/base-notebook` | Default notebook image.                   |
+| `singleuser.storage.enabled`     | `true`                          | Create user notebook PVCs.                |
+| `service.ipFamilyPolicy`         | `null`                          | Optional Service dual-stack policy.       |
+| `gateway.enabled`                | `false`                         | Render Gateway API HTTPRoute.             |
+| `metrics.serviceMonitor.enabled` | `false`                         | Render ServiceMonitor.                    |
+| `externalSecrets.enabled`        | `false`                         | Render ExternalSecret resources.          |
+
+## Links
+
+- [JupyterHub](https://jupyter.org/hub)
+- [JupyterHub GitHub](https://github.com/jupyterhub/jupyterhub)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub)

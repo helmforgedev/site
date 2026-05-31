@@ -1,0 +1,82 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: SonarQube Chart
+description: SonarQube Community Build Helm chart with HelmForge PostgreSQL, plugin automation, community branch plugin wiring, Gateway API, and production controls.
+---
+
+# SonarQube
+
+SonarQube Community Build provides code quality and security analysis. The HelmForge chart deploys the official SonarQube image with PostgreSQL integration, plugin automation, and operational guardrails.
+
+## Key Features
+
+- Official `docker.io/library/sonarqube` image pinned to `26.4.0.121862-community`
+- HelmForge PostgreSQL dependency or external PostgreSQL
+- Plugin download init container
+- First-class community branch plugin wiring, Java agents, and webapp replacement support
+- Gateway API, Ingress, dual-stack Service fields, NetworkPolicy, PDB, persistence, and Helm tests
+- External Secrets Operator support for database credentials
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install sonarqube helmforge/sonarqube --namespace sonarqube --create-namespace
+```
+
+```bash
+helm install sonarqube oci://ghcr.io/helmforgedev/helm/sonarqube --namespace sonarqube --create-namespace
+```
+
+## Examples
+
+Bundled PostgreSQL:
+
+```yaml
+sonarqube:
+  databaseMode: postgresql
+postgresql:
+  enabled: true
+  auth:
+    database: sonarqube
+    username: sonar
+    password: change-me
+```
+
+Community branch plugin:
+
+```yaml
+communityBranchPlugin:
+  enabled: true
+  version: '26.4.0'
+```
+
+## Operations
+
+SonarQube embeds Elasticsearch and has host kernel requirements for production bootstrap checks. The chart keeps local evaluation approachable, but production clusters should satisfy SonarQube host requirements and use PostgreSQL, either bundled or external.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                       | Default                       | Description                                                     |
+| ------------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `image.repository`              | `docker.io/library/sonarqube` | Official SonarQube image.                                       |
+| `image.tag`                     | `26.4.0.121862-community`     | SonarQube Community Build tag.                                  |
+| `sonarqube.databaseMode`        | `auto`                        | Database mode: `auto`, `embedded`, `postgresql`, or `external`. |
+| `postgresql.enabled`            | `false`                       | Deploy HelmForge PostgreSQL dependency.                         |
+| `waitForDatabase.enabled`       | `true`                        | Wait for PostgreSQL before startup.                             |
+| `plugins.enabled`               | `false`                       | Enable plugin download init container.                          |
+| `communityBranchPlugin.enabled` | `false`                       | Install and wire the community branch plugin.                   |
+| `persistence.data.enabled`      | `true`                        | Persist SonarQube data.                                         |
+| `gatewayAPI.enabled`            | `false`                       | Render Gateway API HTTPRoute.                                   |
+| `externalSecrets.enabled`       | `false`                       | Render ExternalSecret resources.                                |
+
+## Links
+
+- [SonarQube Community Build](https://docs.sonarsource.com/sonarqube-community-build/)
+- [Community branch plugin](https://github.com/mc1arke/sonarqube-community-branch-plugin)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/sonarqube)

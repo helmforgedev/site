@@ -1,0 +1,86 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: ZooKeeper Chart
+description: Apache ZooKeeper Helm chart with replicated ensembles, quorum validation, SASL client authentication, TLS, Prometheus metrics, PDB, and dual-stack Services.
+---
+
+# ZooKeeper
+
+Apache ZooKeeper provides distributed coordination for cloud applications. The HelmForge chart deploys the official ZooKeeper image as a stable StatefulSet ensemble with quorum-safe defaults.
+
+## Key Features
+
+- Official `docker.io/library/zookeeper` image pinned to `3.9.5`
+- Three-node replicated ensemble by default
+- Validation against accidental even replica counts
+- Client, headless, secure client, and metrics Services
+- Optional SASL/Digest client authentication
+- Optional secure client port using existing JKS keystore and truststore Secrets
+- Prometheus metrics provider, ServiceMonitor, PrometheusRule, NetworkPolicy, PDB, External Secrets, and dual-stack Services
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install zookeeper helmforge/zookeeper --namespace zookeeper --create-namespace
+```
+
+```bash
+helm install zookeeper oci://ghcr.io/helmforgedev/helm/zookeeper --namespace zookeeper --create-namespace
+```
+
+## Examples
+
+Standalone local install:
+
+```yaml
+replicaCount: 1
+persistence:
+  enabled: false
+```
+
+Production ensemble:
+
+```yaml
+replicaCount: 3
+persistence:
+  enabled: true
+  size: 20Gi
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+```
+
+## Operations
+
+Keep production replica counts odd. Use `allowEvenReplicas=true` only for a deliberate platform-specific reason. Enable NetworkPolicy and explicitly allow client, quorum, DNS, and metrics flows.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                     | Default                       | Description                                           |
+| ----------------------------- | ----------------------------- | ----------------------------------------------------- |
+| `replicaCount`                | `3`                           | ZooKeeper ensemble size.                              |
+| `allowEvenReplicas`           | `false`                       | Allow even replica counts.                            |
+| `image.repository`            | `docker.io/library/zookeeper` | Official ZooKeeper image.                             |
+| `zookeeper.clientPort`        | `2181`                        | Plain client port.                                    |
+| `auth.client.enabled`         | `false`                       | Enable SASL/Digest client authentication.             |
+| `tls.client.enabled`          | `false`                       | Enable secure client port with existing JKS material. |
+| `persistence.enabled`         | `true`                        | Persist ZooKeeper data.                               |
+| `metrics.enabled`             | `false`                       | Enable Prometheus metrics provider.                   |
+| `podDisruptionBudget.enabled` | `true`                        | Render PDB for ensemble availability.                 |
+| `externalSecrets.enabled`     | `false`                       | Render ExternalSecret resources.                      |
+
+## Links
+
+- [Apache ZooKeeper](https://zookeeper.apache.org)
+- [Official image](https://hub.docker.com/_/zookeeper)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/zookeeper)

@@ -1,0 +1,86 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Jenkins Chart
+description: Jenkins Helm chart with secure controller defaults, JCasC, plugin bootstrap, Gateway API, Kubernetes agent RBAC, and persistent Jenkins home.
+---
+
+# Jenkins
+
+Jenkins is an automation server for CI/CD pipelines. The HelmForge chart deploys the official Jenkins controller image as a StatefulSet with persistent home, secure admin bootstrap, plugin installation, and Kubernetes agent RBAC.
+
+## Key Features
+
+- Official `jenkins/jenkins` controller image pinned to `2.555.2`
+- Persistent Jenkins home with StatefulSet identity
+- Initial admin Secret generation or existing Secret integration
+- Optional Jenkins Configuration as Code and pinned plugin bootstrap
+- Optional RBAC for Kubernetes build agents
+- Ingress, Gateway API, dual-stack Service fields, NetworkPolicy, ServiceMonitor, PDB, and External Secrets
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install jenkins helmforge/jenkins --namespace jenkins --create-namespace
+```
+
+```bash
+helm install jenkins oci://ghcr.io/helmforgedev/helm/jenkins --namespace jenkins --create-namespace
+```
+
+## Examples
+
+Pinned plugins:
+
+```yaml
+plugins:
+  install:
+    enabled: true
+    initializeOnce: true
+    list:
+      - kubernetes:4423.vb_59f230b_ce53
+      - workflow-aggregator:608.v67378e9d3db_1
+      - git:5.10.1
+      - configuration-as-code:2074.va_57f83f7a_10b_
+```
+
+Gateway API:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+  hostnames:
+    - jenkins.example.com
+```
+
+## Operations
+
+Store admin credentials outside the values file for production. If `jcasC.enabled=true`, include the Configuration as Code plugin through the image or the plugin bootstrap list.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                        | Default                     | Description                                                                      |
+| -------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `replicaCount`                   | `1`                         | Controller replicas. Keep one unless shared storage and HA behavior are planned. |
+| `image.repository`               | `docker.io/jenkins/jenkins` | Jenkins controller image.                                                        |
+| `admin.createSecret`             | `true`                      | Create initial admin credentials.                                                |
+| `plugins.install.enabled`        | `false`                     | Install pinned plugins before startup.                                           |
+| `jcasC.enabled`                  | `false`                     | Enable Jenkins Configuration as Code.                                            |
+| `agent.enabled`                  | `true`                      | Enable Kubernetes agent integration.                                             |
+| `persistence.enabled`            | `true`                      | Persist Jenkins home.                                                            |
+| `gateway.enabled`                | `false`                     | Render Gateway API HTTPRoute.                                                    |
+| `metrics.serviceMonitor.enabled` | `false`                     | Render ServiceMonitor.                                                           |
+| `externalSecrets.enabled`        | `false`                     | Render ExternalSecret resources.                                                 |
+
+## Links
+
+- [Jenkins](https://www.jenkins.io)
+- [Jenkins Docker image](https://github.com/jenkinsci/docker)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/jenkins)

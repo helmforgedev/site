@@ -1,0 +1,87 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Kibana Chart
+description: Kibana Helm chart with secure Elasticsearch connectivity, optional HelmForge Elasticsearch subchart, Wolfi image support, Gateway API, and dual-stack Services.
+---
+
+# Kibana
+
+Kibana is the Elastic Stack analytics and visualization UI. The HelmForge chart connects Kibana to an existing Elasticsearch cluster or an optional HelmForge Elasticsearch dependency for self-contained environments.
+
+## Key Features
+
+- Official Elastic Kibana image pinned to `9.4.2`
+- Optional Wolfi image flavor
+- Basic auth or Elasticsearch service account token wiring
+- Static encryption key support for HA sessions and encrypted saved objects
+- Optional HelmForge Elasticsearch subchart for local and self-contained installs
+- Ingress, Gateway API, dual-stack Services, NetworkPolicy, ServiceMonitor, PDB, and External Secrets
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install kibana helmforge/kibana --namespace observability --create-namespace \
+  --set elasticsearch.hosts[0]=http://elasticsearch:9200
+```
+
+```bash
+helm install kibana oci://ghcr.io/helmforgedev/helm/kibana --namespace observability --create-namespace
+```
+
+## Examples
+
+Bundled Elasticsearch:
+
+```yaml
+bundledElasticsearch:
+  enabled: true
+
+elasticsearch:
+  hosts:
+    - http://kibana-bundled-elasticsearch:9200
+```
+
+Secured Elasticsearch:
+
+```yaml
+elasticsearch:
+  hosts:
+    - https://elasticsearch:9200
+  auth:
+    type: serviceAccountToken
+    existingSecret: kibana-elasticsearch-token
+  tls:
+    enabled: true
+    certificateAuthoritiesSecret: elasticsearch-ca
+```
+
+## Operations
+
+Set stable encryption keys before scaling beyond one replica. Elastic recommends matching Kibana and Elasticsearch versions across the stack.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                       | Default                           | Description                                           |
+| ------------------------------- | --------------------------------- | ----------------------------------------------------- |
+| `image.repository`              | `docker.elastic.co/kibana/kibana` | Official Kibana image.                                |
+| `image.flavor`                  | `default`                         | Image flavor: `default` or `wolfi`.                   |
+| `replicaCount`                  | `1`                               | Number of Kibana replicas.                            |
+| `elasticsearch.hosts`           | `[http://elasticsearch:9200]`     | Elasticsearch endpoints.                              |
+| `bundledElasticsearch.enabled`  | `false`                           | Deploy HelmForge Elasticsearch dependency.            |
+| `elasticsearch.auth.type`       | `none`                            | Auth mode: `none`, `basic`, or `serviceAccountToken`. |
+| `encryptionKeys.existingSecret` | `""`                              | Secret with stable Kibana encryption keys.            |
+| `gateway.enabled`               | `false`                           | Render Gateway API HTTPRoute.                         |
+| `serviceMonitor.enabled`        | `false`                           | Render ServiceMonitor.                                |
+| `externalSecrets.enabled`       | `false`                           | Render ExternalSecret resources.                      |
+
+## Links
+
+- [Kibana](https://www.elastic.co/kibana)
+- [Kibana GitHub](https://github.com/elastic/kibana)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/kibana)

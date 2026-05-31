@@ -1,0 +1,82 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Tomcat Chart
+description: Apache Tomcat Helm chart with official image, health webapp, writable runtime volumes, Gateway API, JMX, persistence, and production controls.
+---
+
+# Tomcat
+
+Apache Tomcat chart for Kubernetes using the official `docker.io/library/tomcat` image. The chart supports immutable application images, mounted WARs, optional writable webapps, JMX, and modern ingress patterns.
+
+## Key Features
+
+- Official Tomcat image pinned to `11.0.22-jdk17-temurin-noble`
+- Optional ROOT health webapp for deterministic probes and Helm tests
+- Copies image-baked webapps into writable runtime volume when needed
+- Writable `webapps`, `logs`, `temp`, and `work` volumes for non-root runtime
+- Ingress, Gateway API, dual-stack Service fields, NetworkPolicy, HPA, PDB, persistent webapps/logs, and JMX
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install tomcat helmforge/tomcat --namespace tomcat --create-namespace
+```
+
+```bash
+helm install tomcat oci://ghcr.io/helmforgedev/helm/tomcat --namespace tomcat --create-namespace
+```
+
+## Examples
+
+Application probes through TCP:
+
+```yaml
+webapps:
+  defaultRoot:
+    enabled: false
+startupProbe:
+  mode: tcp
+livenessProbe:
+  mode: tcp
+readinessProbe:
+  mode: tcp
+```
+
+JMX:
+
+```yaml
+jmx:
+  enabled: true
+  hostname: tomcat.example.local
+```
+
+## Operations
+
+Prefer immutable Tomcat images or init containers that fetch versioned WAR artifacts. Enable JMX only on trusted networks and add authentication or TLS flags through `jmx.extraOpts` when exposing remote JMX.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                          | Default                       | Description                                    |
+| ---------------------------------- | ----------------------------- | ---------------------------------------------- |
+| `replicaCount`                     | `1`                           | Number of Tomcat pods when HPA is disabled.    |
+| `image.repository`                 | `docker.io/library/tomcat`    | Official Tomcat image repository.              |
+| `image.tag`                        | `11.0.22-jdk17-temurin-noble` | Tomcat image tag.                              |
+| `webapps.defaultRoot.enabled`      | `true`                        | Render minimal ROOT app for health checks.     |
+| `webapps.copyImageContent.enabled` | `true`                        | Copy image-baked webapps into writable volume. |
+| `webapps.persistence.enabled`      | `false`                       | Persist `/usr/local/tomcat/webapps`.           |
+| `logs.persistence.enabled`         | `false`                       | Persist Tomcat logs.                           |
+| `jmx.enabled`                      | `false`                       | Enable JMX remote settings and Service ports.  |
+| `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                  |
+| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                          |
+
+## Links
+
+- [Apache Tomcat](https://tomcat.apache.org)
+- [Official image](https://hub.docker.com/_/tomcat)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/tomcat)

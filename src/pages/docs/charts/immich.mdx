@@ -1,0 +1,88 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Immich Chart
+description: Immich Helm chart with official Immich images, HelmForge PostgreSQL, Redis-compatible cache, machine learning, Gateway API, and production controls.
+---
+
+# Immich
+
+Immich is a self-hosted photo and video management platform. The HelmForge chart deploys Immich server, machine learning, PostgreSQL, and a Redis-compatible cache with production-oriented Kubernetes defaults.
+
+## Key Features
+
+- Official Immich images pinned to `v2.7.5`
+- HelmForge PostgreSQL dependency using Immich's VectorChord PostgreSQL image defaults
+- HelmForge Redis chart aliased as `valkey` for Redis-compatible cache support
+- Machine learning service with persistent model cache
+- External PostgreSQL and external Redis/Valkey modes
+- Ingress, Gateway API, dual-stack Service fields, HPA, PDB, NetworkPolicy, External Secrets, and Helm tests
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install immich helmforge/immich --namespace immich --create-namespace
+```
+
+```bash
+helm install immich oci://ghcr.io/helmforgedev/helm/immich --namespace immich --create-namespace
+```
+
+## Examples
+
+External database:
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  external:
+    host: postgres.example.com
+    database: immich
+    username: immich
+    existingSecret: immich-db
+    existingSecretPasswordKey: database-password
+```
+
+Ingress:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: immich.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Operations
+
+Persistent uploads are application data. Keep the upload PVC backed up with your platform backup tool. For production, prefer an external PostgreSQL instance or explicitly size the bundled PostgreSQL and cache PVCs.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                 | Default                            | Description                               |
+| ------------------------- | ---------------------------------- | ----------------------------------------- |
+| `image.repository`        | `ghcr.io/immich-app/immich-server` | Immich server image repository.           |
+| `image.tag`               | `v2.7.5`                           | Immich server image tag.                  |
+| `machineLearning.enabled` | `true`                             | Deploy the machine learning service.      |
+| `postgresql.enabled`      | `true`                             | Deploy HelmForge PostgreSQL dependency.   |
+| `valkey.internal.enabled` | `true`                             | Deploy Redis-compatible cache dependency. |
+| `database.external.host`  | `""`                               | External PostgreSQL hostname.             |
+| `service.ipFamilyPolicy`  | `null`                             | Optional Service dual-stack policy.       |
+| `ingress.enabled`         | `false`                            | Render Ingress.                           |
+| `gateway.enabled`         | `false`                            | Render Gateway API HTTPRoute.             |
+| `externalSecrets.enabled` | `false`                            | Render ExternalSecret resources.          |
+
+## Links
+
+- [Immich](https://immich.app)
+- [Immich GitHub](https://github.com/immich-app/immich)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/immich)

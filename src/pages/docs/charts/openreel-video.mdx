@@ -1,0 +1,83 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OpenReel Video Chart
+description: OpenReel Video Helm chart with WebCodecs-ready static hosting, Gateway API, dual-stack Service fields, HPA, PDB, NetworkPolicy, and hardened runtime defaults.
+---
+
+# OpenReel Video
+
+OpenReel Video is a browser-based video editor. The HelmForge chart serves the static application with hardened runtime defaults and modern Kubernetes exposure options.
+
+## Key Features
+
+- HelmForge-maintained `docker.io/helmforge/openreel-video:v0.4.0` image
+- Static hosting for the upstream browser-based editor
+- WebCodecs-ready deployment with writable temporary volume support
+- Ingress, Gateway API through the single `gateway` values block, dual-stack Service fields, HPA, PDB, NetworkPolicy, and Helm tests
+- Non-root runtime with dropped Linux capabilities
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install openreel-video helmforge/openreel-video --namespace openreel-video --create-namespace
+```
+
+```bash
+helm install openreel-video oci://ghcr.io/helmforgedev/helm/openreel-video --namespace openreel-video --create-namespace
+```
+
+## Examples
+
+Ingress:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: video.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+Gateway API:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+  hostnames:
+    - video.example.com
+```
+
+## Operations
+
+The chart is stateless by default. Scale horizontally with HPA when the ingress layer can distribute requests across replicas.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                | Default                              | Description                                  |
+| ------------------------ | ------------------------------------ | -------------------------------------------- |
+| `replicaCount`           | `1`                                  | Number of pods when autoscaling is disabled. |
+| `image.repository`       | `docker.io/helmforge/openreel-video` | HelmForge OpenReel Video image.              |
+| `service.type`           | `ClusterIP`                          | Kubernetes Service type.                     |
+| `service.ipFamilyPolicy` | `null`                               | Optional Service dual-stack policy.          |
+| `ingress.enabled`        | `false`                              | Render Ingress.                              |
+| `gateway.enabled`        | `false`                              | Render Gateway API HTTPRoute.                |
+| `autoscaling.enabled`    | `false`                              | Render HPA.                                  |
+| `pdb.enabled`            | `false`                              | Render PodDisruptionBudget.                  |
+| `networkPolicy.enabled`  | `false`                              | Render NetworkPolicy.                        |
+| `tmpVolume.enabled`      | `true`                               | Mount writable temporary storage.            |
+
+## Links
+
+- [OpenReel Video GitHub](https://github.com/Augani/openreel-video)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/openreel-video)
