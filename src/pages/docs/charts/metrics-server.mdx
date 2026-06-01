@@ -1,0 +1,71 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Metrics Server Chart
+description: Kubernetes Metrics Server Helm chart with official image, secure RBAC, HA controls, k3d-friendly validation settings, and ServiceMonitor support.
+---
+
+# Metrics Server
+
+Metrics Server collects container resource metrics from kubelets and exposes the Kubernetes Metrics API for HPA, VPA, and `kubectl top` workflows.
+
+## Key Features
+
+- Official `registry.k8s.io/metrics-server/metrics-server` image pinned to `v0.8.1`
+- Metrics API `APIService`, ServiceAccount, ClusterRole, ClusterRoleBinding, and delegated authentication RoleBinding
+- Typed kubelet flag modeling instead of only raw args
+- Optional k3d and kind-compatible kubelet insecure TLS mode for local clusters
+- Optional HA replicas, PDB, topology spread, and hostNetwork mode
+- Dual-stack Service fields, NetworkPolicy, ServiceMonitor, and readiness Helm test
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install metrics-server helmforge/metrics-server --namespace kube-system
+```
+
+```bash
+helm install metrics-server oci://ghcr.io/helmforgedev/helm/metrics-server --namespace kube-system
+```
+
+## Local Clusters
+
+Many local clusters expose kubelet certificates without the address SANs Metrics Server validates. For k3d or kind smoke tests:
+
+```yaml
+metricsServer:
+  kubelet:
+    insecureTLS: true
+```
+
+Do not enable insecure kubelet TLS in production unless your platform explicitly accepts that risk.
+
+## Operations
+
+Metrics Server `0.8.x` targets Kubernetes `1.31+`. For HA, use at least two replicas and configure aggregator routing on the API server where supported.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                           | Default                                         | Description                                          |
+| ----------------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| `image.repository`                  | `registry.k8s.io/metrics-server/metrics-server` | Official image repository.                           |
+| `image.tag`                         | `v0.8.1`                                        | Metrics Server image tag.                            |
+| `replicaCount`                      | `1`                                             | Deployment replicas.                                 |
+| `apiService.create`                 | `true`                                          | Create `v1beta1.metrics.k8s.io` APIService.          |
+| `rbac.create`                       | `true`                                          | Create required RBAC resources.                      |
+| `metricsServer.metricResolution`    | `15s`                                           | Metrics collection interval.                         |
+| `metricsServer.kubelet.insecureTLS` | `false`                                         | Disable kubelet TLS verification for local clusters. |
+| `hostNetwork.enabled`               | `false`                                         | Use host networking.                                 |
+| `service.ipFamilyPolicy`            | `null`                                          | Optional Service dual-stack policy.                  |
+| `serviceMonitor.enabled`            | `false`                                         | Render ServiceMonitor.                               |
+
+## Links
+
+- [Metrics Server](https://github.com/kubernetes-sigs/metrics-server)
+- [Upstream chart](https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/metrics-server)

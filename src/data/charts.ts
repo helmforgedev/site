@@ -469,6 +469,107 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
   },
+  {
+    name: 'Apache',
+    slug: 'apache',
+    description:
+      'Apache HTTP Server with custom content, non-root defaults, Gateway API, metrics, and dual-stack Services.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Immich',
+    slug: 'immich',
+    description: 'Photo and video management with HelmForge PostgreSQL, Redis-compatible cache, and machine learning.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Jenkins',
+    slug: 'jenkins',
+    description:
+      'CI/CD automation with JCasC, plugin bootstrap, Kubernetes agent RBAC, Gateway API, and persistent home.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'JupyterHub',
+    slug: 'jupyterhub',
+    description: 'Multi-user notebook platform with KubeSpawner, configurable-http-proxy, user PVCs, and secure RBAC.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Kibana',
+    slug: 'kibana',
+    description:
+      'Elastic Stack UI with secure Elasticsearch connectivity, optional HelmForge Elasticsearch, and Wolfi images.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Metrics Server',
+    slug: 'metrics-server',
+    description:
+      'Kubernetes Metrics API server with secure RBAC, HA controls, k3d-friendly validation, and ServiceMonitor.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'OAuth2 Proxy',
+    slug: 'oauth2-proxy',
+    description:
+      'OAuth2 and OIDC reverse proxy with hardened header trust, External Secrets, metrics, and Gateway API.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'OpenCut',
+    slug: 'opencut',
+    description:
+      'Open-source video editor with HelmForge PostgreSQL and Redis dependencies plus Redis-over-HTTP bridge.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'OpenReel Video',
+    slug: 'openreel-video',
+    description:
+      'Browser-based video editor with WebCodecs-ready static hosting, Gateway API, and hardened runtime defaults.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'SonarQube',
+    slug: 'sonarqube',
+    description: 'SonarQube Community Build with HelmForge PostgreSQL, plugin automation, and branch plugin wiring.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Tomcat',
+    slug: 'tomcat',
+    description:
+      'Apache Tomcat with official image, default health webapp, writable runtime volumes, Gateway API, and JMX.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Valkey',
+    slug: 'valkey',
+    description:
+      'Valkey standalone, replication, Sentinel, and cluster topologies with TLS, metrics, dual-stack, and ESO.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'ZooKeeper',
+    slug: 'zookeeper',
+    description:
+      'Apache ZooKeeper replicated ensembles with quorum validation, SASL/TLS, metrics, PDB, and dual-stack.',
+    maturity: 'stable',
+    backup: false,
+  },
 ];
 
 export const chartCount = charts.length;

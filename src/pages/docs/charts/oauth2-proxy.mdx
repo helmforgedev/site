@@ -1,0 +1,87 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OAuth2 Proxy Chart
+description: OAuth2 Proxy Helm chart with official image, hardened reverse proxy trust, External Secrets, Gateway API, metrics, HPA, and PDB support.
+---
+
+# OAuth2 Proxy
+
+OAuth2 Proxy is a reverse proxy and authentication gateway for OAuth2 and OIDC providers. The HelmForge chart deploys the official upstream image with secure Kubernetes defaults and explicit proxy trust controls.
+
+## Key Features
+
+- Official `quay.io/oauth2-proxy/oauth2-proxy` image pinned to `v7.15.2`
+- Chart-managed Secret, existing Secret, or ExternalSecret credential modes
+- Reverse proxy header trust disabled by default
+- Config validation init container using `--config-test`
+- Legacy config and alpha structured config support
+- Ingress, Gateway API, dual-stack Service fields, ServiceMonitor, HPA, PDB, NetworkPolicy, and runtime tests
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install oauth2-proxy helmforge/oauth2-proxy --namespace auth --create-namespace \
+  --set auth.clientID=example \
+  --set auth.clientSecret=example-secret \
+  --set auth.cookieSecret=0123456789abcdef0123456789abcdef \
+  --set config.provider=github \
+  --set config.redirectUrl=https://auth.example.com/oauth2/callback
+```
+
+```bash
+helm install oauth2-proxy oci://ghcr.io/helmforgedev/helm/oauth2-proxy --namespace auth --create-namespace
+```
+
+## Examples
+
+Existing Secret:
+
+```yaml
+auth:
+  existingSecret: oauth2-proxy-auth
+  keys:
+    clientID: client-id
+    clientSecret: client-secret
+    cookieSecret: cookie-secret
+```
+
+Trusted reverse proxy headers:
+
+```yaml
+config:
+  reverseProxy:
+    enabled: true
+    trustedProxyIps:
+      - 10.42.0.0/16
+```
+
+## Operations
+
+Keep `config.reverseProxy.enabled=false` unless the deployment is behind a trusted ingress, gateway, or edge proxy. When enabled, define narrow `trustedProxyIps` CIDRs to avoid trusting client-supplied forwarded headers.
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                     | Default                             | Description                      |
+| ----------------------------- | ----------------------------------- | -------------------------------- |
+| `replicaCount`                | `2`                                 | Number of OAuth2 Proxy pods.     |
+| `image.repository`            | `quay.io/oauth2-proxy/oauth2-proxy` | Official image repository.       |
+| `auth.existingSecret`         | `""`                                | Existing credential Secret.      |
+| `config.provider`             | `oidc`                              | OAuth2/OIDC provider.            |
+| `config.reverseProxy.enabled` | `false`                             | Trust reverse proxy headers.     |
+| `alphaConfig.enabled`         | `false`                             | Render structured alpha config.  |
+| `metrics.enabled`             | `false`                             | Enable metrics endpoint.         |
+| `ingress.enabled`             | `false`                             | Render Ingress.                  |
+| `gateway.enabled`             | `false`                             | Render Gateway API HTTPRoute.    |
+| `externalSecrets.enabled`     | `false`                             | Render ExternalSecret resources. |
+
+## Links
+
+- [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/)
+- [OAuth2 Proxy GitHub](https://github.com/oauth2-proxy/oauth2-proxy)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/oauth2-proxy)
