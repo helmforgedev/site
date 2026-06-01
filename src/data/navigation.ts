@@ -68,6 +68,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Authelia', href: '/docs/charts/authelia', maturity: 'stable' },
       { label: 'OAuth2 Proxy', href: '/docs/charts/oauth2-proxy', maturity: 'stable' },
       { label: 'SonarQube', href: '/docs/charts/sonarqube', maturity: 'stable' },
+      { label: 'Gophish', href: '/docs/charts/gophish', maturity: 'stable' },
     ],
   },
   {
