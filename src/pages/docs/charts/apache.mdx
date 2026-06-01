@@ -59,6 +59,171 @@ gateway:
 
 Use `serverStatus.require` carefully when metrics are enabled. The Apache exporter reads `mod_status`; keep status paths restricted to the metrics sidecar or trusted networks in production.
 
+## Architecture
+
+The chart runs Apache HTTP Server as a non-root Deployment listening on port `8080`. The web root is populated from
+`content.files` or from `content.existingConfigMap`, while the generated Apache configuration keeps logs on
+stdout/stderr and avoids writable paths outside the configured volumes.
+
+Typical production traffic is:
+
+1. Client traffic enters through Ingress or Gateway API.
+2. The HelmForge Service forwards requests to Apache pods.
+3. Apache serves static files, reverse-proxy rules, or extra virtual hosts from chart-managed configuration.
+4. Optional metrics scraping reaches the exporter sidecar and `mod_status`.
+5. Optional Basic Auth material is mounted from a Secret or an ExternalSecret-managed target Secret.
+
+## Production Values
+
+Use explicit content, resources, replica count, disruption budgets, and network boundaries for production:
+
+```yaml
+replicaCount: 3
+
+content:
+  existingConfigMap: apache-site-content
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1
+    memory: 512Mi
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDns: true
+    allowInternet: false
+```
+
+Use immutable ConfigMaps for content releases. If a CI system rebuilds site assets, publish a new ConfigMap name and
+roll the release instead of mutating files inside the running container.
+
+## Routing
+
+Ingress uses `ingress.ingressClassName`, matching the rest of the HelmForge chart catalog:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: apache.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: apache-tls
+      hosts:
+        - apache.example.com
+```
+
+Gateway API uses the single `gateway` block:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - apache.example.com
+  path: /
+  pathType: PathPrefix
+```
+
+Dual-stack Service fields are exposed directly:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+## Authentication And Secrets
+
+Basic Auth is optional and expects an htpasswd file in an existing Secret:
+
+```yaml
+basicAuth:
+  enabled: true
+  existingSecret: apache-basicauth
+  htpasswdKey: htpasswd
+```
+
+For GitOps platforms, let External Secrets Operator reconcile that Secret:
+
+```yaml
+basicAuth:
+  enabled: true
+  existingSecret: apache-basicauth
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: htpasswd
+      remoteRef:
+        key: apache/basicauth
+        property: htpasswd
+```
+
+The chart intentionally does not install a certificate manager, ingress controller, Gateway implementation, or WAF.
+Those platform responsibilities should be managed outside the Apache release.
+
+## Observability
+
+Enable the exporter only when `serverStatus.require` allows the sidecar or a trusted scrape path to read `mod_status`:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+
+serverStatus:
+  require: 'all granted'
+```
+
+In locked-down environments, prefer restricting metrics with NetworkPolicy and ServiceMonitor selectors instead of
+opening `mod_status` to arbitrary client traffic.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test apache -n apache
+kubectl get pods -n apache -l app.kubernetes.io/name=apache
+kubectl logs -n apache deploy/apache --since=10m
+kubectl get events -n apache --sort-by=.lastTimestamp
+```
+
+The chart exposes `/healthz` for probes and Helm tests. If you replace the generated configuration, keep the health
+endpoint or update probes to a path served by your application.
+
+## Common Issues
+
+| Symptom                            | Likely Cause                                          | Fix                                                                     |
+| ---------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| `403` from `/server-status`        | `serverStatus.require` blocks the exporter            | Permit the exporter path or disable metrics.                            |
+| Pods restart after adding content  | ConfigMap checksum changed                            | Expected rollout; publish immutable ConfigMaps for controlled releases. |
+| Ingress works but Gateway does not | `parentRefs` points to the wrong Gateway or namespace | Verify Gateway API resources and listener hostnames.                    |
+| Basic Auth is ignored              | Secret key does not match `basicAuth.htpasswdKey`     | Check Secret data keys and ExternalSecret target keys.                  |
+
 <a id="values"></a>
 
 ## Values

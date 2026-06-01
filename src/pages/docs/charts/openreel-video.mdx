@@ -60,6 +60,136 @@ gateway:
 
 The chart is stateless by default. Scale horizontally with HPA when the ingress layer can distribute requests across replicas.
 
+## Architecture
+
+OpenReel Video is deployed as a stateless web workload. The chart is designed for browser-based editing frontends and
+WebCodecs-ready static hosting, so the main operational concerns are routing, cache behavior, temporary writable
+storage, and safe horizontal scaling.
+
+Runtime flow:
+
+1. Ingress or Gateway API receives public HTTPS traffic.
+2. The Service load-balances requests across OpenReel Video pods.
+3. The container serves static assets and browser application code.
+4. Temporary files are written only to the configured `tmpVolume`.
+5. Optional HPA and PDB keep the frontend available during rollouts.
+
+## Production Values
+
+Use multiple replicas, explicit resources, NetworkPolicy, and either Ingress or Gateway API:
+
+```yaml
+replicaCount: 2
+
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: openreel.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openreel-video-tls
+      hosts:
+        - openreel.example.com
+
+networkPolicy:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+```
+
+## ExternalName Compatibility
+
+When the Kubernetes Service should point clients at an externally hosted OpenReel endpoint, use `ExternalName` and keep
+Ingress/Gateway disabled:
+
+```yaml
+service:
+  type: ExternalName
+  externalName: openreel-static.example.com
+
+ingress:
+  enabled: false
+
+gateway:
+  enabled: false
+```
+
+This is useful during migration from external hosting into the cluster, or when consumers need a stable Kubernetes DNS
+name for a service that remains outside Kubernetes.
+
+## Gateway API
+
+Gateway API is first-class and uses the shared HelmForge `gateway` shape:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - openreel.example.com
+  path: /
+  pathType: PathPrefix
+```
+
+## Scaling And Rollouts
+
+The chart is stateless, so HPA is safe when the edge layer can distribute requests:
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+
+pdb:
+  enabled: true
+  minAvailable: 1
+```
+
+Keep `tmpVolume.enabled=true` unless your custom image does not need writable temporary storage. The root filesystem can
+remain read-only while `/tmp` stays writable.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test openreel-video -n openreel-video
+kubectl get pods -n openreel-video -l app.kubernetes.io/name=openreel-video
+kubectl logs -n openreel-video deploy/openreel-video --since=10m
+kubectl get events -n openreel-video --sort-by=.lastTimestamp
+```
+
+For public routes, validate that static assets load with the same host, scheme, and path used by the browser.
+
+## Common Issues
+
+| Symptom                                    | Likely Cause                                           | Fix                                                                      |
+| ------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Blank page after route exposure            | Base URL or static asset path does not match the route | Check browser network errors and Gateway/Ingress path settings.          |
+| Pods fail with read-only filesystem errors | Application writes outside `tmpVolume`                 | Mount an explicit writable volume for the path or fix the image.         |
+| HPA scales but requests still hit one pod  | Edge proxy affinity or cache behavior                  | Review ingress/gateway load-balancing settings.                          |
+| ExternalName has no endpoints              | Expected Kubernetes behavior                           | Validate DNS resolution from a client pod instead of checking Endpoints. |
+
 <a id="values"></a>
 
 ## Values

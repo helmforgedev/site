@@ -59,6 +59,181 @@ singleuser:
 
 Keep the default SQLite Hub database to a single Hub replica. For HA Hub deployments, configure an external database, provide a shared cookie secret, and avoid single-writer PVC modes for shared Hub state.
 
+## Architecture
+
+The chart deploys a JupyterHub Hub, configurable-http-proxy, and RBAC for KubeSpawner-managed user pods. The Hub owns
+authentication, spawning decisions, and user state. The proxy receives browser traffic and routes each authenticated
+user to the correct notebook server.
+
+Main runtime pieces:
+
+1. Public traffic reaches configurable-http-proxy through Ingress or Gateway API.
+2. The Hub authenticates users and instructs KubeSpawner to create notebook pods.
+3. User notebook pods run with the configured single-user image and optional per-user storage.
+4. The proxy routes each user to their notebook server.
+5. Optional metrics and ServiceMonitor expose Hub and proxy observability.
+
+## Production Values
+
+For production, replace DummyAuthenticator, use durable storage, configure a real authenticator, and keep metrics
+private:
+
+```yaml
+auth:
+  type: custom
+
+hub:
+  extraConfig: |
+    c.JupyterHub.authenticator_class = "nativeauthenticator.NativeAuthenticator"
+    # Configure c.JupyterHub.db_url before increasing hub.replicaCount.
+  persistence:
+    enabled: true
+    storageClass: fast-retain
+    size: 20Gi
+
+singleuser:
+  storage:
+    enabled: true
+    storageClass: fast-retain
+    capacity: 20Gi
+  profiles:
+    - display_name: Standard Lab
+      slug: standard
+      default: true
+      kubespawner_override:
+        default_url: /lab
+
+metrics:
+  authenticatePrometheus: true
+  serviceMonitor:
+    enabled: false
+```
+
+Do not expose the default dummy authentication mode on a public route. It is useful for local validation only.
+
+## Hub Database And HA
+
+The default Hub state uses SQLite on the Hub PVC. Keep `hub.replicaCount=1` in that mode. Before increasing replicas:
+
+1. Configure an external database with `c.JupyterHub.db_url` in `hub.extraConfig`.
+2. Provide a stable shared cookie secret.
+3. Avoid single-writer PVC modes for state shared by multiple Hub replicas.
+4. Validate login, spawn, stop, and resume flows behind your load balancer.
+
+For HA Hubs without Hub persistence, create a Secret containing the hex-encoded JupyterHub cookie secret:
+
+```yaml
+hub:
+  cookieSecret:
+    existingSecret: jupyterhub-cookie-secret
+  persistence:
+    enabled: false
+```
+
+Without a shared cookie secret, login sessions can fail when requests move between Hub replicas.
+
+## Single-User Profiles
+
+Profiles give platform teams controlled notebook options:
+
+```yaml
+singleuser:
+  image:
+    name: quay.io/jupyter/scipy-notebook
+    tag: '2026-05-26'
+  profiles:
+    - display_name: Data Science
+      slug: data-science
+      default: true
+      kubespawner_override:
+        cpu_limit: 2
+        mem_limit: 4G
+    - display_name: Lightweight
+      slug: lightweight
+      kubespawner_override:
+        cpu_limit: 1
+        mem_limit: 1G
+```
+
+Use profile overrides to limit CPU, memory, GPU access, default URL, images, and storage behavior.
+
+## Networking
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: hub.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: jupyterhub-tls
+      hosts:
+        - hub.example.com
+```
+
+Gateway API example:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - hub.example.com
+```
+
+Enable NetworkPolicy once you have confirmed the CNI enforces it and user pods can still reach the Hub and proxy.
+
+## Secrets
+
+The proxy token can be chart-generated for local environments. Production should use an existing Secret or External
+Secrets Operator:
+
+```yaml
+proxy:
+  existingSecret: jupyterhub-proxy-token
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: proxy-token
+      remoteRef:
+        key: jupyterhub/proxy
+        property: proxy-token
+```
+
+## Validation
+
+After deployment:
+
+```bash
+helm test jupyterhub -n jupyterhub
+kubectl get pods -n jupyterhub -l app.kubernetes.io/name=jupyterhub
+kubectl logs -n jupyterhub deploy/jupyterhub-hub --since=10m
+kubectl get events -n jupyterhub --sort-by=.lastTimestamp
+```
+
+Also validate a full user workflow: login, spawn a notebook, restart the Hub, and confirm the notebook session survives
+when `hub.cleanupServers=false`.
+
+## Common Issues
+
+| Symptom                                  | Likely Cause                                     | Fix                                                                                  |
+| ---------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Login sessions fail behind multiple Hubs | Cookie secret is not shared                      | Set `hub.cookieSecret.existingSecret`.                                               |
+| HA Hub render fails                      | SQLite DB or RWO persistence is incompatible     | Configure external DB and compatible persistence.                                    |
+| ServiceMonitor cannot scrape             | Prometheus auth remains enabled                  | Use private scrape credentials or explicitly disable metrics auth for private paths. |
+| User pods stay pending                   | RBAC, quotas, storage class, or image pulls fail | Describe the user pod and check namespace events.                                    |
+
 <a id="values"></a>
 
 ## Values

@@ -63,6 +63,190 @@ metrics:
 
 Choose topology before production use. Sentinel requires Sentinel-aware clients. Cluster mode requires Valkey Cluster-aware clients and a fresh cluster bootstrap.
 
+## Architecture
+
+One HelmForge Valkey chart supports four topologies through `architecture`:
+
+| Architecture  | Contract                                    | Best Fit                                                |
+| ------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `standalone`  | One Valkey pod with optional persistence    | Development, small caches, simple app state             |
+| `replication` | Fixed primary with read replicas            | Read-heavy workloads that can tolerate manual failover  |
+| `sentinel`    | Replication plus Sentinel primary discovery | HA clients that support Sentinel                        |
+| `cluster`     | Native Valkey Cluster sharding and replicas | Cluster-aware clients and horizontally growing datasets |
+
+Each topology renders the appropriate StatefulSets, Services, persistence settings, and tests. Select topology as an
+application contract, not only as a replica count.
+
+## Standalone
+
+Minimal standalone with an existing password Secret:
+
+```yaml
+architecture: standalone
+
+auth:
+  enabled: true
+  existingSecret: valkey-auth
+  existingSecretPasswordKey: valkey-password
+
+standalone:
+  persistence:
+    enabled: true
+    size: 10Gi
+```
+
+Standalone does not provide failover. Use it when the workload can tolerate downtime or when Valkey is a disposable
+cache.
+
+## Replication
+
+Replication gives one fixed primary endpoint and separate read replicas:
+
+```yaml
+architecture: replication
+
+auth:
+  enabled: true
+  existingSecret: valkey-auth
+  existingSecretPasswordKey: valkey-password
+
+replication:
+  replicaCount: 2
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+  replica:
+    persistence:
+      enabled: true
+      size: 50Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+pdb:
+  enabled: true
+```
+
+Replication alone does not promote a replica automatically. Applications should write only to the primary Service.
+
+## Sentinel
+
+Sentinel adds primary discovery and failover for Sentinel-aware clients:
+
+```yaml
+architecture: sentinel
+
+replication:
+  replicaCount: 2
+
+sentinel:
+  replicaCount: 3
+  quorum: 2
+
+pdb:
+  enabled: true
+```
+
+Keep at least three Sentinels and choose a quorum that matches the failure domains. Validate application reconnect
+behavior before production rollout.
+
+## Cluster
+
+Cluster mode is for native sharding and requires Valkey Cluster-compatible clients:
+
+```yaml
+architecture: cluster
+
+auth:
+  enabled: true
+  existingSecret: valkey-auth
+  existingSecretPasswordKey: valkey-password
+
+cluster:
+  nodes: 6
+  replicasPerMaster: 1
+  persistence:
+    enabled: true
+    size: 20Gi
+```
+
+Cluster clients must handle `MOVED` and `ASK` redirects. Plan operational windows for future resharding, expansion, or
+maintenance.
+
+## TLS And Secrets
+
+Password authentication is enabled by default. Production should use existing Secrets or External Secrets:
+
+```yaml
+auth:
+  enabled: true
+  existingSecret: valkey-auth
+  existingSecretPasswordKey: valkey-password
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: valkey-password
+      remoteRef:
+        key: valkey/auth
+        property: password
+```
+
+TLS is file-based and expects the referenced Secrets to be created by the platform:
+
+```yaml
+tls:
+  enabled: true
+  existingSecret: valkey-tls
+  certKey: tls.crt
+  keyKey: tls.key
+  caKey: ca.crt
+```
+
+## Observability
+
+Enable the exporter sidecar and ServiceMonitor for production topologies:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+```
+
+Monitor memory pressure, evictions, replication lag, Sentinel quorum, cluster slot health, and restart counts.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test valkey -n valkey
+kubectl get pods -n valkey -l app.kubernetes.io/name=valkey
+kubectl logs -n valkey statefulset/valkey --since=10m
+kubectl get events -n valkey --sort-by=.lastTimestamp
+```
+
+For Sentinel and cluster mode, test the exact client library used by the application. A healthy pod does not prove the
+client understands Sentinel discovery or Cluster redirects.
+
+## Common Issues
+
+| Symptom                                  | Likely Cause                                | Fix                                                        |
+| ---------------------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| Writes fail in replication mode          | Application writes to replica Service       | Use the primary Service for writes.                        |
+| Sentinel failover is not observed by app | Client is not Sentinel-aware                | Configure Sentinel client support or use another topology. |
+| Cluster client receives redirect errors  | Client lacks Cluster support                | Use a Cluster-compatible client library.                   |
+| Auth changes break clients               | Password Secret rotated without app rollout | Coordinate Secret rotation and application restarts.       |
+
 <a id="values"></a>
 
 ## Values

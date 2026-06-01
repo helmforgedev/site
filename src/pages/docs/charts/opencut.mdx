@@ -63,6 +63,174 @@ redisHttp:
 
 The chart uses HelmForge subcharts for databases by default. For production, pin credentials through existing Secrets or External Secrets and size PostgreSQL and Redis PVCs explicitly.
 
+## Architecture
+
+The chart deploys OpenCut with HelmForge PostgreSQL and Redis by default, plus the Redis-over-HTTP bridge required by
+the application path. The application pod receives a stable site URL, authentication secret, database connection, Redis
+connection, and optional workspace integration values.
+
+Runtime flow:
+
+1. Public traffic enters through Ingress or Gateway API.
+2. OpenCut handles browser and API traffic through the main Service.
+3. PostgreSQL stores application state.
+4. Redis and the Redis HTTP bridge support cache and application integration paths.
+5. Optional External Secrets reconcile database, Redis, and app secrets.
+
+## Production Values
+
+Use stable application secrets, durable PostgreSQL and Redis, explicit route settings, and NetworkPolicy:
+
+```yaml
+opencut:
+  siteUrl: https://opencut.example.com
+  betterAuthSecret: replace-with-a-stable-secret
+  marbleWorkspaceKey: replace-with-workspace-key
+
+postgresql:
+  auth:
+    existingSecret: opencut-postgresql-auth
+    existingSecretUserPasswordKey: user-password
+  standalone:
+    persistence:
+      enabled: true
+      storageClass: fast-retain
+      size: 50Gi
+
+redis:
+  auth:
+    enabled: true
+    existingSecret: opencut-redis-auth
+    existingSecretPasswordKey: redis-password
+  standalone:
+    persistence:
+      enabled: true
+      storageClass: fast-retain
+      size: 8Gi
+
+redisHttp:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+networkPolicy:
+  enabled: true
+```
+
+`opencut.siteUrl` should match the externally visible URL exactly. Authentication callback and generated links depend on
+that value.
+
+## External Services
+
+Use external dependencies when PostgreSQL or Redis are platform-managed:
+
+```yaml
+opencut:
+  siteUrl: https://opencut.example.com
+  betterAuthSecret: replace-with-a-stable-secret
+
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgres.example.com
+    port: 5432
+    name: opencut
+    username: opencut
+    existingSecret: opencut-db
+    existingSecretPasswordKey: database-password
+
+redis:
+  enabled: false
+  external:
+    host: redis.example.com
+    port: 6379
+    existingSecret: opencut-redis
+    existingSecretPasswordKey: redis-password
+```
+
+Keep the Redis HTTP bridge enabled unless your deployment provides a compatible external bridge through
+`redisHttp.externalUrl`.
+
+## Networking And Scaling
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: opencut.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: opencut-tls
+      hosts:
+        - opencut.example.com
+```
+
+Gateway API example:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - opencut.example.com
+  path: /
+  pathType: PathPrefix
+```
+
+Enable HPA only after database and Redis capacity have been sized for additional application pods:
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+```
+
+## Secrets
+
+For GitOps, store app and dependency secrets outside values files. The chart supports generated Kubernetes Secrets for
+local tests, existing Secrets for production, and ExternalSecret resources when External Secrets Operator is installed.
+
+Rotate `betterAuthSecret` carefully because it can invalidate sessions or signed application state.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test opencut -n opencut
+kubectl get pods -n opencut -l app.kubernetes.io/name=opencut
+kubectl logs -n opencut deploy/opencut --since=10m
+kubectl get events -n opencut --sort-by=.lastTimestamp
+```
+
+Also validate the browser editor loads, authentication works, project creation succeeds, and the Redis HTTP bridge is
+reachable from the OpenCut pod.
+
+## Common Issues
+
+| Symptom                                  | Likely Cause                                   | Fix                                                         |
+| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Login or callbacks use the wrong URL     | `opencut.siteUrl` does not match public route  | Set the exact external HTTPS URL.                           |
+| App starts before dependencies are ready | External DB/Redis DNS or credentials are wrong | Check connection Secrets and service reachability.          |
+| Redis HTTP bridge errors                 | Bridge disabled or external URL wrong          | Keep `redisHttp.enabled=true` or set a valid `externalUrl`. |
+| Sessions break after redeploy            | Auth secret changed                            | Store `betterAuthSecret` in a stable Secret.                |
+
 <a id="values"></a>
 
 ## Values

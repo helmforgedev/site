@@ -64,6 +64,166 @@ ingress:
 
 Persistent uploads are application data. Keep the upload PVC backed up with your platform backup tool. For production, prefer an external PostgreSQL instance or explicitly size the bundled PostgreSQL and cache PVCs.
 
+## Architecture
+
+The chart deploys the Immich server, the machine-learning service, HelmForge PostgreSQL, and a Redis/Valkey-compatible
+cache by default. Uploads, database data, cache data, and machine-learning model cache are separate persistence concerns
+and should be sized independently.
+
+Runtime flow:
+
+1. Ingress or Gateway API exposes the Immich server.
+2. The server stores metadata in PostgreSQL and binary media in the uploads volume.
+3. The cache service backs queues and application cache behavior.
+4. The machine-learning service stores model files on its own cache volume.
+5. Optional External Secrets wire external database or cache credentials.
+
+## Production Values
+
+Use durable uploads, durable dependencies, stable credentials, and explicit routing:
+
+```yaml
+server:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    storageClass: fast-retain
+    size: 500Gi
+
+machineLearning:
+  persistence:
+    enabled: true
+    storageClass: fast-retain
+    size: 20Gi
+
+postgresql:
+  auth:
+    existingSecret: immich-postgresql-auth
+    existingSecretPostgresPasswordKey: postgres-password
+    existingSecretUserPasswordKey: user-password
+  standalone:
+    persistence:
+      enabled: true
+      storageClass: fast-retain
+      size: 100Gi
+
+valkey:
+  auth:
+    enabled: true
+    existingSecret: immich-cache-auth
+    existingSecretPasswordKey: valkey-password
+  standalone:
+    persistence:
+      enabled: true
+      storageClass: fast-retain
+      size: 10Gi
+```
+
+Do not increase server replicas while uploads use `ReadWriteOnce` storage. The chart blocks unsafe multi-writer shapes
+so media libraries are not corrupted by multiple pods writing to a single-writer volume.
+
+## External Services
+
+For platform-managed PostgreSQL and Redis/Valkey:
+
+```yaml
+postgresql:
+  enabled: false
+
+database:
+  external:
+    host: postgres.example.com
+    port: 5432
+    database: immich
+    username: immich
+    existingSecret: immich-db
+    existingSecretPasswordKey: database-password
+
+valkey:
+  internal:
+    enabled: false
+  external:
+    host: valkey.example.com
+    port: 6379
+    existingSecret: immich-cache
+    existingSecretPasswordKey: redis-password
+```
+
+The external database must include the extensions required by Immich before application startup. Validate extension
+ownership and upgrade behavior in the database runbook, not only in the Helm release.
+
+## Networking
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: immich.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: immich-tls
+      hosts:
+        - immich.example.com
+```
+
+Gateway API example:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - immich.example.com
+  path: /
+  pathType: PathPrefix
+```
+
+## Storage And Backup
+
+Back up at least:
+
+- the uploads PVC
+- PostgreSQL data, whether bundled or external
+- Secrets used for database/cache credentials
+- any external object storage or backup configuration used by the platform
+
+The cache is usually rebuildable, but persistent cache storage can reduce cold-start impact. Do not treat the cache as
+the source of truth for photos or videos.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test immich -n immich
+kubectl get pods -n immich -l app.kubernetes.io/name=immich
+kubectl logs -n immich deploy/immich --since=10m
+kubectl get events -n immich --sort-by=.lastTimestamp
+```
+
+Also validate browser login, upload, thumbnail generation, search, and machine-learning classification against a small
+test library.
+
+## Common Issues
+
+| Symptom                                | Likely Cause                                                 | Fix                                                     |
+| -------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| Render fails when scaling server       | Upload volume is single-writer                               | Use `ReadWriteMany` storage or keep one server replica. |
+| Startup fails on database migrations   | External PostgreSQL lacks required extensions or permissions | Prepare the database before deploying Immich.           |
+| ML features are slow after restart     | Model cache is ephemeral                                     | Enable `machineLearning.persistence`.                   |
+| Uploads disappear after pod recreation | Upload persistence disabled or wrong PVC                     | Enable server persistence and verify PVC binding.       |
+
 <a id="values"></a>
 
 ## Values
