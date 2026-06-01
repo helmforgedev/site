@@ -77,9 +77,15 @@ export const comparisonFull: ComparisonRow[] = [
   },
   {
     aspect: 'CI pipeline',
-    helmforge: 'Lint + template + unittest + kubeconform',
+    helmforge: 'Lint + template + unittest + kubeconform + Artifact Hub lint',
     bitnami: 'Internal CI',
     community: 'Minimal or none',
+  },
+  {
+    aspect: 'Security scanning',
+    helmforge: 'Kubescape MITRE + NSA + SOC2 scan on chart changes',
+    bitnami: 'Internal security process',
+    community: 'Rare',
   },
 ];
 
