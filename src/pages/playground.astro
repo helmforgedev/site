@@ -6,8 +6,6 @@ import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
 import { charts, chartIcon, FALLBACK_ICON } from '../data/charts';
 
-const stableCharts = charts.filter((c) => c.maturity === 'stable' || c.slug === 'gophish' || c.slug === 'hoppscotch');
-
 // Field definition for playground configs
 interface PlaygroundField {
   label: string;
@@ -5826,6 +5824,11 @@ const scenarios: Record<string, { label: string; description: string; values: Re
 
 const configsJson = JSON.stringify(chartConfigs);
 const scenariosJson = JSON.stringify(scenarios);
+const configuredChartSlugs = new Set(Object.keys(chartConfigs).filter((slug) => slug !== '_default'));
+const defaultConfiguredChartSlugs = new Set(['generic']);
+const stableCharts = charts.filter(
+  (c) => c.maturity === 'stable' && (configuredChartSlugs.has(c.slug) || defaultConfiguredChartSlugs.has(c.slug)),
+);
 ---
 
 <BaseLayout

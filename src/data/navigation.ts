@@ -32,7 +32,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'MariaDB', href: '/docs/charts/mariadb', maturity: 'stable' },
       { label: 'Redis', href: '/docs/charts/redis', maturity: 'stable' },
       { label: 'Valkey', href: '/docs/charts/valkey', maturity: 'stable' },
-      { label: 'Memcached', href: '/docs/charts/memcached', maturity: 'beta' },
+      { label: 'Memcached', href: '/docs/charts/memcached', maturity: 'stable' },
     ],
   },
   {
@@ -68,13 +68,14 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Authelia', href: '/docs/charts/authelia', maturity: 'stable' },
       { label: 'OAuth2 Proxy', href: '/docs/charts/oauth2-proxy', maturity: 'stable' },
       { label: 'SonarQube', href: '/docs/charts/sonarqube', maturity: 'stable' },
+      { label: 'Gophish', href: '/docs/charts/gophish', maturity: 'stable' },
     ],
   },
   {
     label: 'Networking & DNS',
     charts: [
       { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
-      { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'beta' },
+      { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'stable' },
       { label: 'DDNS Updater', href: '/docs/charts/ddns-updater', maturity: 'stable' },
       { label: 'Pi-hole', href: '/docs/charts/pihole', maturity: 'stable' },
       { label: 'AdGuard Home', href: '/docs/charts/adguard-home', maturity: 'stable' },
@@ -95,7 +96,7 @@ export const chartCategories: ChartCategory[] = [
   },
   {
     label: 'Home Automation',
-    charts: [{ label: 'openHAB', href: '/docs/charts/openhab', maturity: 'beta' }],
+    charts: [{ label: 'openHAB', href: '/docs/charts/openhab', maturity: 'stable' }],
   },
   {
     label: 'Monitoring & Ops',
@@ -124,7 +125,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Jenkins', href: '/docs/charts/jenkins', maturity: 'stable' },
       { label: 'Apache', href: '/docs/charts/apache', maturity: 'stable' },
       { label: 'Tomcat', href: '/docs/charts/tomcat', maturity: 'stable' },
-      { label: 'Hoppscotch', href: '/docs/charts/hoppscotch', maturity: 'beta' },
+      { label: 'Hoppscotch', href: '/docs/charts/hoppscotch', maturity: 'stable' },
     ],
   },
   {
@@ -149,7 +150,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'CKAN', href: '/docs/charts/ckan', maturity: 'stable' },
       { label: 'Apache Druid', href: '/docs/charts/druid', maturity: 'stable' },
       { label: 'Kibana', href: '/docs/charts/kibana', maturity: 'stable' },
-      { label: 'Elasticsearch', href: '/docs/charts/elasticsearch', maturity: 'alpha' },
+      { label: 'Elasticsearch', href: '/docs/charts/elasticsearch', maturity: 'stable' },
     ],
   },
   {
