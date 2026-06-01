@@ -62,6 +62,178 @@ metrics:
 
 Keep production replica counts odd. Use `allowEvenReplicas=true` only for a deliberate platform-specific reason. Enable NetworkPolicy and explicitly allow client, quorum, DNS, and metrics flows.
 
+## Architecture
+
+ZooKeeper is deployed as a StatefulSet with stable pod DNS, a client Service, a headless Service for quorum traffic, and
+optional metrics exposure. Production ensembles should use an odd replica count so quorum can survive a member failure.
+
+Ports and roles:
+
+- client port for application connections
+- quorum election and follower communication ports between pods
+- optional secure client port when TLS is enabled
+- optional metrics port for Prometheus scraping
+
+The chart blocks accidental even replica counts by default. Set `allowEvenReplicas=true` only when an operator has a
+clear reason and accepts the quorum tradeoff.
+
+## Production Values
+
+Use three replicas, persistent data, a data log volume, PDB, metrics, topology spread, and NetworkPolicy:
+
+```yaml
+replicaCount: 3
+
+persistence:
+  enabled: true
+  size: 20Gi
+  dataLogDir:
+    enabled: true
+    size: 10Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 2Gi
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+networkPolicy:
+  enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+```
+
+For local or CI smoke tests, standalone mode is intentionally simple:
+
+```yaml
+replicaCount: 1
+
+persistence:
+  enabled: false
+```
+
+## Authentication
+
+Client SASL/Digest authentication is optional:
+
+```yaml
+auth:
+  client:
+    enabled: true
+    existingSecret: zookeeper-client-auth
+    usernameKey: username
+    passwordKey: password
+```
+
+When clients use authentication, update every application connection string and client JAAS configuration before
+enforcing the authenticated path.
+
+## TLS
+
+Secure client port support expects existing JKS keystore and truststore material:
+
+```yaml
+tls:
+  client:
+    enabled: true
+    existingSecret: zookeeper-client-tls
+    keystoreKey: keystore.jks
+    truststoreKey: truststore.jks
+    existingPasswordsSecret: zookeeper-client-tls-passwords
+```
+
+TLS changes affect both server startup and client compatibility. Validate the exact client libraries used by Kafka,
+Solr, or other ZooKeeper consumers before rollout.
+
+## External Secrets
+
+External Secrets Operator can reconcile auth and TLS material when the operator already exists:
+
+```yaml
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: password
+      remoteRef:
+        key: zookeeper/client
+        property: password
+```
+
+The chart renders ExternalSecret resources only when explicitly enabled; it does not install External Secrets Operator
+or create a SecretStore.
+
+## Networking
+
+NetworkPolicy must allow:
+
+- client traffic from approved application namespaces
+- quorum traffic between ZooKeeper pods
+- DNS egress
+- metrics scraping from the monitoring namespace when metrics are enabled
+
+Dual-stack Service fields are available:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+## Observability
+
+Enable metrics, ServiceMonitor, and PrometheusRule together when Prometheus Operator is available:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus
+  prometheusRule:
+    enabled: true
+```
+
+Watch quorum health, outstanding requests, latency, watches, open file descriptors, leader changes, and pod restarts.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test zookeeper -n zookeeper
+kubectl get pods -n zookeeper -l app.kubernetes.io/name=zookeeper
+kubectl logs -n zookeeper statefulset/zookeeper --since=10m
+kubectl get events -n zookeeper --sort-by=.lastTimestamp
+```
+
+For production, validate a real client connection, quorum after a pod restart, and behavior during voluntary disruption
+with the PDB enabled.
+
+## Common Issues
+
+| Symptom                          | Likely Cause                                    | Fix                                                                    |
+| -------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| Render blocks even replicas      | Quorum safety validation                        | Use an odd replica count or deliberately set `allowEvenReplicas=true`. |
+| Ensemble never forms quorum      | Pod DNS, NetworkPolicy, or quorum ports blocked | Check headless Service DNS and intra-ensemble policy.                  |
+| Clients fail after enabling auth | Client JAAS/config not updated                  | Roll client configuration before enforcing auth.                       |
+| TLS startup fails                | JKS Secret keys or passwords mismatch           | Verify Secret keys and password Secret values.                         |
+
 <a id="values"></a>
 
 ## Values

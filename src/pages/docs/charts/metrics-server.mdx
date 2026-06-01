@@ -47,6 +47,123 @@ Do not enable insecure kubelet TLS in production unless your platform explicitly
 
 Metrics Server `0.8.x` targets Kubernetes `1.31+`. For HA, use at least two replicas and configure aggregator routing on the API server where supported.
 
+## Architecture
+
+Metrics Server is a cluster add-on. The chart renders the Deployment, Service, RBAC, and optional APIService that backs
+`metrics.k8s.io/v1beta1`. The pod scrapes kubelets, aggregates CPU and memory samples, and serves them through the
+Kubernetes aggregation layer for `kubectl top`, HPA, and VPA integrations.
+
+Traffic flow:
+
+1. Metrics Server connects to kubelets on the configured secure port.
+2. The Kubernetes API aggregation layer proxies `metrics.k8s.io` requests to the Metrics Server Service.
+3. Controllers such as HPA read pod and node metrics from the aggregated API.
+4. Optional ServiceMonitor resources scrape Metrics Server's own process metrics.
+
+## Production Values
+
+Use two replicas, a PDB, and topology spread in production clusters:
+
+```yaml
+replicaCount: 2
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: metrics-server
+```
+
+For local k3d or self-signed kubelet serving certificates, use the dedicated local override:
+
+```yaml
+metricsServer:
+  kubelet:
+    insecureTLS: true
+```
+
+Do not carry `insecureTLS: true` into production unless the platform team has explicitly accepted the TLS validation
+tradeoff.
+
+## APIService And RBAC
+
+Keep `apiService.create=true` when the cluster does not already provide Metrics Server. The APIService must be
+`Available=True` before HPA and `kubectl top` can work:
+
+```bash
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl describe apiservice v1beta1.metrics.k8s.io
+```
+
+The chart can also run without creating RBAC or the APIService for distributions that already manage those resources,
+but in that mode ownership must be clear to avoid reconciliation conflicts.
+
+## Networking
+
+Metrics Server usually needs egress from the pod to every node kubelet. If NetworkPolicy enforcement is enabled, allow
+node/kubelet traffic and DNS:
+
+```yaml
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDns: true
+```
+
+Host networking is opt-in for platforms where pod-to-kubelet routing requires it:
+
+```yaml
+hostNetwork:
+  enabled: true
+dnsPolicy: ClusterFirstWithHostNet
+```
+
+## Observability
+
+Enable the ServiceMonitor when Prometheus Operator is installed:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus
+```
+
+Use Metrics Server process metrics to detect scrape failures, API aggregation errors, and high request latency. Use the
+Metrics API itself for autoscaling signals rather than scraping application metrics from Metrics Server.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test metrics-server -n kube-system
+kubectl get pods -n kube-system -l app.kubernetes.io/name=metrics-server
+kubectl top nodes
+kubectl top pods -A
+kubectl get events -n kube-system --sort-by=.lastTimestamp
+```
+
+If `kubectl top` returns no data immediately after install, wait for at least one metric resolution interval and check
+the APIService condition.
+
+## Common Issues
+
+| Symptom                                           | Likely Cause                          | Fix                                                                       |
+| ------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| `kubectl top` returns `Metrics API not available` | APIService is unavailable             | Describe `v1beta1.metrics.k8s.io` and check Service endpoints.            |
+| Logs show kubelet certificate errors              | Kubelet serving certs are not trusted | Configure platform CA trust or use `insecureTLS` only for local clusters. |
+| HPA never scales                                  | Metrics API has no pod samples        | Check pod readiness, Metrics Server logs, and kubelet connectivity.       |
+| Pods cannot scrape kubelets                       | NetworkPolicy blocks node egress      | Allow kubelet ports and DNS in egress policy.                             |
+
 <a id="values"></a>
 
 ## Values

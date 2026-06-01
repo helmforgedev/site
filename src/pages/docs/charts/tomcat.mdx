@@ -58,6 +58,164 @@ jmx:
 
 Prefer immutable Tomcat images or init containers that fetch versioned WAR artifacts. Enable JMX only on trusted networks and add authentication or TLS flags through `jmx.extraOpts` when exposing remote JMX.
 
+## Architecture
+
+The chart deploys the official Tomcat image with a writable application layer for `webapps`, `logs`, `temp`, and `work`.
+This keeps the container security posture strict while still allowing Tomcat to unpack WARs and write runtime files.
+
+Application delivery options:
+
+1. Bake WAR files or exploded applications into a custom Tomcat image.
+2. Mount WAR artifacts through an init container and shared volume.
+3. Use `webapps.persistence` for controlled mutable deployments.
+4. Disable the default ROOT health webapp when your application provides its own health endpoint.
+
+The default ROOT application exists only to make probes and Helm tests deterministic on a fresh install.
+
+## Production Values
+
+For production applications, disable the sample ROOT app, switch probes to an application-safe endpoint or TCP mode, and
+configure routing explicitly:
+
+```yaml
+replicaCount: 2
+
+webapps:
+  defaultRoot:
+    enabled: false
+  copyImageContent:
+    enabled: true
+
+startupProbe:
+  mode: tcp
+livenessProbe:
+  mode: tcp
+readinessProbe:
+  mode: tcp
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - tomcat.example.com
+
+networkPolicy:
+  enabled: true
+  ingress:
+    extraFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: gateway-system
+```
+
+## Deploying Applications
+
+For immutable images, keep `webapps.copyImageContent.enabled=true`; the chart copies image-baked contents from
+`/usr/local/tomcat/webapps` into the writable volume only when that volume is empty.
+
+For artifact-driven deployments, add an init container:
+
+```yaml
+extraInitContainers:
+  - name: fetch-war
+    image: docker.io/curlimages/curl:8.17.0
+    command:
+      - sh
+      - -ec
+      - |
+        curl -fsSL "$WAR_URL" -o /webapps/ROOT.war
+    env:
+      - name: WAR_URL
+        value: https://artifacts.example.com/apps/myapp-1.2.3.war
+    volumeMounts:
+      - name: webapps
+        mountPath: /webapps
+```
+
+Use persistent `webapps` only when applications are intentionally installed or mutated at runtime:
+
+```yaml
+webapps:
+  persistence:
+    enabled: true
+    size: 20Gi
+logs:
+  persistence:
+    enabled: true
+    size: 10Gi
+```
+
+## Reverse Proxy Configuration
+
+When Tomcat is behind an ingress controller or Gateway, configure connector proxy attributes so applications generate
+correct absolute URLs and redirects:
+
+```yaml
+tomcat:
+  serverXml: |
+    <Server port="8005" shutdown="SHUTDOWN">
+      <Service name="Catalina">
+        <Connector port="8080" protocol="HTTP/1.1"
+          proxyName="tomcat.example.com"
+          proxyPort="443"
+          scheme="https"
+          secure="true" />
+        <Engine name="Catalina" defaultHost="localhost">
+          <Host name="localhost" appBase="webapps" />
+        </Engine>
+      </Service>
+    </Server>
+```
+
+Use `tomcat.existingServerXmlConfigMap` when platform teams manage the full server configuration externally.
+
+## JMX
+
+Remote JMX is opt-in and should stay on trusted networks:
+
+```yaml
+jmx:
+  enabled: true
+  hostname: tomcat.example.local
+  extraOpts: '-Dcom.sun.management.jmxremote.local.only=false'
+
+networkPolicy:
+  enabled: true
+  ingress:
+    extraFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: monitoring
+```
+
+For authenticated or TLS-secured JMX, mount the required files with `extraVolumes` and append the JVM flags through
+`jmx.extraOpts`.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test tomcat -n tomcat
+kubectl get pods -n tomcat -l app.kubernetes.io/name=tomcat
+kubectl logs -n tomcat deploy/tomcat --since=10m
+kubectl get events -n tomcat --sort-by=.lastTimestamp
+```
+
+If probes use HTTP paths, confirm the deployed application serves those paths before disabling the default ROOT health
+webapp.
+
+## Common Issues
+
+| Symptom                              | Likely Cause                                | Fix                                                         |
+| ------------------------------------ | ------------------------------------------- | ----------------------------------------------------------- |
+| Probe failures after deploying a WAR | `/health.jsp` no longer exists              | Switch probes to TCP or configure app-specific probe paths. |
+| Redirects use `http://` behind TLS   | Connector proxy attributes missing          | Set `proxyName`, `proxyPort`, `scheme`, and `secure`.       |
+| Image-baked apps disappear           | Writable webapps volume hides image content | Keep `webapps.copyImageContent.enabled=true`.               |
+| JMX cannot connect                   | RMI hostname or NetworkPolicy is wrong      | Set `jmx.hostname` and allow monitoring namespace traffic.  |
+
 <a id="values"></a>
 
 ## Values

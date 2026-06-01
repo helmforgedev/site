@@ -63,6 +63,162 @@ elasticsearch:
 
 Set stable encryption keys before scaling beyond one replica. Elastic recommends matching Kibana and Elasticsearch versions across the stack.
 
+## Architecture
+
+The chart deploys Kibana as the visualization layer for Elasticsearch. It can connect to an external Elasticsearch
+cluster or deploy the HelmForge Elasticsearch subchart for self-contained environments. Authentication can be disabled
+for local tests, use basic credentials, or use a service account token.
+
+Runtime flow:
+
+1. Users reach Kibana through Ingress or Gateway API.
+2. Kibana reads stable encryption keys from generated or existing Secrets.
+3. Kibana connects to one or more Elasticsearch endpoints.
+4. Optional TLS CA material verifies Elasticsearch certificates.
+5. Optional ServiceMonitor scrapes Kibana process metrics.
+
+## Production Values
+
+Use stable encryption keys, TLS verification, service account tokens, and explicit network policy:
+
+```yaml
+replicaCount: 2
+
+elasticsearch:
+  hosts:
+    - https://elasticsearch:9200
+  auth:
+    type: serviceAccountToken
+    existingSecret: kibana-elasticsearch-token
+  tls:
+    enabled: true
+    certificateAuthoritiesSecret: elasticsearch-ca
+    verificationMode: certificate
+
+encryptionKeys:
+  existingSecret: kibana-encryption-keys
+
+networkPolicy:
+  enabled: true
+```
+
+Stable encryption keys are required before scaling beyond one pod. Without them, sessions, saved object encryption, and
+reporting features can fail across restarts or replicas.
+
+## Bundled Elasticsearch
+
+For development or self-contained validation, enable the HelmForge Elasticsearch dependency:
+
+```yaml
+bundledElasticsearch:
+  enabled: true
+
+elasticsearch:
+  hosts:
+    - http://kibana-bundled-elasticsearch:9200
+
+bundled-elasticsearch:
+  clusterProfile: dev
+  image:
+    tag: '9.4.2'
+  kibana:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+  sysctlInit:
+    enabled: false
+```
+
+For production, prefer a separately managed Elasticsearch release with its own capacity, backup, and upgrade plan.
+
+## Secrets And External Secrets
+
+Service account token example:
+
+```yaml
+elasticsearch:
+  auth:
+    type: serviceAccountToken
+    existingSecret: kibana-elasticsearch-token
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: service-account-token
+      remoteRef:
+        key: elastic/kibana
+        property: service-account-token
+```
+
+Use the same target Secret names in Kibana values and ExternalSecret configuration to avoid race conditions or orphaned
+credentials.
+
+## Networking
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: kibana.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: kibana-tls
+      hosts:
+        - kibana.example.com
+```
+
+Gateway API example:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+  hostnames:
+    - kibana.example.com
+```
+
+## Upgrade Notes
+
+Keep Kibana and Elasticsearch versions aligned. When upgrading:
+
+1. Confirm Elasticsearch is compatible with the target Kibana version.
+2. Back up saved objects and Elasticsearch data according to the Elastic runbook.
+3. Keep encryption keys stable.
+4. Roll out Kibana after Elasticsearch is healthy.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test kibana -n kibana
+kubectl get pods -n kibana -l app.kubernetes.io/name=kibana
+kubectl logs -n kibana deploy/kibana --since=10m
+kubectl get events -n kibana --sort-by=.lastTimestamp
+```
+
+Also validate login, saved object access, index pattern discovery, and TLS verification against Elasticsearch.
+
+## Common Issues
+
+| Symptom                                | Likely Cause                                   | Fix                                               |
+| -------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| Kibana reports encryption key warnings | Keys are generated or unstable                 | Set `encryptionKeys.existingSecret`.              |
+| Cannot connect to Elasticsearch        | Wrong hosts, credentials, CA, or NetworkPolicy | Validate DNS, Secret keys, CA Secret, and egress. |
+| TLS verification fails                 | CA Secret missing or verification mode wrong   | Mount the correct CA and set `verificationMode`.  |
+| Version compatibility errors           | Kibana and Elasticsearch versions differ       | Align stack versions before rollout.              |
+
 <a id="values"></a>
 
 ## Values

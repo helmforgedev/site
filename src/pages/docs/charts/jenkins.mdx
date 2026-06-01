@@ -62,6 +62,153 @@ gateway:
 
 Store admin credentials outside the values file for production. If `jcasC.enabled=true`, include the Configuration as Code plugin through the image or the plugin bootstrap list.
 
+## Architecture
+
+The chart runs the Jenkins controller as a StatefulSet with persistent `JENKINS_HOME`. Optional init logic installs
+pinned plugins before startup, JCasC config maps can seed controller configuration, and RBAC can be created for
+Kubernetes-based build agents.
+
+Main paths:
+
+1. Users reach the controller through Ingress or Gateway API.
+2. The controller stores jobs, plugin state, and build metadata on the Jenkins home PVC.
+3. Optional plugin bootstrap installs pinned plugin versions before Jenkins starts.
+4. Optional JCasC files configure Jenkins from code once the Configuration as Code plugin is available.
+5. Optional Kubernetes agent RBAC lets the controller schedule ephemeral build agents.
+
+## Production Values
+
+Production Jenkins should use stable credentials, persistent storage, pinned plugins, explicit resources, and network
+boundaries:
+
+```yaml
+persistence:
+  enabled: true
+  size: 100Gi
+
+admin:
+  existingSecret: jenkins-admin
+
+resources:
+  requests:
+    cpu: 1
+    memory: 2Gi
+  limits:
+    cpu: 4
+    memory: 6Gi
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    allowDns: true
+    allowInternet: true
+```
+
+Keep `allowInternet=true` only when plugin installation, SCM checkout, or build workloads require outbound internet. In
+restricted environments, mirror plugins and build dependencies internally.
+
+## Plugins And JCasC
+
+Pin plugins and test upgrades outside production:
+
+```yaml
+plugins:
+  install:
+    enabled: true
+    initializeOnce: true
+    list:
+      - configuration-as-code:2074.va_57f83f7a_10b_
+      - workflow-aggregator:608.v67378e9d3db_1
+      - git:5.10.1
+      - kubernetes:4423.vb_59f230b_ce53
+
+jcasC:
+  enabled: true
+  configScripts:
+    welcome.yaml: |
+      jenkins:
+        systemMessage: "Managed by HelmForge"
+```
+
+`initializeOnce` prevents repeated plugin install work after the first initialized Jenkins home. Disable it only when
+the release process intentionally reconciles plugins on every start.
+
+## Credentials
+
+By default, the chart can create initial admin credentials. For production, point both the workload and optional
+ExternalSecret at the same target Secret:
+
+```yaml
+admin:
+  existingSecret: jenkins-admin
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: jenkins-admin-user
+      remoteRef:
+        key: jenkins/admin
+        property: username
+    - secretKey: jenkins-admin-password
+      remoteRef:
+        key: jenkins/admin
+        property: password
+```
+
+## Networking And Agents
+
+Expose the controller with Ingress or Gateway API. Disable the inbound TCP agent listener when all builds use WebSocket
+agents or Kubernetes plugin agents:
+
+```yaml
+agent:
+  enabled: false
+
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - jenkins.example.com
+```
+
+For Kubernetes agents, keep `rbac.create=true` only in namespaces where Jenkins is allowed to create build pods.
+
+## Backup And Upgrade Notes
+
+Back up `JENKINS_HOME` before plugin, Java, or Jenkins LTS upgrades. Treat plugin upgrades as application changes:
+review plugin changelogs, test JCasC reloads, and validate representative pipelines before promotion.
+
+Avoid changing the controller image and a large plugin set in the same release unless you have a rollback plan for both
+the image and persistent home contents.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test jenkins -n jenkins
+kubectl get pods -n jenkins -l app.kubernetes.io/name=jenkins
+kubectl logs -n jenkins statefulset/jenkins --since=10m
+kubectl get events -n jenkins --sort-by=.lastTimestamp
+```
+
+Also validate a real pipeline run if Kubernetes agents, credentials, or network egress policies changed.
+
+## Common Issues
+
+| Symptom                             | Likely Cause                                     | Fix                                                             |
+| ----------------------------------- | ------------------------------------------------ | --------------------------------------------------------------- |
+| Jenkins starts without JCasC        | Configuration as Code plugin is missing          | Include the plugin in the image or `plugins.install.list`.      |
+| Plugin install repeats every start  | `initializeOnce` disabled or home not persistent | Enable persistence and `initializeOnce` for stable controllers. |
+| Agents cannot start                 | RBAC or NetworkPolicy blocks agent pods          | Check ServiceAccount permissions and egress to the API server.  |
+| Admin password changes unexpectedly | Chart-generated Secret was recreated             | Use `admin.existingSecret` or External Secrets.                 |
+
 <a id="values"></a>
 
 ## Values

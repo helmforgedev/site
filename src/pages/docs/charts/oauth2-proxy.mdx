@@ -63,6 +63,142 @@ config:
 
 Keep `config.reverseProxy.enabled=false` unless the deployment is behind a trusted ingress, gateway, or edge proxy. When enabled, define narrow `trustedProxyIps` CIDRs to avoid trusting client-supplied forwarded headers.
 
+## Architecture
+
+OAuth2 Proxy usually sits between an ingress or Gateway and protected upstream applications. This chart can run it as a
+dedicated authentication endpoint, a reverse proxy, or a forward-auth style component depending on how your ingress
+controller or Gateway implementation is configured.
+
+Typical flow:
+
+1. The browser reaches `/oauth2/start` or a protected route.
+2. OAuth2 Proxy redirects the user to the configured OAuth2/OIDC provider.
+3. The provider sends the browser back to `config.redirectUrl`.
+4. OAuth2 Proxy validates the response, sets a secure cookie, and forwards authenticated requests.
+5. Metrics and health endpoints stay separate from application traffic.
+
+## Production Values
+
+Use existing Secrets, secure cookies, explicit trusted proxy CIDRs, and at least two replicas:
+
+```yaml
+replicaCount: 2
+
+auth:
+  createSecret: false
+  existingSecret: oauth2-proxy-auth
+
+config:
+  provider: oidc
+  oidcIssuerUrl: https://idp.example.com/realms/platform
+  redirectUrl: https://auth.example.com/oauth2/callback
+  cookie:
+    secure: true
+    domains:
+      - .example.com
+  reverseProxy:
+    enabled: true
+    trustedProxyIps:
+      - 10.42.0.0/16
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+```
+
+The Secret referenced by `auth.existingSecret` should contain the client secret and cookie secret keys expected by the
+chart. Keep cookie secrets stable across rollouts or users will be logged out.
+
+## OIDC Routing
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /oauth2
+          pathType: Prefix
+  tls:
+    - secretName: oauth2-proxy-tls
+      hosts:
+        - auth.example.com
+```
+
+Gateway API example:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - auth.example.com
+  path: /oauth2
+  pathType: PathPrefix
+```
+
+Make sure `config.redirectUrl` exactly matches the externally reachable callback URL, including scheme, host, and path.
+
+## External Secrets
+
+For GitOps, let External Secrets Operator manage the OAuth2 credentials:
+
+```yaml
+auth:
+  createSecret: false
+  existingSecret: oauth2-proxy-auth
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  dataFrom:
+    - extract:
+        key: oauth2-proxy/auth
+```
+
+Use `data` when your secret backend stores each key separately, and `dataFrom` when a single remote object contains all
+required keys.
+
+## Alpha Config
+
+Use `alphaConfig.enabled=true` when you need structured OAuth2 Proxy alpha configuration instead of command-line flags.
+Keep the generated config and classic `config` values aligned so the rendered arguments do not describe a different
+provider or cookie contract than the mounted config file.
+
+## Validation
+
+After deployment:
+
+```bash
+helm test oauth2-proxy -n oauth2-proxy
+kubectl get pods -n oauth2-proxy -l app.kubernetes.io/name=oauth2-proxy
+kubectl logs -n oauth2-proxy deploy/oauth2-proxy --since=10m
+kubectl get events -n oauth2-proxy --sort-by=.lastTimestamp
+```
+
+Validate a browser login flow as well as a direct health check. A healthy pod does not guarantee the OIDC provider,
+callback URL, cookie domain, and upstream proxy integration are correct.
+
+## Common Issues
+
+| Symptom                                  | Likely Cause                                            | Fix                                                      |
+| ---------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| Callback returns `redirect_uri mismatch` | `config.redirectUrl` differs from provider registration | Update either the chart value or the IdP client.         |
+| Users are logged out on every rollout    | Cookie secret changes                                   | Use `auth.existingSecret` or External Secrets.           |
+| Client IPs are spoofable                 | Reverse proxy trust is too broad                        | Keep `trustedProxyIps` narrow and platform-owned.        |
+| Login works but upstream denies user     | Missing headers or email/domain allow-list              | Check OAuth2 Proxy config and upstream expected headers. |
+
 <a id="values"></a>
 
 ## Values

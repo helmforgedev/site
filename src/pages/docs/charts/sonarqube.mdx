@@ -58,6 +58,169 @@ communityBranchPlugin:
 
 SonarQube embeds Elasticsearch and has host kernel requirements for production bootstrap checks. The chart keeps local evaluation approachable, but production clusters should satisfy SonarQube host requirements and use PostgreSQL, either bundled or external.
 
+## Architecture
+
+The chart runs SonarQube Community Build with one of three database paths:
+
+- `embedded` for disposable local validation
+- `postgresql` for the HelmForge PostgreSQL subchart
+- `external` for a platform-managed PostgreSQL database
+
+SonarQube also embeds Elasticsearch for search. That makes node kernel settings, persistent data, and startup probes
+part of the production contract.
+
+## Production Values
+
+Use PostgreSQL, persistent data and extensions volumes, and production bootstrap checks:
+
+```yaml
+sonarqube:
+  databaseMode: external
+  esBootstrapChecksDisable: false
+
+database:
+  external:
+    jdbcUrl: jdbc:postgresql://postgresql.database.svc.cluster.local:5432/sonarqube
+    username: sonar
+    existingSecret: sonarqube-database
+    existingSecretPasswordKey: jdbc-password
+
+persistence:
+  data:
+    enabled: true
+    size: 50Gi
+  extensions:
+    enabled: true
+    size: 10Gi
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+
+pdb:
+  enabled: true
+```
+
+Bundled HelmForge PostgreSQL is useful for self-contained releases:
+
+```yaml
+sonarqube:
+  databaseMode: postgresql
+  esBootstrapChecksDisable: false
+
+postgresql:
+  enabled: true
+  auth:
+    database: sonarqube
+    username: sonar
+    password: change-me
+  standalone:
+    persistence:
+      enabled: true
+      size: 50Gi
+```
+
+## Host Requirements
+
+Production nodes must satisfy SonarQube's Elasticsearch requirements before enabling bootstrap checks:
+
+- `vm.max_map_count=524288`
+- `fs.file-max=131072`
+- file descriptor limit of `131072`
+- process limit of `8192`
+
+Keep `sonarqube.esBootstrapChecksDisable=true` only for local and disposable environments.
+
+## Plugins
+
+The chart can download plugins during initialization:
+
+```yaml
+plugins:
+  enabled: true
+  install:
+    - name: sonar-auth-oidc
+      url: https://artifacts.example.com/sonar-auth-oidc.jar
+```
+
+Use an internal artifact repository for production. Startup should not depend on public internet availability.
+
+## Community Branch Plugin
+
+Community Branch Plugin wiring is explicit because it replaces web application files and adds Java agents:
+
+```yaml
+communityBranchPlugin:
+  enabled: true
+  version: '26.4.0'
+
+plugins:
+  enabled: true
+
+persistence:
+  extensions:
+    enabled: true
+    size: 10Gi
+```
+
+Keep the plugin major and minor version aligned with the SonarQube major and minor version. Mirror `jarUrl` and
+`webappUrl` internally when outbound internet is restricted.
+
+## Networking
+
+Ingress example:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: sonarqube.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: sonarqube-tls
+      hosts:
+        - sonarqube.example.com
+```
+
+Gateway API uses `gatewayAPI` for this chart:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+  hostnames:
+    - sonarqube.example.com
+```
+
+## Validation
+
+After deployment:
+
+```bash
+helm test sonarqube -n sonarqube
+kubectl get pods -n sonarqube -l app.kubernetes.io/name=sonarqube
+kubectl logs -n sonarqube deploy/sonarqube --since=10m
+kubectl get events -n sonarqube --sort-by=.lastTimestamp
+```
+
+Also validate the UI system status, a project scan, plugin loading, and branch analysis when the community branch plugin
+is enabled.
+
+## Common Issues
+
+| Symptom                             | Likely Cause                                     | Fix                                              |
+| ----------------------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| Elasticsearch bootstrap check fails | Node kernel limits are too low                   | Configure node sysctls and process/file limits.  |
+| Plugin disappears after restart     | Extensions persistence disabled                  | Enable `persistence.extensions`.                 |
+| Startup waits forever for DB        | JDBC URL, Secret key, or network policy is wrong | Check DB Secret, DNS, and egress policy.         |
+| Branch plugin fails after upgrade   | Plugin version mismatches SonarQube              | Align plugin and SonarQube major/minor versions. |
+
 <a id="values"></a>
 
 ## Values
