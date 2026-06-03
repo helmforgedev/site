@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: RabbitMQ Chart
-description: RabbitMQ Helm chart for Kubernetes with single-node or cluster mode, quorum queues, Erlang cookie clustering, management UI, TLS, metrics, and PDB.
+description: RabbitMQ Helm chart for Kubernetes with single-node or cluster mode, quorum queues, Erlang cookie clustering, management UI, TLS, metrics, Gateway API, External Secrets, dual-stack Services, and PDB.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -24,6 +24,9 @@ TLS listeners.
 - **Two architectures** — `single-node` (Deployment) or `cluster` (StatefulSet with peer discovery)
 - **Quorum queues by default** — `queueDefaults.type: quorum` for durable, replicated HA queues
 - **Dedicated management ingress** — `management.ingress` is separate from the AMQP service
+- **Gateway API support** — optional HTTPRoute for the management UI
+- **External Secrets Operator** — source username, password, and Erlang cookie from an external provider
+- **Dual-stack Services** — optional Service `ipFamilyPolicy` and `ipFamilies` controls
 - **Partition handling** — `pause_minority` strategy prevents split-brain in cluster mode
 - **PDB support** — optional PodDisruptionBudget to protect cluster quorum during node maintenance
 - **TLS listeners** — configurable AMQP/S and management TLS from an existing Secret
@@ -65,6 +68,8 @@ helm install rabbitmq oci://ghcr.io/helmforgedev/helm/rabbitmq -f values.yaml
     { id: 'cluster', label: 'HA Cluster' },
     { id: 'tls', label: 'With TLS' },
     { id: 'metrics', label: 'With Prometheus' },
+    { id: 'external-secrets', label: 'External Secrets' },
+    { id: 'gateway-api', label: 'Gateway API' },
   ]}
 >
 
@@ -91,7 +96,7 @@ management:
   enabled: true
   ingress:
     enabled: true
-    className: traefik
+    ingressClassName: traefik
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
     hosts:
@@ -147,7 +152,7 @@ management:
   enabled: true
   ingress:
     enabled: true
-    className: traefik
+    ingressClassName: traefik
     hosts:
       - host: rabbitmq.example.com
         paths:
@@ -188,7 +193,7 @@ management:
   enabled: true
   ingress:
     enabled: true
-    className: traefik
+    ingressClassName: traefik
     useTlsPort: true # route ingress to management HTTPS port (15671)
     hosts:
       - host: rabbitmq.example.com
@@ -233,6 +238,59 @@ management:
 
 </div>
 
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — RabbitMQ credentials managed by External Secrets Operator
+auth:
+  username: admin
+  existingSecret: rabbitmq-credentials
+  existingSecretUsernameKey: rabbitmq-username
+  existingSecretPasswordKey: rabbitmq-password
+  existingSecretErlangCookieKey: rabbitmq-erlang-cookie
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  refreshInterval: '0'
+  secretStoreRef:
+    name: platform-secrets
+    kind: ClusterSecretStore
+  data:
+    - secretKey: rabbitmq-username
+      remoteRef:
+        key: rabbitmq/admin
+        property: username
+    - secretKey: rabbitmq-password
+      remoteRef:
+        key: rabbitmq/admin
+        property: password
+    - secretKey: rabbitmq-erlang-cookie
+      remoteRef:
+        key: rabbitmq/cluster
+        property: erlangCookie
+```
+
+</div>
+
+<div data-tab-panel="gateway-api">
+
+```yaml
+# values.yaml — expose the RabbitMQ management UI through Gateway API
+management:
+  enabled: true
+
+gateway:
+  enabled: true
+  hostnames:
+    - rabbitmq.example.com
+  parentRefs:
+    - name: public-gateway
+      namespace: gateway-system
+```
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -252,7 +310,7 @@ management:
 | Parameter          | Type   | Default                      | Description                          |
 | ------------------ | ------ | ---------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/rabbitmq` | RabbitMQ image (management variant). |
-| `image.tag`        | string | `"4.2.4-management"`         | Image tag. Includes management UI.   |
+| `image.tag`        | string | `"4.3.1-management"`         | Image tag. Includes management UI.   |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                         | Pull secrets for private registries. |
 
@@ -312,15 +370,16 @@ management:
 
 ### Management UI
 
-| Parameter                        | Type    | Default   | Description                                             |
-| -------------------------------- | ------- | --------- | ------------------------------------------------------- |
-| `management.enabled`             | boolean | `true`    | Enable the management plugin and UI (port 15672/15671). |
-| `management.ingress.enabled`     | boolean | `false`   | Enable Ingress for the management UI.                   |
-| `management.ingress.className`   | string  | `traefik` | Ingress class for the management UI.                    |
-| `management.ingress.annotations` | object  | `{}`      | Annotations for the management Ingress.                 |
-| `management.ingress.hosts`       | array   | `[]`      | Ingress host and path rules.                            |
-| `management.ingress.tls`         | array   | `[]`      | TLS configuration for the management Ingress.           |
-| `management.ingress.useTlsPort`  | boolean | `false`   | Route ingress to the TLS management port (15671).       |
+| Parameter                             | Type    | Default   | Description                                                                             |
+| ------------------------------------- | ------- | --------- | --------------------------------------------------------------------------------------- |
+| `management.enabled`                  | boolean | `true`    | Enable the management plugin and UI (port 15672/15671).                                 |
+| `management.ingress.enabled`          | boolean | `false`   | Enable Ingress for the management UI.                                                   |
+| `management.ingress.ingressClassName` | string  | `traefik` | Ingress class for the management UI.                                                    |
+| `management.ingress.className`        | string  | _unset_   | Deprecated compatibility alias. Set `""` to intentionally omit `spec.ingressClassName`. |
+| `management.ingress.annotations`      | object  | `{}`      | Annotations for the management Ingress.                                                 |
+| `management.ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                                                            |
+| `management.ingress.tls`              | array   | `[]`      | TLS configuration for the management Ingress.                                           |
+| `management.ingress.useTlsPort`       | boolean | `false`   | Route ingress to the TLS management port (15671).                                       |
 
 ### TLS
 
@@ -367,18 +426,44 @@ management:
 
 ### Service
 
-| Parameter                   | Type    | Default     | Description                                            |
-| --------------------------- | ------- | ----------- | ------------------------------------------------------ |
-| `service.type`              | string  | `ClusterIP` | Service type.                                          |
-| `service.amqpPort`          | integer | `5672`      | AMQP listener port.                                    |
-| `service.amqpsPort`         | integer | `5671`      | AMQPS listener port (TLS).                             |
-| `service.managementPort`    | integer | `15672`     | Management UI HTTP port.                               |
-| `service.managementTlsPort` | integer | `15671`     | Management UI HTTPS port.                              |
-| `service.epmdPort`          | integer | `4369`      | Erlang port mapper daemon port.                        |
-| `service.distPort`          | integer | `25672`     | Erlang distribution port (cluster inter-node traffic). |
-| `service.metricsPort`       | integer | `15692`     | Prometheus metrics port.                               |
-| `service.annotations`       | object  | `{}`        | Annotations for the Service.                           |
-| `service.extraPorts`        | array   | `[]`        | Extra ports added to the Service.                      |
+| Parameter                   | Type    | Default     | Description                                               |
+| --------------------------- | ------- | ----------- | --------------------------------------------------------- |
+| `service.type`              | string  | `ClusterIP` | Service type.                                             |
+| `service.amqpPort`          | integer | `5672`      | AMQP listener port.                                       |
+| `service.amqpsPort`         | integer | `5671`      | AMQPS listener port (TLS).                                |
+| `service.managementPort`    | integer | `15672`     | Management UI HTTP port.                                  |
+| `service.managementTlsPort` | integer | `15671`     | Management UI HTTPS port.                                 |
+| `service.epmdPort`          | integer | `4369`      | Erlang port mapper daemon port.                           |
+| `service.distPort`          | integer | `25672`     | Erlang distribution port (cluster inter-node traffic).    |
+| `service.metricsPort`       | integer | `15692`     | Prometheus metrics port.                                  |
+| `service.annotations`       | object  | `{}`        | Annotations for the Service.                              |
+| `service.extraPorts`        | array   | `[]`        | Extra ports added to the Service.                         |
+| `service.ipFamilyPolicy`    | string  | `""`        | Service IP family policy. Empty uses the cluster default. |
+| `service.ipFamilies`        | array   | `[]`        | Ordered Service IP families such as `IPv4` and `IPv6`.    |
+
+### Gateway API
+
+The chart can expose the management UI with Gateway API by rendering an HTTPRoute that targets the management Service
+port. Use this when your cluster standardizes north-south HTTP traffic through Gateway API.
+
+| Parameter            | Type    | Default | Description                                       |
+| -------------------- | ------- | ------- | ------------------------------------------------- |
+| `gateway.enabled`    | boolean | `false` | Render a Gateway API HTTPRoute for management UI. |
+| `gateway.hostnames`  | array   | `[]`    | HTTPRoute hostnames. Empty matches all hostnames. |
+| `gateway.parentRefs` | array   | `[]`    | Parent Gateway references used by the HTTPRoute.  |
+
+### External Secrets Operator
+
+Use External Secrets for RabbitMQ credentials when passwords and Erlang cookies are owned by a secret manager.
+
+| Parameter                               | Type    | Default                  | Description                                              |
+| --------------------------------------- | ------- | ------------------------ | -------------------------------------------------------- |
+| `externalSecrets.enabled`               | boolean | `false`                  | Render an ExternalSecret for RabbitMQ credentials.       |
+| `externalSecrets.apiVersion`            | string  | `external-secrets.io/v1` | ExternalSecret API version.                              |
+| `externalSecrets.refreshInterval`       | string  | `"0"`                    | Refresh interval. `"0"` syncs once.                      |
+| `externalSecrets.secretStoreRef`        | object  | `{}`                     | SecretStore or ClusterSecretStore reference.             |
+| `externalSecrets.target.creationPolicy` | string  | `Owner`                  | Target Secret creation policy.                           |
+| `externalSecrets.data`                  | array   | `[]`                     | Mappings for username, password, and Erlang cookie keys. |
 
 ### Resources and Security
 

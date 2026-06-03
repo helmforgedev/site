@@ -58,7 +58,8 @@ export const charts: Chart[] = [
   {
     name: 'RabbitMQ',
     slug: 'rabbitmq',
-    description: 'RabbitMQ with management UI and clustering support.',
+    description:
+      'RabbitMQ with single-node or cluster mode, quorum queues, Gateway API, External Secrets, and dual-stack Services.',
     maturity: 'stable',
     backup: false,
   },
@@ -164,7 +165,8 @@ export const charts: Chart[] = [
   {
     name: 'Uptime Kuma',
     slug: 'uptime-kuma',
-    description: 'Self-hosted monitoring with status pages and broad notification support.',
+    description:
+      'Self-hosted monitoring with SQLite or MariaDB, Gateway API, External Secrets, S3 backup, and status pages.',
     maturity: 'stable',
     backup: true,
   },
@@ -339,7 +341,8 @@ export const charts: Chart[] = [
   {
     name: 'Statistics for Strava',
     slug: 'strava-statistics',
-    description: 'Self-hosted fitness dashboard with SQLite and Strava OAuth integration.',
+    description:
+      'Self-hosted fitness dashboard with SQLite, Strava OAuth, Gateway API, External Secrets, and dual-stack Services.',
     maturity: 'stable',
     backup: false,
   },
@@ -423,7 +426,8 @@ export const charts: Chart[] = [
   {
     name: 'OliveTin',
     slug: 'olivetin',
-    description: 'Browser-based UI for predefined shell commands and system actions.',
+    description:
+      'Browser-based command panel with ConfigMap actions, metrics, Gateway API, External Secrets, and dual-stack Services.',
     maturity: 'stable',
     backup: false,
   },
