@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Uptime Kuma Chart
-description: Uptime Kuma Helm chart for Kubernetes monitoring with 20+ check types, 90+ notifications, public status pages, SQLite or MariaDB, and S3 backup.
+description: Uptime Kuma Helm chart for Kubernetes monitoring with 20+ check types, 90+ notifications, public status pages, SQLite or MariaDB, Gateway API, External Secrets, dual-stack Services, and S3 backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -28,6 +28,9 @@ Discord, Slack, email, and more), and publishes customizable public status pages
 - **External database** — connect to an existing MariaDB/MySQL instance
 - **Smart S3 backup** — `tar` for SQLite mode, `mysqldump` for MariaDB mode
 - **Custom CA certificates** — monitor internal HTTPS services with private CA
+- **Gateway API and Ingress** — expose the UI with classic Ingress or HTTPRoute
+- **External Secrets Operator** — source database and S3 credentials from external providers
+- **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
 
 ## Installation
 
@@ -61,6 +64,8 @@ kubectl port-forward svc/<release>-uptime-kuma 3001:80
     { id: 'external-db', label: 'External Database' },
     { id: 'private-ca', label: 'Private CA Monitoring' },
     { id: 'backup', label: 'With S3 Backup' },
+    { id: 'gateway-api', label: 'Gateway API' },
+    { id: 'external-secrets', label: 'External Secrets' },
   ]}
 >
 
@@ -207,6 +212,91 @@ ingress:
 
 </div>
 
+<div data-tab-panel="gateway-api">
+
+```yaml
+# values.yaml — expose Uptime Kuma through Gateway API
+persistence:
+  enabled: true
+  size: 2Gi
+
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: uptime-kuma
+      spec:
+        parentRefs:
+          - name: public-gateway
+            namespace: gateway-system
+        hostnames:
+          - status.example.com
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — external database and S3 credentials managed by External Secrets Operator
+database:
+  type: mariadb
+  external:
+    host: mariadb.database.svc.cluster.local
+    username: uptime_kuma
+    existingSecret: uptime-kuma-db
+    existingSecretPasswordKey: password
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-uptime-kuma-backups
+    existingSecret: uptime-kuma-s3
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  refreshInterval: 1h
+  items:
+    - name: database
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: uptime-kuma-db
+          creationPolicy: Owner
+        data:
+          - secretKey: password
+            remoteRef:
+              key: uptime-kuma/database
+              property: password
+    - name: s3
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: uptime-kuma-s3
+          creationPolicy: Owner
+        data:
+          - secretKey: access-key
+            remoteRef:
+              key: uptime-kuma/s3
+              property: accessKey
+          - secretKey: secret-key
+            remoteRef:
+              key: uptime-kuma/s3
+              property: secretKey
+```
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -224,7 +314,7 @@ ingress:
 | Parameter          | Type   | Default                          | Description                          |
 | ------------------ | ------ | -------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/louislam/uptime-kuma` | Uptime Kuma container image.         |
-| `image.tag`        | string | `"2.2.1"`                        | Image tag.                           |
+| `image.tag`        | string | `"2.4.0"`                        | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                   | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                             | Pull secrets for private registries. |
 
@@ -265,7 +355,8 @@ ingress:
 
 <Callout type="info" title="The mysql subchart is MariaDB-compatible">
   The subchart is named `mysql` in the values, but Uptime Kuma uses it as a MariaDB-compatible backend. Set
-  `database.type: mariadb` alongside `mysql.enabled: true` to activate this mode.
+  `database.type: mariadb` alongside `mysql.enabled: true` to activate this mode. The bundled dependency is the
+  HelmForge MySQL chart `2.0.0`.
 </Callout>
 
 | Parameter             | Type    | Default       | Description                                           |
@@ -320,11 +411,13 @@ The backup strategy adapts to the configured database mode automatically:
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                | Type    | Default     | Description                                                                        |
+| ------------------------ | ------- | ----------- | ---------------------------------------------------------------------------------- |
+| `service.type`           | string  | `ClusterIP` | Kubernetes service type.                                                           |
+| `service.port`           | integer | `80`        | Service port exposed to the cluster.                                               |
+| `service.annotations`    | object  | `{}`        | Annotations for the Service.                                                       |
+| `service.ipFamilyPolicy` | string  | _omitted_   | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. |
+| `service.ipFamilies`     | array   | _omitted_   | Ordered Service IP families such as `IPv4` and `IPv6`.                             |
 
 ### Ingress
 
@@ -335,6 +428,27 @@ The backup strategy adapts to the configured database mode automatically:
 | `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
 | `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+
+### Gateway API
+
+Use Gateway API when your cluster standardizes HTTP routing through Gateway resources. The chart renders HTTPRoutes that
+target the Uptime Kuma Service by default.
+
+| Parameter               | Type    | Default | Description                      |
+| ----------------------- | ------- | ------- | -------------------------------- |
+| `gatewayAPI.enabled`    | boolean | `false` | Enable HTTPRoute resources.      |
+| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoute definitions to render. |
+
+### External Secrets Operator
+
+External Secrets can materialize database, S3, or integration credentials without storing them directly in Helm values.
+
+| Parameter                         | Type    | Default                  | Description                                                   |
+| --------------------------------- | ------- | ------------------------ | ------------------------------------------------------------- |
+| `externalSecrets.enabled`         | boolean | `false`                  | Render ExternalSecret resources.                              |
+| `externalSecrets.apiVersion`      | string  | `external-secrets.io/v1` | ExternalSecret API version.                                   |
+| `externalSecrets.refreshInterval` | string  | `1h`                     | Default refresh interval for items that do not set one.       |
+| `externalSecrets.items`           | array   | `[]`                     | ExternalSecret definitions. Each item requires a full `spec`. |
 
 ### Probes
 

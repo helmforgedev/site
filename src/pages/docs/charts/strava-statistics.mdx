@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Statistics for Strava Chart
-description: Statistics for Strava Helm chart for Kubernetes fitness dashboards with SQLite storage, Strava OAuth, activity visualizations, persistence, and ingress.
+description: Statistics for Strava Helm chart for Kubernetes fitness dashboards with SQLite storage, Strava OAuth, activity visualizations, persistence, Ingress, Gateway API, External Secrets, and dual-stack Services.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -26,7 +26,9 @@ external database required.
 - **SQLite storage** — embedded database, no external database dependency
 - **OAuth integration** — syncs with a single Strava athlete account via OAuth2
 - **Persistent storage** — PVC-backed data directory for SQLite database and cached files
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Ingress and Gateway API** — expose the dashboard with classic Ingress or HTTPRoute
+- **External Secrets Operator** — render ExternalSecret resources for Strava credentials
+- **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
 
 ## Strava OAuth Setup
 
@@ -82,6 +84,8 @@ helm install strava-statistics oci://ghcr.io/helmforgedev/helm/strava-statistics
     { id: 'basic', label: 'Basic' },
     { id: 'existing-secret', label: 'With Existing Secret' },
     { id: 'tls', label: 'With TLS' },
+    { id: 'gateway-api', label: 'Gateway API' },
+    { id: 'external-secrets', label: 'External Secrets' },
   ]}
 >
 
@@ -174,6 +178,76 @@ ingress:
 
 </div>
 
+<div data-tab-panel="gateway-api">
+
+```yaml
+# values.yaml — expose Statistics for Strava through Gateway API
+strava:
+  existingSecret: strava-credentials
+  existingSecretClientIdKey: client-id
+  existingSecretClientSecretKey: client-secret
+  existingSecretRefreshTokenKey: refresh-token
+  timezone: America/Sao_Paulo
+
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: strava-statistics
+      spec:
+        parentRefs:
+          - name: public-gateway
+            namespace: gateway-system
+        hostnames:
+          - strava.example.com
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — Strava credentials managed by External Secrets Operator
+strava:
+  timezone: America/Sao_Paulo
+  existingSecret: strava-credentials
+  existingSecretClientIdKey: client-id
+  existingSecretClientSecretKey: client-secret
+  existingSecretRefreshTokenKey: refresh-token
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  items:
+    - name: strava-credentials
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: strava-credentials
+          creationPolicy: Owner
+        data:
+          - secretKey: client-id
+            remoteRef:
+              key: strava/oauth
+              property: clientId
+          - secretKey: client-secret
+            remoteRef:
+              key: strava/oauth
+              property: clientSecret
+          - secretKey: refresh-token
+            remoteRef:
+              key: strava/oauth
+              property: refreshToken
+```
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -191,7 +265,7 @@ ingress:
 | Parameter          | Type   | Default                                        | Description                          |
 | ------------------ | ------ | ---------------------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/robiningelbrecht/strava-statistics` | Container image.                     |
-| `image.tag`        | string | `"v4.8.1"`                                     | Image tag.                           |
+| `image.tag`        | string | `"v4.8.5"`                                     | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                                           | Pull secrets for private registries. |
 
@@ -322,15 +396,22 @@ ingress:
 
 | Parameter               | Type    | Default | Description                      |
 | ----------------------- | ------- | ------- | -------------------------------- |
-| `gatewayApi.enabled`    | boolean | `false` | Enable HTTPRoute resources.      |
-| `gatewayApi.httpRoutes` | array   | `[]`    | HTTPRoute definitions to render. |
+| `gatewayAPI.enabled`    | boolean | `false` | Enable HTTPRoute resources.      |
+| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoute definitions to render. |
+| `gatewayApi.enabled`    | boolean | `false` | Deprecated compatibility alias.  |
+| `gatewayApi.httpRoutes` | array   | `[]`    | Deprecated compatibility alias.  |
+
+<Callout type="info" title="Use gatewayAPI for new values">
+  `gatewayApi` remains as a compatibility alias for older values files. New deployments should use `gatewayAPI`.
+</Callout>
 
 ### External Secrets
 
-| Parameter                 | Type    | Default | Description                           |
-| ------------------------- | ------- | ------- | ------------------------------------- |
-| `externalSecrets.enabled` | boolean | `false` | Enable ExternalSecret resources.      |
-| `externalSecrets.items`   | array   | `[]`    | ExternalSecret definitions to render. |
+| Parameter                    | Type    | Default                  | Description                           |
+| ---------------------------- | ------- | ------------------------ | ------------------------------------- |
+| `externalSecrets.enabled`    | boolean | `false`                  | Enable ExternalSecret resources.      |
+| `externalSecrets.apiVersion` | string  | `external-secrets.io/v1` | ExternalSecret API version.           |
+| `externalSecrets.items`      | array   | `[]`                     | ExternalSecret definitions to render. |
 
 ## Common Issues
 

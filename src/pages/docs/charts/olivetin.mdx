@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: OliveTin Chart
-description: OliveTin Helm chart for Kubernetes command panels with browser UI, ConfigMap-defined actions, Prometheus metrics, persistence, and ingress.
+description: OliveTin Helm chart for Kubernetes command panels with browser UI, ConfigMap-defined actions, Prometheus metrics, persistence, Ingress, Gateway API, External Secrets, and dual-stack Services.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -24,6 +24,9 @@ clean web UI, without giving users direct shell access.
 - **ConfigMap-based actions** — define shell commands in YAML, mounted as a ConfigMap
 - **No external dependencies** — no database, no state, stateless by design
 - **Prometheus metrics** — optional scraping with ServiceMonitor support
+- **Gateway API and Ingress** — expose the UI with either classic Ingress or HTTPRoute
+- **External Secrets Operator** — render ExternalSecret resources for credentials used by custom actions
+- **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
 - **Confirmation prompts** — require user confirmation before running destructive commands
 - **Icon and title customization** — human-friendly labels for each action
 - **Lightweight** — minimal resource footprint
@@ -52,6 +55,8 @@ helm install olivetin oci://ghcr.io/helmforgedev/helm/olivetin
     { id: 'actions', label: 'Rich Actions' },
     { id: 'metrics', label: 'With Metrics' },
     { id: 'auth-proxy', label: 'With Auth Proxy' },
+    { id: 'gateway-api', label: 'Gateway API' },
+    { id: 'external-secrets', label: 'External Secrets' },
   ]}
 >
 
@@ -194,6 +199,71 @@ ingress:
 
 </div>
 
+<div data-tab-panel="gateway-api">
+
+```yaml
+# values.yaml — expose OliveTin through Gateway API
+config: |
+  actions:
+    - title: "Show Disk Usage"
+      shell: "df -h"
+
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: olivetin
+      spec:
+        parentRefs:
+          - name: internal-gateway
+            namespace: gateway-system
+        hostnames:
+          - olivetin.internal.example.com
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — credentials for custom actions managed by External Secrets Operator
+config: |
+  actions:
+    - title: "Trigger API"
+      shell: "curl -H \"Authorization: Bearer ${API_TOKEN}\" https://api.example.com/jobs"
+
+extraEnv:
+  - name: API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: olivetin-command-credentials
+        key: API_TOKEN
+
+externalSecrets:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  refreshInterval: 1h
+  items:
+    - name: command-credentials
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: olivetin-command-credentials
+          creationPolicy: Owner
+        data:
+          - secretKey: API_TOKEN
+            remoteRef:
+              key: olivetin/api-token
+```
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -211,7 +281,7 @@ ingress:
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/jamesread/olivetin` | OliveTin container image.            |
-| `image.tag`        | string | `"3000.13.0"`                  | Image tag.                           |
+| `image.tag`        | string | `"3000.14.0"`                  | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
@@ -268,11 +338,13 @@ and only needed if your actions produce output files that must survive pod resta
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                | Type    | Default     | Description                                                                        |
+| ------------------------ | ------- | ----------- | ---------------------------------------------------------------------------------- |
+| `service.type`           | string  | `ClusterIP` | Kubernetes service type.                                                           |
+| `service.port`           | integer | `80`        | Service port exposed to the cluster.                                               |
+| `service.annotations`    | object  | `{}`        | Annotations for the Service.                                                       |
+| `service.ipFamilyPolicy` | string  | _omitted_   | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. |
+| `service.ipFamilies`     | array   | _omitted_   | Ordered Service IP families such as `IPv4` and `IPv6`.                             |
 
 ### Ingress
 
@@ -283,6 +355,27 @@ and only needed if your actions produce output files that must survive pod resta
 | `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. ForwardAuth, TLS). |
 | `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                         |
 | `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).           |
+
+### Gateway API
+
+Use `gatewayAPI` when your cluster exposes applications through Gateway API instead of Ingress. The chart renders
+HTTPRoute resources and routes them to the OliveTin Service by default.
+
+| Parameter               | Type    | Default | Description                             |
+| ----------------------- | ------- | ------- | --------------------------------------- |
+| `gatewayAPI.enabled`    | boolean | `false` | Render Gateway API HTTPRoute resources. |
+| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoute definitions to render.        |
+
+### External Secrets Operator
+
+External Secrets can materialize credentials for custom actions without committing secrets to the values file.
+
+| Parameter                         | Type    | Default                  | Description                                                   |
+| --------------------------------- | ------- | ------------------------ | ------------------------------------------------------------- |
+| `externalSecrets.enabled`         | boolean | `false`                  | Render ExternalSecret resources.                              |
+| `externalSecrets.apiVersion`      | string  | `external-secrets.io/v1` | ExternalSecret API version.                                   |
+| `externalSecrets.refreshInterval` | string  | `1h`                     | Default refresh interval for items that do not set one.       |
+| `externalSecrets.items`           | array   | `[]`                     | ExternalSecret definitions. Each item requires a full `spec`. |
 
 ### Probes
 
