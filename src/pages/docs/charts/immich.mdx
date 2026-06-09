@@ -201,6 +201,29 @@ Back up at least:
 The cache is usually rebuildable, but persistent cache storage can reduce cold-start impact. Do not treat the cache as
 the source of truth for photos or videos.
 
+### Extra Server Volumes
+
+Mount additional ConfigMaps, Secrets, or PVCs into the Immich server container with `extraVolumes` and
+`extraVolumeMounts`. This is useful for custom configuration files and read-only external media libraries.
+
+```yaml
+extraVolumes:
+  - name: external-media
+    persistentVolumeClaim:
+      claimName: external-media
+  - name: immich-config
+    configMap:
+      name: immich-config
+
+extraVolumeMounts:
+  - name: external-media
+    mountPath: /mnt/external-media
+    readOnly: true
+  - name: immich-config
+    mountPath: /config/immich
+    readOnly: true
+```
+
 ## Validation
 
 After deployment:
@@ -240,6 +263,8 @@ test library.
 | `ingress.enabled`         | `false`                            | Render Ingress.                           |
 | `gateway.enabled`         | `false`                            | Render Gateway API HTTPRoute.             |
 | `externalSecrets.enabled` | `false`                            | Render ExternalSecret resources.          |
+| `extraVolumes`            | `[]`                               | Extra volumes for the Immich server pod.  |
+| `extraVolumeMounts`       | `[]`                               | Extra mounts for the server container.    |
 
 ## Links
 
