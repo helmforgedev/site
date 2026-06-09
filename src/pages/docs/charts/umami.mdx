@@ -12,19 +12,20 @@ import UmamiDiagram from '../../../components/diagrams/UmamiDiagram.astro';
 # Umami
 
 Deploy [Umami](https://umami.is/) on Kubernetes as a privacy-first web analytics platform. The chart uses the official
-`ghcr.io/umami-software/umami:3.1.0` image and supports a quick bundled PostgreSQL install as well as production
+`ghcr.io/umami-software/umami:3.0.3` image and supports a quick bundled PostgreSQL install as well as production
 setups with external PostgreSQL, Gateway API or Ingress, External Secrets Operator, dual-stack Service fields,
 NetworkPolicy, PodDisruptionBudget, S3-compatible backups, and structured Umami runtime options.
 
-Umami tracks page views, sessions, events, Web Vitals, boards, shares, and session replay data without requiring
-third-party analytics services. The application stores its state in PostgreSQL and exposes a lightweight tracker script
-that your websites load from the Umami instance.
+Umami tracks page views, sessions, events, and website analytics without requiring third-party analytics services. The
+application stores its state in PostgreSQL and exposes a lightweight tracker script that your websites load from the
+Umami instance.
 
 ## Key Features
 
-- **Umami 3.1.0** - aligned with the current HelmForge chart `appVersion`, including Umami 3.x analytics features.
+- **Umami 3.0.3** - aligned with the current HelmForge chart `appVersion` and validated with the HelmForge k3d runtime gate.
 - **PostgreSQL first** - bundled HelmForge PostgreSQL subchart for quick starts or external PostgreSQL for production.
 - **External database preparation** - optional init container can run `CREATE EXTENSION IF NOT EXISTS pgcrypto;` with an admin Secret.
+- **Custom initialization** - user-defined init containers can prepare shared volumes, such as GeoIP databases, before Umami starts.
 - **Structured runtime settings** - telemetry, updates, bot detection, SSL, client IP header, collect endpoint, CORS, frame allowlists, and tracker script name.
 - **Secret management** - inline values, existing Kubernetes Secrets, or `external-secrets.io/v1` resources for APP_SECRET, database password, and S3 credentials.
 - **Routing choices** - Ingress or Kubernetes Gateway API `HTTPRoute`.
@@ -314,6 +315,36 @@ service:
 
 Dual stack only works when the cluster, CNI, and Service CIDRs are configured for IPv4 and IPv6.
 
+## Custom Initialization
+
+Use `extraInitContainers` with `extraVolumes` and `extraVolumeMounts` when Umami needs files prepared before the
+application starts, such as a GeoIP database or organization-owned assets:
+
+```yaml
+extraVolumes:
+  - name: geoip
+    emptyDir: {}
+
+extraInitContainers:
+  - name: download-geoip
+    image: docker.io/library/busybox:1.37
+    command:
+      - sh
+      - -ec
+    args:
+      - wget -O /geoip/GeoLite2-City.mmdb https://example.com/GeoLite2-City.mmdb
+    volumeMounts:
+      - name: geoip
+        mountPath: /geoip
+
+extraVolumeMounts:
+  - name: geoip
+    mountPath: /app/geoip
+```
+
+Custom init containers run after the chart's built-in database readiness check and optional external database
+preparation. Pin downloads to trusted URLs or use an internal artifact mirror for reproducible installs.
+
 ## Umami Runtime Settings
 
 | Value                      | Env Var                | Default | Purpose                                                                  |
@@ -419,7 +450,7 @@ state.
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/umami-software/umami` | Umami container image repository.    |
-| `image.tag`        | string | `3.1.0`                        | Umami image tag.                     |
+| `image.tag`        | string | `3.0.3`                        | Umami image tag.                     |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
@@ -483,27 +514,28 @@ state.
 
 ### Probes, Security, and Scheduling
 
-| Parameter                                     | Type    | Default          | Description                                 |
-| --------------------------------------------- | ------- | ---------------- | ------------------------------------------- |
-| `probes.startup.path`                         | string  | `/api/heartbeat` | Startup probe path.                         |
-| `probes.startup.initialDelaySeconds`          | integer | `30`             | Startup probe initial delay.                |
-| `probes.liveness.path`                        | string  | `/api/heartbeat` | Liveness probe path.                        |
-| `probes.readiness.path`                       | string  | `/api/heartbeat` | Readiness probe path.                       |
-| `resources`                                   | object  | `{}`             | Container resource requests and limits.     |
-| `podSecurityContext`                          | object  | `{}`             | Pod-level security context.                 |
-| `securityContext`                             | object  | `{}`             | Container security context.                 |
-| `serviceAccount.create`                       | boolean | `false`          | Create a dedicated ServiceAccount.          |
-| `serviceAccount.automountServiceAccountToken` | boolean | `false`          | Mount API token into Umami and backup pods. |
-| `nodeSelector`                                | object  | `{}`             | Node selector.                              |
-| `tolerations`                                 | array   | `[]`             | Tolerations.                                |
-| `affinity`                                    | object  | `{}`             | Affinity rules.                             |
-| `topologySpreadConstraints`                   | array   | `[]`             | Topology spread constraints.                |
-| `priorityClassName`                           | string  | `""`             | PriorityClass name.                         |
-| `podLabels`                                   | object  | `{}`             | Extra pod labels.                           |
-| `podAnnotations`                              | object  | `{}`             | Extra pod annotations.                      |
-| `extraVolumes`                                | array   | `[]`             | Extra volumes.                              |
-| `extraVolumeMounts`                           | array   | `[]`             | Extra volume mounts.                        |
-| `extraManifests`                              | array   | `[]`             | Additional Kubernetes manifests.            |
+| Parameter                                     | Type    | Default          | Description                                                                     |
+| --------------------------------------------- | ------- | ---------------- | ------------------------------------------------------------------------------- |
+| `probes.startup.path`                         | string  | `/api/heartbeat` | Startup probe path.                                                             |
+| `probes.startup.initialDelaySeconds`          | integer | `30`             | Startup probe initial delay.                                                    |
+| `probes.liveness.path`                        | string  | `/api/heartbeat` | Liveness probe path.                                                            |
+| `probes.readiness.path`                       | string  | `/api/heartbeat` | Readiness probe path.                                                           |
+| `resources`                                   | object  | `{}`             | Container resource requests and limits.                                         |
+| `podSecurityContext`                          | object  | `{}`             | Pod-level security context.                                                     |
+| `securityContext`                             | object  | `{}`             | Container security context.                                                     |
+| `serviceAccount.create`                       | boolean | `false`          | Create a dedicated ServiceAccount.                                              |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`          | Mount API token into Umami and backup pods.                                     |
+| `nodeSelector`                                | object  | `{}`             | Node selector.                                                                  |
+| `tolerations`                                 | array   | `[]`             | Tolerations.                                                                    |
+| `affinity`                                    | object  | `{}`             | Affinity rules.                                                                 |
+| `topologySpreadConstraints`                   | array   | `[]`             | Topology spread constraints.                                                    |
+| `priorityClassName`                           | string  | `""`             | PriorityClass name.                                                             |
+| `podLabels`                                   | object  | `{}`             | Extra pod labels.                                                               |
+| `podAnnotations`                              | object  | `{}`             | Extra pod annotations.                                                          |
+| `extraVolumes`                                | array   | `[]`             | Extra volumes.                                                                  |
+| `extraVolumeMounts`                           | array   | `[]`             | Extra volume mounts.                                                            |
+| `extraInitContainers`                         | array   | `[]`             | Extra init containers rendered after database readiness and preparation checks. |
+| `extraManifests`                              | array   | `[]`             | Additional Kubernetes manifests.                                                |
 
 ## Common Issues
 
@@ -524,8 +556,8 @@ state.
 
 ## Upgrade Notes
 
-Umami 3.x includes schema migrations for newer analytics features such as Boards, Shares, Web Vitals, and Session
-Replay. Back up PostgreSQL before upgrading live deployments, especially when moving from Umami 2.x.
+Umami 3.x includes schema migrations for newer analytics features. Back up PostgreSQL before upgrading live deployments,
+especially when moving from Umami 2.x.
 
 The chart version `2.0.0` is a breaking modernization release. Review production values for renamed or newly structured
 settings, External Secrets behavior, Gateway API, NetworkPolicy, and backup credentials before upgrading.
