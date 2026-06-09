@@ -9,9 +9,9 @@ import Callout from '../../../components/Callout.astro';
 
 # MariaDB
 
-Deploy [MariaDB](https://mariadb.org/) on Kubernetes using the official `mariadb` Docker image (11.4 LTS).
-Supports standalone and GTID-based asynchronous replication, six built-in configuration presets,
-TLS, Prometheus metrics via mysqld-exporter, and scheduled `mariadb-dump` backups to S3-compatible storage.
+Deploy [MariaDB](https://mariadb.org/) on Kubernetes using the official `mariadb` Docker image.
+Supports standalone and GTID-based asynchronous replication, six built-in configuration presets, TLS, Prometheus
+metrics via mysqld-exporter, and scheduled `mariadb-dump` backups to S3-compatible storage.
 
 <Callout type="info" title="Replication mode enables PDB and pod anti-affinity automatically">
   When `architecture: replication`, the chart enables a PodDisruptionBudget (`replication.pdb`) and configures default
@@ -234,7 +234,7 @@ standalone:
 | Parameter          | Type   | Default                     | Description              |
 | ------------------ | ------ | --------------------------- | ------------------------ |
 | `image.repository` | string | `docker.io/library/mariadb` | MariaDB container image. |
-| `image.tag`        | string | `"11.4"`                    | Image tag (LTS).         |
+| `image.tag`        | string | `"12.2.2"`                  | Image tag.               |
 | `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy.       |
 
 ### Authentication
@@ -265,6 +265,23 @@ standalone:
 | -------------------------- | ------ | ------- | ------------------------------------------------------------------------------ |
 | `initdb.scripts`           | object | `{}`    | SQL or Shell scripts injected into `docker-entrypoint-initdb.d` at first boot. |
 | `initdb.existingConfigMap` | string | `""`    | Existing ConfigMap also mounted into `docker-entrypoint-initdb.d`.             |
+
+### Persistence
+
+| Parameter                            | Type    | Default | Description                                                                                                   |
+| ------------------------------------ | ------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `persistence.subPath`                | string  | `mysql` | Data volume subdirectory mounted as `/var/lib/mysql`; set `""` for legacy volume-root installs.               |
+| `persistence.prepareDataDir.enabled` | boolean | `false` | Opt-in root initContainer for storage drivers that do not honor `fsGroup`; requires a Pod Security exception. |
+
+The default `subPath` path relies on `podSecurityContext.fsGroup` and does not render a root initContainer, keeping it
+compatible with Pod Security `restricted`. Enable `persistence.prepareDataDir.enabled` only for storage drivers that do
+not honor `fsGroup` for subPath directories.
+
+### Extra Objects
+
+| Parameter      | Type  | Default | Description                                                |
+| -------------- | ----- | ------- | ---------------------------------------------------------- |
+| `extraObjects` | array | `[]`    | Additional Kubernetes manifests rendered with the release. |
 
 ### Standalone Mode
 
