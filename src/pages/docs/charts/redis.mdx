@@ -60,6 +60,7 @@ Secrets Operator integration.
 
 - **Four architectures** — standalone, replication, Sentinel, cluster
 - **Sentinel quorum** — configurable failover quorum (default: 2 out of 3 Sentinels)
+- **Sentinel master set** — configurable primary discovery name for Sentinel-aware clients
 - **Cluster mode** — 6 nodes by default (3 master + 3 replica), auto-initialized via init Job
 - **TLS encryption** — mutual TLS for all Redis connections
 - **`existingSecret`** — keep credentials out of the values file
@@ -164,6 +165,7 @@ replication:
 
 sentinel:
   replicaCount: 3 # always deploy an ODD number of Sentinels
+  masterSet: mymaster # Sentinel master set name used by clients
   quorum: 2 # minimum Sentinels that must agree to trigger failover
   downAfterMilliseconds: 60000 # time without response before marking as down
   failoverTimeout: 180000
@@ -342,13 +344,14 @@ clustered deployments.
 
 ### Sentinel
 
-| Parameter                        | Type    | Default  | Description                                            |
-| -------------------------------- | ------- | -------- | ------------------------------------------------------ |
-| `sentinel.replicaCount`          | integer | `3`      | Number of Sentinel pods (always use an odd number).    |
-| `sentinel.quorum`                | integer | `2`      | Minimum Sentinels that must agree to trigger failover. |
-| `sentinel.downAfterMilliseconds` | integer | `60000`  | Milliseconds before marking a primary as down.         |
-| `sentinel.failoverTimeout`       | integer | `180000` | Failover timeout in milliseconds.                      |
-| `sentinel.parallelSyncs`         | integer | `1`      | Replicas that sync in parallel during failover.        |
+| Parameter                        | Type    | Default    | Description                                            |
+| -------------------------------- | ------- | ---------- | ------------------------------------------------------ |
+| `sentinel.replicaCount`          | integer | `3`        | Number of Sentinel pods (always use an odd number).    |
+| `sentinel.masterSet`             | string  | `mymaster` | Master set name used by Sentinel-aware clients.        |
+| `sentinel.quorum`                | integer | `2`        | Minimum Sentinels that must agree to trigger failover. |
+| `sentinel.downAfterMilliseconds` | integer | `60000`    | Milliseconds before marking a primary as down.         |
+| `sentinel.failoverTimeout`       | integer | `180000`   | Failover timeout in milliseconds.                      |
+| `sentinel.parallelSyncs`         | integer | `1`        | Replicas that sync in parallel during failover.        |
 
 ### Cluster
 
