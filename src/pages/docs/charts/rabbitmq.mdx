@@ -21,7 +21,8 @@ TLS listeners.
 
 ## Key Features
 
-- **Two architectures** — `single-node` (Deployment) or `cluster` (StatefulSet with peer discovery)
+- **Official Alpine image** — default `docker.io/library/rabbitmq:4.3.1-alpine` with chart-managed plugins
+- **Two architectures** — `single-node` (one StatefulSet replica) or `cluster` (StatefulSet with peer discovery)
 - **Quorum queues by default** — `queueDefaults.type: quorum` for durable, replicated HA queues
 - **Dedicated management ingress** — `management.ingress` is separate from the AMQP service
 - **Gateway API support** — optional HTTPRoute for the management UI
@@ -31,6 +32,7 @@ TLS listeners.
 - **PDB support** — optional PodDisruptionBudget to protect cluster quorum during node maintenance
 - **TLS listeners** — configurable AMQP/S and management TLS from an existing Secret
 - **Prometheus metrics** — built-in metrics plugin with optional ServiceMonitor
+- **Low idle CPU defaults** — disables Erlang scheduler busy-wait and uses lightweight TCP probes
 
 ## Port Reference
 
@@ -43,6 +45,22 @@ TLS listeners.
 | 15692 | HTTP     | Prometheus metrics endpoint           |
 | 4369  | TCP      | EPMD (Erlang port mapper daemon)      |
 | 25672 | TCP      | Erlang distribution (cluster traffic) |
+
+## Runtime Efficiency
+
+The chart defaults to the official Alpine RabbitMQ image and controls enabled plugins through the rendered
+`enabled_plugins` file. The base Alpine image already contains the management, Prometheus, and Kubernetes peer-discovery
+plugins, so `management.enabled`, `metrics.enabled`, `architecture: cluster`, and `plugins.extra` decide what is active
+without switching image variants.
+
+By default, `runtime.disableSchedulerBusyWait: true` renders:
+
+```yaml
+RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +sbwt none +sbwtdcpu none +sbwtdio none
+```
+
+This lowers idle CPU in containerized RabbitMQ deployments. Startup, liveness, and readiness probes use TCP checks
+against the active AMQP listener instead of repeatedly starting `rabbitmq-diagnostics`.
 
 ## Installation
 
@@ -279,14 +297,13 @@ externalSecrets:
 # values.yaml — expose the RabbitMQ management UI through Gateway API
 management:
   enabled: true
-
-gateway:
-  enabled: true
-  hostnames:
-    - rabbitmq.example.com
-  parentRefs:
-    - name: public-gateway
-      namespace: gateway-system
+  gateway:
+    enabled: true
+    hostnames:
+      - rabbitmq.example.com
+    parentRefs:
+      - name: public-gateway
+        namespace: gateway-system
 ```
 
 </div>
@@ -309,8 +326,8 @@ gateway:
 
 | Parameter          | Type   | Default                      | Description                          |
 | ------------------ | ------ | ---------------------------- | ------------------------------------ |
-| `image.repository` | string | `docker.io/library/rabbitmq` | RabbitMQ image (management variant). |
-| `image.tag`        | string | `"4.3.1-management"`         | Image tag. Includes management UI.   |
+| `image.repository` | string | `docker.io/library/rabbitmq` | Official RabbitMQ image repository.  |
+| `image.tag`        | string | `"4.3.1-alpine"`             | Official Alpine RabbitMQ image tag.  |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                         | Pull secrets for private registries. |
 
@@ -370,16 +387,15 @@ gateway:
 
 ### Management UI
 
-| Parameter                             | Type    | Default   | Description                                                                             |
-| ------------------------------------- | ------- | --------- | --------------------------------------------------------------------------------------- |
-| `management.enabled`                  | boolean | `true`    | Enable the management plugin and UI (port 15672/15671).                                 |
-| `management.ingress.enabled`          | boolean | `false`   | Enable Ingress for the management UI.                                                   |
-| `management.ingress.ingressClassName` | string  | `traefik` | Ingress class for the management UI.                                                    |
-| `management.ingress.className`        | string  | _unset_   | Deprecated compatibility alias. Set `""` to intentionally omit `spec.ingressClassName`. |
-| `management.ingress.annotations`      | object  | `{}`      | Annotations for the management Ingress.                                                 |
-| `management.ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                                                            |
-| `management.ingress.tls`              | array   | `[]`      | TLS configuration for the management Ingress.                                           |
-| `management.ingress.useTlsPort`       | boolean | `false`   | Route ingress to the TLS management port (15671).                                       |
+| Parameter                             | Type    | Default   | Description                                             |
+| ------------------------------------- | ------- | --------- | ------------------------------------------------------- |
+| `management.enabled`                  | boolean | `true`    | Enable the management plugin and UI (port 15672/15671). |
+| `management.ingress.enabled`          | boolean | `false`   | Enable Ingress for the management UI.                   |
+| `management.ingress.ingressClassName` | string  | `traefik` | Ingress class for the management UI.                    |
+| `management.ingress.annotations`      | object  | `{}`      | Annotations for the management Ingress.                 |
+| `management.ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                            |
+| `management.ingress.tls`              | array   | `[]`      | TLS configuration for the management Ingress.           |
+| `management.ingress.useTlsPort`       | boolean | `false`   | Route ingress to the TLS management port (15671).       |
 
 ### TLS
 
@@ -406,6 +422,33 @@ gateway:
 | ----------------------- | ------ | ------- | --------------------------------------------------------------- |
 | `config.extra`          | string | `""`    | Extra `rabbitmq.conf` entries appended to the generated config. |
 | `config.advancedConfig` | string | `""`    | Raw `advanced.config` Erlang term content.                      |
+
+### Runtime
+
+| Parameter                          | Type    | Default | Description                                                        |
+| ---------------------------------- | ------- | ------- | ------------------------------------------------------------------ |
+| `runtime.disableSchedulerBusyWait` | boolean | `true`  | Add Erlang VM flags that reduce scheduler busy-wait idle CPU.      |
+| `runtime.additionalErlArgs`        | string  | `""`    | Additional Erlang VM arguments appended to chart-managed defaults. |
+
+### Probes
+
+| Parameter                            | Type    | Default | Description                        |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| `startupProbe.enabled`               | boolean | `true`  | Enable TCP startup probe.          |
+| `startupProbe.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
+| `startupProbe.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
+| `startupProbe.periodSeconds`         | integer | `10`    | Startup probe period.              |
+| `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `livenessProbe.enabled`              | boolean | `true`  | Enable TCP liveness probe.         |
+| `livenessProbe.initialDelaySeconds`  | integer | `30`    | Liveness probe initial delay.      |
+| `livenessProbe.timeoutSeconds`       | integer | `3`     | Liveness probe timeout.            |
+| `livenessProbe.periodSeconds`        | integer | `30`    | Liveness probe period.             |
+| `livenessProbe.failureThreshold`     | integer | `6`     | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`             | boolean | `true`  | Enable TCP readiness probe.        |
+| `readinessProbe.initialDelaySeconds` | integer | `20`    | Readiness probe initial delay.     |
+| `readinessProbe.timeoutSeconds`      | integer | `3`     | Readiness probe timeout.           |
+| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
+| `readinessProbe.failureThreshold`    | integer | `6`     | Readiness probe failure threshold. |
 
 ### PodDisruptionBudget
 
@@ -446,11 +489,11 @@ gateway:
 The chart can expose the management UI with Gateway API by rendering an HTTPRoute that targets the management Service
 port. Use this when your cluster standardizes north-south HTTP traffic through Gateway API.
 
-| Parameter            | Type    | Default | Description                                       |
-| -------------------- | ------- | ------- | ------------------------------------------------- |
-| `gateway.enabled`    | boolean | `false` | Render a Gateway API HTTPRoute for management UI. |
-| `gateway.hostnames`  | array   | `[]`    | HTTPRoute hostnames. Empty matches all hostnames. |
-| `gateway.parentRefs` | array   | `[]`    | Parent Gateway references used by the HTTPRoute.  |
+| Parameter                       | Type    | Default | Description                                       |
+| ------------------------------- | ------- | ------- | ------------------------------------------------- |
+| `management.gateway.enabled`    | boolean | `false` | Render a Gateway API HTTPRoute for management UI. |
+| `management.gateway.hostnames`  | array   | `[]`    | HTTPRoute hostnames. Empty matches all hostnames. |
+| `management.gateway.parentRefs` | array   | `[]`    | Parent Gateway references used by the HTTPRoute.  |
 
 ### External Secrets Operator
 
