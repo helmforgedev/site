@@ -402,6 +402,145 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  'envoy-gateway': [
+    {
+      name: 'Controller',
+      fields: [
+        {
+          label: 'Controller Replicas',
+          key: 'controller.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Envoy Gateway controller replicas',
+        },
+        {
+          label: 'Controller Tag',
+          key: 'controller.image.tag',
+          type: 'text',
+          default: 'v1.8.1',
+          description: 'Envoy Gateway controller image tag',
+        },
+      ],
+    },
+    {
+      name: 'Gateway API',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Create Gateway',
+          key: 'gateway.create',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create the default Gateway resource',
+        },
+        {
+          label: 'Examples',
+          key: 'gatewayAPI.examples.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create example Gateway, HTTPRoute, and backend',
+        },
+        {
+          label: 'GatewayClass',
+          key: 'gatewayClass.name',
+          type: 'text',
+          default: 'envoy-gateway',
+          description: 'GatewayClass name',
+        },
+      ],
+    },
+    {
+      name: 'Proxy',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Proxy Kind',
+          key: 'proxy.kind',
+          type: 'select',
+          default: 'Deployment',
+          options: ['Deployment', 'DaemonSet'],
+          description: 'Envoy proxy workload kind managed by EG',
+        },
+        {
+          label: 'Proxy Replicas',
+          key: 'proxy.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Proxy replicas in Deployment mode',
+        },
+        {
+          label: 'Envoy Tag',
+          key: 'proxy.image.tag',
+          type: 'text',
+          default: 'distroless-v1.38.0',
+          description: 'Managed Envoy proxy image tag',
+        },
+        {
+          label: 'Shutdown Tag',
+          key: 'proxy.shutdownManager.image.tag',
+          type: 'text',
+          default: 'v1.8.1',
+          description: 'Shutdown manager sidecar image tag',
+        },
+      ],
+    },
+    {
+      name: 'Rate Limiting',
+      collapsible: true,
+      gateField: 'rateLimiting.enabled',
+      fields: [
+        {
+          label: 'Redis Subchart',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy helmforge/redis for rate limiting',
+        },
+        {
+          label: 'API Preset',
+          key: 'rateLimiting.presets.api',
+          type: 'toggle',
+          default: 'false',
+          description: 'Apply the API rate limit preset',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Monitoring',
+          key: 'monitoring.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable metrics and access log configuration',
+        },
+        {
+          label: 'Access Logs',
+          key: 'monitoring.accessLogs.format',
+          type: 'select',
+          default: 'json',
+          options: ['json', 'text'],
+          description: 'Envoy access log format',
+        },
+        {
+          label: 'NetworkPolicies',
+          key: 'security.networkPolicies',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create controller and rate limit NetworkPolicies',
+        },
+        {
+          label: 'Cleanup Hook',
+          key: 'cleanup.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Run pre-delete cleanup for GatewayClass finalizers',
+        },
+      ],
+    },
+  ],
   opencut: [
     {
       name: 'General',
