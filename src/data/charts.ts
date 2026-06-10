@@ -59,7 +59,7 @@ export const charts: Chart[] = [
     name: 'RabbitMQ',
     slug: 'rabbitmq',
     description:
-      'RabbitMQ with single-node or cluster mode, quorum queues, Gateway API, External Secrets, and dual-stack Services.',
+      'RabbitMQ with single-node or cluster mode, quorum queues, low idle CPU defaults, Gateway API, and External Secrets.',
     maturity: 'stable',
     backup: false,
   },
