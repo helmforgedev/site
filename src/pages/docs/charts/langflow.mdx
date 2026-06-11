@@ -22,6 +22,46 @@ The chart generates the core Langflow runtime environment:
 - `LANGFLOW_SAVE_DB_IN_CONFIG_DIR=true`
 - `LANGFLOW_OPEN_BROWSER=false`
 
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Langflow image and pull behavior.
+- `imagePullSecrets`: optional registry pull secrets.
+- `replicaCount`: web/API replica count. Values greater than `1` require a shared external database.
+- `app.port`: Langflow HTTP port.
+- `app.command`, `app.args`: optional container command and argument overrides.
+- `app.env`, `app.envFrom`, `app.extraEnv`: provider credentials, integration settings, and advanced runtime environment.
+- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
+
+Secrets and database:
+
+- `auth.secretKey`, `auth.superuser`, `auth.superuserPassword`: inline lab credentials.
+- `auth.existingSecret`, `auth.secretKeyKey`, `auth.superuserKey`, `auth.superuserPasswordKey`: production Secret wiring.
+- `database.mode`: `sqlite` or `external`.
+- `database.url`: inline SQLAlchemy database URL for labs.
+- `database.existingSecret`, `database.urlKey`: production external database URL Secret.
+
+Storage and scaling:
+
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`: local config and SQLite storage.
+- `persistence.accessModes`: generated PVC access modes. Multi-replica persistent deployments require `ReadWriteMany`.
+- `persistence.existingClaim`: mount an existing claim instead of creating one.
+- `persistence.mountPath`: Langflow config directory, default `/app/langflow`.
+- `pdb.enabled`, `pdb.minAvailable`: disruption budget for scaled deployments.
+
+Exposure and operations:
+
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
 ## Installation
 
 ```bash
