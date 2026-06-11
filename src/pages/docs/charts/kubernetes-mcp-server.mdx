@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Kubernetes MCP Server Chart
-description: Kubernetes MCP Server Helm chart for in-cluster read-only MCP access with RBAC, HTTP, and SSE transport.
+description: Kubernetes MCP Server Helm chart with in-cluster auth, read-only safety flags, RBAC, config, and NetworkPolicy.
 ---
 
 # Kubernetes MCP Server
@@ -10,7 +10,16 @@ Deploy [Kubernetes MCP Server](https://github.com/containers/kubernetes-mcp-serv
 
 ## Overview
 
-The HelmForge Kubernetes MCP Server chart uses the official `ghcr.io/containers/kubernetes-mcp-server` image. By default it starts the HTTP and SSE server on port `8080`, uses the `in-cluster` provider, enables read-only mode, disables destructive tools, and binds the service account to the Kubernetes `view` ClusterRole.
+The HelmForge chart uses the official `ghcr.io/containers/kubernetes-mcp-server:v0.0.62` image and serves HTTP on port `8080`.
+This workload is a control-plane bridge: its effective permissions are the Kubernetes RBAC permissions granted to its ServiceAccount.
+
+Defaults are inspection-oriented:
+
+- `mcp.readOnly=true`
+- `mcp.disableDestructive=true`
+- `mcp.stateless=true`
+- `mcp.clusterProvider=in-cluster`
+- RBAC bound to the built-in `view` ClusterRole
 
 ## Installation
 
@@ -26,7 +35,7 @@ OCI install:
 helm install kubernetes-mcp-server oci://ghcr.io/helmforgedev/helm/kubernetes-mcp-server
 ```
 
-## Basic Values
+## Safe Defaults
 
 ```yaml
 mcp:
@@ -43,7 +52,22 @@ rbac:
   clusterRoleName: view
 ```
 
+The chart blocks fully unsafe write mode unless `mcp.allowUnsafeWriteAccess=true` is set deliberately.
+
+## Config File
+
+Use `mcp.configToml` for upstream TOML configuration when command-line flags are not enough:
+
+```yaml
+mcp:
+  configToml: |
+    [server]
+    listOutput = "table"
+```
+
 ## Exposure
+
+Keep this service internal or place it behind a trusted identity-aware proxy:
 
 ```yaml
 ingress:
@@ -56,12 +80,9 @@ ingress:
           pathType: Prefix
 ```
 
-## Operational Notes
+## RBAC
 
-- The default RBAC grants read-only cluster visibility through the built-in `view` ClusterRole.
-- `mcp.readOnly` and `mcp.disableDestructive` should stay enabled for shared or production clusters.
-- Set `app.args` only when you need to replace the generated CLI arguments.
-- Use a private endpoint or upstream auth proxy before exposing this server outside a trusted network.
+Review RBAC before enabling write tools. For production, prefer a purpose-built ClusterRole over broad `cluster-admin`.
 
 ## Additional Resources
 

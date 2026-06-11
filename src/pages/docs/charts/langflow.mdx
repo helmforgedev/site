@@ -1,16 +1,26 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Langflow Chart
-description: Langflow Helm chart for Kubernetes visual AI workflow deployments with persistent configuration and HTTP exposure.
+description: Langflow Helm chart for visual AI workflows with persistent state, secret management, external database, and scaling guards.
 ---
 
 # Langflow
 
-Deploy [Langflow](https://github.com/langflow-ai/langflow) on Kubernetes for building and running visual AI workflows.
+Deploy [Langflow](https://github.com/langflow-ai/langflow) on Kubernetes for visual AI workflows, agents, RAG applications, and provider
+integrations.
 
 ## Overview
 
-The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow` image and exposes the web application on port `7860`. The default deployment persists Langflow configuration under `/app/langflow`.
+The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow:1.10.0` image and exposes the web/API server on port `7860`.
+The default deployment persists `/app/langflow` because flows, local SQLite state, provider settings, and local configuration are not stateless.
+
+The chart generates the core Langflow runtime environment:
+
+- `LANGFLOW_HOST=0.0.0.0`
+- `LANGFLOW_PORT`
+- `LANGFLOW_CONFIG_DIR`
+- `LANGFLOW_SAVE_DB_IN_CONFIG_DIR=true`
+- `LANGFLOW_OPEN_BROWSER=false`
 
 ## Installation
 
@@ -26,47 +36,59 @@ OCI install:
 helm install langflow oci://ghcr.io/helmforgedev/helm/langflow
 ```
 
-## Basic Values
+## Production Example
 
 ```yaml
+auth:
+  existingSecret: langflow-secrets
+  secretKeyKey: secret-key
+  superuserKey: superuser
+  superuserPasswordKey: superuser-password
+
+database:
+  existingSecret: langflow-database
+  urlKey: database-url
+
 persistence:
   enabled: true
-  size: 5Gi
+  size: 20Gi
 
-ingress:
+networkPolicy:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: langflow.example.com
-      paths:
-        - path: /
-          pathType: Prefix
 ```
 
-## Runtime Configuration
+## Secrets
 
-The chart sets the core Langflow runtime environment by default:
+Use `auth.existingSecret` for production. It can hold:
+
+- `LANGFLOW_SECRET_KEY`
+- `LANGFLOW_SUPERUSER`
+- `LANGFLOW_SUPERUSER_PASSWORD`
+
+Keep `LANGFLOW_SECRET_KEY` stable across upgrades. Rotating it can make encrypted provider credentials unusable.
+
+## Database And Scaling
+
+The default single-replica mode can use local SQLite under `/app/langflow`. For multiple replicas, configure a shared database:
 
 ```yaml
-app:
-  env:
-    - name: LANGFLOW_HOST
-      value: '0.0.0.0'
-    - name: LANGFLOW_PORT
-      value: '7860'
-    - name: LANGFLOW_CONFIG_DIR
-      value: /app/langflow
+replicaCount: 3
+database:
+  existingSecret: langflow-database
+  urlKey: database-url
+pdb:
+  enabled: true
 ```
 
-Add provider keys or database settings through `app.extraEnv` or Kubernetes secrets.
+The chart blocks `replicaCount > 1` unless `database.url` or `database.existingSecret` is configured.
 
-## Operational Notes
+## Backup
 
-- The default persistence path is `/app/langflow`.
-- Keep `replicaCount: 1` unless your external storage and database configuration supports multiple replicas.
-- Use Ingress or Gateway API for browser access.
+Back up the PVC and any external database. The PVC contains local configuration and may contain SQLite state, generated files, or custom
+components depending on how Langflow is used.
 
 ## Additional Resources
 
-- [Langflow source](https://github.com/langflow-ai/langflow)
+- [Langflow documentation](https://docs.langflow.org/)
+- [Langflow deployment docs](https://docs.langflow.org/deployment-kubernetes-prod)
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/langflow)

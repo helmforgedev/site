@@ -1,16 +1,25 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: GitHub MCP Server Chart
-description: GitHub MCP Server Helm chart for Kubernetes streamable HTTP deployments with token secret and toolset controls.
+description: GitHub MCP Server Helm chart with streamable HTTP transport, token secrets, toolsets, and read-only defaults.
 ---
 
 # GitHub MCP Server
 
-Deploy [GitHub MCP Server](https://github.com/github/github-mcp-server) on Kubernetes to expose GitHub tools over MCP streamable HTTP.
+Deploy [GitHub MCP Server](https://github.com/github/github-mcp-server) on Kubernetes to expose GitHub APIs over MCP streamable HTTP.
 
 ## Overview
 
-The HelmForge GitHub MCP Server chart uses the official `ghcr.io/github/github-mcp-server` image and runs the `http` transport on port `8082`. The default configuration enables read-only mode and the `default` toolset.
+The HelmForge chart uses the official `ghcr.io/github/github-mcp-server:v1.2.0` image and runs the HTTP transport on port `8082`.
+It is intentionally stateless and defaults to read-only operation.
+
+The chart generates upstream CLI flags from values:
+
+- `--read-only`
+- `--toolsets`
+- `--tools`
+- `--exclude-tools`
+- `--gh-host`
 
 ## Installation
 
@@ -28,7 +37,7 @@ helm install github-mcp-server oci://ghcr.io/helmforgedev/helm/github-mcp-server
 
 ## Token Secret
 
-Create a token secret when the server needs to call authenticated GitHub APIs:
+Create a token Secret when authenticated GitHub API access is required:
 
 ```bash
 kubectl create secret generic github-mcp-token \
@@ -42,7 +51,25 @@ github:
   existingSecret: github-mcp-token
   existingSecretKey: token
   readOnly: true
-  toolsets: default
+  requireToken: true
+```
+
+Use the least-privileged GitHub token that matches the enabled toolsets. Keep the endpoint private or protect it with external authentication.
+
+## Toolsets
+
+```yaml
+github:
+  toolsets: repos,issues,pull_requests
+  tools: ''
+  excludeTools: ''
+```
+
+For GitHub Enterprise Server, include the scheme in `github.host`:
+
+```yaml
+github:
+  host: https://ghe.example.com
 ```
 
 ## Exposure
@@ -57,13 +84,6 @@ ingress:
         - path: /
           pathType: Prefix
 ```
-
-## Operational Notes
-
-- `github.readOnly` maps to the server `--read-only` flag.
-- `github.toolsets`, `github.tools`, `github.excludeTools`, and `github.host` map to the corresponding server CLI flags.
-- Set `app.args` only when you need to override the generated argument list completely.
-- Keep the endpoint behind authentication or a trusted network boundary.
 
 ## Additional Resources
 

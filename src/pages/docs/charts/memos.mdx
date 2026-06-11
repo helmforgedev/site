@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Memos Chart
-description: Memos Helm chart for Kubernetes self-hosted notes with SQLite persistence and HTTP exposure.
+description: Memos Helm chart for self-hosted notes with SQLite, external database support, backup guidance, and secure defaults.
 ---
 
 # Memos
@@ -10,7 +10,11 @@ Deploy [Memos](https://github.com/usememos/memos) on Kubernetes as a lightweight
 
 ## Overview
 
-The HelmForge Memos chart uses the official `docker.io/neosmemo/memos` image and runs a persistent StatefulSet. The web UI listens on port `5230`, and application data is stored under `/var/opt/memos`.
+The HelmForge Memos chart uses the official `docker.io/neosmemo/memos:0.29.1` image and deploys a StatefulSet.
+Memos listens on port `5230` and stores durable data under `/var/opt/memos`.
+
+The default topology is one persistent pod with SQLite. PostgreSQL and MySQL are supported through `MEMOS_DRIVER` and `MEMOS_DSN`, but the
+data PVC remains required because Memos can still store local assets and instance data on disk.
 
 ## Installation
 
@@ -26,12 +30,15 @@ OCI install:
 helm install memos oci://ghcr.io/helmforgedev/helm/memos
 ```
 
-## Basic Values
+## Production Example
 
 ```yaml
+memos:
+  instanceUrl: https://memos.example.com
+
 persistence:
   enabled: true
-  size: 5Gi
+  size: 20Gi
 
 ingress:
   enabled: true
@@ -41,30 +48,58 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: memos-tls
+      hosts:
+        - memos.example.com
+
+networkPolicy:
+  enabled: true
 ```
 
-## Runtime Configuration
+Set `memos.instanceUrl` when Memos is behind Ingress, Gateway API, or another reverse proxy.
+
+## External Database
 
 ```yaml
-app:
-  env:
-    - name: MEMOS_PORT
-      value: '5230'
-    - name: MEMOS_DATA
-      value: /var/opt/memos
-    - name: MEMOS_DRIVER
-      value: sqlite
+database:
+  driver: postgres
+  existingSecret: memos-postgres
+  existingSecretKey: dsn
 ```
 
-Use `app.extraEnv` for additional Memos settings or secret-backed environment variables.
+The Secret should contain a Memos-compatible DSN:
 
-## Operational Notes
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: memos-postgres
+type: Opaque
+stringData:
+  dsn: postgres://memos:password@postgresql:5432/memos?sslmode=disable
+```
 
-- The default SQLite database and attachments live on the persistent volume.
-- Keep `replicaCount: 1` with SQLite.
-- Use Ingress or Gateway API for browser access.
+The chart blocks unsafe configurations:
+
+- multiple replicas with SQLite
+- MySQL/PostgreSQL without a DSN Secret or inline DSN
+- external database with no data volume
+
+## Security
+
+The chart runs the upstream non-root UID/GID `10001`, disables ServiceAccount token automount by default, drops Linux capabilities, and keeps
+`memos.allowPrivateWebhooks=false`.
+
+Only enable private webhooks when the targets are trusted internal services and cluster egress is controlled.
+
+## Backup
+
+Back up the PVC in every mode. With SQLite, it contains the database and assets. With PostgreSQL or MySQL, it can still contain local assets
+and instance data, so database backup alone is not enough.
 
 ## Additional Resources
 
+- [Memos Docker deployment](https://usememos.com/docs/deploy/docker)
 - [Memos source](https://github.com/usememos/memos)
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/memos)

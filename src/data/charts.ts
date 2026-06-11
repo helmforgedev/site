@@ -257,9 +257,9 @@ export const charts: Chart[] = [
   {
     name: 'Langflow',
     slug: 'langflow',
-    description: 'Visual AI workflow builder with persistent configuration and HTTP exposure controls.',
+    description: 'Visual AI workflow builder with persistent state, external database, and scaling guards.',
     maturity: 'stable',
-    backup: false,
+    backup: true,
   },
   {
     name: 'phpMyAdmin',
@@ -426,9 +426,9 @@ export const charts: Chart[] = [
   {
     name: 'Qdrant',
     slug: 'qdrant',
-    description: 'Vector database with persistent storage and HTTP, gRPC, and peer ports.',
+    description: 'Vector database with persistent storage, auth, snapshots, metrics, and guarded clustering.',
     maturity: 'stable',
-    backup: false,
+    backup: true,
   },
   {
     name: 'ntfy',
@@ -455,9 +455,9 @@ export const charts: Chart[] = [
   {
     name: 'Memos',
     slug: 'memos',
-    description: 'Self-hosted note-taking service with SQLite persistence and simple web UI.',
+    description: 'Self-hosted notes with SQLite, external database support, backups, and secure defaults.',
     maturity: 'stable',
-    backup: false,
+    backup: true,
   },
   {
     name: 'GitHub MCP Server',

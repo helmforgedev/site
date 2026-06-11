@@ -1,16 +1,20 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Qdrant Chart
-description: Qdrant Helm chart for Kubernetes vector database deployments with persistent storage, REST, gRPC, and peer ports.
+description: Qdrant Helm chart for Kubernetes vector search with persistent storage, auth, snapshots, metrics, and guarded distributed mode.
 ---
 
 # Qdrant
 
-Deploy [Qdrant](https://github.com/qdrant/qdrant) on Kubernetes as a vector database for semantic search, RAG applications, recommendations, and AI workloads.
+Deploy [Qdrant](https://github.com/qdrant/qdrant) on Kubernetes for semantic search, RAG, recommendations, and vector similarity workloads.
 
 ## Overview
 
-The HelmForge Qdrant chart uses the official `docker.io/qdrant/qdrant` image and defaults to a single persistent StatefulSet. It exposes the REST API on port `6333`, gRPC on `6334`, and the peer port on `6335`.
+The HelmForge Qdrant chart uses the official `docker.io/qdrant/qdrant:v1.18.2` image and deploys a StatefulSet.
+It exposes HTTP on `6333`, gRPC on `6334`, and the cluster peer port on `6335`.
+
+The default topology is a single persistent pod. Distributed mode is available, but it is guarded because Qdrant clustering requires
+per-pod storage, peer communication, and operator knowledge of collection replication and shard placement.
 
 ## Installation
 
@@ -26,35 +30,74 @@ OCI install:
 helm install qdrant oci://ghcr.io/helmforgedev/helm/qdrant
 ```
 
-## Basic Values
+## Production Example
 
 ```yaml
+auth:
+  existingSecret: qdrant-auth
+  apiKeySecretKey: api-key
+  readOnlyApiKeySecretKey: read-only-api-key
+
 persistence:
   enabled: true
-  size: 10Gi
+  size: 50Gi
 
-service:
-  type: ClusterIP
-  port: 6333
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: '2'
+    memory: 4Gi
 
-ingress:
+networkPolicy:
   enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: qdrant.example.com
-      paths:
-        - path: /
-          pathType: Prefix
 ```
 
-## Operational Notes
+## Runtime Values
 
-- Data is stored at `/qdrant/storage` on a persistent volume.
-- Use `resources` requests and limits for production workloads with large collections.
-- Keep the peer port internal unless you intentionally build a multi-node topology.
-- The chart includes Gateway API and dual-stack Service controls for clusters that use those networking models.
+- `app.httpPort`: HTTP API port, default `6333`.
+- `app.grpcPort`: gRPC API port, default `6334`.
+- `persistence.mountPath`: Qdrant storage path, default `/qdrant/storage`.
+- `snapshots.path`: snapshot path, default `/qdrant/snapshots`.
+- `config.localYaml`: optional `local.yaml` content mounted into the Qdrant config directory.
+- `auth.apiKey` and `auth.readOnlyApiKey`: lab-friendly inline API keys.
+- `auth.existingSecret`: production Secret for `QDRANT__SERVICE__API_KEY` and read-only key.
+
+## Distributed Mode
+
+```yaml
+cluster:
+  enabled: true
+  p2pPort: 6335
+replicaCount: 3
+persistence:
+  enabled: true
+```
+
+Distributed mode requires at least two replicas, persistence, and chart-managed PVCs. The chart blocks unsafe combinations at render time.
+Plan snapshots, restore procedures, and collection replication before enabling this in production.
+
+## Monitoring
+
+Qdrant exposes Prometheus metrics at `/metrics`.
+
+```yaml
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+```
+
+Enable `metrics.serviceMonitor` only when the Prometheus Operator CRDs exist in the cluster.
+
+## Backup
+
+Back up the Qdrant PVC and snapshot directory. For distributed clusters, capture snapshots for all relevant shards and validate restore
+procedures before relying on the backup policy.
 
 ## Additional Resources
 
-- [Qdrant source](https://github.com/qdrant/qdrant)
+- [Qdrant documentation](https://qdrant.tech/documentation/)
+- [Qdrant configuration](https://qdrant.tech/documentation/guides/configuration/)
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/qdrant)
