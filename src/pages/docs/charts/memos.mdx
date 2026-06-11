@@ -22,7 +22,7 @@ Core runtime:
 
 - `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Memos image and pull behavior.
 - `imagePullSecrets`: optional registry pull secrets.
-- `replicaCount`: Memos pod count. Keep `1` with SQLite.
+- `replicaCount`: Memos pod count. Keep `1` with SQLite; scale external database mode only with shared `MEMOS_DATA` storage.
 - `app.port`: HTTP port.
 - `app.command`, `app.args`: optional command and argument overrides.
 - `app.env`, `app.envFrom`, `app.extraEnv`: additional runtime environment and Secret or ConfigMap imports.
@@ -43,7 +43,7 @@ Database and storage:
 - `database.existingSecret`, `database.existingSecretKey`: production DSN Secret.
 - `persistence.enabled`, `persistence.size`, `persistence.storageClass`: Memos data directory storage.
 - `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
-- The chart rejects SQLite scaling, external database without DSN, and external database without a data volume.
+- The chart rejects SQLite scaling, external database without DSN, external database without a data volume, and scaled MySQL/PostgreSQL without `persistence.existingClaim`.
 
 Exposure and operations:
 
@@ -108,6 +108,8 @@ database:
   driver: postgres
   existingSecret: memos-postgres
   existingSecretKey: dsn
+persistence:
+  existingClaim: memos-shared-data
 ```
 
 The Secret should contain a Memos-compatible DSN:
@@ -125,6 +127,7 @@ stringData:
 The chart blocks unsafe configurations:
 
 - multiple replicas with SQLite
+- multiple replicas with MySQL/PostgreSQL and no shared existing data claim
 - MySQL/PostgreSQL without a DSN Secret or inline DSN
 - external database with no data volume
 
