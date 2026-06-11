@@ -259,7 +259,7 @@ export const charts: Chart[] = [
     slug: 'langflow',
     description: 'Visual AI workflow builder with persistent state, external database, and scaling guards.',
     maturity: 'stable',
-    backup: true,
+    backup: false,
   },
   {
     name: 'phpMyAdmin',
@@ -428,7 +428,7 @@ export const charts: Chart[] = [
     slug: 'qdrant',
     description: 'Vector database with persistent storage, auth, snapshots, metrics, and guarded clustering.',
     maturity: 'stable',
-    backup: true,
+    backup: false,
   },
   {
     name: 'ntfy',
@@ -457,7 +457,7 @@ export const charts: Chart[] = [
     slug: 'memos',
     description: 'Self-hosted notes with SQLite, external database support, backups, and secure defaults.',
     maturity: 'stable',
-    backup: true,
+    backup: false,
   },
   {
     name: 'GitHub MCP Server',
