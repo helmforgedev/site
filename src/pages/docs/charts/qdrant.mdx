@@ -15,6 +15,8 @@ It exposes HTTP on `6333`, gRPC on `6334`, and the cluster peer port on `6335`.
 
 The default topology is a single persistent pod. Distributed mode is available, but it is guarded because Qdrant clustering requires
 per-pod storage, peer communication, and operator knowledge of collection replication and shard placement.
+When distributed mode is enabled, the chart derives stable StatefulSet peer DNS names and starts the first pod with `--uri`; later pods
+join that peer with `--bootstrap`.
 
 ## Installation
 
@@ -56,7 +58,8 @@ networkPolicy:
 
 ## Runtime Values
 
-- `app.httpPort`: HTTP API port, default `6333`.
+- `clusterDomain`: Kubernetes DNS domain used for StatefulSet peer discovery, default `cluster.local`.
+- `app.port`: HTTP API port, default `6333`.
 - `app.grpcPort`: gRPC API port, default `6334`.
 - `persistence.mountPath`: Qdrant storage path, default `/qdrant/storage`.
 - `snapshots.path`: snapshot path, default `/qdrant/snapshots`.
@@ -76,6 +79,8 @@ persistence:
 ```
 
 Distributed mode requires at least two replicas, persistence, and chart-managed PVCs. The chart blocks unsafe combinations at render time.
+The chart also owns the startup command in distributed mode so it can pass Qdrant the required peer bootstrap arguments; use `app.args`
+for additional Qdrant flags.
 Plan snapshots, restore procedures, and collection replication before enabling this in production.
 
 ## Monitoring

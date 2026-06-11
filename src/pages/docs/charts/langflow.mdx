@@ -76,11 +76,16 @@ replicaCount: 3
 database:
   existingSecret: langflow-database
   urlKey: database-url
+persistence:
+  accessModes:
+    - ReadWriteMany
 pdb:
   enabled: true
 ```
 
 The chart blocks `replicaCount > 1` unless `database.url` or `database.existingSecret` is configured.
+When persistence stays enabled for multiple replicas, the shared config directory must use `ReadWriteMany`; the default generated
+`ReadWriteOnce` PVC is rejected to avoid multi-attach failures on multi-node clusters.
 
 ## Backup
 
