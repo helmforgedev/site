@@ -255,6 +255,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Langflow',
+    slug: 'langflow',
+    description: 'Visual AI workflow builder with persistent state, external database, and scaling guards.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'phpMyAdmin',
     slug: 'phpmyadmin',
     description: 'MySQL and MariaDB administration with Gateway API, External Secrets, and NetworkPolicy controls.',
@@ -417,6 +424,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Qdrant',
+    slug: 'qdrant',
+    description: 'Vector database with persistent storage, auth, snapshots, metrics, and guarded clustering.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'ntfy',
     slug: 'ntfy',
     description: 'Self-hosted push notification server with Prometheus metrics and REST API.',
@@ -437,6 +451,27 @@ export const charts: Chart[] = [
     description: 'Self-hosted AI chat platform with Ollama/OpenAI, RAG, PostgreSQL, and Redis.',
     maturity: 'stable',
     backup: true,
+  },
+  {
+    name: 'Memos',
+    slug: 'memos',
+    description: 'Self-hosted notes with SQLite, external database support, backups, and secure defaults.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'GitHub MCP Server',
+    slug: 'github-mcp-server',
+    description: 'GitHub MCP server with streamable HTTP transport, toolset controls, and token secret support.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Kubernetes MCP Server',
+    slug: 'kubernetes-mcp-server',
+    description: 'Kubernetes MCP server with in-cluster RBAC, read-only defaults, and HTTP/SSE transport.',
+    maturity: 'stable',
+    backup: false,
   },
   {
     name: 'FastMCP Server',

@@ -1,0 +1,139 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Langflow Chart
+description: Langflow Helm chart for visual AI workflows with persistent state, secret management, external database, and scaling guards.
+---
+
+# Langflow
+
+Deploy [Langflow](https://github.com/langflow-ai/langflow) on Kubernetes for visual AI workflows, agents, RAG applications, and provider
+integrations.
+
+## Overview
+
+The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow:1.10.0` image and exposes the web/API server on port `7860`.
+The default deployment persists `/app/langflow` because flows, local SQLite state, provider settings, and local configuration are not stateless.
+
+The chart generates the core Langflow runtime environment:
+
+- `LANGFLOW_HOST=0.0.0.0`
+- `LANGFLOW_PORT`
+- `LANGFLOW_CONFIG_DIR`
+- `LANGFLOW_SAVE_DB_IN_CONFIG_DIR=true`
+- `LANGFLOW_OPEN_BROWSER=false`
+
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Langflow image and pull behavior.
+- `imagePullSecrets`: optional registry pull secrets.
+- `replicaCount`: web/API replica count. Values greater than `1` require a shared external database.
+- `app.port`: Langflow HTTP port.
+- `app.command`, `app.args`: optional container command and argument overrides.
+- `app.env`, `app.envFrom`, `app.extraEnv`: provider credentials, integration settings, and advanced runtime environment.
+- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
+
+Secrets and database:
+
+- `auth.secretKey`, `auth.superuser`, `auth.superuserPassword`: inline lab credentials.
+- `auth.existingSecret`, `auth.secretKeyKey`, `auth.superuserKey`, `auth.superuserPasswordKey`: production Secret wiring.
+- `database.mode`: `sqlite` or `external`.
+- `database.url`: inline SQLAlchemy database URL for labs.
+- `database.existingSecret`, `database.urlKey`: production external database URL Secret.
+
+Storage and scaling:
+
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`: local config and SQLite storage.
+- `persistence.accessModes`: generated PVC access modes. Multi-replica persistent deployments require `ReadWriteMany`.
+- `persistence.existingClaim`: mount an existing claim instead of creating one.
+- `persistence.mountPath`: Langflow config directory, default `/app/langflow`.
+- `pdb.enabled`, `pdb.minAvailable`: disruption budget for scaled deployments.
+
+Exposure and operations:
+
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install langflow helmforge/langflow
+```
+
+OCI install:
+
+```bash
+helm install langflow oci://ghcr.io/helmforgedev/helm/langflow
+```
+
+## Production Example
+
+```yaml
+auth:
+  existingSecret: langflow-secrets
+  secretKeyKey: secret-key
+  superuserKey: superuser
+  superuserPasswordKey: superuser-password
+
+database:
+  existingSecret: langflow-database
+  urlKey: database-url
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+networkPolicy:
+  enabled: true
+```
+
+## Secrets
+
+Use `auth.existingSecret` for production. It can hold:
+
+- `LANGFLOW_SECRET_KEY`
+- `LANGFLOW_SUPERUSER`
+- `LANGFLOW_SUPERUSER_PASSWORD`
+
+Keep `LANGFLOW_SECRET_KEY` stable across upgrades. Rotating it can make encrypted provider credentials unusable.
+
+## Database And Scaling
+
+The default single-replica mode can use local SQLite under `/app/langflow`. For multiple replicas, configure a shared database:
+
+```yaml
+replicaCount: 3
+database:
+  existingSecret: langflow-database
+  urlKey: database-url
+persistence:
+  accessModes:
+    - ReadWriteMany
+pdb:
+  enabled: true
+```
+
+The chart blocks `replicaCount > 1` unless `database.url` or `database.existingSecret` is configured.
+When persistence stays enabled for multiple replicas, the shared config directory must use `ReadWriteMany`; the default generated
+`ReadWriteOnce` PVC is rejected to avoid multi-attach failures on multi-node clusters.
+
+## Backup
+
+Back up the PVC and any external database. The PVC contains local configuration and may contain SQLite state, generated files, or custom
+components depending on how Langflow is used.
+
+## Additional Resources
+
+- [Langflow documentation](https://docs.langflow.org/)
+- [Langflow deployment docs](https://docs.langflow.org/deployment-kubernetes-prod)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/langflow)

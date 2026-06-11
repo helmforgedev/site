@@ -1,0 +1,132 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: GitHub MCP Server Chart
+description: GitHub MCP Server Helm chart with streamable HTTP transport, token secrets, toolsets, and read-only defaults.
+---
+
+# GitHub MCP Server
+
+Deploy [GitHub MCP Server](https://github.com/github/github-mcp-server) on Kubernetes to expose GitHub APIs over MCP streamable HTTP.
+
+## Overview
+
+The HelmForge chart uses the official `ghcr.io/github/github-mcp-server:v1.2.0` image and runs the HTTP transport on port `8082`.
+It is intentionally stateless and defaults to read-only operation.
+
+The chart generates upstream CLI flags from values:
+
+- `--read-only`
+- `--toolsets`
+- `--tools`
+- `--exclude-tools`
+- `--gh-host`
+
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned GitHub MCP Server image.
+- `imagePullSecrets`: optional registry pull secrets.
+- `replicaCount`: HTTP MCP server replica count.
+- `app.port`: streamable HTTP listen port.
+- `app.command`, `app.args`: optional command and complete argument override.
+- `app.env`, `app.envFrom`, `app.extraEnv`: additional environment and Secret or ConfigMap imports.
+- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
+
+GitHub access:
+
+- `github.personalAccessToken`: inline lab token.
+- `github.existingSecret`, `github.existingSecretKey`: production token Secret.
+- `github.requireToken`: fail rendering when no token source is configured.
+- `github.host`: GitHub Enterprise Server hostname without scheme; the chart passes it to upstream as an HTTPS API host.
+- `github.readOnly`: generate `--read-only` to filter write tools.
+- `github.toolsets`, `github.tools`, `github.excludeTools`: upstream toolset, allow-list, and deny-list controls.
+
+Storage and scaling:
+
+- `persistence.enabled`: optional data volume. The server is stateless by default.
+- `persistence.size`, `persistence.storageClass`, `persistence.accessModes`: generated PVC settings.
+- `persistence.existingClaim`, `persistence.mountPath`: existing claim and mount path.
+- `replicaCount > 1` with persistence requires `ReadWriteMany` or `persistence.enabled=false`.
+
+Exposure and operations:
+
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
+- `pdb.enabled`, `pdb.minAvailable`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install github-mcp-server helmforge/github-mcp-server
+```
+
+OCI install:
+
+```bash
+helm install github-mcp-server oci://ghcr.io/helmforgedev/helm/github-mcp-server
+```
+
+## Token Secret
+
+Create a token Secret when authenticated GitHub API access is required:
+
+```bash
+kubectl create secret generic github-mcp-token \
+  --from-literal=token="$GITHUB_TOKEN"
+```
+
+Reference it from values:
+
+```yaml
+github:
+  existingSecret: github-mcp-token
+  existingSecretKey: token
+  readOnly: true
+  requireToken: true
+```
+
+Use the least-privileged GitHub token that matches the enabled toolsets. Keep the endpoint private or protect it with external authentication.
+
+## Toolsets
+
+```yaml
+github:
+  toolsets: repos,issues,pull_requests
+  tools: ''
+  excludeTools: ''
+```
+
+For GitHub Enterprise Server, set `github.host` to the bare hostname. The chart passes it to the upstream server as an HTTPS API host:
+
+```yaml
+github:
+  host: ghe.example.com
+```
+
+## Exposure
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: github-mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Additional Resources
+
+- [GitHub MCP Server source](https://github.com/github/github-mcp-server)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/github-mcp-server)
