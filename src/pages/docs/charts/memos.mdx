@@ -1,0 +1,70 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Memos Chart
+description: Memos Helm chart for Kubernetes self-hosted notes with SQLite persistence and HTTP exposure.
+---
+
+# Memos
+
+Deploy [Memos](https://github.com/usememos/memos) on Kubernetes as a lightweight self-hosted note-taking service.
+
+## Overview
+
+The HelmForge Memos chart uses the official `docker.io/neosmemo/memos` image and runs a persistent StatefulSet. The web UI listens on port `5230`, and application data is stored under `/var/opt/memos`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install memos helmforge/memos
+```
+
+OCI install:
+
+```bash
+helm install memos oci://ghcr.io/helmforgedev/helm/memos
+```
+
+## Basic Values
+
+```yaml
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: memos.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Runtime Configuration
+
+```yaml
+app:
+  env:
+    - name: MEMOS_PORT
+      value: '5230'
+    - name: MEMOS_DATA
+      value: /var/opt/memos
+    - name: MEMOS_DRIVER
+      value: sqlite
+```
+
+Use `app.extraEnv` for additional Memos settings or secret-backed environment variables.
+
+## Operational Notes
+
+- The default SQLite database and attachments live on the persistent volume.
+- Keep `replicaCount: 1` with SQLite.
+- Use Ingress or Gateway API for browser access.
+
+## Additional Resources
+
+- [Memos source](https://github.com/usememos/memos)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/memos)

@@ -1,0 +1,72 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Langflow Chart
+description: Langflow Helm chart for Kubernetes visual AI workflow deployments with persistent configuration and HTTP exposure.
+---
+
+# Langflow
+
+Deploy [Langflow](https://github.com/langflow-ai/langflow) on Kubernetes for building and running visual AI workflows.
+
+## Overview
+
+The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow` image and exposes the web application on port `7860`. The default deployment persists Langflow configuration under `/app/langflow`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install langflow helmforge/langflow
+```
+
+OCI install:
+
+```bash
+helm install langflow oci://ghcr.io/helmforgedev/helm/langflow
+```
+
+## Basic Values
+
+```yaml
+persistence:
+  enabled: true
+  size: 5Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: langflow.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Runtime Configuration
+
+The chart sets the core Langflow runtime environment by default:
+
+```yaml
+app:
+  env:
+    - name: LANGFLOW_HOST
+      value: '0.0.0.0'
+    - name: LANGFLOW_PORT
+      value: '7860'
+    - name: LANGFLOW_CONFIG_DIR
+      value: /app/langflow
+```
+
+Add provider keys or database settings through `app.extraEnv` or Kubernetes secrets.
+
+## Operational Notes
+
+- The default persistence path is `/app/langflow`.
+- Keep `replicaCount: 1` unless your external storage and database configuration supports multiple replicas.
+- Use Ingress or Gateway API for browser access.
+
+## Additional Resources
+
+- [Langflow source](https://github.com/langflow-ai/langflow)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/langflow)

@@ -1,0 +1,71 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: GitHub MCP Server Chart
+description: GitHub MCP Server Helm chart for Kubernetes streamable HTTP deployments with token secret and toolset controls.
+---
+
+# GitHub MCP Server
+
+Deploy [GitHub MCP Server](https://github.com/github/github-mcp-server) on Kubernetes to expose GitHub tools over MCP streamable HTTP.
+
+## Overview
+
+The HelmForge GitHub MCP Server chart uses the official `ghcr.io/github/github-mcp-server` image and runs the `http` transport on port `8082`. The default configuration enables read-only mode and the `default` toolset.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install github-mcp-server helmforge/github-mcp-server
+```
+
+OCI install:
+
+```bash
+helm install github-mcp-server oci://ghcr.io/helmforgedev/helm/github-mcp-server
+```
+
+## Token Secret
+
+Create a token secret when the server needs to call authenticated GitHub APIs:
+
+```bash
+kubectl create secret generic github-mcp-token \
+  --from-literal=token="$GITHUB_TOKEN"
+```
+
+Reference it from values:
+
+```yaml
+github:
+  existingSecret: github-mcp-token
+  existingSecretKey: token
+  readOnly: true
+  toolsets: default
+```
+
+## Exposure
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: github-mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Operational Notes
+
+- `github.readOnly` maps to the server `--read-only` flag.
+- `github.toolsets`, `github.tools`, `github.excludeTools`, and `github.host` map to the corresponding server CLI flags.
+- Set `app.args` only when you need to override the generated argument list completely.
+- Keep the endpoint behind authentication or a trusted network boundary.
+
+## Additional Resources
+
+- [GitHub MCP Server source](https://github.com/github/github-mcp-server)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/github-mcp-server)

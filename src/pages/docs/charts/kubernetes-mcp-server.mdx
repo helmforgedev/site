@@ -1,0 +1,69 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Kubernetes MCP Server Chart
+description: Kubernetes MCP Server Helm chart for in-cluster read-only MCP access with RBAC, HTTP, and SSE transport.
+---
+
+# Kubernetes MCP Server
+
+Deploy [Kubernetes MCP Server](https://github.com/containers/kubernetes-mcp-server) inside a cluster to expose Kubernetes context to MCP clients.
+
+## Overview
+
+The HelmForge Kubernetes MCP Server chart uses the official `ghcr.io/containers/kubernetes-mcp-server` image. By default it starts the HTTP and SSE server on port `8080`, uses the `in-cluster` provider, enables read-only mode, disables destructive tools, and binds the service account to the Kubernetes `view` ClusterRole.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install kubernetes-mcp-server helmforge/kubernetes-mcp-server
+```
+
+OCI install:
+
+```bash
+helm install kubernetes-mcp-server oci://ghcr.io/helmforgedev/helm/kubernetes-mcp-server
+```
+
+## Basic Values
+
+```yaml
+mcp:
+  readOnly: true
+  disableDestructive: true
+  stateless: true
+  clusterProvider: in-cluster
+  toolsets:
+    - core
+    - config
+
+rbac:
+  create: true
+  clusterRoleName: view
+```
+
+## Exposure
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: kubernetes-mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Operational Notes
+
+- The default RBAC grants read-only cluster visibility through the built-in `view` ClusterRole.
+- `mcp.readOnly` and `mcp.disableDestructive` should stay enabled for shared or production clusters.
+- Set `app.args` only when you need to replace the generated CLI arguments.
+- Use a private endpoint or upstream auth proxy before exposing this server outside a trusted network.
+
+## Additional Resources
+
+- [Kubernetes MCP Server source](https://github.com/containers/kubernetes-mcp-server)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/kubernetes-mcp-server)
