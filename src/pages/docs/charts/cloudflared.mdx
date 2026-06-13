@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Cloudflare Tunnel Chart
-description: Cloudflare Tunnel Helm chart for Kubernetes with outbound-only access, HA replicas, PodDisruptionBudget, Prometheus metrics, ServiceMonitor, External Secrets, quick tunnel mode, and dual-stack Service support.
+description: Cloudflare Tunnel Helm chart for Kubernetes with outbound-only access, tokenless quick tunnel defaults, production HA settings, Prometheus metrics, ServiceMonitor, External Secrets, and Service IP family support.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,8 +11,9 @@ import Callout from '../../../components/Callout.astro';
 
 Secure, outbound-only tunnel between your Kubernetes cluster and Cloudflare's global network. cloudflared
 connects to Cloudflare from inside the cluster — no open inbound ports, no public IP required. Traffic
-routing is managed in the Cloudflare dashboard via Public Hostnames, and each replica opens an independent
-connection for high availability.
+routing is managed in the Cloudflare dashboard via Public Hostnames. The default install uses a tokenless
+quick tunnel for demos and smoke tests; production managed tunnels explicitly disable quick tunnel mode
+and use an existing Secret or tunnel token with HA settings.
 
 <Callout type="warning" title="cloudflared replaces the Ingress controller for publicly exposed services">
   When using Cloudflare Tunnel, traffic routing is configured in the **Cloudflare dashboard** under Networks → Tunnels →
@@ -24,8 +25,8 @@ connection for high availability.
 ## Key Features
 
 - **Zero-trust networking** — outbound-only connections, no inbound firewall rules needed
-- **HA by default** — 2 replicas, each with an independent Cloudflare edge connection
-- **PodDisruptionBudget** — built-in disruption protection enabled by default
+- **Tokenless default** — quick tunnel mode installs without a Cloudflare token for demos and smoke tests
+- **HA-ready production** — 2+ replicas and PodDisruptionBudget can be enabled for managed tunnels
 - **Dashboard-managed routing** — Public Hostnames configured in the Cloudflare dashboard
 - **Prometheus metrics** — `/ready` and `/metrics` endpoint on port 2000, enabled by default
 - **ServiceMonitor** — optional Prometheus Operator integration
@@ -36,12 +37,15 @@ connection for high availability.
 
 ## Quick Start
 
+The chart installs without values by running an ephemeral quick tunnel. For a managed production tunnel:
+
 1. Go to [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com) → **Networks → Tunnels**
 2. Create a new tunnel and copy the token
 3. Deploy this chart with the token
 
 ```bash
 helm install cloudflared helmforge/cloudflared \
+  --set tunnel.quickTunnel.enabled=false \
   --set tunnel.token='eyJhIjoiY2Y...'
 ```
 
@@ -79,9 +83,11 @@ helm install cloudflared oci://ghcr.io/helmforgedev/helm/cloudflared -f values.y
 <div data-tab-panel="basic">
 
 ```yaml
-# values.yaml — cloudflared with inline token (not recommended for production)
+# values.yaml — managed cloudflared with inline token (not recommended for production)
 # Store the token in an existing Secret for production environments.
 tunnel:
+  quickTunnel:
+    enabled: false
   token: 'eyJhIjoiY2Y...' # From Cloudflare dashboard
 
 replicaCount: 2
@@ -99,6 +105,8 @@ pdb:
 # values.yaml — Production cloudflared with secret-backed token and Prometheus metrics
 # Create the secret first: kubectl create secret generic cloudflare-tunnel --from-literal=token='eyJ...'
 tunnel:
+  quickTunnel:
+    enabled: false
   existingSecret: cloudflare-tunnel
   existingSecretKey: token
 
@@ -132,6 +140,8 @@ serviceMonitor:
 ```yaml
 # values.yaml — External Secrets Operator generates the Kubernetes Secret
 tunnel:
+  quickTunnel:
+    enabled: false
   existingSecret: cloudflared-tunnel-token
   existingSecretKey: token
 
@@ -170,6 +180,8 @@ pdb:
 ```yaml
 # values.yaml — Single replica for dev or resource-constrained environments
 tunnel:
+  quickTunnel:
+    enabled: false
   existingSecret: cloudflare-tunnel
   existingSecretKey: token
 
@@ -204,14 +216,14 @@ pdb:
 
 ### Tunnel
 
-| Parameter                       | Type    | Default                 | Description                                                                        |
-| ------------------------------- | ------- | ----------------------- | ---------------------------------------------------------------------------------- |
-| `tunnel.token`                  | string  | `""`                    | Tunnel token from the Cloudflare dashboard. Prefer `existingSecret` in production. |
-| `tunnel.existingSecret`         | string  | `""`                    | Existing Kubernetes Secret containing the tunnel token.                            |
-| `tunnel.existingSecretKey`      | string  | `token`                 | Key inside the existing Secret for the token value.                                |
-| `tunnel.quickTunnel.enabled`    | boolean | `false`                 | Run an ephemeral quick tunnel without a managed tunnel token.                      |
-| `tunnel.quickTunnel.helloWorld` | boolean | `true`                  | Use cloudflared's built-in hello-world origin in quick tunnel mode.                |
-| `tunnel.quickTunnel.url`        | string  | `http://localhost:8080` | Origin URL when quick tunnel mode does not use hello-world.                        |
+| Parameter                       | Type    | Default                 | Description                                                                               |
+| ------------------------------- | ------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `tunnel.token`                  | string  | `""`                    | Tunnel token from the Cloudflare dashboard. Prefer `existingSecret` in production.        |
+| `tunnel.existingSecret`         | string  | `""`                    | Existing Kubernetes Secret containing the tunnel token.                                   |
+| `tunnel.existingSecretKey`      | string  | `token`                 | Key inside the existing Secret for the token value.                                       |
+| `tunnel.quickTunnel.enabled`    | boolean | `true`                  | Run an ephemeral quick tunnel for demos and smoke tests. Set `false` for managed tunnels. |
+| `tunnel.quickTunnel.helloWorld` | boolean | `true`                  | Use cloudflared's built-in hello-world origin in quick tunnel mode.                       |
+| `tunnel.quickTunnel.url`        | string  | `http://localhost:8080` | Origin URL when quick tunnel mode does not use hello-world.                               |
 
 <Callout type="danger" title="Do not store the tunnel token inline in values.yaml for production">
   Setting `tunnel.token` inline exposes the token in `helm get values` and Helm release history. Use
@@ -231,9 +243,9 @@ pdb:
 
 ### Replicas and Availability
 
-| Parameter      | Type    | Default | Description                                                                          |
-| -------------- | ------- | ------- | ------------------------------------------------------------------------------------ |
-| `replicaCount` | integer | `2`     | Number of cloudflared replicas. Each replica opens an independent tunnel connection. |
+| Parameter      | Type    | Default | Description                                                                   |
+| -------------- | ------- | ------- | ----------------------------------------------------------------------------- |
+| `replicaCount` | integer | `1`     | Number of cloudflared replicas. Use 2 or more for production managed tunnels. |
 
 <Callout type="warning" title="Do not use HPA with cloudflared">
   Horizontal Pod Autoscaling that scales down replicas terminates active tunnel connections immediately. Clients
@@ -245,7 +257,7 @@ pdb:
 
 | Parameter          | Type    | Default | Description                                                      |
 | ------------------ | ------- | ------- | ---------------------------------------------------------------- |
-| `pdb.enabled`      | boolean | `true`  | Create a PodDisruptionBudget for cloudflared pods.               |
+| `pdb.enabled`      | boolean | `false` | Create a PodDisruptionBudget for cloudflared pods.               |
 | `pdb.minAvailable` | integer | `1`     | Minimum available replicas during voluntary cluster disruptions. |
 
 ### Service

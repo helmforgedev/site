@@ -156,6 +156,24 @@ function updateToggleVisual(btn: HTMLButtonElement, isOn: boolean) {
   }
 }
 
+function setFieldValue(key: string, value: string) {
+  currentValues[key] = value;
+  syncDerivedFieldValues();
+}
+
+function syncDerivedFieldValues() {
+  const usesCloudflaredManagedTunnel =
+    selectedSlug === 'cloudflared' &&
+    ((currentValues['tunnel.token'] ?? '').trim() !== '' ||
+      (currentValues['tunnel.existingSecret'] ?? '').trim() !== '');
+
+  if (usesCloudflaredManagedTunnel) {
+    currentValues['tunnel.quickTunnel.enabled'] = 'false';
+    const btn = controlsEl?.querySelector<HTMLButtonElement>('button[data-field-key="tunnel.quickTunnel.enabled"]');
+    if (btn) updateToggleVisual(btn, false);
+  }
+}
+
 function selectChart(slug: string, name: string) {
   selectedSlug = slug;
   selectedName = name;
@@ -328,6 +346,7 @@ function toggleSection(group: GroupConfig) {
     for (const key of Object.keys(group.activationValues ?? {})) {
       currentValues[key] = getFieldDefault(key) ?? '';
     }
+    syncDerivedFieldValues();
   } else {
     // Expand: set gate to true
     expandedSections.add(group.name);
@@ -473,7 +492,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.className =
       'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
-      currentValues[field.key] = input.value;
+      setFieldValue(field.key, input.value);
       updateOutput();
     });
     controlDiv.appendChild(input);
@@ -485,7 +504,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.className =
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
-      currentValues[field.key] = input.value;
+      setFieldValue(field.key, input.value);
       updateOutput();
     });
     controlDiv.appendChild(input);
@@ -613,6 +632,15 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
     if (value !== undefined && value !== '') {
       changes.push({ key, value, defaultValue: '' });
     }
+  }
+
+  const usesCloudflaredManagedTunnel =
+    selectedSlug === 'cloudflared' &&
+    ((currentValues['tunnel.token'] ?? '').trim() !== '' ||
+      (currentValues['tunnel.existingSecret'] ?? '').trim() !== '');
+  const hasQuickTunnelOverride = changes.some((change) => change.key === 'tunnel.quickTunnel.enabled');
+  if (usesCloudflaredManagedTunnel && !hasQuickTunnelOverride) {
+    changes.unshift({ key: 'tunnel.quickTunnel.enabled', value: 'false', defaultValue: 'true' });
   }
 
   return changes;
@@ -895,7 +923,7 @@ function loadFromUrl() {
     for (const field of group.fields) {
       const val = params.get(field.key);
       if (val !== null) {
-        currentValues[field.key] = val;
+        setFieldValue(field.key, val);
         hasChanges = true;
         // Auto-expand collapsible section if a child value is set
         if (group.collapsible) {
