@@ -140,6 +140,7 @@ test.describe('Playground', () => {
     await expect(code).toContainText('resources.limits.cpu=1');
     await expect(code).toContainText('resources.limits.memory=512Mi');
     await expect(code).toContainText('pdb.enabled=true');
+    await expect(code).toContainText('networkPolicy.ingress.enabled=false');
   });
 
   test('apache optional networking fields remain opt-in', async ({ page }) => {
@@ -159,6 +160,22 @@ test.describe('Playground', () => {
     await page.locator('select[data-field-key="service.ipFamilies[0]"]').selectOption('IPv4');
     await expect(code).toContainText('service.ipFamilyPolicy=SingleStack');
     await expect(code).toContainText('service.ipFamilies[0]=IPv4');
+  });
+
+  test('apache expanded sections preserve secure chart defaults', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="apache"]').click();
+
+    await page.locator('[data-section-toggle="Metrics"]').click();
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('serverStatus.enabled=true');
+    await expect(code).toContainText('serverStatus.require=local');
+    await expect(code).not.toContainText('serverStatus.require=all granted');
+
+    await page.locator('[data-section-toggle="Network Policy"]').click();
+    await expect(code).toContainText('networkPolicy.ingress.enabled=false');
+    await expect(code).toContainText('networkPolicy.egress.allowInternet=true');
+    await expect(code).not.toContainText('networkPolicy.egress.allowInternet=false');
   });
 
   test('copy button is enabled after selection', async ({ page }) => {
