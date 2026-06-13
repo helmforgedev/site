@@ -142,6 +142,25 @@ test.describe('Playground', () => {
     await expect(code).toContainText('pdb.enabled=true');
   });
 
+  test('apache optional networking fields remain opt-in', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="apache"]').click();
+
+    await page.locator('[data-section-toggle="Ingress"]').click();
+    const code = page.locator('#playground-code');
+    await expect(code).not.toContainText('ingress.tls[0].secretName');
+    await expect(code).not.toContainText('ingress.ingressClassName');
+
+    await page.locator('[data-section-toggle="Service IP Family"]').click();
+    await expect(code).not.toContainText('service.ipFamilyPolicy');
+    await expect(code).not.toContainText('service.ipFamilies[0]');
+
+    await page.locator('select[data-field-key="service.ipFamilyPolicy"]').selectOption('SingleStack');
+    await page.locator('select[data-field-key="service.ipFamilies[0]"]').selectOption('IPv4');
+    await expect(code).toContainText('service.ipFamilyPolicy=SingleStack');
+    await expect(code).toContainText('service.ipFamilies[0]=IPv4');
+  });
+
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
