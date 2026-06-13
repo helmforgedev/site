@@ -269,6 +269,14 @@ function isDropdownActive(items: NavLink[]): boolean {
       const menuItems = menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
       let timeout: ReturnType<typeof setTimeout>;
 
+      function focusMenuItem(item: HTMLAnchorElement) {
+        menuItems.forEach((menuItem) => {
+          menuItem.tabIndex = -1;
+        });
+        item.tabIndex = 0;
+        item.focus();
+      }
+
       function show() {
         clearTimeout(timeout);
         trigger.setAttribute('aria-expanded', 'true');
@@ -283,6 +291,9 @@ function isDropdownActive(items: NavLink[]): boolean {
           trigger.setAttribute('aria-expanded', 'false');
           menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
           menu.classList.remove('opacity-100', 'visible', 'translate-y-0');
+          menuItems.forEach((item) => {
+            item.tabIndex = -1;
+          });
           const chevron = trigger.querySelector('svg:last-child');
           if (chevron) (chevron as HTMLElement).style.transform = '';
         }, 150);
@@ -301,37 +312,60 @@ function isDropdownActive(items: NavLink[]): boolean {
       trigger.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          clearTimeout(timeout);
           show();
-          setTimeout(() => {
-            const items = menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
-            if (items[0]) {
-              items[0].focus();
-              // WebKit sometimes needs a second attempt
-              if (document.activeElement !== items[0]) {
-                items[0].focus();
+          const firstItem = menu.querySelector<HTMLAnchorElement>('[role="menuitem"]');
+          if (firstItem) {
+            focusMenuItem(firstItem);
+            requestAnimationFrame(() => {
+              if (document.activeElement !== firstItem) {
+                focusMenuItem(firstItem);
               }
-            }
-          }, 150);
+            });
+            setTimeout(() => {
+              if (document.activeElement !== firstItem) {
+                focusMenuItem(firstItem);
+              }
+            }, 50);
+            setTimeout(() => {
+              if (document.activeElement !== firstItem) {
+                focusMenuItem(firstItem);
+              }
+            }, 150);
+          }
+        }
+      });
+
+      menu.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          hide();
+          trigger.focus();
         }
       });
 
       menuItems.forEach((item, i) => {
         item.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowDown') {
+          if (e.key === 'Home') {
             e.preventDefault();
-            menuItems[Math.min(i + 1, menuItems.length - 1)]?.focus();
+            if (menuItems[0]) focusMenuItem(menuItems[0]);
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            const lastItem = menuItems[menuItems.length - 1];
+            if (lastItem) focusMenuItem(lastItem);
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextItem = menuItems[Math.min(i + 1, menuItems.length - 1)];
+            if (nextItem) focusMenuItem(nextItem);
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (i === 0) {
               trigger.focus();
               hide();
             } else {
-              menuItems[i - 1]?.focus();
+              const previousItem = menuItems[i - 1];
+              if (previousItem) focusMenuItem(previousItem);
             }
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            hide();
-            trigger.focus();
           } else if (e.key === 'Tab') {
             hide();
           }

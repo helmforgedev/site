@@ -289,4 +289,49 @@ test.describe('Playground', () => {
     // Output should contain backup and resources values
     await expect(page.locator('#playground-code')).toContainText('backup.enabled=true');
   });
+
+  test('scenario-only values are removed when their section is collapsed', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="liwan"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Dual Stack")').click();
+    await expect(page.locator('#playground-code')).toContainText('service.ipFamilies[0]=IPv4');
+    await expect(page.locator('#playground-code')).toContainText('service.ipFamilies[1]=IPv6');
+
+    await page.locator('[data-section-toggle="Service IP Family"]').click();
+    await expect(page.locator('#playground-code')).not.toContainText('service.ipFamilies[1]');
+  });
+
+  test('scenario-only array values do not duplicate edited primary values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="liwan"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Dual Stack")').click();
+    await page.locator('select[data-field-key="service.ipFamilies[0]"]').selectOption('IPv6');
+
+    await expect(page.locator('#playground-code')).toContainText('service.ipFamilies[0]=IPv6');
+    await expect(page.locator('#playground-code')).not.toContainText('service.ipFamilies[1]=IPv6');
+  });
+
+  test('scenario-only secondary family is removed for SingleStack policy', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="liwan"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Dual Stack")').click();
+    await page.locator('select[data-field-key="service.ipFamilyPolicy"]').selectOption('SingleStack');
+
+    await expect(page.locator('#playground-code')).toContainText('service.ipFamilyPolicy=SingleStack');
+    await expect(page.locator('#playground-code')).not.toContainText('service.ipFamilies[1]');
+  });
+
+  test('scenario-only values follow their collapsible section ownership', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    await expect(page.locator('#playground-code')).toContainText('replication.wal.maxSlotWalKeepSize=8GB');
+
+    await page.locator('[data-section-toggle="Production Security"]').click();
+    await expect(page.locator('#playground-code')).not.toContainText('replication.wal.maxSlotWalKeepSize');
+  });
 });

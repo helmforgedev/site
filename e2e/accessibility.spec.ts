@@ -74,9 +74,13 @@ test.describe('Accessibility', () => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
 
-    // Tab to the Tools dropdown trigger
     const toolsBtn = nav.getByRole('button', { name: 'Tools' });
-    await toolsBtn.focus();
+
+    // Keyboard users reach Tools after skip link, logo, Docs, and Blog.
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Tab');
+    }
+    await expect(toolsBtn).toBeFocused();
 
     // ArrowDown should open dropdown and focus first item
     await page.keyboard.press('ArrowDown');
