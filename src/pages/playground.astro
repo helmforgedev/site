@@ -13,6 +13,10 @@ interface PlaygroundField {
   type: 'text' | 'number' | 'select' | 'toggle';
   default: string;
   options?: string[];
+  valueActivationValues?: Record<string, Record<string, string>>;
+  toggleActivationValues?: Record<string, Record<string, string>>;
+  activationExpandSections?: Record<string, string[]>;
+  activationResetSections?: Record<string, string[]>;
   description: string;
 }
 
@@ -21,6 +25,7 @@ interface PlaygroundGroup {
   name: string;
   collapsible?: boolean;
   gateField?: string; // e.g. "backup.enabled" — toggles section visibility AND sets this value
+  activationValues?: Record<string, string>;
   fields: PlaygroundField[];
 }
 
@@ -5316,6 +5321,43 @@ const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Database Mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'postgresql', 'external'],
+          valueActivationValues: {
+            auto: { 'postgresql.enabled': 'true' },
+            postgresql: { 'postgresql.enabled': 'true' },
+            external: { 'postgresql.enabled': 'false' },
+          },
+          activationExpandSections: {
+            external: ['External Database'],
+          },
+          activationResetSections: {
+            auto: ['External Database'],
+            postgresql: ['External Database'],
+          },
+          description: 'Bundled or external PostgreSQL selection',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          toggleActivationValues: {
+            true: { 'database.mode': 'auto' },
+            false: { 'database.mode': 'external' },
+          },
+          activationExpandSections: {
+            false: ['External Database'],
+          },
+          activationResetSections: {
+            true: ['External Database'],
+          },
+          description: 'Deploy HelmForge PostgreSQL subchart',
+        },
+        {
           label: 'Uploads Storage',
           key: 'storage.size',
           type: 'text',
@@ -5332,23 +5374,69 @@ const chartConfigs: Record<string, ChartConfig> = {
           label: 'CPU Request',
           key: 'resources.requests.cpu',
           type: 'text',
-          default: '100m',
+          default: '',
           description: 'CPU request',
         },
         {
           label: 'Memory Request',
           key: 'resources.requests.memory',
           type: 'text',
-          default: '128Mi',
+          default: '',
           description: 'Memory request',
         },
-        { label: 'CPU Limit', key: 'resources.limits.cpu', type: 'text', default: '500m', description: 'CPU limit' },
+        { label: 'CPU Limit', key: 'resources.limits.cpu', type: 'text', default: '', description: 'CPU limit' },
         {
           label: 'Memory Limit',
           key: 'resources.limits.memory',
           type: 'text',
-          default: '256Mi',
+          default: '',
           description: 'Memory limit',
+        },
+      ],
+    },
+    {
+      name: 'External Database',
+      collapsible: true,
+      activationValues: {
+        'database.mode': 'external',
+        'postgresql.enabled': 'false',
+      },
+      fields: [
+        {
+          label: 'Host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External PostgreSQL host',
+        },
+        {
+          label: 'Database',
+          key: 'database.external.name',
+          type: 'text',
+          default: 'listmonk',
+          description: 'External database name',
+        },
+        {
+          label: 'Username',
+          key: 'database.external.username',
+          type: 'text',
+          default: 'listmonk',
+          description: 'External database user',
+        },
+        {
+          label: 'Password Secret',
+          key: 'database.external.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing database-password',
+        },
+        {
+          label: 'SSL Mode',
+          key: 'database.external.sslMode',
+          type: 'select',
+          default: 'disable',
+          options: ['disable', 'require', 'verify-ca', 'verify-full'],
+          description: 'PostgreSQL SSL mode',
         },
       ],
     },
@@ -5359,7 +5447,7 @@ const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'listmonk.example.com',
           description: 'Ingress hostname',
@@ -5371,6 +5459,35 @@ const chartConfigs: Record<string, ChartConfig> = {
           default: 'traefik',
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
+        },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Ingress path',
+        },
+        {
+          label: 'Path Type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact'],
+          description: 'Ingress path type',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'ingress.tls[0].secretName',
+          type: 'text',
+          default: '',
+          description: 'TLS Secret name',
+        },
+        {
+          label: 'TLS Host',
+          key: 'ingress.tls[0].hosts[0]',
+          type: 'text',
+          default: '',
+          description: 'TLS host entry',
         },
       ],
     },
@@ -5399,6 +5516,13 @@ const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '',
           description: 'Target bucket name',
+        },
+        {
+          label: 'S3 Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret with S3 access-key and secret-key',
         },
       ],
     },
@@ -6514,28 +6638,52 @@ const scenarios: Record<string, { label: string; description: string; values: Re
   ],
   listmonk: [
     {
-      label: 'Development',
-      description: 'Single instance for testing',
+      label: 'Bundled PostgreSQL',
+      description: 'Private install with uploads persistence and bundled PostgreSQL',
       values: {
-        'storage.size': '2Gi',
-        'ingress.enabled': 'false',
+        'database.mode': 'auto',
+        'postgresql.enabled': 'true',
+        'storage.size': '5Gi',
         'resources.requests.cpu': '100m',
         'resources.requests.memory': '128Mi',
+        'resources.limits.memory': '512Mi',
       },
     },
     {
-      label: 'Production',
-      description: 'With ingress, backups, and more resources',
+      label: 'TLS and Backup',
+      description: 'Ingress with TLS and S3-compatible PostgreSQL backup',
       values: {
         'storage.size': '10Gi',
         'ingress.enabled': 'true',
-        'ingress.hostname': 'listmonk.example.com',
+        'ingress.hosts[0].host': 'listmonk.example.com',
+        'ingress.hosts[0].paths[0].path': '/',
+        'ingress.hosts[0].paths[0].pathType': 'Prefix',
+        'ingress.ingressClassName': 'nginx',
+        'ingress.tls[0].secretName': 'listmonk-tls',
+        'ingress.tls[0].hosts[0]': 'listmonk.example.com',
         'resources.requests.cpu': '250m',
         'resources.requests.memory': '256Mi',
         'resources.limits.cpu': '1000m',
-        'resources.limits.memory': '512Mi',
+        'resources.limits.memory': '1Gi',
         'backup.enabled': 'true',
         'backup.schedule': '0 3 * * *',
+        'backup.s3.endpoint': 'https://s3.amazonaws.com',
+        'backup.s3.bucket': 'listmonk-backups',
+        'backup.s3.existingSecret': 'listmonk-s3-credentials',
+      },
+    },
+    {
+      label: 'External Database',
+      description: 'Listmonk connected to managed PostgreSQL',
+      values: {
+        'database.mode': 'external',
+        'postgresql.enabled': 'false',
+        'database.external.host': 'postgres.example.com',
+        'database.external.name': 'listmonk',
+        'database.external.username': 'listmonk',
+        'database.external.existingSecret': 'listmonk-db-credentials',
+        'database.external.sslMode': 'require',
+        'storage.size': '10Gi',
       },
     },
   ],
