@@ -127,6 +127,21 @@ test.describe('Playground', () => {
     await expect(code).toContainText('externalSecrets.data[0].remoteRef.key=apache/basicauth');
   });
 
+  test('apache production scenario emits resources and disruption budget values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="apache"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    const code = page.locator('#playground-code');
+
+    await expect(code).toContainText('replicaCount=3');
+    await expect(code).toContainText('resources.requests.cpu=100m');
+    await expect(code).toContainText('resources.requests.memory=128Mi');
+    await expect(code).toContainText('resources.limits.cpu=1');
+    await expect(code).toContainText('resources.limits.memory=512Mi');
+    await expect(code).toContainText('pdb.enabled=true');
+  });
+
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
