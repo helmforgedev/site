@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Discount Bandit Chart
-description: Discount Bandit Helm chart for Kubernetes with HelmForge MySQL, external MySQL, SQLite dev mode, Gateway API, External Secrets, and dual-stack Service.
+description: Discount Bandit Helm chart for Kubernetes with HelmForge MySQL, external MySQL, SQLite dev mode, Gateway API, External Secrets, dual-stack Service, and conservative runtime defaults.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -26,6 +26,8 @@ available for development and small single-replica installs.
 - **Service dual-stack fields** — optional `ipFamilyPolicy` and `ipFamilies`
 - **NetworkPolicy and PDB** — optional production controls for ingress, crawler egress, database egress, and disruption
 - **Supervisor hardening** — removes the upstream unauthenticated Supervisor HTTP endpoint from the generated config
+- **Conservative runtime defaults** — explicit resources, RuntimeDefault seccomp, no service account token automount, and
+  privilege escalation disabled
 
 ## Architecture
 
@@ -109,6 +111,13 @@ mysql:
     persistence:
       enabled: true
       size: 8Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
 ```
 
 </div>
@@ -173,6 +182,7 @@ resources:
     cpu: 250m
     memory: 512Mi
   limits:
+    cpu: 1000m
     memory: 1Gi
 ```
 
@@ -268,15 +278,19 @@ externalSecrets:
 
 ### Database
 
-| Parameter                          | Default           | Description                                              |
-| ---------------------------------- | ----------------- | -------------------------------------------------------- |
-| `database.mode`                    | `auto`            | Database mode: `auto`, `mysql`, `external`, or `sqlite`. |
-| `mysql.enabled`                    | `true`            | Deploy HelmForge MySQL as the primary database.          |
-| `mysql.auth.database`              | `discount_bandit` | MySQL database created by the subchart.                  |
-| `mysql.auth.username`              | `discount_bandit` | MySQL application user.                                  |
-| `database.external.host`           | `""`              | External MySQL or MariaDB hostname.                      |
-| `database.external.existingSecret` | `""`              | Secret containing the external database password.        |
-| `database.sqlite.enabled`          | `false`           | Enable SQLite development mode.                          |
+| Parameter                                    | Default           | Description                                              |
+| -------------------------------------------- | ----------------- | -------------------------------------------------------- |
+| `database.mode`                              | `auto`            | Database mode: `auto`, `mysql`, `external`, or `sqlite`. |
+| `mysql.enabled`                              | `true`            | Deploy HelmForge MySQL as the primary database.          |
+| `mysql.auth.database`                        | `discount_bandit` | MySQL database created by the subchart.                  |
+| `mysql.auth.username`                        | `discount_bandit` | MySQL application user.                                  |
+| `mysql.standalone.resources.requests.cpu`    | `250m`            | Default CPU request for bundled MySQL.                   |
+| `mysql.standalone.resources.requests.memory` | `512Mi`           | Default memory request for bundled MySQL.                |
+| `mysql.standalone.resources.limits.cpu`      | `1000m`           | Default CPU limit for bundled MySQL.                     |
+| `mysql.standalone.resources.limits.memory`   | `1Gi`             | Default memory limit for bundled MySQL.                  |
+| `database.external.host`                     | `""`              | External MySQL or MariaDB hostname.                      |
+| `database.external.existingSecret`           | `""`              | Secret containing the external database password.        |
+| `database.sqlite.enabled`                    | `false`           | Enable SQLite development mode.                          |
 
 ### Application
 
@@ -315,16 +329,33 @@ externalSecrets:
 
 ### Runtime and Operations
 
-| Parameter                                     | Default | Description                                                                |
-| --------------------------------------------- | ------- | -------------------------------------------------------------------------- |
-| `serviceAccount.create`                       | `true`  | Create a dedicated ServiceAccount.                                         |
-| `serviceAccount.automountServiceAccountToken` | `false` | Avoid mounting Kubernetes API credentials into the app pod.                |
-| `externalSecrets.enabled`                     | `false` | Render External Secrets Operator resources using `external-secrets.io/v1`. |
-| `pdb.enabled`                                 | `false` | Render a PodDisruptionBudget.                                              |
-| `persistence.database.enabled`                | `true`  | SQLite data PVC. Used only in SQLite mode.                                 |
-| `persistence.logs.enabled`                    | `false` | Persist `/logs` instead of using container-local logs.                     |
-| `supervisor.configMap.enabled`                | `true`  | Mount a sanitized Supervisor base config.                                  |
-| `resources`                                   | `{}`    | CPU and memory requests/limits.                                            |
+| Parameter                                     | Default          | Description                                                                |
+| --------------------------------------------- | ---------------- | -------------------------------------------------------------------------- |
+| `serviceAccount.create`                       | `true`           | Create a dedicated ServiceAccount.                                         |
+| `serviceAccount.automountServiceAccountToken` | `false`          | Avoid mounting Kubernetes API credentials into the app pod.                |
+| `externalSecrets.enabled`                     | `false`          | Render External Secrets Operator resources using `external-secrets.io/v1`. |
+| `pdb.enabled`                                 | `false`          | Render a PodDisruptionBudget.                                              |
+| `persistence.database.enabled`                | `true`           | SQLite data PVC. Used only in SQLite mode.                                 |
+| `persistence.logs.enabled`                    | `false`          | Persist `/logs` instead of using container-local logs.                     |
+| `supervisor.configMap.enabled`                | `true`           | Mount a sanitized Supervisor base config.                                  |
+| `resources.requests.cpu`                      | `250m`           | Default CPU request for the app container.                                 |
+| `resources.requests.memory`                   | `512Mi`          | Default memory request for the app container.                              |
+| `resources.limits.cpu`                        | `1000m`          | Default CPU limit for the app container.                                   |
+| `resources.limits.memory`                     | `1Gi`            | Default memory limit for the app container.                                |
+| `podSecurityContext.seccompProfile.type`      | `RuntimeDefault` | Kubernetes seccomp profile for the pod.                                    |
+| `securityContext.allowPrivilegeEscalation`    | `false`          | Disable privilege escalation for the app container.                        |
+
+## Security Scan
+
+| Framework          | Score       |
+| ------------------ | ----------- |
+| MITRE + NSA + SOC2 | **91.21%**  |
+| MITRE              | **100.00%** |
+| NSA                | **87.50%**  |
+| SOC2               | **92.00%**  |
+
+Remaining expected findings come from the upstream root runtime, writable filesystem requirements for FrankenPHP and
+Chromium crawlers, and NetworkPolicy/firewall decisions that depend on store and notification destinations.
 
 ## Production Guidance
 
@@ -341,6 +372,12 @@ externalSecrets:
 <Callout type="info" title="External Secrets are optional">
   The chart can render `external-secrets.io/v1` resources, but it does not install the External Secrets Operator or a
   SecretStore. Install and validate those platform components before enabling `externalSecrets.enabled` in production.
+</Callout>
+
+<Callout type="info" title="Runtime hardening is intentionally conservative">
+  The upstream image currently runs as root and listens on port 80. The chart sets seccomp, resources, and privilege
+  escalation defaults, but does not force `runAsNonRoot`, a read-only filesystem, or dropped capabilities until the
+  upstream runtime supports those constraints.
 </Callout>
 
 ## Common Issues
