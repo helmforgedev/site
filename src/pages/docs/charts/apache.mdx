@@ -6,21 +6,24 @@ description: Apache HTTP Server Helm chart with official httpd image, non-root d
 
 # Apache
 
-Apache HTTP Server chart for Kubernetes using the official `docker.io/library/httpd` image. The chart is designed for static sites, reverse-proxy front doors, and simple web workloads that need a secure default runtime.
+Apache HTTP Server chart for Kubernetes using the official `docker.io/library/httpd` image. The chart is designed for static sites, reverse-proxy front doors, and internal web endpoints that need a small, hardened web server with clear Kubernetes integration points.
 
 ## Key Features
 
 - Official `httpd` image pinned to Apache HTTP Server `2.4.67`
-- Non-root runtime on port `8080` with hardened pod and container security contexts
-- Inline content, existing ConfigMap content, and extra Apache configuration
-- Ingress and Gateway API through the single `gateway` values block
-- Optional Basic Auth through an existing Secret
+- Non-root runtime on port `8080` with a read-only root filesystem
+- Generated Apache configuration for security headers, health checks, logging, and static content
+- Inline content, existing ConfigMap content, and extra virtual host snippets
+- Ingress and Gateway API routing with separate value contracts
+- Optional Basic Auth from an existing Secret or External Secrets Operator
 - Apache exporter sidecar, ServiceMonitor, HPA, PDB, NetworkPolicy, and dual-stack Services
-- External Secrets Operator support for managed credentials
+- Helm tests that verify the `/healthz` endpoint through the Service
 
 <a id="install"></a>
 
 ## Installation
+
+Install from the HelmForge HTTPS repository:
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -28,60 +31,72 @@ helm repo update
 helm install apache helmforge/apache --namespace apache --create-namespace
 ```
 
+Install from OCI:
+
 ```bash
-helm install apache oci://ghcr.io/helmforgedev/helm/apache --namespace apache --create-namespace
+helm install apache oci://ghcr.io/helmforgedev/helm/apache \
+  --namespace apache \
+  --create-namespace
 ```
 
-## Examples
+## Architecture
 
-Custom static content:
+The chart runs Apache HTTP Server as a Deployment. Apache listens on a non-root container port, serves content from a ConfigMap-backed document root, writes logs to stdout and stderr, and exposes `/healthz` for probes and Helm tests.
+
+Typical traffic flow:
+
+1. Client traffic enters through Ingress, Gateway API, or the cluster Service.
+2. The Service forwards traffic to Apache pods on port `8080`.
+3. Apache serves chart-managed static content, a user-managed ConfigMap, or custom virtual host snippets.
+4. Optional Basic Auth reads htpasswd material from a Secret.
+5. Optional metrics scrape the exporter sidecar, which reads Apache `mod_status`.
+
+The chart intentionally does not install a certificate manager, ingress controller, Gateway implementation, WAF, content build system, PHP runtime, or external synchronization agent.
+
+## Differentiators
+
+The Apache chart is useful when you need a secure web server primitive rather than a full application platform:
+
+- It uses the official Apache image without wrapping it in a custom runtime.
+- It defaults to a non-root, read-only filesystem posture while keeping the required Apache write paths explicit.
+- It treats static content as a deployable artifact through ConfigMap names, which fits GitOps rollouts.
+- It can expose the same workload through Ingress or Gateway API without changing application pods.
+- It keeps Basic Auth as a Kubernetes Secret concern and integrates with External Secrets Operator for provider-backed secrets.
+- It includes NetworkPolicy and Service dual-stack fields for platform teams that enforce network boundaries centrally.
+
+## Quick Start
+
+Deploy a small static page from inline values:
 
 ```yaml
 content:
   files:
     index.html: |
-      <h1>Hello from Apache</h1>
+      <!doctype html>
+      <html lang="en">
+      <body>
+        <h1>Hello from Apache</h1>
+      </body>
+      </html>
 ```
 
-Gateway API exposure:
+Validate the deployment:
 
-```yaml
-gateway:
-  enabled: true
-  parentRefs:
-    - name: public-gateway
-      namespace: gateway-system
-  hostnames:
-    - apache.example.com
+```bash
+helm test apache -n apache
+kubectl port-forward svc/apache -n apache 8080:80
+curl -fsS http://localhost:8080/healthz
 ```
 
-## Operations
+## Production Pattern
 
-Use `serverStatus.require` carefully when metrics are enabled. The Apache exporter reads `mod_status`; keep status paths restricted to the metrics sidecar or trusted networks in production.
-
-## Architecture
-
-The chart runs Apache HTTP Server as a non-root Deployment listening on port `8080`. The web root is populated from
-`content.files` or from `content.existingConfigMap`, while the generated Apache configuration keeps logs on
-stdout/stderr and avoids writable paths outside the configured volumes.
-
-Typical production traffic is:
-
-1. Client traffic enters through Ingress or Gateway API.
-2. The HelmForge Service forwards requests to Apache pods.
-3. Apache serves static files, reverse-proxy rules, or extra virtual hosts from chart-managed configuration.
-4. Optional metrics scraping reaches the exporter sidecar and `mod_status`.
-5. Optional Basic Auth material is mounted from a Secret or an ExternalSecret-managed target Secret.
-
-## Production Values
-
-Use explicit content, resources, replica count, disruption budgets, and network boundaries for production:
+For production, keep web content in an immutable ConfigMap that is created by your release pipeline. Roll the Helm release by changing the ConfigMap name.
 
 ```yaml
 replicaCount: 3
 
 content:
-  existingConfigMap: apache-site-content
+  existingConfigMap: apache-site-content-20260613
 
 resources:
   requests:
@@ -97,18 +112,21 @@ pdb:
 
 networkPolicy:
   enabled: true
+  ingress:
+    enabled: true
   egress:
     enabled: true
     allowDns: true
     allowInternet: false
 ```
 
-Use immutable ConfigMaps for content releases. If a CI system rebuilds site assets, publish a new ConfigMap name and
-roll the release instead of mutating files inside the running container.
+Use immutable content names instead of mutating a live ConfigMap. That keeps rollbacks deterministic and avoids confusing pod checksums.
 
 ## Routing
 
-Ingress uses `ingress.ingressClassName`, matching the rest of the HelmForge chart catalog:
+### Ingress
+
+Ingress uses the HelmForge-standard `ingress.ingressClassName` key:
 
 ```yaml
 ingress:
@@ -125,7 +143,9 @@ ingress:
         - apache.example.com
 ```
 
-Gateway API uses the single `gateway` block:
+### Gateway API
+
+Gateway API renders an HTTPRoute. The chart points route backends to the Apache Service automatically.
 
 ```yaml
 gateway:
@@ -135,11 +155,18 @@ gateway:
       namespace: gateway-system
   hostnames:
     - apache.example.com
-  path: /
-  pathType: PathPrefix
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
 ```
 
-Dual-stack Service fields are exposed directly:
+Gateway API requires Gateway API CRDs and a compatible controller in the cluster. See the official [Gateway API documentation](https://gateway-api.sigs.k8s.io/).
+
+### Dual-Stack Services
+
+Dual-stack fields are optional and map directly to Kubernetes Service fields:
 
 ```yaml
 service:
@@ -149,9 +176,11 @@ service:
     - IPv6
 ```
 
-## Authentication And Secrets
+Use `SingleStack` with one family when validating on IPv4-only local clusters.
 
-Basic Auth is optional and expects an htpasswd file in an existing Secret:
+## Authentication And External Secrets
+
+Basic Auth expects an htpasswd file from a Secret:
 
 ```yaml
 basicAuth:
@@ -160,7 +189,7 @@ basicAuth:
   htpasswdKey: htpasswd
 ```
 
-For GitOps platforms, let External Secrets Operator reconcile that Secret:
+For GitOps installations, let External Secrets Operator reconcile that Secret:
 
 ```yaml
 basicAuth:
@@ -179,12 +208,11 @@ externalSecrets:
         property: htpasswd
 ```
 
-The chart intentionally does not install a certificate manager, ingress controller, Gateway implementation, or WAF.
-Those platform responsibilities should be managed outside the Apache release.
+The chart fails template rendering when ExternalSecret is enabled without `data` or `dataFrom`. See the official [External Secrets Operator documentation](https://external-secrets.io/latest/).
 
 ## Observability
 
-Enable the exporter only when `serverStatus.require` allows the sidecar or a trusted scrape path to read `mod_status`:
+Enable the exporter only when Apache `mod_status` is explicitly allowed for the scrape path:
 
 ```yaml
 metrics:
@@ -195,11 +223,190 @@ metrics:
       release: prometheus
 
 serverStatus:
+  enabled: true
   require: 'all granted'
 ```
 
-In locked-down environments, prefer restricting metrics with NetworkPolicy and ServiceMonitor selectors instead of
-opening `mod_status` to arbitrary client traffic.
+In production, restrict `mod_status` with NetworkPolicy and ServiceMonitor selectors rather than exposing it to general client traffic.
+
+## Network Policy
+
+NetworkPolicy is opt-in because enforcement depends on the cluster CNI:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    enabled: true
+    namespaceSelector:
+      kubernetes.io/metadata.name: ingress-nginx
+  egress:
+    enabled: true
+    allowDns: true
+    allowInternet: false
+```
+
+Set `networkPolicy.egress.allowInternet=true` only when Apache needs outbound access for reverse proxy targets or remote content integrations.
+
+## Configuration Reference
+
+### Core
+
+| Parameter                | Default                   | Description                            |
+| ------------------------ | ------------------------- | -------------------------------------- |
+| `replicaCount`           | `2`                       | Apache pod count when HPA is disabled. |
+| `nameOverride`           | `""`                      | Chart name override.                   |
+| `fullnameOverride`       | `""`                      | Full release name override.            |
+| `commonLabels`           | `{}`                      | Labels added to chart resources.       |
+| `serverName`             | `localhost`               | Apache `ServerName` value.             |
+| `image.repository`       | `docker.io/library/httpd` | Official Apache HTTP Server image.     |
+| `image.tag`              | `2.4.67`                  | Apache image tag.                      |
+| `image.pullPolicy`       | `IfNotPresent`            | Image pull policy.                     |
+| `imagePullSecrets`       | `[]`                      | Image pull secrets.                    |
+| `containerPorts.http`    | `8080`                    | Non-root Apache listener port.         |
+| `containerPorts.metrics` | `9117`                    | Exporter sidecar port.                 |
+
+### Apache Configuration
+
+| Parameter               | Default                    | Description                              |
+| ----------------------- | -------------------------- | ---------------------------------------- |
+| `httpd.serverTokens`    | `Prod`                     | Apache `ServerTokens` value.             |
+| `httpd.serverSignature` | `Off`                      | Apache `ServerSignature` value.          |
+| `httpd.traceEnable`     | `Off`                      | Apache `TraceEnable` value.              |
+| `httpd.logLevel`        | `warn`                     | Apache log level.                        |
+| `httpd.allowOverride`   | `None`                     | Directory `AllowOverride` setting.       |
+| `httpd.options`         | `-Indexes +FollowSymLinks` | Directory `Options` setting.             |
+| `httpd.extraConfig`     | `""`                       | Extra snippets appended to `httpd.conf`. |
+| `httpd.extraVhosts`     | `{}`                       | Additional virtual host snippets.        |
+
+### Content
+
+| Parameter                   | Default             | Description                                              |
+| --------------------------- | ------------------- | -------------------------------------------------------- |
+| `content.existingConfigMap` | `""`                | Existing ConfigMap containing web root files.            |
+| `content.files`             | sample `index.html` | Files rendered into the chart-managed content ConfigMap. |
+
+### Authentication And Secrets
+
+| Parameter                               | Default       | Description                                       |
+| --------------------------------------- | ------------- | ------------------------------------------------- |
+| `basicAuth.enabled`                     | `false`       | Enable Basic Auth using htpasswd data.            |
+| `basicAuth.existingSecret`              | `""`          | Secret containing htpasswd data.                  |
+| `basicAuth.htpasswdKey`                 | `htpasswd`    | Secret key for the htpasswd file.                 |
+| `externalSecrets.enabled`               | `false`       | Render an ExternalSecret for Basic Auth material. |
+| `externalSecrets.refreshInterval`       | `0`           | ExternalSecret refresh interval.                  |
+| `externalSecrets.secretStoreRef.name`   | `""`          | SecretStore or ClusterSecretStore name.           |
+| `externalSecrets.secretStoreRef.kind`   | `SecretStore` | Secret store kind.                                |
+| `externalSecrets.target.creationPolicy` | `Owner`       | ExternalSecret target creation policy.            |
+| `externalSecrets.data`                  | `[]`          | Individual provider key mappings.                 |
+| `externalSecrets.dataFrom`              | `[]`          | Provider extraction blocks.                       |
+
+### Service And Routing
+
+| Parameter                  | Default                        | Description                        |
+| -------------------------- | ------------------------------ | ---------------------------------- |
+| `service.type`             | `ClusterIP`                    | Kubernetes Service type.           |
+| `service.annotations`      | `{}`                           | Service annotations.               |
+| `service.port`             | `80`                           | Public HTTP Service port.          |
+| `service.metricsPort`      | `9117`                         | Metrics Service port.              |
+| `service.ipFamilyPolicy`   | `null`                         | Optional Service IP family policy. |
+| `service.ipFamilies`       | `[]`                           | Optional Service IP families.      |
+| `ingress.enabled`          | `false`                        | Render an Ingress.                 |
+| `ingress.ingressClassName` | `""`                           | IngressClass name.                 |
+| `ingress.annotations`      | `{}`                           | Ingress annotations.               |
+| `ingress.hosts`            | `apache.local`                 | Ingress host and path rules.       |
+| `ingress.tls`              | `[]`                           | Ingress TLS entries.               |
+| `gateway.enabled`          | `false`                        | Render a Gateway API HTTPRoute.    |
+| `gateway.apiVersion`       | `gateway.networking.k8s.io/v1` | HTTPRoute API version.             |
+| `gateway.parentRefs`       | `[]`                           | Gateway parent references.         |
+| `gateway.hostnames`        | `[]`                           | HTTPRoute hostnames.               |
+| `gateway.rules`            | path prefix `/`                | HTTPRoute match rules.             |
+
+### Network Policy
+
+| Parameter                                 | Default | Description                                       |
+| ----------------------------------------- | ------- | ------------------------------------------------- |
+| `networkPolicy.enabled`                   | `false` | Render NetworkPolicy resources.                   |
+| `networkPolicy.ingress.enabled`           | `true`  | Restrict inbound traffic when policy is enabled.  |
+| `networkPolicy.ingress.namespaceSelector` | `{}`    | Allowed namespace selector.                       |
+| `networkPolicy.ingress.podSelector`       | `{}`    | Allowed pod selector.                             |
+| `networkPolicy.egress.enabled`            | `true`  | Restrict outbound traffic when policy is enabled. |
+| `networkPolicy.egress.allowDns`           | `true`  | Allow DNS egress.                                 |
+| `networkPolicy.egress.allowInternet`      | `true`  | Allow IPv4 and IPv6 internet egress.              |
+| `networkPolicy.egress.extraRules`         | `[]`    | Additional egress rules.                          |
+
+### Probes, Resources, And Scheduling
+
+| Parameter                       | Default                           | Description                       |
+| ------------------------------- | --------------------------------- | --------------------------------- |
+| `livenessProbe.*`               | see values                        | Apache liveness probe timings.    |
+| `readinessProbe.*`              | see values                        | Apache readiness probe timings.   |
+| `startupProbe.*`                | see values                        | Apache startup probe timings.     |
+| `resources.requests.cpu`        | `50m`                             | Apache CPU request.               |
+| `resources.requests.memory`     | `64Mi`                            | Apache memory request.            |
+| `resources.limits.cpu`          | `500m`                            | Apache CPU limit.                 |
+| `resources.limits.memory`       | `256Mi`                           | Apache memory limit.              |
+| `podSecurityContext`            | non-root fsGroup + seccomp        | Pod-level security context.       |
+| `securityContext`               | non-root, no privilege escalation | Container-level security context. |
+| `nodeSelector`                  | `{}`                              | Node selector.                    |
+| `tolerations`                   | `[]`                              | Pod tolerations.                  |
+| `affinity`                      | `{}`                              | Pod affinity.                     |
+| `topologySpreadConstraints`     | `[]`                              | Pod topology spread constraints.  |
+| `priorityClassName`             | `""`                              | PriorityClass name.               |
+| `terminationGracePeriodSeconds` | `30`                              | Pod termination grace period.     |
+
+### Availability And Metrics
+
+| Parameter                                    | Default                                | Description                                    |
+| -------------------------------------------- | -------------------------------------- | ---------------------------------------------- |
+| `pdb.enabled`                                | `false`                                | Render a PodDisruptionBudget.                  |
+| `pdb.minAvailable`                           | `1`                                    | Minimum available pods.                        |
+| `autoscaling.enabled`                        | `false`                                | Render an HPA.                                 |
+| `autoscaling.minReplicas`                    | `2`                                    | HPA minimum replicas.                          |
+| `autoscaling.maxReplicas`                    | `10`                                   | HPA maximum replicas.                          |
+| `autoscaling.targetCPUUtilizationPercentage` | `80`                                   | HPA CPU target.                                |
+| `metrics.enabled`                            | `false`                                | Enable Apache exporter sidecar.                |
+| `metrics.image.repository`                   | `docker.io/lusotycoon/apache-exporter` | Exporter image repository.                     |
+| `metrics.image.tag`                          | `v1.0.11`                              | Exporter image tag.                            |
+| `metrics.resources`                          | small defaults                         | Exporter resources.                            |
+| `metrics.serviceMonitor.enabled`             | `false`                                | Render a ServiceMonitor.                       |
+| `metrics.serviceMonitor.interval`            | `30s`                                  | Scrape interval.                               |
+| `metrics.serviceMonitor.labels`              | `{}`                                   | ServiceMonitor labels.                         |
+| `serverStatus.enabled`                       | `false`                                | Enable Apache `mod_status` config.             |
+| `serverStatus.path`                          | `/server-status`                       | Status endpoint path.                          |
+| `serverStatus.require`                       | `local`                                | Apache `Require` expression for status access. |
+
+### Extension Points
+
+| Parameter                    | Default | Description                                        |
+| ---------------------------- | ------- | -------------------------------------------------- |
+| `serviceAccount.create`      | `true`  | Create a dedicated ServiceAccount.                 |
+| `serviceAccount.name`        | `""`    | ServiceAccount name override.                      |
+| `serviceAccount.annotations` | `{}`    | ServiceAccount annotations.                        |
+| `podLabels`                  | `{}`    | Additional pod labels.                             |
+| `podAnnotations`             | `{}`    | Additional pod annotations.                        |
+| `annotations`                | `{}`    | Additional resource annotations.                   |
+| `extraEnv`                   | `[]`    | Additional Apache container environment variables. |
+| `extraVolumes`               | `[]`    | Additional pod volumes.                            |
+| `extraVolumeMounts`          | `[]`    | Additional Apache volume mounts.                   |
+| `extraManifests`             | `[]`    | Additional manifests rendered verbatim.            |
+
+## Examples
+
+- [Production values](https://github.com/helmforgedev/charts/blob/main/charts/apache/examples/production.yaml)
+- [Gateway API values](https://github.com/helmforgedev/charts/blob/main/charts/apache/examples/gateway.yaml)
+- [External Secrets values](https://github.com/helmforgedev/charts/blob/main/charts/apache/examples/external-secrets.yaml)
+
+## Common Issues
+
+| Symptom                      | Likely Cause                                                    | Fix                                                                       |
+| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `/healthz` returns 404       | Custom Apache config no longer serves the generated health file | Preserve the generated health alias or update probe paths.                |
+| `403` from `/server-status`  | `serverStatus.require` blocks the exporter                      | Permit the exporter path or disable metrics.                              |
+| Basic Auth is ignored        | Secret key does not match `basicAuth.htpasswdKey`               | Check Secret data keys and ExternalSecret target keys.                    |
+| Gateway route has no traffic | `parentRefs` or listener hostnames do not match the Gateway     | Check Gateway readiness and HTTPRoute attachment status.                  |
+| NetworkPolicy blocks traffic | Namespace or pod selectors do not match callers                 | Adjust selectors or disable the policy until the CNI rules are verified.  |
+| Content does not change      | Existing ConfigMap name did not change                          | Publish a new immutable ConfigMap and update `content.existingConfigMap`. |
 
 ## Validation
 
@@ -208,42 +415,15 @@ After deployment:
 ```bash
 helm test apache -n apache
 kubectl get pods -n apache -l app.kubernetes.io/name=apache
-kubectl logs -n apache deploy/apache --since=10m
+kubectl rollout status deployment/apache -n apache
+kubectl logs -n apache deploy/apache --all-containers --since=10m
 kubectl get events -n apache --sort-by=.lastTimestamp
 ```
-
-The chart exposes `/healthz` for probes and Helm tests. If you replace the generated configuration, keep the health
-endpoint or update probes to a path served by your application.
-
-## Common Issues
-
-| Symptom                            | Likely Cause                                          | Fix                                                                     |
-| ---------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------- |
-| `403` from `/server-status`        | `serverStatus.require` blocks the exporter            | Permit the exporter path or disable metrics.                            |
-| Pods restart after adding content  | ConfigMap checksum changed                            | Expected rollout; publish immutable ConfigMaps for controlled releases. |
-| Ingress works but Gateway does not | `parentRefs` points to the wrong Gateway or namespace | Verify Gateway API resources and listener hostnames.                    |
-| Basic Auth is ignored              | Secret key does not match `basicAuth.htpasswdKey`     | Check Secret data keys and ExternalSecret target keys.                  |
-
-<a id="values"></a>
-
-## Values
-
-| Parameter                   | Default                   | Description                                         |
-| --------------------------- | ------------------------- | --------------------------------------------------- |
-| `replicaCount`              | `2`                       | Number of Apache pods when autoscaling is disabled. |
-| `image.repository`          | `docker.io/library/httpd` | Official Apache HTTP Server image.                  |
-| `content.files`             | `{}`                      | Inline files rendered into the web root.            |
-| `content.existingConfigMap` | `""`                      | Existing ConfigMap with site content.               |
-| `httpd.extraConfig`         | `""`                      | Additional Apache configuration.                    |
-| `basicAuth.enabled`         | `false`                   | Enable Basic Auth from an existing Secret.          |
-| `service.ipFamilyPolicy`    | `null`                    | Optional Kubernetes Service IP family policy.       |
-| `ingress.enabled`           | `false`                   | Render Kubernetes Ingress.                          |
-| `gateway.enabled`           | `false`                   | Render Gateway API HTTPRoute.                       |
-| `metrics.enabled`           | `false`                   | Enable Apache exporter sidecar.                     |
-| `externalSecrets.enabled`   | `false`                   | Render ExternalSecret resources.                    |
 
 ## Links
 
 - [Apache HTTP Server](https://httpd.apache.org)
-- [Official image](https://hub.docker.com/_/httpd)
+- [Official Apache image](https://hub.docker.com/_/httpd)
+- [Gateway API](https://gateway-api.sigs.k8s.io/)
+- [External Secrets Operator](https://external-secrets.io/latest/)
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/apache)

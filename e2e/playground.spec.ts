@@ -113,6 +113,20 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).not.toContainText('database.external.');
   });
 
+  test('apache basic auth scenario emits external secrets values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="apache"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Basic Auth")').click();
+    const code = page.locator('#playground-code');
+
+    await expect(code).toContainText('basicAuth.enabled=true');
+    await expect(code).toContainText('basicAuth.existingSecret=apache-basicauth');
+    await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('externalSecrets.secretStoreRef.kind=ClusterSecretStore');
+    await expect(code).toContainText('externalSecrets.data[0].remoteRef.key=apache/basicauth');
+  });
+
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
