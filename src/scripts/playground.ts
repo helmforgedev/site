@@ -451,7 +451,10 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 }
 
 function buildSetFlags(): string[] {
-  return getChangedValues().map((c) => `--set ${c.key}=${quoteSetValue(c.value)}`);
+  return getChangedValues().map((c) => {
+    const setter = shouldPreserveString(c.key) ? '--set-string' : '--set';
+    return `${setter} ${c.key}=${quoteSetValue(c.value)}`;
+  });
 }
 
 function quoteSetValue(value: string): string {
@@ -489,7 +492,7 @@ function generateValuesYaml(): string {
 
   const tree: Record<string, any> = {};
   changes.forEach(({ key, value }) => {
-    setTreeValue(tree, key, coerceValue(value));
+    setTreeValue(tree, key, coerceValue(key, value));
   });
 
   function renderYaml(obj: any, indent: number): void {
@@ -544,7 +547,7 @@ function getPlainValuesYaml(): string {
 
   const tree: Record<string, any> = {};
   changes.forEach(({ key, value }) => {
-    setTreeValue(tree, key, coerceValue(value));
+    setTreeValue(tree, key, coerceValue(key, value));
   });
 
   function renderYaml(obj: any, indent: number): void {
@@ -576,10 +579,15 @@ function getPlainValuesYaml(): string {
   return lines.join('\n');
 }
 
-function coerceValue(value: string): boolean | number | string {
+function coerceValue(key: string, value: string): boolean | number | string {
+  if (shouldPreserveString(key)) return JSON.stringify(value);
   if (value === 'true' || value === 'false') return value === 'true';
   if (/^\d+$/.test(value)) return parseInt(value, 10);
   return value;
+}
+
+function shouldPreserveString(key: string): boolean {
+  return /\.extraEnv\[\d+\]\.value$/.test(key) || /\.env\[\d+\]\.value$/.test(key);
 }
 
 function parseKeyPath(key: string): Array<string | number> {
