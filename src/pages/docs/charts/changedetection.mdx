@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: changedetection.io Chart
-description: changedetection.io Helm chart for Kubernetes website monitoring with CSS/XPath selectors, notifications, persistence, and optional Playwright sidecar.
+description: changedetection.io Helm chart for Kubernetes website monitoring with persistent SQLite storage, notifications, External Secrets, Ingress, Gateway API, and optional Playwright rendering.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,35 +9,31 @@ import Callout from '../../../components/Callout.astro';
 
 # changedetection.io
 
-Website change monitoring platform. changedetection.io watches any URL for content changes, compares page
-snapshots, and sends alerts via email, webhooks, Slack, Telegram, and 80+ other notification services.
-Supports CSS and XPath selectors to target specific page elements for precise change detection.
+changedetection.io watches URLs for content changes, stores snapshots and diff history, and sends notifications through
+Apprise-backed channels such as email, webhooks, Slack, Telegram, Discord, Gotify, and many others. The HelmForge chart
+packages the official `ghcr.io/dgtlmoon/changedetection.io:0.55.7` image with persistent `/datastore` storage and an
+optional Playwright browser sidecar for JavaScript-rendered pages.
 
 ## Architecture
 
-changedetection.io runs in two modes depending on whether the browser sidecar is enabled:
+The chart deploys a single `Deployment` with the `Recreate` strategy. The application stores its SQLite database,
+watch configuration, rendered snapshots, and optional Python user packages under `/datastore`, which is backed by a PVC
+by default.
 
-| Mode                          | Fetch Method          | JavaScript        | Best For                                         |
-| ----------------------------- | --------------------- | ----------------- | ------------------------------------------------ |
-| **Without browser** (default) | Python `requests`     | ❌ Not executed   | Static pages, RSS, APIs, plain HTML              |
-| **With browser**              | Playwright + Chromium | ✅ Full rendering | SPAs, React/Vue apps, dynamically loaded content |
+| Component                   | Purpose                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `changedetection` container | Runs the changedetection.io web UI, scheduler, diff engine, and notification flow.          |
+| Optional `browser` sidecar  | Runs Browserless Chromium on localhost for Playwright-backed JavaScript rendering.          |
+| PVC                         | Stores SQLite data, snapshots, watch history, and Python user package installs.             |
+| Service                     | Exposes the HTTP application port inside the cluster.                                       |
+| Ingress or HTTPRoute        | Optional external routing, disabled by default.                                             |
+| ExternalSecret              | Optional environment Secret materialization for notification credentials or runtime tuning. |
 
-<Callout type="warning" title="Choose your fetch mode before deploying">
-  The decision to enable `browser.enabled` is the most important configuration choice for this chart. Without the
-  browser sidecar, changedetection.io cannot detect changes on JavaScript-rendered pages (single-page applications,
-  lazy-loaded content, price tracking on modern e-commerce sites). With the browser enabled, memory requirements
-  increase significantly — each Playwright worker holds a Chromium instance in memory.
+<Callout type="warning" title="Plan the browser mode before production">
+  The most important sizing decision is whether `browser.enabled` is required. Static pages and APIs work without the
+  sidecar. SPAs, modern commerce pages, and client-rendered dashboards usually need Playwright, which materially
+  increases CPU and memory usage.
 </Callout>
-
-## Key Features
-
-- **Plain HTTP monitoring** — fast, lightweight fetch for static pages and APIs
-- **Playwright browser sidecar** — full JavaScript rendering via `browserless/chromium`
-- **CSS and XPath selectors** — target specific elements for precise change detection
-- **Visual diff** — side-by-side content comparison
-- **80+ notification channels** — email, webhooks, Slack, Telegram, Gotify, and more
-- **REST API** — programmatic management of watches and history
-- **Persistent storage** — SQLite database and all page snapshots on a persistent volume
 
 ## Installation
 
@@ -55,44 +51,35 @@ helm install changedetection helmforge/changedetection
 helm install changedetection oci://ghcr.io/helmforgedev/helm/changedetection
 ```
 
+Port-forward a default install:
+
+```bash
+kubectl port-forward svc/changedetection 5000:80
+```
+
+Open `http://localhost:5000/`.
+
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'basic', label: 'Basic (No Browser)' },
-    { id: 'browser', label: 'With Browser Sidecar' },
-    { id: 'browser-resources', label: 'Browser + Resource Limits' },
-    { id: 'throttled', label: 'Throttled (Many Watches)' },
+    { id: 'basic', label: 'Basic' },
+    { id: 'browser', label: 'Browser' },
+    { id: 'production', label: 'Production' },
+    { id: 'gateway', label: 'Gateway API' },
   ]}
 >
 
 <div data-tab-panel="basic">
 
 ```yaml
-# values.yaml — changedetection.io without browser sidecar
-# Use for: static pages, RSS feeds, plain HTML sites, APIs
 changedetection:
   baseUrl: 'https://changes.example.com'
-  timezone: 'America/Sao_Paulo'
+  timezone: 'UTC'
 
 persistence:
   enabled: true
   size: 10Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: changes.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: changedetection-tls
-      hosts:
-        - changes.example.com
 ```
 
 </div>
@@ -100,37 +87,6 @@ ingress:
 <div data-tab-panel="browser">
 
 ```yaml
-# values.yaml — changedetection.io with Playwright/Chromium browser sidecar
-# Use for: SPAs, React/Vue apps, JavaScript-rendered pages, modern e-commerce
-changedetection:
-  baseUrl: 'https://changes.example.com'
-  fetchWorkers: 4 # Reduce workers to limit concurrent Chromium instances
-
-browser:
-  enabled: true
-
-persistence:
-  enabled: true
-  size: 20Gi # Increase storage for browser-rendered snapshots
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: changes.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-```
-
-</div>
-
-<div data-tab-panel="browser-resources">
-
-```yaml
-# values.yaml — Browser mode with explicit resource limits
-# Chromium per-instance uses ~300-500MB RAM.
-# With fetchWorkers: 4, plan for ~2GB RAM for the browser container.
 changedetection:
   baseUrl: 'https://changes.example.com'
   fetchWorkers: 4
@@ -139,227 +95,272 @@ browser:
   enabled: true
   resources:
     requests:
-      memory: 1Gi
       cpu: 250m
+      memory: 512Mi
     limits:
       memory: 2Gi
-      cpu: 1000m
-
-resources:
-  requests:
-    memory: 256Mi
-    cpu: 100m
-  limits:
-    memory: 512Mi
-    cpu: 500m
 
 persistence:
   enabled: true
   size: 20Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: changes.example.com
-      paths:
-        - path: /
-          pathType: Prefix
 ```
 
 </div>
 
-<div data-tab-panel="throttled">
+<div data-tab-panel="production">
 
 ```yaml
-# values.yaml — Throttled configuration for many watches
-# minimumSecondsRecheckTime prevents hammering monitored sites
 changedetection:
   baseUrl: 'https://changes.example.com'
-  fetchWorkers: 5
-  minimumSecondsRecheckTime: '300' # At least 5 minutes between rechecks per watch
+  fetchWorkers: 4
+  minimumSecondsRecheckTime: '300'
+  timezone: 'America/Sao_Paulo'
+  envFrom:
+    - secretRef:
+        name: changedetection-env
+
+browser:
+  enabled: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
 
 persistence:
   enabled: true
-  size: 50Gi # Larger PVC for many snapshots over time
+  size: 50Gi
+  storageClass: fast-retain
 
 ingress:
   enabled: true
-  ingressClassName: traefik
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: changes.example.com
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - hosts:
+        - changes.example.com
+      secretName: changedetection-tls
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: cluster-secrets
+    kind: ClusterSecretStore
+  target:
+    name: changedetection-env
+    creationPolicy: Owner
+  data:
+    - secretKey: LOGGER_LEVEL
+      remoteRef:
+        key: changedetection/app
+        property: loggerLevel
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+```
+
+</div>
+
+<div data-tab-panel="gateway">
+
+```yaml
+changedetection:
+  baseUrl: 'https://changes.example.com'
+
+gateway:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: ingress
+  hostnames:
+    - changes.example.com
 ```
 
 </div>
 
 </DocsTabs>
 
+## Operational Guidance
+
+Keep `persistence.enabled=true` for any environment where watches or history matter. changedetection.io uses SQLite,
+so the chart intentionally runs a single replica and does not expose horizontal scaling knobs. Increase `persistence.size`
+for frequent checks, long retention, rendered screenshots, and many watches.
+
+Enable `browser.enabled=true` only for pages that require JavaScript rendering. When enabled, reduce
+`changedetection.fetchWorkers` and set `browser.resources`, because every concurrent browser-backed fetch can hold a
+Chromium process in memory.
+
+Set `changedetection.baseUrl` when exposing the service publicly. Notification links depend on this value and should
+match the Ingress or Gateway hostname.
+
+Use `externalSecrets` for notification credentials, application tuning values, or other upstream-supported environment
+variables that should not live in Git. The rendered Secret is automatically consumed through `envFrom` when
+`externalSecrets.enabled=true`.
+
+## Routing
+
+Ingress and Gateway API are both disabled by default. Choose the routing model managed by your platform and avoid
+publishing the same hostname through both unless your cluster policy explicitly expects that topology.
+
+Ingress supports class name, annotations, host paths, and TLS:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: changes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - changes.example.com
+      secretName: changedetection-tls
+```
+
+Gateway API renders an `HTTPRoute` and requires at least one `gateway.parentRefs` entry:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: shared-gateway
+      namespace: ingress
+  hostnames:
+    - changes.example.com
+```
+
+Service dual-stack fields are optional and preserve cluster defaults unless explicitly set:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
 ## Configuration Reference
 
-### Core
+### Image And Application
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter                                   | Default                               | Description                                                             |
+| ------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| `image.repository`                          | `ghcr.io/dgtlmoon/changedetection.io` | Official changedetection.io image.                                      |
+| `image.tag`                                 | `0.55.7`                              | Pinned upstream image tag.                                              |
+| `image.pullPolicy`                          | `IfNotPresent`                        | Kubernetes image pull policy.                                           |
+| `changedetection.port`                      | `5000`                                | Container HTTP port.                                                    |
+| `changedetection.baseUrl`                   | `""`                                  | Public URL used in notification links.                                  |
+| `changedetection.fetchWorkers`              | `10`                                  | Concurrent fetch workers. Lower this when browser rendering is enabled. |
+| `changedetection.minimumSecondsRecheckTime` | `""`                                  | Minimum seconds between rechecks per watch.                             |
+| `changedetection.timezone`                  | `""`                                  | Container `TZ` value.                                                   |
+| `changedetection.locale`                    | `C`                                   | `LANG` and `LC_ALL` locale.                                             |
+| `changedetection.defaultWatches.enabled`    | `false`                               | Allow upstream sample watches on a fresh datastore.                     |
+| `changedetection.extraEnv`                  | `[]`                                  | Extra environment variables.                                            |
+| `changedetection.envFrom`                   | `[]`                                  | Additional `envFrom` sources.                                           |
 
-### Image
+### Browser
 
-| Parameter          | Type   | Default                               | Description                          |
-| ------------------ | ------ | ------------------------------------- | ------------------------------------ |
-| `image.repository` | string | `ghcr.io/dgtlmoon/changedetection.io` | changedetection.io container image.  |
-| `image.tag`        | string | `"0.55.5"`                            | Image tag.                           |
-| `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
-
-### changedetection.io Configuration
-
-| Parameter                                   | Type    | Default | Description                                                                |
-| ------------------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
-| `changedetection.port`                      | integer | `5000`  | Internal HTTP port.                                                        |
-| `changedetection.baseUrl`                   | string  | `""`    | Public URL of the instance. Used in notification links.                    |
-| `changedetection.fetchWorkers`              | integer | `10`    | Number of concurrent fetch workers. Reduce when using the browser sidecar. |
-| `changedetection.minimumSecondsRecheckTime` | string  | `""`    | Minimum interval between rechecks in seconds. Empty means no minimum.      |
-| `changedetection.timezone`                  | string  | `""`    | Container timezone for scheduling and display.                             |
-| `changedetection.locale`                    | string  | `C`     | Locale assigned to `LANG` and `LC_ALL`.                                    |
-| `changedetection.extraEnv`                  | array   | `[]`    | Extra environment variables for advanced configuration.                    |
-
-<Callout type="tip" title="Reduce fetchWorkers when enabling the browser sidecar">
-  The default `fetchWorkers: 10` means up to 10 concurrent Chromium instances when `browser.enabled: true`. Each
-  Chromium instance consumes 300–500 MB of RAM. For most deployments, `fetchWorkers: 4` or `fetchWorkers: 5` provides a
-  good balance between parallelism and memory usage. Set `browser.resources.limits.memory` accordingly.
-</Callout>
-
-<Callout type="info" title="Set baseUrl for clickable notification links">
-  Notification messages sent by changedetection.io include a link back to the watch diff view. If `baseUrl` is empty,
-  these links will not work. Set it to the public URL of your instance (e.g. `https://changes.example.com`).
-</Callout>
-
-### Browser Sidecar
-
-The browser sidecar runs `browserless/chromium` in the same pod and provides Playwright-based rendering for
-JavaScript-heavy pages. changedetection.io automatically routes requests through the browser when it is enabled.
-
-| Parameter                  | Type    | Default                        | Description                                                                |
-| -------------------------- | ------- | ------------------------------ | -------------------------------------------------------------------------- |
-| `browser.enabled`          | boolean | `false`                        | Enable the Playwright/Chromium sidecar container.                          |
-| `browser.image.repository` | string  | `ghcr.io/browserless/chromium` | Browser sidecar container image.                                           |
-| `browser.image.tag`        | string  | `"v2.46.0"`                    | Browser image tag.                                                         |
-| `browser.image.pullPolicy` | string  | `IfNotPresent`                 | Browser image pull policy.                                                 |
-| `browser.resources`        | object  | `{}`                           | Resource requests and limits for the browser container. Set memory limits. |
-
-<Callout type="danger" title="Browser sidecar without memory limits can OOMKill the pod">
-  Without `browser.resources.limits.memory`, the Chromium sidecar has no memory ceiling. Pages with heavy JavaScript or
-  memory leaks can cause the pod to be OOMKilled. Always set `browser.resources.limits.memory` when enabling the browser
-  sidecar. Start with `2Gi` and monitor actual usage.
-</Callout>
+| Parameter                  | Default                        | Description                                        |
+| -------------------------- | ------------------------------ | -------------------------------------------------- |
+| `browser.enabled`          | `false`                        | Enable the Browserless Chromium sidecar.           |
+| `browser.image.repository` | `ghcr.io/browserless/chromium` | Browser sidecar image.                             |
+| `browser.image.tag`        | `v2.46.0`                      | Browser sidecar tag.                               |
+| `browser.image.pullPolicy` | `IfNotPresent`                 | Browser image pull policy.                         |
+| `browser.resources`        | `{}`                           | Resource requests and limits for the sidecar only. |
 
 ### Persistence
 
-changedetection.io stores its SQLite database and all page snapshots (HTML content captured on each change) in
-`/datastore`. Snapshot volume grows over time based on the number of watches and their history retention.
+| Parameter                   | Default           | Description                                     |
+| --------------------------- | ----------------- | ----------------------------------------------- |
+| `persistence.enabled`       | `true`            | Create/use persistent storage for `/datastore`. |
+| `persistence.size`          | `10Gi`            | PVC size.                                       |
+| `persistence.storageClass`  | `""`              | StorageClass name; empty uses cluster default.  |
+| `persistence.accessModes`   | `[ReadWriteOnce]` | PVC access modes.                               |
+| `persistence.existingClaim` | `""`              | Reuse an existing PVC.                          |
 
-| Parameter                   | Type    | Default             | Description                                                           |
-| --------------------------- | ------- | ------------------- | --------------------------------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/datastore` (SQLite database + all page snapshots). |
-| `persistence.size`          | string  | `10Gi`              | PVC size. Increase based on number of watches and history retention.  |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                             |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                     |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                          |
+### Routing And Service
 
-<Callout type="warning" title="No built-in S3 backup — protect the PVC manually">
-  Unlike other HelmForge charts, changedetection.io does not include a built-in S3 backup CronJob. The PVC contains both
-  the SQLite database and all captured page snapshots. Implement an external backup strategy (e.g. Velero volume
-  snapshots, NFS snapshots, or a custom CronJob) to protect this data.
-</Callout>
+| Parameter                  | Default      | Description                                      |
+| -------------------------- | ------------ | ------------------------------------------------ |
+| `service.type`             | `ClusterIP`  | Service type.                                    |
+| `service.port`             | `80`         | Service HTTP port.                               |
+| `service.annotations`      | `{}`         | Service annotations.                             |
+| `service.ipFamilyPolicy`   | unset        | Optional Service IP family policy.               |
+| `service.ipFamilies`       | `[]`         | Optional Service IP families.                    |
+| `ingress.enabled`          | `false`      | Render Ingress.                                  |
+| `ingress.ingressClassName` | `traefik`    | Ingress class name.                              |
+| `ingress.annotations`      | `{}`         | Ingress annotations.                             |
+| `ingress.hosts`            | `[]`         | Ingress host/path rules.                         |
+| `ingress.tls`              | `[]`         | Ingress TLS entries.                             |
+| `gateway.enabled`          | `false`      | Render Gateway API HTTPRoute.                    |
+| `gateway.parentRefs`       | `[]`         | Required parent Gateway references when enabled. |
+| `gateway.hostnames`        | `[]`         | HTTPRoute hostnames.                             |
+| `gateway.path`             | `/`          | HTTPRoute path prefix.                           |
+| `gateway.pathType`         | `PathPrefix` | HTTPRoute path match type.                       |
 
-### Service
+### External Secrets
 
-| Parameter             | Type    | Default     | Description                          |
-| --------------------- | ------- | ----------- | ------------------------------------ |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`        | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+| Parameter                               | Default                  | Description                                             |
+| --------------------------------------- | ------------------------ | ------------------------------------------------------- |
+| `externalSecrets.enabled`               | `false`                  | Render an ExternalSecret and consume the target Secret. |
+| `externalSecrets.apiVersion`            | `external-secrets.io/v1` | ExternalSecret API version.                             |
+| `externalSecrets.refreshInterval`       | `1h`                     | Reconciliation interval.                                |
+| `externalSecrets.secretStoreRef.name`   | `""`                     | SecretStore or ClusterSecretStore name.                 |
+| `externalSecrets.secretStoreRef.kind`   | `SecretStore`            | Store reference kind.                                   |
+| `externalSecrets.target.name`           | `""`                     | Target Secret name; empty derives from release name.    |
+| `externalSecrets.target.creationPolicy` | `Owner`                  | ExternalSecret target creation policy.                  |
+| `externalSecrets.data`                  | `[]`                     | Individual remote key mappings.                         |
+| `externalSecrets.dataFrom`              | `[]`                     | Provider-side extraction entries.                       |
 
-### Ingress
+### Runtime, Security, And Scheduling
 
-| Parameter                  | Type    | Default   | Description                                      |
-| -------------------------- | ------- | --------- | ------------------------------------------------ |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
-| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
-| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+| Parameter                                  | Default          | Description                                                  |
+| ------------------------------------------ | ---------------- | ------------------------------------------------------------ |
+| `probes.startup.enabled`                   | `true`           | Enable startup probe.                                        |
+| `probes.liveness.enabled`                  | `true`           | Enable liveness probe.                                       |
+| `probes.readiness.enabled`                 | `true`           | Enable readiness probe.                                      |
+| `resources.requests.cpu`                   | `100m`           | Main container CPU request.                                  |
+| `resources.requests.memory`                | `256Mi`          | Main container memory request.                               |
+| `resources.limits.cpu`                     | `1000m`          | Main container CPU limit.                                    |
+| `resources.limits.memory`                  | `1Gi`            | Main container memory limit.                                 |
+| `podSecurityContext.fsGroup`               | `1000`           | Writable group for `/datastore`.                             |
+| `podSecurityContext.seccompProfile.type`   | `RuntimeDefault` | Pod seccomp profile.                                         |
+| `securityContext.runAsNonRoot`             | `true`           | Run main container as non-root.                              |
+| `securityContext.allowPrivilegeEscalation` | `false`          | Prevent privilege escalation.                                |
+| `securityContext.readOnlyRootFilesystem`   | `false`          | Writable root remains enabled for upstream runtime behavior. |
+| `securityContext.capabilities.drop`        | `[ALL]`          | Drop Linux capabilities.                                     |
+| `nodeSelector`                             | `{}`             | Node selector.                                               |
+| `tolerations`                              | `[]`             | Pod tolerations.                                             |
+| `affinity`                                 | `{}`             | Pod affinity.                                                |
+| `topologySpreadConstraints`                | `[]`             | Topology spread constraints.                                 |
+| `priorityClassName`                        | `""`             | PriorityClass name.                                          |
+| `terminationGracePeriodSeconds`            | `30`             | Pod termination grace period.                                |
+| `extraVolumes`                             | `[]`             | Extra pod volumes.                                           |
+| `extraVolumeMounts`                        | `[]`             | Extra mounts for the main container.                         |
+| `extraManifests`                           | `[]`             | Extra Kubernetes manifests rendered with the release.        |
 
-### Probes
+## Validation
 
-| Parameter                              | Type    | Default | Description                        |
-| -------------------------------------- | ------- | ------- | ---------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
-| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
-| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
-
-### Resources and Security
-
-`resources` applies to the main changedetection.io container only. Set `browser.resources` separately for the
-Chromium sidecar when `browser.enabled: true`.
-
-| Parameter                                  | Type    | Default | Description                                                          |
-| ------------------------------------------ | ------- | ------- | -------------------------------------------------------------------- |
-| `resources.requests.cpu`                   | string  | `100m`  | Default CPU request for the changedetection.io container.            |
-| `resources.requests.memory`                | string  | `256Mi` | Default memory request for the changedetection.io container.         |
-| `resources.limits`                         | object  | unset   | Optional CPU and memory limits for the changedetection.io container. |
-| `podSecurityContext`                       | object  | `{}`    | Pod-level security context.                                          |
-| `securityContext.allowPrivilegeEscalation` | boolean | `false` | Prevent privilege escalation in the main container.                  |
-| `securityContext.capabilities.drop`        | array   | `[ALL]` | Drop Linux capabilities by default.                                  |
-
-### Service Account
-
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
-
-### Scheduling
-
-| Parameter                       | Type    | Default | Description                    |
-| ------------------------------- | ------- | ------- | ------------------------------ |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
-| `affinity`                      | object  | `{}`    | Affinity rules.                |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
-
-### Extra
-
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+The chart is validated through HelmForge chart gates: strict linting, templating across CI values, helm-unittest,
+kubeconform with real CRD schemas, Artifact Hub linting, and k3d behavioral installs.
 
 ## More Information
 
-- [changedetection.io Official Website](https://changedetection.io)
-- [changedetection.io GitHub Repository](https://github.com/dgtlmoon/changedetection.io)
-- [HelmForge changedetection.io Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/changedetection)
+- [changedetection.io website](https://changedetection.io)
+- [changedetection.io source](https://github.com/dgtlmoon/changedetection.io)
+- [HelmForge chart source](https://github.com/helmforgedev/charts/tree/main/charts/changedetection)
+- [Production guide](https://github.com/helmforgedev/charts/tree/main/charts/changedetection/docs/production.md)
