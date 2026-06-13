@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: DDNS Updater Chart
-description: DDNS Updater Helm chart for Kubernetes dynamic DNS with Cloudflare, Route53, DuckDNS, Namecheap, web UI, persistence, and existingSecret support.
+description: DDNS Updater Helm chart for Kubernetes dynamic DNS with Cloudflare, Route53, DuckDNS, Namecheap, web UI, persistence, existingSecret support, and restricted pod defaults.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -27,6 +27,7 @@ a responsive web dashboard and persistent update history.
 - **Persistent history** — `updates.json` stored in a PVC survives pod restarts
 - **existingSecret** — bring your own `config.json` Secret for GitOps and production use
 - **Configurable IP detection** — HTTP, DNS, or combined public IP fetching strategies
+- **Restricted runtime** — non-root container, read-only root filesystem, dropped capabilities, and ServiceAccount token automount disabled
 
 ## Installation
 
@@ -203,7 +204,7 @@ ingress:
 | Parameter          | Type   | Default                         | Description                          |
 | ------------------ | ------ | ------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/qmcgaw/ddns-updater` | DDNS Updater container image.        |
-| `image.tag`        | string | `"v2.9.0"`                      | Image tag.                           |
+| `image.tag`        | string | `"2.10.0"`                      | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
@@ -280,11 +281,23 @@ ingress:
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                   | Type   | Default                     | Description                       |
+| --------------------------- | ------ | --------------------------- | --------------------------------- |
+| `resources.requests.cpu`    | string | `10m`                       | Default CPU request.              |
+| `resources.requests.memory` | string | `32Mi`                      | Default memory request.           |
+| `resources.limits.cpu`      | string | `100m`                      | Default CPU limit.                |
+| `resources.limits.memory`   | string | `128Mi`                     | Default memory limit.             |
+| `podSecurityContext`        | object | non-root seccomp defaults   | Pod-level security context.       |
+| `securityContext`           | object | non-root read-only defaults | Container-level security context. |
+
+### Service Account
+
+| Parameter                                     | Type    | Default | Description                           |
+| --------------------------------------------- | ------- | ------- | ------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.    |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount Kubernetes API token into pods. |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.     |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.   |
 
 ### Scheduling
 
