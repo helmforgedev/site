@@ -29,6 +29,14 @@ installation required.
 - **Tomcat reverse proxy** — correct client IP via `X-Forwarded-For` support
 - **Database-aware backup** — `pg_dump` or `mysqldump` to S3
 
+## Chart Documentation
+
+- [Chart design](https://github.com/helmforgedev/charts/tree/main/charts/guacamole/DESIGN.md)
+- [Database configuration](https://github.com/helmforgedev/charts/tree/main/charts/guacamole/docs/database.md)
+- [OIDC with Keycloak](https://github.com/helmforgedev/charts/tree/main/charts/guacamole/docs/oidc-keycloak.md)
+- [Backup guide](https://github.com/helmforgedev/charts/tree/main/charts/guacamole/docs/backup.md)
+- [External PostgreSQL example](https://github.com/helmforgedev/charts/tree/main/charts/guacamole/examples/external-postgresql/values.yaml)
+
 ## Installation
 
 **HTTPS repository:**
@@ -260,15 +268,21 @@ ingress:
 
 ### Database and Init Job
 
-| Parameter                          | Type    | Default      | Description                                         |
-| ---------------------------------- | ------- | ------------ | --------------------------------------------------- |
-| `database.type`                    | string  | `postgresql` | Database type: `postgresql` or `mysql`.             |
-| `database.external.host`           | string  | `""`         | External database hostname.                         |
-| `database.external.existingSecret` | string  | `""`         | Existing secret with database password.             |
-| `initDb.enabled`                   | boolean | `true`       | Run schema init Job on install (safe for upgrades). |
-| `postgresql.enabled`               | boolean | `true`       | Deploy the bundled PostgreSQL subchart.             |
-| `postgresql.auth.password`         | string  | `""`         | Password. Required when using the subchart.         |
-| `mysql.enabled`                    | boolean | `false`      | Deploy the bundled MySQL subchart.                  |
+| Parameter                                     | Type    | Default          | Description                                         |
+| --------------------------------------------- | ------- | ---------------- | --------------------------------------------------- |
+| `database.type`                               | string  | `postgresql`     | Database type: `postgresql` or `mysql`.             |
+| `database.external.host`                      | string  | `""`             | External database hostname.                         |
+| `database.external.port`                      | string  | `""`             | External database port. Defaults by database type.  |
+| `database.external.name`                      | string  | `guacamole_db`   | External database name.                             |
+| `database.external.username`                  | string  | `guacamole_user` | External database user.                             |
+| `database.external.password`                  | string  | `""`             | Inline external database password. Prefer secrets.  |
+| `database.external.existingSecret`            | string  | `""`             | Existing secret with database password.             |
+| `database.external.existingSecretPasswordKey` | string  | `password`       | Password key in the external database secret.       |
+| `initDb.enabled`                              | boolean | `true`           | Run schema init Job on install (safe for upgrades). |
+| `postgresql.enabled`                          | boolean | `true`           | Deploy the bundled PostgreSQL subchart.             |
+| `postgresql.auth.password`                    | string  | `""`             | Password. Required when using the subchart.         |
+| `mysql.enabled`                               | boolean | `false`          | Deploy the bundled MySQL subchart.                  |
+| `mysql.auth.password`                         | string  | `""`             | Password. Required when using the MySQL subchart.   |
 
 ### Service and Ingress
 
@@ -283,14 +297,17 @@ ingress:
 
 Database-aware: `pg_dump` for PostgreSQL, `mysqldump` for MySQL.
 
-| Parameter                  | Type    | Default       | Description                          |
-| -------------------------- | ------- | ------------- | ------------------------------------ |
-| `backup.enabled`           | boolean | `false`       | Enable scheduled database S3 backup. |
-| `backup.schedule`          | string  | `"0 2 * * *"` | Cron schedule.                       |
-| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                  |
-| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials. |
-| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.          |
+| Parameter                  | Type    | Default       | Description                           |
+| -------------------------- | ------- | ------------- | ------------------------------------- |
+| `backup.enabled`           | boolean | `false`       | Enable scheduled database S3 backup.  |
+| `backup.schedule`          | string  | `"0 2 * * *"` | Cron schedule.                        |
+| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
+| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
+| `backup.s3.prefix`         | string  | `guacamole`   | Prefix inside the target bucket.      |
+| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
+| `backup.s3.accessKey`      | string  | `""`          | Inline S3 access key. Prefer secrets. |
+| `backup.s3.secretKey`      | string  | `""`          | Inline S3 secret key. Prefer secrets. |
+| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
 
 ## More Information
 
