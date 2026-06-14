@@ -31,6 +31,16 @@ helm install jenkins helmforge/jenkins --namespace jenkins --create-namespace
 helm install jenkins oci://ghcr.io/helmforgedev/helm/jenkins --namespace jenkins --create-namespace
 ```
 
+## Chart References
+
+- [Chart standards PR](https://github.com/helmforgedev/charts/pull/509)
+- [Design](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/DESIGN.md)
+- [Production guide](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/docs/production.md)
+- [Networking guide](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/docs/networking.md)
+- [External Secrets guide](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/docs/external-secrets.md)
+- [JCasC and plugins guide](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/docs/jcasc-and-plugins.md)
+- [Production values example](https://github.com/helmforgedev/charts/tree/main/charts/jenkins/examples/production.yaml)
+
 ## Examples
 
 Pinned plugins:
@@ -61,6 +71,19 @@ gateway:
 ## Operations
 
 Store admin credentials outside the values file for production. If `jcasC.enabled=true`, include the Configuration as Code plugin through the image or the plugin bootstrap list.
+
+Keep plugin installation in environments with explicit egress to the Jenkins update center or to an internal plugin
+mirror. Restricted NetworkPolicy profiles should disable `plugins.install.enabled` and rely on pre-baked controller
+images or mirrored dependencies.
+
+## Security Scan
+
+| Framework          | Score          |
+| ------------------ | -------------- |
+| MITRE + NSA + SOC2 | **86.111115%** |
+
+The chart runs the controller as a non-root user, drops Linux capabilities, supports optional NetworkPolicy, and keeps
+Jenkins credentials behind a chart-managed Secret or External Secrets target Secret.
 
 ## Architecture
 
@@ -217,12 +240,18 @@ Also validate a real pipeline run if Kubernetes agents, credentials, or network 
 | -------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
 | `replicaCount`                   | `1`                         | Controller replicas. Keep one unless shared storage and HA behavior are planned. |
 | `image.repository`               | `docker.io/jenkins/jenkins` | Jenkins controller image.                                                        |
-| `admin.createSecret`             | `true`                      | Create initial admin credentials.                                                |
+| `admin.create`                   | `true`                      | Create initial admin credentials.                                                |
+| `admin.existingSecret`           | `""`                        | Existing Secret for initial admin credentials.                                   |
+| `controller.jenkinsUrl`          | `""`                        | Optional Jenkins root URL for JCasC/plugin use.                                  |
 | `plugins.install.enabled`        | `false`                     | Install pinned plugins before startup.                                           |
+| `plugins.install.initializeOnce` | `true`                      | Skip plugin installation after the first initialized Jenkins home.               |
 | `jcasC.enabled`                  | `false`                     | Enable Jenkins Configuration as Code.                                            |
 | `agent.enabled`                  | `true`                      | Enable Kubernetes agent integration.                                             |
+| `rbac.create`                    | `false`                     | Create namespaced RBAC for Kubernetes agents.                                    |
 | `persistence.enabled`            | `true`                      | Persist Jenkins home.                                                            |
+| `service.ipFamilyPolicy`         | `null`                      | Optional Service IP family policy.                                               |
 | `gateway.enabled`                | `false`                     | Render Gateway API HTTPRoute.                                                    |
+| `networkPolicy.enabled`          | `false`                     | Render NetworkPolicy resources.                                                  |
 | `metrics.serviceMonitor.enabled` | `false`                     | Render ServiceMonitor.                                                           |
 | `externalSecrets.enabled`        | `false`                     | Render ExternalSecret resources.                                                 |
 
