@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Apache Druid Chart
-description: Apache Druid Helm chart for Kubernetes analytics with coordinator, broker, historical, router, deep storage, ZooKeeper, metadata, and JVM tuning.
+description: Apache Druid Helm chart for Kubernetes analytics with a lightweight coordinator, broker, and router default plus opt-in ingestion and segment-serving components.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -20,28 +20,28 @@ for BI dashboards and real-time data exploration.
   `deepStorage.s3.existingSecret` to keep credentials out of the values file.
 </Callout>
 
-<Callout type="warning" title="Druid is memory-intensive — all 6 components require at least 4 GiB RAM total">
-  Druid's default JVM settings allocate 256 MB–1 GiB per component. The six components together require a minimum of **4
-  GiB RAM** for a functional deployment. Size the JVM heap per component (`javaOpts`) based on your actual query and
-  ingestion workload before going to production.
+<Callout type="warning" title="Default install is lightweight; production ingestion needs extra components">
+  The default chart deploys coordinator, broker, router, PostgreSQL, and ZooKeeper so a k3d or lab cluster can validate
+  the control plane without starting every Druid role. Enable `overlord.enabled`, `historical.enabled`, and
+  `middleManager.enabled` before running ingestion, compaction, or segment-serving workloads.
 </Callout>
 
 ## Component Architecture
 
-| Component     | Port | Role                                          | JVM Default |
-| ------------- | ---- | --------------------------------------------- | ----------- |
-| coordinator   | 8081 | Segment assignment and load balancing.        | `-Xmx512m`  |
-| overlord      | 8090 | Task management (ingestion scheduling).       | `-Xmx512m`  |
-| broker        | 8082 | Query routing to historical + realtime.       | `-Xmx1g`    |
-| router        | 8888 | Web console and API gateway (ingress target). | `-Xmx256m`  |
-| historical    | 8083 | Segment storage and query serving.            | `-Xmx1g`    |
-| middlemanager | 8091 | Task worker (ingestion, compaction).          | `-Xmx256m`  |
+| Component     | Port | Default | Role                                          | JVM Default         |
+| ------------- | ---- | ------- | --------------------------------------------- | ------------------- |
+| coordinator   | 8081 | enabled | Segment assignment and load balancing.        | `-Xms128m -Xmx256m` |
+| overlord      | 8090 | opt-in  | Task management (ingestion scheduling).       | `-Xms128m -Xmx256m` |
+| broker        | 8082 | enabled | Query routing to historical + realtime.       | `-Xms256m -Xmx512m` |
+| router        | 8888 | enabled | Web console and API gateway (ingress target). | `-Xms128m -Xmx256m` |
+| historical    | 8083 | opt-in  | Segment storage and query serving.            | `-Xms256m -Xmx512m` |
+| middlemanager | 8091 | opt-in  | Task worker (ingestion, compaction).          | `-Xms128m -Xmx256m` |
 
 ## Key Features
 
-- **6 independent Deployments** — each component scales and tunes independently
+- **Modular Druid topology** — coordinator, broker, and router by default; ingestion and segment serving are opt-in
 - **Deep storage** — local (dev) or S3/MinIO (production)
-- **Two persistent volumes** — historical (segment cache) and middlemanager (task storage)
+- **Persistent task and segment storage** — historical and middlemanager PVCs are created when those components are enabled
 - **ZooKeeper** — bundled native StatefulSet or external connection string
 - **PostgreSQL metadata** — bundled subchart or external PostgreSQL/MySQL
 - **Gateway API** — optional native Kubernetes `HTTPRoute` for the router/web console
@@ -79,15 +79,19 @@ helm install druid oci://ghcr.io/helmforgedev/helm/druid -f values.yaml
 <div data-tab-panel="dev">
 
 ```yaml
-# values.yaml — Druid development mode (local deep storage, not for production)
-# All segments stored locally on historical node disk
-# NOT suitable for multi-node or production use
+# values.yaml — Druid development mode with local ingestion
+# Local deep storage is for tests and single-node evaluation, not production.
+
+overlord:
+  enabled: true
 
 historical:
+  enabled: true
   persistence:
     size: 50Gi
 
 middleManager:
+  enabled: true
   persistence:
     size: 20Gi
 
@@ -131,17 +135,20 @@ coordinator:
   javaOpts: '-Xms512m -Xmx1g'
 
 overlord:
+  enabled: true
   javaOpts: '-Xms512m -Xmx1g'
 
 broker:
   javaOpts: '-Xms1g -Xmx2g'
 
 historical:
+  enabled: true
   javaOpts: '-Xms1g -Xmx2g'
   persistence:
     size: 100Gi # local segment cache only; segments also stored in S3
 
 middleManager:
+  enabled: true
   workerCapacity: 4
   persistence:
     size: 50Gi
@@ -206,6 +213,15 @@ deepStorage:
   s3:
     bucket: druid-segments
     existingSecret: druid-s3-credentials
+
+overlord:
+  enabled: true
+
+historical:
+  enabled: true
+
+middleManager:
+  enabled: true
 ```
 
 </div>
@@ -225,8 +241,13 @@ broker:
   replicaCount: 3
   javaOpts: '-Xms2g -Xmx4g'
 
+# Enable ingestion coordination
+overlord:
+  enabled: true
+
 # Scale storage layer (shared S3 enables multiple historical nodes)
 historical:
+  enabled: true
   replicaCount: 3
   javaOpts: '-Xms2g -Xmx4g'
   persistence:
@@ -234,6 +255,7 @@ historical:
 
 # Scale ingestion layer
 middleManager:
+  enabled: true
   replicaCount: 2
   workerCapacity: 8
   persistence:
@@ -271,15 +293,24 @@ zookeeper:
 
 ### Components
 
-All 6 components share this structure:
+Every component uses the same shape, but default enablement differs by role:
 
-| Parameter                     | Type    | Default           | Description                                   |
-| ----------------------------- | ------- | ----------------- | --------------------------------------------- |
-| `<component>.enabled`         | boolean | `true`            | Deploy this component.                        |
-| `<component>.replicaCount`    | integer | `1`               | Pod replicas.                                 |
-| `<component>.javaOpts`        | string  | (see table above) | JVM flags. Tune `-Xms`/`-Xmx` for production. |
-| `<component>.extraProperties` | string  | `""`              | Extra `runtime.properties` lines.             |
-| `<component>.resources`       | object  | `{}`              | CPU and memory requests/limits.               |
+| Component       | `enabled` default | `javaOpts` default  |
+| --------------- | ----------------- | ------------------- |
+| `coordinator`   | `true`            | `-Xms128m -Xmx256m` |
+| `overlord`      | `false`           | `-Xms128m -Xmx256m` |
+| `broker`        | `true`            | `-Xms256m -Xmx512m` |
+| `router`        | `true`            | `-Xms128m -Xmx256m` |
+| `historical`    | `false`           | `-Xms256m -Xmx512m` |
+| `middleManager` | `false`           | `-Xms128m -Xmx256m` |
+
+| Parameter                     | Type    | Default           | Description                                    |
+| ----------------------------- | ------- | ----------------- | ---------------------------------------------- |
+| `<component>.enabled`         | boolean | (see table above) | Deploy this component.                         |
+| `<component>.replicaCount`    | integer | `1`               | Pod replicas.                                  |
+| `<component>.javaOpts`        | string  | (see table above) | JVM flags. Raise `-Xms`/`-Xmx` for production. |
+| `<component>.extraProperties` | string  | `""`              | Extra `runtime.properties` lines.              |
+| `<component>.resources`       | object  | `{}`              | CPU and memory requests/limits for that role.  |
 
 Historical and middlemanager also have:
 
