@@ -20,6 +20,12 @@ and native apps for iOS and Android.
   source collection. Always back up `/config`.
 </Callout>
 
+## Chart References
+
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/komga)
+- [Chart design](https://github.com/helmforgedev/charts/blob/main/charts/komga/DESIGN.md)
+- [Standards completion PR](https://github.com/helmforgedev/charts/pull/512)
+
 ## Key Features
 
 - **No database server** — SQLite stored in `/config` PVC, zero external dependencies
@@ -27,6 +33,8 @@ and native apps for iOS and Android.
 - **OPDS support** — works with Kybook, Chunky, Moon+ Reader, and other OPDS clients
 - **JVM tuning** — configurable JVM flags via `javaToolOptions` (`-Xmx`, GC options)
 - **S3 backup** — consistent SQLite export via Alpine backup job (covers `/config` only)
+- **External Secrets** — optional ExternalSecret items for S3 backup credentials
+- **Gateway API** — optional HTTPRoute for clusters using Gateway API
 - **Session timeout** — configurable for long-lived mobile client sessions
 
 ## Installation
@@ -52,6 +60,7 @@ helm install komga oci://ghcr.io/helmforgedev/helm/komga -f values.yaml
     { id: 'basic', label: 'Basic' },
     { id: 'production', label: 'Production' },
     { id: 'backup', label: 'With S3 Backup' },
+    { id: 'external-secrets', label: 'External Secrets' },
     { id: 'nfs-library', label: 'NFS Library' },
   ]}
 >
@@ -165,6 +174,42 @@ backup:
 
 </div>
 
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — Komga backup credentials projected by External Secrets Operator
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-komga-backups
+    existingSecret: komga-backup-s3
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: backup-s3
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: komga-backup-s3
+          creationPolicy: Owner
+        data:
+          - secretKey: access-key
+            remoteRef:
+              key: komga/backup
+              property: access-key
+          - secretKey: secret-key
+            remoteRef:
+              key: komga/backup
+              property: secret-key
+```
+
+</div>
+
 <div data-tab-panel="nfs-library">
 
 ```yaml
@@ -212,7 +257,7 @@ ingress:
 | Parameter          | Type   | Default                  | Description                          |
 | ------------------ | ------ | ------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/gotson/komga` | Komga container image.               |
-| `image.tag`        | string | `"1.24.1"`               | Image tag.                           |
+| `image.tag`        | string | `"1.24.4"`               | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
 
@@ -251,11 +296,13 @@ ingress:
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                                   |
-| --------------------- | ------- | ----------- | --------------------------------------------- |
-| `service.type`        | string  | `ClusterIP` | Service type.                                 |
-| `service.port`        | integer | `80`        | Service port. Mapped to container port 25600. |
-| `service.annotations` | object  | `{}`        | Annotations for the Service.                  |
+| Parameter                | Type    | Default     | Description                                   |
+| ------------------------ | ------- | ----------- | --------------------------------------------- |
+| `service.type`           | string  | `ClusterIP` | Service type.                                 |
+| `service.port`           | integer | `80`        | Service port. Mapped to container port 25600. |
+| `service.annotations`    | object  | `{}`        | Annotations for the Service.                  |
+| `service.ipFamilyPolicy` | string  | `""`        | Optional Service IP family policy.            |
+| `service.ipFamilies`     | array   | `[]`        | Optional Service IP families.                 |
 
 ### Ingress
 
@@ -266,6 +313,17 @@ ingress:
 | `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
 | `ingress.hosts`            | array   | `[]`      | Host and path rules.                             |
 | `ingress.tls`              | array   | `[]`      | TLS configuration.                               |
+
+### Gateway API
+
+| Parameter             | Type    | Default      | Description                |
+| --------------------- | ------- | ------------ | -------------------------- |
+| `gateway.enabled`     | boolean | `false`      | Create an HTTPRoute.       |
+| `gateway.annotations` | object  | `{}`         | Annotations for HTTPRoute. |
+| `gateway.parentRefs`  | array   | `[]`         | Gateway parent references. |
+| `gateway.hostnames`   | array   | `[]`         | HTTPRoute hostnames.       |
+| `gateway.path`        | string  | `/`          | HTTPRoute path match.      |
+| `gateway.pathType`    | string  | `PathPrefix` | HTTPRoute path match type. |
 
 ### Backup
 
@@ -286,6 +344,24 @@ ingress:
 | `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                 |
 | `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                           |
 | `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                           |
+
+### External Secrets
+
+Komga uses the HelmForge canonical `externalSecrets.items[]` contract. External Secrets Operator is installed
+out-of-band; this chart only renders `ExternalSecret` resources when enabled. See the
+[External Secrets documentation](https://external-secrets.io/latest/) for provider configuration.
+
+| Parameter                         | Type    | Default | Description                                                     |
+| --------------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `externalSecrets.enabled`         | boolean | `false` | Render ExternalSecret resources.                                |
+| `externalSecrets.refreshInterval` | string  | `1h`    | Default sync interval for items without `spec.refreshInterval`. |
+| `externalSecrets.items`           | array   | `[]`    | ExternalSecret definitions with complete `spec` blocks.         |
+
+<Callout type="info" title="External Secrets projects the backup credential Secret">
+  Set `backup.s3.existingSecret` to the Secret name generated by your ExternalSecret target. For the common
+  `items[0].name: backup-s3` shape, either set `spec.target.name` explicitly or use the rendered
+  `<release>-komga-backup-s3` name.
+</Callout>
 
 ### Probes
 
@@ -313,6 +389,14 @@ ingress:
 | `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **73%** |
+
+Security posture: acceptable. Follow-up hardening candidates are tracked in the chart design.
 
 ## More Information
 
