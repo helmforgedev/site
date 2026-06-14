@@ -70,6 +70,8 @@ const linkedFieldValues: Record<string, Record<string, string>> = {
   },
 };
 
+const giteaPostgresqlPassword = 'change-me-gitea-postgresql';
+
 function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
 }
@@ -215,6 +217,60 @@ function updateToggleField(key: string, isOn: boolean, manual = false) {
 function autoEnableField(key: string) {
   if (manuallyDisabledAutoEnables.has(key)) return;
   updateToggleField(key, true);
+}
+
+function setControlValue(key: string, value: string) {
+  currentValues[key] = value;
+  const control = controlsEl?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
+    `[data-field-key="${key}"]`,
+  );
+
+  if (!control) return;
+  if (control instanceof HTMLButtonElement) {
+    updateToggleVisual(control, value === 'true');
+  } else if (control.value !== value) {
+    control.value = value;
+  }
+}
+
+function ensureGiteaPostgresqlPassword() {
+  if (currentValues['postgresql.auth.password']) return;
+  setControlValue('postgresql.auth.password', giteaPostgresqlPassword);
+}
+
+function clearGiteaPostgresqlSideEffects() {
+  setControlValue('postgresql.enabled', 'false');
+  setControlValue('postgresql.auth.password', '');
+}
+
+function clearGiteaExternalDatabaseDetectionFields() {
+  setControlValue('database.external.host', '');
+  setControlValue('database.external.existingSecret', '');
+}
+
+function applyFieldSideEffects(key: string, value: string) {
+  if (selectedSlug !== 'gitea') return;
+
+  if (key === 'database.mode' && value === 'postgresql') {
+    setControlValue('postgresql.enabled', 'true');
+    clearGiteaExternalDatabaseDetectionFields();
+    ensureGiteaPostgresqlPassword();
+  } else if (key === 'database.mode') {
+    clearGiteaPostgresqlSideEffects();
+  }
+
+  if (key === 'postgresql.enabled' && value === 'true') {
+    if (currentValues['database.mode'] === 'sqlite' || currentValues['database.mode'] === 'external') {
+      setControlValue('database.mode', 'auto');
+    }
+    clearGiteaExternalDatabaseDetectionFields();
+    ensureGiteaPostgresqlPassword();
+  } else if (key === 'postgresql.enabled') {
+    if (currentValues['database.mode'] === 'postgresql') {
+      setControlValue('database.mode', 'auto');
+    }
+    setControlValue('postgresql.auth.password', '');
+  }
 }
 
 function selectChart(slug: string, name: string) {
@@ -499,6 +555,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       }
       syncLinkedFieldValue(field.key, select.value);
       if (field.enables) autoEnableField(field.enables);
+      applyFieldSideEffects(field.key, select.value);
       updateOutput();
     });
     controlDiv.appendChild(select);
@@ -524,6 +581,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         updateUrlState();
         return;
       }
+      applyFieldSideEffects(field.key, currentValues[field.key]);
       updateOutput();
     });
     controlDiv.appendChild(btn);

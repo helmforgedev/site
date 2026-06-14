@@ -58,6 +58,77 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText(String.raw`phpmyadmin.verboses=Primary\,Replica`);
   });
 
+  test('gitea database mode choices stay renderable', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="gitea"]').click();
+    await page.locator('[data-section-toggle="Database"]').click();
+
+    const databaseMode = page.locator('select[data-field-key="database.mode"]');
+    await expect(databaseMode.locator('option[value="mysql"]')).toHaveCount(0);
+    await expect(databaseMode.locator('option[value="postgresql"]')).toHaveCount(1);
+
+    const postgresqlToggle = page.locator('button[data-field-key="postgresql.enabled"]');
+
+    await databaseMode.selectOption('postgresql');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=postgresql');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.auth.password=change-me-gitea-postgresql');
+
+    await databaseMode.selectOption('sqlite');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=sqlite');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.auth.password=');
+
+    await postgresqlToggle.click();
+    await expect(page.locator('#playground-code')).not.toContainText('database.mode=sqlite');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=auto');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.auth.password=change-me-gitea-postgresql');
+
+    await postgresqlToggle.click();
+    await databaseMode.selectOption('external');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=external');
+    await postgresqlToggle.click();
+    await expect(page.locator('#playground-code')).not.toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=auto');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.auth.password=change-me-gitea-postgresql');
+
+    await postgresqlToggle.click();
+    await databaseMode.selectOption('postgresql');
+    await postgresqlToggle.click();
+    await expect(page.locator('#playground-code')).not.toContainText('database.mode=postgresql');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.auth.password=');
+
+    await page.locator('.playground-chart-btn[data-slug="gitea"]').click();
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.auth.password=change-me-gitea-postgresql');
+
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.enabled=true');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.auth.password=');
+  });
+
+  test('gitea postgresql toggle clears external database detection fields', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="gitea"]').click();
+    await page.locator('.playground-scenario-btn:has-text("External Database")').click();
+
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('database.mode=external');
+    await expect(code).toContainText('database.external.host=postgres.database.svc.cluster.local');
+    await expect(code).toContainText('database.external.existingSecret=gitea-db-credentials');
+
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(code).not.toContainText('database.mode=external');
+    await expect(code).not.toContainText('database.external.host=');
+    await expect(code).not.toContainText('database.external.existingSecret=');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await expect(code).toContainText('postgresql.auth.password=change-me-gitea-postgresql');
+  });
+
   test('scenario buttons apply values', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
