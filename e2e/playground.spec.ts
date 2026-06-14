@@ -276,6 +276,41 @@ test.describe('Playground', () => {
     );
     await expect(page.locator('#playground-code')).not.toContainText('externalSecrets.database.enabled');
   });
+
+  test('dolibarr playground emits chart contract fields', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="dolibarr"]').click();
+
+    await page.locator('[data-section-toggle="External Secrets"]').click();
+    let code = page.locator('#playground-code');
+    await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('admin.existingSecret=dolibarr-admin-credentials');
+    await expect(code).toContainText('externalSecrets.data[0].secretKey=admin-password');
+    await expect(code).toContainText('admin.existingSecretPasswordKey=admin-password');
+    await expect(code).toContainText('externalSecrets.data[0].remoteRef.key=apps/dolibarr');
+    await expect(code).toContainText('externalSecrets.data[0].remoteRef.property=admin-password');
+
+    const adminSecretKey = page.locator('input[data-field-key="externalSecrets.data[0].secretKey"]');
+    await adminSecretKey.clear();
+    await adminSecretKey.fill('custom-admin-password');
+    await expect(code).toContainText('externalSecrets.data[0].secretKey=custom-admin-password');
+    await expect(code).toContainText('admin.existingSecretPasswordKey=custom-admin-password');
+
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    code = page.locator('#playground-code');
+
+    await expect(code).toContainText('dolibarr.siteUrl=https://erp.example.com');
+    await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('admin.existingSecret=dolibarr-admin-secret');
+    await expect(code).toContainText('externalSecrets.data[0].secretKey=admin-password');
+    await expect(code).toContainText('mysql.standalone.persistence.size=20Gi');
+    await expect(code).toContainText('persistence.documents.size=20Gi');
+    await expect(code).toContainText('ingress.hosts[0].host=erp.example.com');
+    await expect(code).toContainText('backup.enabled=true');
+    await expect(code).toContainText('backup.s3.existingSecret=dolibarr-s3-credentials');
+    await expect(code).not.toContainText('--set persistence.size=');
+    await expect(code).not.toContainText('--set ingress.hostname=');
+  });
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
