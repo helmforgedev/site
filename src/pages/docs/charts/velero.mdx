@@ -211,6 +211,24 @@ aws_secret_access_key=your-secret-key' \
   -n velero
 ```
 
+The chart only mounts `/credentials` when `credentials.useSecret=true` and one of
+`credentials.existingSecret`, `credentials.name`, or `credentials.secretContents` is set. This keeps the default install
+runtime-valid for smoke testing while still making credentials explicit for real backup storage.
+
+## Dual-stack Networking
+
+The metrics Service supports Kubernetes [dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)
+fields through `service.ipFamilyPolicy` and `service.ipFamilies`. Defaults omit both fields so the cluster default
+remains authoritative.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
+
+Use `PreferDualStack` without `service.ipFamilies` when the same values file may run on both single-stack and dual-stack
+clusters. Set `service.ipFamilies` only when the target cluster advertises the requested families.
+
 ## Configuration Reference
 
 ### Core
@@ -242,13 +260,13 @@ aws_secret_access_key=your-secret-key' \
 
 ### Credentials
 
-| Parameter                    | Type    | Default | Description                                                              |
-| ---------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
-| `credentials.useSecret`      | boolean | `true`  | Mount credentials into the Velero pods.                                  |
-| `credentials.existingSecret` | string  | `""`    | Existing secret containing the credentials file (key: `cloud`).          |
-| `credentials.name`           | string  | `""`    | Name for the Secret created by the chart when `existingSecret` is empty. |
-| `credentials.key`            | string  | `cloud` | Key inside the credentials secret.                                       |
-| `credentials.secretContents` | string  | `""`    | Full AWS credentials file content for inline secret creation.            |
+| Parameter                    | Type    | Default | Description                                                                  |
+| ---------------------------- | ------- | ------- | ---------------------------------------------------------------------------- |
+| `credentials.useSecret`      | boolean | `true`  | Mount credentials when `existingSecret`, `name`, or `secretContents` is set. |
+| `credentials.existingSecret` | string  | `""`    | Existing secret containing the credentials file (key: `cloud`).              |
+| `credentials.name`           | string  | `""`    | Name for the Secret created by the chart when `existingSecret` is empty.     |
+| `credentials.key`            | string  | `cloud` | Key inside the credentials secret.                                           |
+| `credentials.secretContents` | string  | `""`    | Full AWS credentials file content for inline secret creation.                |
 
 ### RBAC
 
@@ -331,6 +349,13 @@ server-level `defaultBackupTTL`.
 | `metrics.serviceMonitor.interval`         | string  | `30s`       | Metrics scrape interval.                     |
 | `metrics.serviceMonitor.scrapeTimeout`    | string  | `10s`       | Metrics scrape timeout.                      |
 | `metrics.serviceMonitor.additionalLabels` | object  | `{}`        | Extra labels for the ServiceMonitor.         |
+
+### Service Networking
+
+| Parameter                | Type   | Default | Description                                      |
+| ------------------------ | ------ | ------- | ------------------------------------------------ |
+| `service.ipFamilyPolicy` | string | `""`    | Optional metrics Service IP family policy.       |
+| `service.ipFamilies`     | array  | `[]`    | Optional ordered metrics Service IP family list. |
 
 ### Resources and Security
 
