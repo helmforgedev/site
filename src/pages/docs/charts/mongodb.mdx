@@ -179,9 +179,7 @@ persistence:
 architecture: sharded
 
 auth:
-  enabled: true
-  existingSecret: mongodb-root-credentials
-  existingKeySecret: mongodb-replica-key # shared across all replica sets in the cluster
+  enabled: false
 
 sharded:
   mongos:
@@ -209,6 +207,12 @@ config:
   directly for administrative operations.
 </Callout>
 
+<Callout type="warning" title="Sharded auth requires operator bootstrap">
+  The chart validates sharded mode as an unauthenticated lab topology. The official MongoDB container initializes
+  `MONGO_INITDB_ROOT_*` as a standalone process, which conflicts with `--configsvr` and `--shardsvr`. Production sharded
+  authentication requires an operator-managed bootstrap flow outside the chart's automatic root-user path.
+</Callout>
+
 </div>
 
 </DocsTabs>
@@ -220,7 +224,7 @@ config:
 | Parameter          | Type   | Default                   | Description    |
 | ------------------ | ------ | ------------------------- | -------------- |
 | `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
-| `image.tag`        | string | `"8.3.1"`                 | Image tag.     |
+| `image.tag`        | string | `"8.3.2"`                 | Image tag.     |
 
 ### Authentication
 
@@ -270,6 +274,30 @@ config:
   memory limit should use `cacheSizeGB: 1.5` (leaving headroom for OS and index overhead).
 </Callout>
 
+### Service
+
+| Parameter                | Type    | Default     | Description                                                                  |
+| ------------------------ | ------- | ----------- | ---------------------------------------------------------------------------- |
+| `service.type`           | string  | `ClusterIP` | Client Service type.                                                         |
+| `service.port`           | integer | `27017`     | Client Service port.                                                         |
+| `service.ipFamilyPolicy` | string  | `""`        | Service IP family policy: SingleStack, PreferDualStack, or RequireDualStack. |
+| `service.ipFamilies`     | array   | `[]`        | Optional Service IP family override.                                         |
+
+### External Secrets
+
+Use External Secrets when root credentials are owned by an external secret
+manager. Set `auth.existingSecret` to the same target Secret name so the
+StatefulSet consumes the synchronized Secret instead of rendering a competing
+chart-managed Secret.
+
+| Parameter                             | Type    | Default       | Description                                            |
+| ------------------------------------- | ------- | ------------- | ------------------------------------------------------ |
+| `externalSecrets.enabled`             | boolean | `false`       | Render an ExternalSecret for MongoDB credentials.      |
+| `externalSecrets.refreshInterval`     | string  | `1h`          | ExternalSecret refresh interval.                       |
+| `externalSecrets.secretStoreRef.name` | string  | `""`          | SecretStore or ClusterSecretStore name.                |
+| `externalSecrets.secretStoreRef.kind` | string  | `SecretStore` | Secret store kind.                                     |
+| `externalSecrets.data`                | array   | `[]`          | Data mappings for root credentials and backup secrets. |
+
 ### Metrics
 
 | Parameter                        | Type    | Default | Description                                |
@@ -298,7 +326,7 @@ Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
 
 ## Upgrade Notes
 
-MongoDB `8.3.1` is an upstream minor release update from `8.2.7`. Review the
+MongoDB `8.3.2` is an upstream minor release update from `8.2.7`. Review the
 MongoDB 8.3 release notes before upgrading production clusters, take a backup,
 and verify existing PVC data files are compatible with the target `mongod`
 version. Keep replica set keyFiles and root credentials stable across

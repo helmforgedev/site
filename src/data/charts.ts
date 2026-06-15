@@ -51,7 +51,7 @@ export const charts: Chart[] = [
   {
     name: 'MongoDB',
     slug: 'mongodb',
-    description: 'MongoDB with standalone and replica set configurations.',
+    description: 'MongoDB with standalone, replica set, sharded cluster, External Secrets, metrics, and S3 backup.',
     maturity: 'stable',
     backup: true,
   },
