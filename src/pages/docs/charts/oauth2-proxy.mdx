@@ -19,6 +19,14 @@ OAuth2 Proxy is a reverse proxy and authentication gateway for OAuth2 and OIDC p
 
 <a id="install"></a>
 
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **95%** |
+
+Security posture: acceptable.
+
 ## Installation
 
 ```bash
@@ -48,6 +56,11 @@ auth:
     clientSecret: client-secret
     cookieSecret: cookie-secret
 ```
+
+The default chart-managed credentials are local placeholders so disposable
+installs can pass runtime validation. Replace them with an existing Secret or
+ExternalSecret before any shared or production deployment, and keep the cookie
+secret stable across rollouts.
 
 Trusted reverse proxy headers:
 
@@ -207,11 +220,13 @@ callback URL, cookie domain, and upstream proxy integration are correct.
 | ----------------------------- | ----------------------------------- | -------------------------------- |
 | `replicaCount`                | `2`                                 | Number of OAuth2 Proxy pods.     |
 | `image.repository`            | `quay.io/oauth2-proxy/oauth2-proxy` | Official image repository.       |
+| `auth.clientID`               | `helmforge-local-client`            | Local placeholder OAuth client.  |
+| `auth.clientSecret`           | `helmforge-local-client-credential` | Local placeholder OAuth secret.  |
 | `auth.existingSecret`         | `""`                                | Existing credential Secret.      |
-| `config.provider`             | `oidc`                              | OAuth2/OIDC provider.            |
+| `config.provider`             | `github`                            | OAuth2/OIDC provider.            |
 | `config.reverseProxy.enabled` | `false`                             | Trust reverse proxy headers.     |
 | `alphaConfig.enabled`         | `false`                             | Render structured alpha config.  |
-| `metrics.enabled`             | `false`                             | Enable metrics endpoint.         |
+| `metrics.enabled`             | `true`                              | Enable metrics endpoint.         |
 | `ingress.enabled`             | `false`                             | Render Ingress.                  |
 | `gateway.enabled`             | `false`                             | Render Gateway API HTTPRoute.    |
 | `externalSecrets.enabled`     | `false`                             | Render ExternalSecret resources. |
