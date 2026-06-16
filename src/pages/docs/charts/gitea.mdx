@@ -27,6 +27,14 @@ official **rootless** image (UID 1000) for improved security.
 - **Admin bootstrap Job** — optional first-run Job to create the admin user
 - **`GITEA__` env configuration** — all `app.ini` keys configurable via environment variables
 - **Database-aware backup** — `tar` for SQLite, `pg_dump`/`mysqldump` for SQL databases
+- **External Secrets guard** — admin credentials can be reconciled by ESO without chart-managed drift
+
+## Chart Documentation
+
+- [Chart design](https://github.com/helmforgedev/charts/tree/main/charts/gitea/DESIGN.md)
+- [Architecture](https://github.com/helmforgedev/charts/tree/main/charts/gitea/docs/architecture.md)
+- [Database modes and secrets](https://github.com/helmforgedev/charts/tree/main/charts/gitea/docs/database-modes.md)
+- [Operations and backup](https://github.com/helmforgedev/charts/tree/main/charts/gitea/docs/operations-and-backup.md)
 
 ## Installation
 
@@ -266,7 +274,7 @@ backup:
 | `gitea.appName`             | string  | `"Gitea: ..."` | Application display name.                                                  |
 | `gitea.runMode`             | string  | `prod`         | Run mode: `dev`, `prod`, `test`.                                           |
 | `gitea.rootUrl`             | string  | `""`           | **Required.** Full public URL (e.g. `https://git.example.com/`).           |
-| `gitea.sshDomain`           | string  | `""`           | SSH domain shown in clone URLs. Defaults to Ingress host.                  |
+| `gitea.sshDomain`           | string  | `""`           | SSH domain shown in clone URLs. Defaults to `localhost` unless set.        |
 | `gitea.sshPort`             | integer | `2222`         | SSH listen port (rootless image default).                                  |
 | `gitea.lfsEnabled`          | boolean | `true`         | Enable Git Large File Storage.                                             |
 | `gitea.disableRegistration` | boolean | `false`        | Disable user self-registration. Set `true` for private instances.          |
@@ -282,7 +290,7 @@ GITEA__mailer__ENABLED=true
 GITEA__mailer__SMTP_ADDR=smtp.example.com
 ```
 
-Pass these via `gitea.extraEnv` or `gitea.existingSecret` for sensitive values.
+Pass these via `gitea.extraEnv`; for sensitive values, use `valueFrom.secretKeyRef`.
 
 </Callout>
 
@@ -355,6 +363,45 @@ Pass these via `gitea.extraEnv` or `gitea.existingSecret` for sensitive values.
 | `readinessProbe.enabled`   | boolean | `true`  | Readiness probe on `/api/healthz`.  |
 | `resources`                | object  | `{}`    | CPU and memory requests/limits.     |
 | `extraManifests`           | array   | `[]`    | Extra Kubernetes manifests.         |
+
+### Gateway API
+
+| Parameter            | Type    | Default      | Description                                      |
+| -------------------- | ------- | ------------ | ------------------------------------------------ |
+| `gateway.enabled`    | boolean | `false`      | Render a Gateway API HTTPRoute for HTTP traffic. |
+| `gateway.parentRefs` | array   | `[]`         | Required parent Gateway references.              |
+| `gateway.hostnames`  | array   | `[]`         | Optional HTTPRoute hostnames.                    |
+| `gateway.path`       | string  | `/`          | HTTPRoute path value.                            |
+| `gateway.pathType`   | string  | `PathPrefix` | HTTPRoute path match type.                       |
+
+### External Secrets
+
+External Secrets integration reconciles admin credentials only. Set `admin.existingSecret` so the ExternalSecret owns
+the target Secret and the chart does not create a competing admin Secret.
+
+```yaml
+admin:
+  username: gitea_admin
+  existingSecret: gitea-admin
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: platform-secrets
+    kind: SecretStore
+  data:
+    - secretKey: admin-username
+      remoteRef:
+        key: gitea/admin
+        property: username
+    - secretKey: admin-password
+      remoteRef:
+        key: gitea/admin
+        property: password
+    - secretKey: admin-email
+      remoteRef:
+        key: gitea/admin
+        property: email
+```
 
 ### Backup
 
