@@ -178,6 +178,20 @@ test.describe('Playground', () => {
     await expect(code).not.toContainText('networkPolicy.egress.allowInternet=false');
   });
 
+  test('ddns-updater ingress emits chart values contract fields', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="ddns-updater"]').click();
+
+    await page.locator('[data-section-toggle="Ingress"]').click();
+    const code = page.locator('#playground-code');
+
+    await expect(code).toContainText('ingress.enabled=true');
+    await expect(code).toContainText('ingress.hosts[0].host=ddns.example.com');
+    await expect(code).toContainText('ingress.hosts[0].paths[0].path=/');
+    await expect(code).toContainText('ingress.hosts[0].paths[0].pathType=Prefix');
+    await expect(code).not.toContainText('ingress.hostname');
+  });
+
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
