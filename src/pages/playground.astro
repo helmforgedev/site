@@ -8924,6 +8924,48 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  liwan: [
+    {
+      label: 'Production TLS',
+      description: 'Public Liwan deployment with persistence, resources, and TLS ingress',
+      values: {
+        'liwan.baseUrl': 'https://analytics.example.com',
+        'persistence.size': '5Gi',
+        'resources.requests.cpu': '25m',
+        'resources.requests.memory': '64Mi',
+        'resources.limits.cpu': '250m',
+        'resources.limits.memory': '256Mi',
+        'ingress.enabled': 'true',
+        'ingress.hosts[0].host': 'analytics.example.com',
+        'ingress.ingressClassName': 'traefik',
+        'ingress.hosts[0].paths[0].path': '/',
+        'ingress.hosts[0].paths[0].pathType': 'Prefix',
+        'ingress.tls[0].secretName': 'liwan-tls',
+        'ingress.tls[0].hosts[0]': 'analytics.example.com',
+      },
+    },
+    {
+      label: 'Gateway API',
+      description: 'Expose Liwan through a shared Gateway API listener',
+      values: {
+        'liwan.baseUrl': 'https://analytics.example.com',
+        'gatewayAPI.enabled': 'true',
+        'gatewayAPI.parentRefs[0].name': 'shared-gateway',
+        'gatewayAPI.parentRefs[0].namespace': 'gateway-system',
+        'gatewayAPI.parentRefs[0].sectionName': 'https',
+        'gatewayAPI.hostnames[0]': 'analytics.example.com',
+      },
+    },
+    {
+      label: 'Dual Stack',
+      description: 'Prefer an IPv4 and IPv6 Service on dual-stack clusters',
+      values: {
+        'service.ipFamilyPolicy': 'PreferDualStack',
+        'service.ipFamilies[0]': 'IPv4',
+        'service.ipFamilies[1]': 'IPv6',
+      },
+    },
+  ],
   alfio: [
     {
       label: 'Self-contained',
