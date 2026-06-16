@@ -204,10 +204,26 @@ TLS is file-based and expects the referenced Secrets to be created by the platfo
 tls:
   enabled: true
   existingSecret: valkey-tls
-  certKey: tls.crt
-  keyKey: tls.key
-  caKey: ca.crt
+  certFilename: tls.crt
+  keyFilename: tls.key
+  caFilename: ca.crt
 ```
+
+Keep `tls.insecureSkipVerify=false` in production. Enable it only for CI or controlled self-signed test certificates
+when chart-rendered `valkey-cli` clients cannot validate release-specific hostnames.
+
+## Networking
+
+The chart renders topology-specific Services and supports Kubernetes dual-stack fields:
+
+```yaml
+service:
+  type: ClusterIP
+  ipFamilyPolicy: PreferDualStack
+```
+
+Leave `service.ipFamilies` empty for portable installs. Set explicit families only in environment-specific values for
+clusters that advertise every requested family.
 
 ## Observability
 
@@ -258,10 +274,18 @@ client understands Sentinel discovery or Cluster redirects.
 | `auth.enabled`                   | `true`                    | Enable password authentication.                                  |
 | `auth.existingSecret`            | `""`                      | Existing password Secret.                                        |
 | `tls.enabled`                    | `false`                   | Enable TLS file wiring.                                          |
+| `tls.existingSecret`             | `""`                      | Existing Secret with TLS files.                                  |
+| `tls.certFilename`               | `tls.crt`                 | Certificate filename mounted from `tls.existingSecret`.          |
+| `tls.keyFilename`                | `tls.key`                 | Private key filename mounted from `tls.existingSecret`.          |
+| `tls.caFilename`                 | `ca.crt`                  | CA filename mounted from `tls.existingSecret`.                   |
+| `tls.insecureSkipVerify`         | `false`                   | Skip TLS hostname verification for chart-rendered CLI clients.   |
 | `standalone.persistence.enabled` | `true`                    | Persist standalone data.                                         |
 | `replication.replicaCount`       | `2`                       | Replica count for replication modes.                             |
 | `sentinel.replicaCount`          | `3`                       | Number of Sentinel pods.                                         |
 | `cluster.nodes`                  | `6`                       | Total cluster pods.                                              |
+| `service.type`                   | `ClusterIP`               | Client Service type where applicable.                            |
+| `service.ipFamilyPolicy`         | `null`                    | Service IP family policy for dual-stack clusters.                |
+| `service.ipFamilies`             | `[]`                      | Optional explicit Service IP families.                           |
 | `metrics.enabled`                | `false`                   | Enable Valkey exporter sidecar.                                  |
 
 ## Links
