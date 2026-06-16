@@ -19,6 +19,12 @@ a KRaft-only design — no ZooKeeper required. It supports a `single-broker` top
   chart.
 </Callout>
 
+## Chart References
+
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/kafka)
+- [Chart design](https://github.com/helmforgedev/charts/blob/main/charts/kafka/DESIGN.md)
+- [Standards completion PR](https://github.com/helmforgedev/charts/pull/511)
+
 ## Key Features
 
 - **KRaft-only** — no ZooKeeper, using Apache Kafka's native consensus protocol
@@ -26,7 +32,7 @@ a KRaft-only design — no ZooKeeper required. It supports a `single-broker` top
 - **Cluster mode** — dedicated controller and broker StatefulSets for production
 - **Combined mode** — `brokers.replicaCount: 0` makes controllers also act as brokers (3-node HA without 6 pods)
 - **Stable broker DNS** — advertised listeners use StatefulSet pod DNS names
-- **JMX metrics** — optional Prometheus-compatible metrics via JMX exporter javaagent
+- **JMX metrics** — optional Prometheus-compatible metrics via a SHA-256 verified JMX exporter javaagent
 - **ServiceMonitor** — Prometheus Operator integration for metrics collection
 - **PodDisruptionBudget** — optional disruption protection for cluster mode
 
@@ -202,6 +208,9 @@ cluster:
 
 metrics:
   enabled: true
+  agent:
+    url: https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+    sha256: 7d61f737fd661610ccc14aea79764faa1ea94a340cbc8f0029b3d2edea3d80c1
   serviceMonitor:
     enabled: true # requires Prometheus Operator
     interval: 30s
@@ -323,15 +332,23 @@ pdb:
 
 ### Metrics
 
-| Parameter                         | Type    | Default                          | Description                                           |
-| --------------------------------- | ------- | -------------------------------- | ----------------------------------------------------- |
-| `metrics.enabled`                 | boolean | `false`                          | Enable JMX exporter javaagent for Prometheus metrics. |
-| `metrics.image.repository`        | string  | `docker.io/bitnami/jmx-exporter` | JMX exporter init image repository.                   |
-| `metrics.image.tag`               | string  | `"1.5.0"`                        | JMX exporter image tag.                               |
-| `metrics.port`                    | integer | `5556`                           | Port exposed by the JMX exporter javaagent.           |
-| `metrics.serviceMonitor.enabled`  | boolean | `false`                          | Create Prometheus Operator ServiceMonitor resources.  |
-| `metrics.serviceMonitor.interval` | string  | `30s`                            | Metrics scrape interval.                              |
-| `metrics.serviceMonitor.labels`   | object  | `{}`                             | Labels added to the ServiceMonitor.                   |
+| Parameter                         | Type    | Default                                                                                                              | Description                                                 |
+| --------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `metrics.enabled`                 | boolean | `false`                                                                                                              | Enable JMX exporter javaagent for Prometheus metrics.       |
+| `metrics.image.repository`        | string  | `docker.io/apache/kafka`                                                                                             | Init container image used to download and verify the agent. |
+| `metrics.image.tag`               | string  | `"4.3.0"`                                                                                                            | Init container image tag.                                   |
+| `metrics.agent.url`               | string  | `https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar` | JMX exporter javaagent artifact URL.                        |
+| `metrics.agent.sha256`            | string  | `7d61f737fd661610ccc14aea79764faa1ea94a340cbc8f0029b3d2edea3d80c1`                                                   | Expected SHA-256 checksum for the javaagent artifact.       |
+| `metrics.port`                    | integer | `5556`                                                                                                               | Port exposed by the JMX exporter javaagent.                 |
+| `metrics.serviceMonitor.enabled`  | boolean | `false`                                                                                                              | Create Prometheus Operator ServiceMonitor resources.        |
+| `metrics.serviceMonitor.interval` | string  | `30s`                                                                                                                | Metrics scrape interval.                                    |
+| `metrics.serviceMonitor.labels`   | object  | `{}`                                                                                                                 | Labels added to the ServiceMonitor.                         |
+
+<Callout type="info" title="Metrics agent verification">
+  When metrics are enabled, an init container downloads the JMX exporter javaagent from `metrics.agent.url` and verifies
+  it against `metrics.agent.sha256` before Kafka starts. Clusters without egress to Maven Central should provide an
+  internal artifact URL and matching checksum.
+</Callout>
 
 ### Security and Resources
 
@@ -376,6 +393,14 @@ ensures PVC data directories are writable by the Kafka process.
 | `extraVolumes`        | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts`   | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`      | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **80%** |
+
+Security posture: acceptable.
 
 ## More Information
 

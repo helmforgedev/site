@@ -3,6 +3,8 @@ interface FieldConfig {
   key: string;
   type: 'text' | 'number' | 'select' | 'toggle';
   default: string;
+  min?: string;
+  max?: string;
   options?: string[];
   valueActivationValues?: Record<string, Record<string, string>>;
   toggleActivationValues?: Record<string, Record<string, string>>;
@@ -400,8 +402,8 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
   } else if (field.type === 'number') {
     const input = document.createElement('input');
     input.type = 'number';
-    input.min = '1';
-    input.max = '10';
+    input.min = field.min ?? '1';
+    input.max = field.max ?? '10';
     input.value = currentValues[field.key] ?? field.default;
     input.dataset.fieldKey = field.key;
     input.className =
