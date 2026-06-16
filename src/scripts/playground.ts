@@ -5,6 +5,7 @@ interface FieldConfig {
   default: string;
   min?: string;
   max?: string;
+  enables?: string;
   options?: string[];
   valueActivationValues?: Record<string, Record<string, string>>;
   toggleActivationValues?: Record<string, Record<string, string>>;
@@ -18,6 +19,7 @@ interface GroupConfig {
   collapsible?: boolean;
   gateField?: string;
   activationValues?: Record<string, string>;
+  emitDefaultsOnExpand?: boolean;
   fields: FieldConfig[];
 }
 
@@ -56,6 +58,7 @@ let outputMode: OutputMode = 'helm';
 let selectedSlug = '';
 let selectedName = '';
 let currentValues: Record<string, string> = {};
+let manuallyDisabledAutoEnables: Set<string> = new Set();
 // Track which collapsible sections are expanded
 let expandedSections: Set<string> = new Set();
 let scenarioOnlyKeys: Set<string> = new Set();
@@ -195,10 +198,30 @@ function syncLinkedFieldValue(key: string, value: string) {
   }
 }
 
+function updateToggleField(key: string, isOn: boolean, manual = false) {
+  currentValues[key] = isOn ? 'true' : 'false';
+  if (manual) {
+    if (isOn) {
+      manuallyDisabledAutoEnables.delete(key);
+    } else {
+      manuallyDisabledAutoEnables.add(key);
+    }
+  }
+
+  const btn = controlsEl?.querySelector<HTMLButtonElement>(`button[data-field-key="${key}"]`);
+  if (btn) updateToggleVisual(btn, isOn);
+}
+
+function autoEnableField(key: string) {
+  if (manuallyDisabledAutoEnables.has(key)) return;
+  updateToggleField(key, true);
+}
+
 function selectChart(slug: string, name: string) {
   selectedSlug = slug;
   selectedName = name;
   currentValues = {};
+  manuallyDisabledAutoEnables = new Set();
   expandedSections = new Set();
   scenarioOnlyKeys = new Set();
 
@@ -475,6 +498,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         return;
       }
       syncLinkedFieldValue(field.key, select.value);
+      if (field.enables) autoEnableField(field.enables);
       updateOutput();
     });
     controlDiv.appendChild(select);
@@ -485,7 +509,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     btn.addEventListener('click', () => {
       const wasOn = currentValues[field.key] === 'true';
       const nextValue = wasOn ? 'false' : 'true';
-      currentValues[field.key] = nextValue;
+      updateToggleField(field.key, nextValue === 'true', true);
       const activationValues = field.toggleActivationValues?.[nextValue];
       const expandSections = field.activationExpandSections?.[nextValue];
       const resetSections = field.activationResetSections?.[nextValue];
@@ -500,7 +524,6 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         updateUrlState();
         return;
       }
-      updateToggleVisual(btn, nextValue === 'true');
       updateOutput();
     });
     controlDiv.appendChild(btn);
@@ -515,6 +538,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
       setFieldValue(field.key, input.value);
+      if (field.enables) autoEnableField(field.enables);
       updateOutput();
     });
     controlDiv.appendChild(input);
@@ -527,6 +551,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
       setFieldValue(field.key, input.value);
+      if (field.enables) autoEnableField(field.enables);
       updateOutput();
     });
     controlDiv.appendChild(input);
@@ -572,6 +597,7 @@ function resetAndCollapseSections(sectionNames?: string[]) {
 function applyScenario(scenario: Scenario) {
   const groups = getGroups(selectedSlug);
   const configuredKeys = getConfiguredKeys(groups);
+  manuallyDisabledAutoEnables = new Set();
 
   // Reset all to defaults
   for (const group of groups) {
@@ -626,11 +652,18 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
   const groups = getGroups(selectedSlug);
   const changes: { key: string; value: string; defaultValue: string }[] = [];
   pruneScenarioOnlyKeys(groups);
+  const emittedKeys = new Set<string>();
+
+  function addChange(key: string, value: string, defaultValue: string): void {
+    if (emittedKeys.has(key)) return;
+    emittedKeys.add(key);
+    changes.push({ key, value, defaultValue });
+  }
 
   for (const group of groups) {
     // For collapsible sections with a gate field, include the gate if enabled
     if (group.gateField && currentValues[group.gateField] === 'true') {
-      changes.push({ key: group.gateField, value: 'true', defaultValue: 'false' });
+      addChange(group.gateField, 'true', 'false');
     }
 
     // Only include child fields if section is expanded (or not collapsible)
@@ -638,13 +671,16 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 
     for (const field of group.fields) {
       const val = currentValues[field.key];
-      if (group.collapsible && expandedSections.has(group.name)) {
-        // Expanded collapsible sections emit all fields (enabling means user wants these values)
+      if (group.collapsible && expandedSections.has(group.name) && group.emitDefaultsOnExpand !== false) {
+        // Expanded collapsible sections normally emit all fields; opt out for read-only tuning groups.
         if (val !== undefined && val !== '') {
-          changes.push({ key: field.key, value: val, defaultValue: field.default });
+          addChange(field.key, val, field.default);
         }
       } else if (val !== undefined && val !== field.default && val !== '') {
-        changes.push({ key: field.key, value: val, defaultValue: field.default });
+        if (field.enables && currentValues[field.enables] === 'true') {
+          addChange(field.enables, 'true', 'false');
+        }
+        addChange(field.key, val, field.default);
       }
     }
   }
