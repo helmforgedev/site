@@ -58,7 +58,7 @@ const chartConfigs: Record<string, ChartConfig> = {
           label: 'Ingress Class',
           key: 'ingress.ingressClassName',
           type: 'select',
-          default: 'nginx',
+          default: 'traefik',
           options: ['nginx', 'traefik'],
           description: 'Ingress controller class',
         },
@@ -2558,6 +2558,111 @@ const chartConfigs: Record<string, ChartConfig> = {
           description: 'Ingress controller class',
         },
         { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
+      ],
+    },
+  ],
+  alfio: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Base URL',
+          key: 'alfio.baseUrl',
+          type: 'text',
+          default: '',
+          description: 'Public URL used by alf.io links and callbacks',
+        },
+        {
+          label: 'Spring Profile',
+          key: 'alfio.profiles',
+          type: 'select',
+          default: 'dev',
+          options: ['dev', 'spring-boot'],
+          description: 'Use spring-boot for production deployments',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge PostgreSQL with the release',
+        },
+        {
+          label: 'External Host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External PostgreSQL hostname when subchart is disabled',
+        },
+        {
+          label: 'External Secret',
+          key: 'database.external.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing the external PostgreSQL password',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'tickets.example.com',
+          description: 'Public ticketing hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '250m',
+          description: 'Application CPU request',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '768Mi',
+          description: 'Application memory request',
+        },
+        {
+          label: 'CPU Limit',
+          key: 'resources.limits.cpu',
+          type: 'text',
+          default: '1',
+          description: 'Application CPU limit',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '1536Mi',
+          description: 'Application memory limit',
+        },
       ],
     },
   ],
@@ -6184,6 +6289,40 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  alfio: [
+    {
+      label: 'Self-contained',
+      description: 'Bundled PostgreSQL for local validation and small events',
+      values: {
+        'alfio.baseUrl': 'http://localhost:8080',
+        'alfio.profiles': 'dev',
+        'postgresql.enabled': 'true',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '768Mi',
+        'resources.limits.memory': '1536Mi',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'External PostgreSQL with HTTPS ingress',
+      values: {
+        'alfio.baseUrl': 'https://tickets.example.com',
+        'alfio.profiles': 'spring-boot',
+        'postgresql.enabled': 'false',
+        'database.external.host': 'postgres.example.com',
+        'database.external.name': 'alfio',
+        'database.external.username': 'alfio',
+        'database.external.existingSecret': 'alfio-db',
+        'ingress.enabled': 'true',
+        'ingress.hosts[0].host': 'tickets.example.com',
+        'ingress.ingressClassName': 'traefik',
+        'resources.requests.cpu': '500m',
+        'resources.requests.memory': '1024Mi',
+        'resources.limits.cpu': '2',
+        'resources.limits.memory': '2048Mi',
+      },
+    },
+  ],
   'fastmcp-server': [
     {
       label: 'Inline Tools',
