@@ -9974,6 +9974,62 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  dolibarr: [
+    {
+      label: 'ERP Starter',
+      description: 'Bundled MySQL with documents and custom module storage',
+      values: {
+        'dolibarr.siteUrl': 'https://erp.example.com',
+        'dolibarr.companyName': 'Acme Corp',
+        'dolibarr.enableModules': 'societe,produit,service,propal,commande,facture',
+        'persistence.documents.size': '8Gi',
+        'persistence.custom.size': '2Gi',
+      },
+    },
+    {
+      label: 'External MySQL',
+      description: 'Managed MySQL or MariaDB with existing database secret',
+      values: {
+        'mysql.enabled': 'false',
+        'database.mode': 'external',
+        'database.external.host': 'mysql.database.svc.cluster.local',
+        'database.external.existingSecret': 'dolibarr-db-credentials',
+        'persistence.documents.size': '20Gi',
+        'persistence.custom.size': '5Gi',
+      },
+    },
+    {
+      label: 'Production',
+      description: 'TLS ingress, larger PVCs, backup, and explicit resources',
+      values: {
+        'dolibarr.siteUrl': 'https://erp.example.com',
+        'dolibarr.companyName': 'Acme Corp',
+        'dolibarr.timezone': 'America/Sao_Paulo',
+        'dolibarr.enableModules': 'societe,produit,service,propal,commande,facture,stock,projet',
+        'admin.existingSecret': 'dolibarr-admin-secret',
+        'externalSecrets.enabled': 'true',
+        'externalSecrets.secretStoreRef.name': 'production-secrets',
+        'externalSecrets.secretStoreRef.kind': 'ClusterSecretStore',
+        'externalSecrets.data[0].secretKey': 'admin-password',
+        'externalSecrets.data[0].remoteRef.key': 'apps/dolibarr',
+        'externalSecrets.data[0].remoteRef.property': 'admin-password',
+        'mysql.standalone.persistence.size': '20Gi',
+        'persistence.documents.size': '20Gi',
+        'persistence.custom.size': '5Gi',
+        'resources.requests.cpu': '250m',
+        'resources.requests.memory': '512Mi',
+        'resources.limits.cpu': '1000m',
+        'resources.limits.memory': '1Gi',
+        'ingress.enabled': 'true',
+        'ingress.hosts[0].host': 'erp.example.com',
+        'ingress.ingressClassName': 'traefik',
+        'ingress.tls[0].secretName': 'dolibarr-tls',
+        'backup.enabled': 'true',
+        'backup.s3.bucket': 'dolibarr-backups',
+        'backup.s3.existingSecret': 'dolibarr-s3-credentials',
+      },
+    },
+  ],
   cloudflared: [
     {
       label: 'Production',
