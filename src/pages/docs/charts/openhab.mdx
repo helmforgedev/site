@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: openHAB
-description: openHAB Helm chart for Kubernetes home automation with GitOps-friendly ConfigMap reload, persistence, ingress, and Prometheus metrics.
+description: openHAB Helm chart for Kubernetes home automation with GitOps-friendly ConfigMap startup sync, persistence, ingress, and Prometheus metrics.
 ---
 
 # openHAB
@@ -14,8 +14,8 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 
 - **StatefulSet workload** for stable, predictable PVC attachment on every restart
 - **Three persistent volumes** (`userdata`, `conf`, `addons`) with independent sizing and storage class configuration
-- **ConfigMap live-reload** for sitemaps, things, and items — changes applied automatically within seconds, no pod restart required
-- **Correct security context** — `fsGroup: 9001` only; `runAsUser`/`runAsGroup` intentionally unset so the entrypoint can bootstrap user creation before dropping privileges via `gosu`
+- **ConfigMap startup sync** for sitemaps, things, and items into the writable `conf` PVC with checksum-driven rollouts
+- **Compatible security hardening** — `fsGroup: 9001`, `RuntimeDefault` seccomp, disabled ServiceAccount token automount, and no forced `runAsUser` so the official entrypoint can bootstrap before dropping privileges via `gosu`
 - **Smart health probes** via `/rest/uuid` (available in openHAB 4.x, no auth required) with a 10-minute startup window for OSGi bundle loading
 - **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
@@ -24,6 +24,15 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **Dual-stack service controls** for HTTP and optional Karaf Services on IPv4/IPv6 clusters
 - **Gateway API HTTPRoute** for shared Gateway deployments
 - **Fail-fast validation** with clear error messages for common misconfigurations
+
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **88%** |
+
+Security posture: acceptable with documented openHAB runtime exceptions for
+root bootstrap, writable runtime filesystem, and site-specific network policy.
 
 ## Installation
 
@@ -127,16 +136,16 @@ persistence:
     existingClaim: my-openhab-addons
 ```
 
-## ConfigMap Live Reload
+## ConfigMap Startup Sync
 
-This is the key differentiator of this chart. openHAB natively monitors `/openhab/conf/` using a file watcher. Any change to `.sitemap`, `.things`, or `.items` files is applied automatically within **2-5 seconds** — no pod restart required.
+This chart lets teams manage `.sitemap`, `.things`, and `.items` files through Helm values while still keeping openHAB's `/openhab/conf` directory writable for the official image startup sequence.
 
-The chart mounts Kubernetes ConfigMaps into the conf PVC using `subPath`, so ConfigMap-managed files coexist with any existing files without overwriting them.
+The chart does not mount ConfigMap files directly under `/openhab/conf`. Kubernetes ConfigMap volumes are read-only, and the official openHAB entrypoint performs a recursive ownership adjustment of `/openhab` before dropping privileges. Instead, a `sync-configmaps` initContainer copies the rendered ConfigMap files into the writable `conf` PVC before openHAB starts.
 
 ### How It Works
 
 ```
-Helm values  →  ConfigMap (K8s)  →  subPath mount  →  openHAB file watcher  →  Live reload (~2-5s)
+Helm values  →  ConfigMap (K8s)  →  sync-configmaps initContainer  →  /openhab/conf PVC  →  openHAB startup
 ```
 
 ### Sitemaps
@@ -208,11 +217,11 @@ configMaps:
 
 ### Applying Changes
 
-After updating ConfigMap values, run `helm upgrade`. openHAB picks up the changes automatically:
+After updating ConfigMap values, run `helm upgrade`. The StatefulSet pod template includes a checksum of the rendered ConfigMaps, so the pod rolls and the initContainer copies the new files before openHAB starts:
 
 ```bash
 helm upgrade my-openhab helmforge/openhab -f values.yaml
-# No restart needed — openHAB reloads configuration within seconds
+# Pod rolls so ConfigMap-managed files are synced into the conf PVC
 ```
 
 ## Prometheus Metrics
@@ -356,20 +365,17 @@ ingress:
 
 ### Security Context
 
-openHAB runs as UID/GID `9001` by default (enforced by the official image). The chart configures this correctly out of the box:
+The official openHAB image drops the application to UID/GID `9001`, but its entrypoint starts as root to create the user/group, adjust directory ownership, and then exec through `gosu`. The chart preserves that bootstrap path and applies compatible hardening:
 
 ```yaml
 podSecurityContext:
-  runAsUser: 9001
-  runAsGroup: 9001
   fsGroup: 9001 # Ensures PVC volumes are group-writable by 9001
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: false # openHAB writes to internal dirs at runtime
-  capabilities:
-    drop:
-      - ALL
 ```
 
 > **Why `readOnlyRootFilesystem: false`?** openHAB (OSGi/Karaf) writes to several internal directories at runtime (`/openhab/runtime/`, `/openhab/userdata/tmp/`, `/openhab/userdata/cache/`). These cannot be relocated. Mount your persistent data on the three PVCs to ensure durability across restarts.
@@ -659,13 +665,16 @@ kubectl scale statefulset my-openhab -n openhab --replicas=1
 
 ### Workload
 
-| Parameter                                     | Description                                    | Default |
-| --------------------------------------------- | ---------------------------------------------- | ------- |
-| `replicaCount`                                | Must be `1` — clustering not supported         | `1`     |
-| `podSecurityContext.fsGroup`                  | fsGroup for PVC ownership after privilege drop | `9001`  |
-| `namespaceOverride`                           | Override chart-managed object namespace        | `""`    |
-| `serviceAccount.create`                       | Create a dedicated ServiceAccount              | `true`  |
-| `serviceAccount.automountServiceAccountToken` | Mount Kubernetes API token into pods           | `false` |
+| Parameter                                     | Description                                    | Default          |
+| --------------------------------------------- | ---------------------------------------------- | ---------------- |
+| `replicaCount`                                | Must be `1` — clustering not supported         | `1`              |
+| `podSecurityContext.fsGroup`                  | fsGroup for PVC ownership after privilege drop | `9001`           |
+| `podSecurityContext.seccompProfile.type`      | Pod seccomp profile                            | `RuntimeDefault` |
+| `securityContext.allowPrivilegeEscalation`    | Prevent privilege escalation                   | `false`          |
+| `securityContext.readOnlyRootFilesystem`      | Keep writable for OSGi/Karaf runtime state     | `false`          |
+| `namespaceOverride`                           | Override chart-managed object namespace        | `""`             |
+| `serviceAccount.create`                       | Create a dedicated ServiceAccount              | `true`           |
+| `serviceAccount.automountServiceAccountToken` | Mount Kubernetes API token into pods           | `false`          |
 
 ### Namespace Override
 
@@ -721,14 +730,16 @@ gateway:
 
 ### ConfigMaps
 
-| Parameter                     | Description                 | Default |
-| ----------------------------- | --------------------------- | ------- |
-| `configMaps.sitemaps.enabled` | Enable sitemaps ConfigMap   | `false` |
-| `configMaps.sitemaps.files`   | Map of `filename → content` | `{}`    |
-| `configMaps.things.enabled`   | Enable things ConfigMap     | `false` |
-| `configMaps.things.files`     | Map of `filename → content` | `{}`    |
-| `configMaps.items.enabled`    | Enable items ConfigMap      | `false` |
-| `configMaps.items.files`      | Map of `filename → content` | `{}`    |
+| Parameter                     | Description                 | Default             |
+| ----------------------------- | --------------------------- | ------------------- |
+| `configMaps.sitemaps.enabled` | Enable sitemaps ConfigMap   | `false`             |
+| `configMaps.sitemaps.files`   | Map of `filename → content` | `{}`                |
+| `configMaps.things.enabled`   | Enable things ConfigMap     | `false`             |
+| `configMaps.things.files`     | Map of `filename → content` | `{}`                |
+| `configMaps.items.enabled`    | Enable items ConfigMap      | `false`             |
+| `configMaps.items.files`      | Map of `filename → content` | `{}`                |
+| `configMaps.syncImage.tag`    | ConfigMap sync image tag    | `1.37`              |
+| `configMaps.syncResources`    | Sync init resources         | requests/limits set |
 
 ### Metrics
 
@@ -782,7 +793,7 @@ gateway:
 | `backup.images.utility.tag`         | Backup utility tag                                      | `3.22`                     |
 | `backup.images.uploader.repository` | S3 uploader image                                       | `docker.io/helmforge/mc`   |
 | `backup.images.uploader.tag`        | S3 uploader tag                                         | `1.0.0`                    |
-| `backup.resources`                  | Resource requests/limits for backup containers          | `{}`                       |
+| `backup.resources`                  | Resource requests/limits for backup containers          | requests/limits set        |
 | `backup.s3.endpoint`                | S3-compatible endpoint URL                              | `""`                       |
 | `backup.s3.bucket`                  | Target bucket name                                      | `""`                       |
 | `backup.s3.prefix`                  | Key prefix within the bucket                            | `openhab`                  |
@@ -794,7 +805,7 @@ gateway:
 
 ### Pod stuck in Init state for several minutes
 
-This is normal on first boot. openHAB loads all OSGi bundles at startup, which takes 60-120 seconds. The chart configures a startup probe with a 5-minute window. Wait patiently before investigating.
+This is normal on first boot. openHAB loads all OSGi bundles at startup, which takes 60-120 seconds. The chart configures a startup probe with a 10-minute window. Wait patiently before investigating.
 
 ```bash
 kubectl get pod -l app.kubernetes.io/name=openhab \
@@ -816,7 +827,7 @@ kubectl run fix-perms --image=busybox --restart=Never \
 
 ### ConfigMap changes not reflected
 
-Kubernetes syncs ConfigMaps to pods every ~60 seconds (kubelet `--sync-frequency`). After the file appears on disk, openHAB applies it within 2-5 seconds. If still not reflected after 2-3 minutes:
+ConfigMap-managed files are copied during pod startup. After `helm upgrade`, verify the StatefulSet rolled and the file exists in the pod:
 
 ```bash
 # Verify the file exists in the pod
