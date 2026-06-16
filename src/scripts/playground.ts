@@ -58,6 +58,7 @@ let selectedName = '';
 let currentValues: Record<string, string> = {};
 // Track which collapsible sections are expanded
 let expandedSections: Set<string> = new Set();
+let scenarioOnlyKeys: Set<string> = new Set();
 
 function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
@@ -75,6 +76,68 @@ function getFieldDefault(key: string): string | undefined {
   }
 
   return undefined;
+}
+
+function getConfiguredKeys(groups: GroupConfig[]): Set<string> {
+  const keys = new Set<string>();
+  for (const group of groups) {
+    if (group.gateField) keys.add(group.gateField);
+    for (const field of group.fields) {
+      keys.add(field.key);
+    }
+  }
+
+  return keys;
+}
+
+function normalizeIndexedKey(key: string): string {
+  return key.replace(/\[\d+\]/g, '[]');
+}
+
+function topLevelKey(key: string): string {
+  return key.split(/[.[\]]/, 1)[0] ?? key;
+}
+
+function groupKeys(group: GroupConfig): string[] {
+  const keys = group.fields.map((field) => field.key);
+  if (group.gateField) keys.push(group.gateField);
+  return keys;
+}
+
+function groupOwnsKey(group: GroupConfig, key: string): boolean {
+  const normalizedKey = normalizeIndexedKey(key);
+  const root = topLevelKey(key);
+
+  return groupKeys(group).some(
+    (groupKey) =>
+      normalizeIndexedKey(groupKey) === normalizedKey || (group.collapsible === true && topLevelKey(groupKey) === root),
+  );
+}
+
+function pruneScenarioOnlyKeys(groups: GroupConfig[]): void {
+  for (const key of Array.from(scenarioOnlyKeys)) {
+    const owner = groups.find((group) => groupOwnsKey(group, key));
+    if (owner?.collapsible && !expandedSections.has(owner.name)) {
+      scenarioOnlyKeys.delete(key);
+      delete currentValues[key];
+      continue;
+    }
+
+    if (key.startsWith('service.ipFamilies[') && currentValues['service.ipFamilyPolicy'] === 'SingleStack') {
+      scenarioOnlyKeys.delete(key);
+      delete currentValues[key];
+      continue;
+    }
+
+    const normalizedKey = normalizeIndexedKey(key);
+    const duplicatesConfiguredField = owner?.fields.some(
+      (field) => normalizeIndexedKey(field.key) === normalizedKey && currentValues[field.key] === currentValues[key],
+    );
+    if (duplicatesConfiguredField) {
+      scenarioOnlyKeys.delete(key);
+      delete currentValues[key];
+    }
+  }
 }
 
 function createToggleButton(isOn: boolean): HTMLButtonElement {
@@ -98,6 +161,7 @@ function selectChart(slug: string, name: string) {
   selectedName = name;
   currentValues = {};
   expandedSections = new Set();
+  scenarioOnlyKeys = new Set();
 
   // Update button states
   chartBtns.forEach((btn) => {
@@ -466,6 +530,7 @@ function resetAndCollapseSections(sectionNames?: string[]) {
 
 function applyScenario(scenario: Scenario) {
   const groups = getGroups(selectedSlug);
+  const configuredKeys = getConfiguredKeys(groups);
 
   // Reset all to defaults
   for (const group of groups) {
@@ -477,10 +542,14 @@ function applyScenario(scenario: Scenario) {
     }
   }
   expandedSections.clear();
+  scenarioOnlyKeys.clear();
 
   // Apply scenario values
   for (const [key, val] of Object.entries(scenario.values)) {
     currentValues[key] = val;
+    if (!configuredKeys.has(key)) {
+      scenarioOnlyKeys.add(key);
+    }
   }
 
   // Determine which collapsible sections should be expanded
@@ -515,6 +584,7 @@ function applyScenario(scenario: Scenario) {
 function getChangedValues(): { key: string; value: string; defaultValue: string }[] {
   const groups = getGroups(selectedSlug);
   const changes: { key: string; value: string; defaultValue: string }[] = [];
+  pruneScenarioOnlyKeys(groups);
 
   for (const group of groups) {
     // For collapsible sections with a gate field, include the gate if enabled
@@ -535,6 +605,13 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
       } else if (val !== undefined && val !== field.default && val !== '') {
         changes.push({ key: field.key, value: val, defaultValue: field.default });
       }
+    }
+  }
+
+  for (const key of scenarioOnlyKeys) {
+    const value = currentValues[key];
+    if (value !== undefined && value !== '') {
+      changes.push({ key, value, defaultValue: '' });
     }
   }
 
@@ -793,6 +870,15 @@ function loadFromUrl() {
 
   // Apply URL params to values
   const groups = getGroups(chart);
+  const configuredKeys = getConfiguredKeys(groups);
+  const knownScenarioOnlyKeys = new Set<string>();
+  for (const scenario of getScenarios(chart)) {
+    for (const key of Object.keys(scenario.values)) {
+      if (!configuredKeys.has(key)) {
+        knownScenarioOnlyKeys.add(key);
+      }
+    }
+  }
   let hasChanges = false;
 
   for (const group of groups) {
@@ -817,6 +903,15 @@ function loadFromUrl() {
           if (group.gateField) currentValues[group.gateField] = 'true';
         }
       }
+    }
+  }
+
+  for (const key of knownScenarioOnlyKeys) {
+    const val = params.get(key);
+    if (val !== null) {
+      currentValues[key] = val;
+      scenarioOnlyKeys.add(key);
+      hasChanges = true;
     }
   }
 

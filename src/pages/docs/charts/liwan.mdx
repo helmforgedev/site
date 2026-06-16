@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Liwan Chart
-description: HelmForge Liwan chart — ultra-lightweight, privacy-first web analytics with embedded DuckDB, GeoIP enrichment, and cookie-free tracking for Kubernetes.
+description: HelmForge Liwan chart - lightweight, privacy-first web analytics with embedded DuckDB, hardened Kubernetes defaults, and Ingress or Gateway API exposure.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,25 +9,23 @@ import Callout from '../../../components/Callout.astro';
 
 # Liwan
 
-Ultra-lightweight, privacy-first web analytics with embedded DuckDB storage. Liwan runs as a single binary with
-minimal resource requirements and no external database dependency. All analytics data — including GeoIP
-location enrichment — lives in a local DuckDB file on a persistent volume.
+Liwan is a lightweight, privacy-focused web analytics application with embedded DuckDB storage. The HelmForge chart
+deploys it as one Kubernetes workload with durable `/data` storage, explicit public URL wiring, and production-oriented
+security defaults.
 
 ## Key Features
 
-- **Single binary** — no external database, no sidecar, minimal footprint
-- **Privacy-first** — no cookies, no cross-site tracking, GDPR-compliant by design
-- **DuckDB storage** — columnar analytics engine embedded in the binary
-- **GeoIP enrichment** — automatic IP-to-location lookup stored alongside DuckDB data
-- **Cookie-free tracking** — JavaScript snippet embeddable on any site
-- **Ingress support** — TLS via cert-manager with configurable ingress class
-- **Gateway API support** — optional HTTPRoute for native Kubernetes routing
-- **Dual-stack ready Service** — optional `ipFamilyPolicy` and `ipFamilies`
-- **Non-root by default** — `runAsNonRoot: true` and `fsGroup: 1000` preconfigured
+- **Official image** - pinned `ghcr.io/explodingcamera/liwan:1.5.0`
+- **Embedded DuckDB** - no external database dependency
+- **PVC-backed data** - analytics and runtime assets stored under `/data`
+- **Recreate rollout** - avoids overlapping DuckDB writers during upgrades
+- **Cookie-free tracking** - small JavaScript snippet for tracked sites
+- **Ingress support** - host, path, class, annotations, and TLS
+- **Gateway API support** - optional HTTPRoute
+- **Dual-stack ready Service** - optional `ipFamilyPolicy` and `ipFamilies`
+- **Hardened defaults** - non-root user, dropped capabilities, `RuntimeDefault` seccomp, and no ServiceAccount token
 
 ## Installation
-
-**HTTPS repository:**
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
@@ -35,38 +33,37 @@ helm repo update
 helm install liwan helmforge/liwan
 ```
 
-**OCI registry:**
+OCI registry:
 
 ```bash
 helm install liwan oci://ghcr.io/helmforgedev/helm/liwan
 ```
 
-## Tracking Script Integration
+## Tracking Script
 
-After deploying Liwan and creating a site in the UI, embed the tracking snippet on your website. Replace
-`analytics.example.com` with your actual Liwan instance URL and `my-site` with your site slug:
+After deploying Liwan and creating a site in the UI, embed the generated tracking snippet on your website. A typical
+snippet looks like:
 
 ```html
 <script defer src="https://analytics.example.com/script.js" data-site-name="my-site"></script>
 ```
 
-The script is cookie-free and GDPR-compliant. No consent banner is required under most EU interpretations
-when using Liwan's privacy-preserving tracking model.
+Set `liwan.baseUrl` to the same public URL used by browsers and tracking scripts. Consent requirements depend on your
+jurisdiction, site policy, and any additional data you collect around Liwan.
 
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'production', label: 'Production (TLS)' },
-    { id: 'geoip', label: 'GeoIP + Resources' },
-    { id: 'minimal', label: 'Minimal (No TLS)' },
+    { id: 'production', label: 'Production TLS' },
+    { id: 'gateway', label: 'Gateway API' },
+    { id: 'minimal', label: 'Internal' },
   ]}
 >
 
 <div data-tab-panel="production">
 
 ```yaml
-# values.yaml — Production Liwan with TLS and resource limits
 liwan:
   baseUrl: 'https://analytics.example.com'
 
@@ -76,11 +73,11 @@ persistence:
 
 resources:
   requests:
-    memory: 64Mi
     cpu: 25m
+    memory: 64Mi
   limits:
-    memory: 256Mi
     cpu: 250m
+    memory: 256Mi
 
 ingress:
   enabled: true
@@ -100,42 +97,24 @@ ingress:
 
 </div>
 
-<div data-tab-panel="geoip">
+<div data-tab-panel="gateway">
 
 ```yaml
-# values.yaml — Liwan with GeoIP enrichment and explicit resource limits
-# GeoIP data is automatically downloaded to /data on first startup.
-# A larger PVC is recommended when GeoIP enrichment is active.
 liwan:
   baseUrl: 'https://analytics.example.com'
 
 persistence:
   enabled: true
-  size: 5Gi # GeoIP database adds ~100MB to the DuckDB data directory
-  storageClass: fast-ssd
+  size: 5Gi
 
-resources:
-  requests:
-    memory: 128Mi
-    cpu: 50m
-  limits:
-    memory: 512Mi
-    cpu: 500m
-
-ingress:
+gatewayAPI:
   enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: analytics.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: liwan-tls
-      hosts:
-        - analytics.example.com
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - analytics.example.com
 ```
 
 </div>
@@ -143,7 +122,6 @@ ingress:
 <div data-tab-panel="minimal">
 
 ```yaml
-# values.yaml — Minimal Liwan, internal access only (no Ingress)
 liwan:
   baseUrl: 'http://liwan.analytics.svc.cluster.local'
 
@@ -155,6 +133,19 @@ persistence:
 </div>
 
 </DocsTabs>
+
+## Architecture
+
+The chart renders a Deployment, Service, and PVC by default. Liwan listens on container port `9042`; the Kubernetes
+Service exposes port `80`.
+
+The Deployment uses `strategy.type: Recreate`. DuckDB is embedded and single-writer oriented, so the chart avoids a
+rolling update that could briefly run two pods against the same data volume.
+
+<Callout type="warning" title="Set the public URL before installing trackers">
+  Without `liwan.baseUrl`, generated script URLs can point at an internal or incomplete endpoint. Keep `liwan.baseUrl`,
+  Ingress hosts, Gateway API hostnames, and TLS hosts aligned.
+</Callout>
 
 ## Configuration Reference
 
@@ -175,44 +166,37 @@ persistence:
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
-### Liwan Configuration
+### Liwan
 
-| Parameter        | Type    | Default | Description                                                                   |
-| ---------------- | ------- | ------- | ----------------------------------------------------------------------------- |
-| `liwan.port`     | integer | `9042`  | Application HTTP port inside the container.                                   |
-| `liwan.baseUrl`  | string  | `""`    | Public base URL of the Liwan instance (e.g. `https://analytics.example.com`). |
-| `liwan.extraEnv` | array   | `[]`    | Extra environment variables for advanced configuration.                       |
-
-<Callout type="warning" title="baseUrl is required for correct tracking script URLs">
-  Set `liwan.baseUrl` to your public URL. Without it, the JavaScript tracking snippet URL generated by Liwan will be
-  incorrect, causing the tracker to fail on embedded sites. This is the most common reason for a Liwan deployment that
-  appears to work but collects no data.
-</Callout>
+| Parameter        | Type    | Default | Description                                                 |
+| ---------------- | ------- | ------- | ----------------------------------------------------------- |
+| `liwan.port`     | integer | `9042`  | Application HTTP port inside the container.                 |
+| `liwan.baseUrl`  | string  | `""`    | Public base URL of the Liwan instance.                      |
+| `liwan.extraEnv` | array   | `[]`    | Extra environment variables for advanced upstream settings. |
 
 ### Persistence
 
-Liwan stores both the DuckDB analytics database and the GeoIP enrichment database in the `/data` directory.
-GeoIP data is downloaded automatically on first startup and adds approximately 100 MB to the volume.
+Liwan stores analytics data and runtime assets in `/data`.
 
-| Parameter                   | Type    | Default             | Description                                              |
-| --------------------------- | ------- | ------------------- | -------------------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (DuckDB database + GeoIP data). |
-| `persistence.size`          | string  | `2Gi`               | PVC size.                                                |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                        |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.             |
+| Parameter                   | Type    | Default             | Description                                  |
+| --------------------------- | ------- | ------------------- | -------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data`.                    |
+| `persistence.size`          | string  | `2Gi`               | PVC size.                                    |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
 
 ### Service
 
 | Parameter                | Type        | Default     | Description                          |
 | ------------------------ | ----------- | ----------- | ------------------------------------ |
-| `service.type`           | string      | `ClusterIP` | Kubernetes service type.             |
+| `service.type`           | string      | `ClusterIP` | Kubernetes Service type.             |
 | `service.port`           | integer     | `80`        | Service port exposed to the cluster. |
 | `service.annotations`    | object      | `{}`        | Annotations for the Service.         |
 | `service.ipFamilyPolicy` | string/null | `null`      | Service IP family policy.            |
 | `service.ipFamilies`     | array       | `[]`        | Ordered Service IP families.         |
 
-#### Dual-Stack Service
+Dual-stack example:
 
 ```yaml
 service:
@@ -222,114 +206,98 @@ service:
     - IPv6
 ```
 
-### Gateway API
-
-Use `gatewayAPI.enabled` to render a native Kubernetes `HTTPRoute` for Liwan. This requires Gateway API CRDs and a
-compatible Gateway controller in the cluster.
-
-```yaml
-gatewayAPI:
-  enabled: true
-  parentRefs:
-    - name: shared-gateway
-      namespace: gateway-system
-      sectionName: https
-  hostnames:
-    - analytics.example.com
-```
-
-| Parameter                | Type   | Default                              | Description                |
-| ------------------------ | ------ | ------------------------------------ | -------------------------- |
-| `gatewayAPI.enabled`     | bool   | `false`                              | Render an HTTPRoute.       |
-| `gatewayAPI.parentRefs`  | array  | `[]`                                 | Parent Gateway references. |
-| `gatewayAPI.hostnames`   | array  | `[]`                                 | HTTPRoute hostnames.       |
-| `gatewayAPI.paths`       | array  | `[{ type: PathPrefix, value: "/" }]` | HTTPRoute path matches.    |
-| `gatewayAPI.annotations` | object | `{}`                                 | HTTPRoute annotations.     |
-
 ### Ingress
 
-| Parameter                  | Type    | Default   | Description                                      |
-| -------------------------- | ------- | --------- | ------------------------------------------------ |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
-| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
-| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
+| Parameter                  | Type    | Default   | Description          |
+| -------------------------- | ------- | --------- | -------------------- |
+| `ingress.enabled`          | boolean | `false`   | Render an Ingress.   |
+| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.  |
+| `ingress.annotations`      | object  | `{}`      | Ingress annotations. |
+| `ingress.hosts`            | array   | `[]`      | Host and path rules. |
+| `ingress.tls`              | array   | `[]`      | TLS configuration.   |
 
-### Probes
+### Gateway API
 
-| Parameter                              | Type    | Default | Description                        |
-| -------------------------------------- | ------- | ------- | ---------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `probes.startup.initialDelaySeconds`   | integer | `5`     | Startup probe initial delay.       |
-| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
-| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+Use `gatewayAPI.enabled` to render a native Kubernetes HTTPRoute. This requires Gateway API CRDs and a compatible
+Gateway controller.
 
-### Resources and Security
+| Parameter                | Type    | Default                              | Description                |
+| ------------------------ | ------- | ------------------------------------ | -------------------------- |
+| `gatewayAPI.enabled`     | boolean | `false`                              | Render an HTTPRoute.       |
+| `gatewayAPI.parentRefs`  | array   | `[]`                                 | Parent Gateway references. |
+| `gatewayAPI.hostnames`   | array   | `[]`                                 | HTTPRoute hostnames.       |
+| `gatewayAPI.paths`       | array   | `[{ type: PathPrefix, value: "/" }]` | HTTPRoute path matches.    |
+| `gatewayAPI.annotations` | object  | `{}`                                 | HTTPRoute annotations.     |
 
-Liwan ships with a non-root security context preconfigured. The `fsGroup: 1000` ensures the DuckDB and GeoIP
-files in `/data` are writable by the container user without requiring privileged access.
+### Security
 
-| Parameter                      | Type    | Default | Description                         |
-| ------------------------------ | ------- | ------- | ----------------------------------- |
-| `resources`                    | object  | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext.fsGroup`   | integer | `1000`  | Filesystem group for the pod.       |
-| `securityContext.runAsUser`    | integer | `1000`  | UID for the container process.      |
-| `securityContext.runAsGroup`   | integer | `1000`  | GID for the container process.      |
-| `securityContext.runAsNonRoot` | boolean | `true`  | Enforce non-root execution.         |
+| Parameter                                     | Type    | Default          | Description                                      |
+| --------------------------------------------- | ------- | ---------------- | ------------------------------------------------ |
+| `serviceAccount.create`                       | boolean | `false`          | Create a dedicated ServiceAccount.               |
+| `serviceAccount.name`                         | string  | `""`             | Override the ServiceAccount name.                |
+| `serviceAccount.annotations`                  | object  | `{}`             | ServiceAccount annotations.                      |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`          | Mount a Kubernetes API token into the pod.       |
+| `podSecurityContext.fsGroup`                  | integer | `1000`           | Filesystem group for mounted data.               |
+| `podSecurityContext.fsGroupChangePolicy`      | string  | `OnRootMismatch` | Avoid recursive ownership changes when possible. |
+| `podSecurityContext.seccompProfile.type`      | string  | `RuntimeDefault` | Use the runtime default seccomp profile.         |
+| `securityContext.runAsUser`                   | integer | `1000`           | Container user ID.                               |
+| `securityContext.runAsGroup`                  | integer | `1000`           | Container group ID.                              |
+| `securityContext.runAsNonRoot`                | boolean | `true`           | Enforce non-root execution.                      |
+| `securityContext.allowPrivilegeEscalation`    | boolean | `false`          | Prevent privilege escalation.                    |
+| `securityContext.capabilities.drop`           | array   | `["ALL"]`        | Drop Linux capabilities.                         |
 
-### Service Account
+### Scheduling and Extensibility
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                       | Type    | Default | Description                                                |
+| ------------------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `resources`                     | object  | `{}`    | CPU and memory requests and limits.                        |
+| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.                              |
+| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.                                |
+| `affinity`                      | object  | `{}`    | Affinity rules.                                            |
+| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.                               |
+| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.                                 |
+| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.                                  |
+| `podLabels`                     | object  | `{}`    | Extra labels for the pod.                                  |
+| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod.                             |
+| `extraVolumes`                  | array   | `[]`    | Extra volumes to attach to the pod.                        |
+| `extraVolumeMounts`             | array   | `[]`    | Extra volume mounts for the container.                     |
+| `extraManifests`                | array   | `[]`    | Additional Kubernetes manifests rendered with the release. |
 
-### Scheduling
+## Operational Patterns
 
-| Parameter                       | Type    | Default | Description                    |
-| ------------------------------- | ------- | ------- | ------------------------------ |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
-| `affinity`                      | object  | `{}`    | Affinity rules.                |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+Liwan is intentionally single-instance. The chart does not expose `replicaCount` because embedded DuckDB is not a shared
+multi-writer database. Run separate releases for separate environments or sites when isolation is required.
 
-### Extra
+Back up the PVC mounted at `/data`. For the most consistent snapshot, pause writes or scale the Deployment to zero before
+taking a storage-level snapshot.
 
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+For upgrades, the `Recreate` strategy causes a short outage while the old pod exits and the new pod starts. That is
+intentional and avoids overlapping writers on the same DuckDB files.
 
 ## Common Issues
 
-<Callout type="danger" title="All analytics data lost when persistence.enabled: false">
-  If `persistence.enabled` is `false`, all DuckDB data — including historical analytics and GeoIP files — is lost when
-  the pod restarts. Always enable persistence in production.
+<Callout type="danger" title="All analytics data is lost when persistence is disabled">
+  If `persistence.enabled` is `false`, Liwan data is stored on `emptyDir` and is lost when the pod restarts. Keep
+  persistence enabled in production.
 </Callout>
 
-<Callout type="tip" title="Right-size your PVC from the start">
-  DuckDB compresses analytics data efficiently. For most small-to-medium sites, `2Gi` is sufficient for years of
-  analytics. Add ~100 MB for the GeoIP database. PVC resize requires a StorageClass with `allowVolumeExpansion: true`.
-  Start at `5Gi` for peace of mind.
+<Callout type="tip" title="Right-size the PVC from the start">
+  DuckDB compresses analytics data efficiently, but retention and traffic vary. Start at `5Gi` for public sites and use
+  a StorageClass that supports expansion if long retention is required.
 </Callout>
+
+## Security Scan
+
+| Framework | Score       |
+| --------- | ----------- |
+| Overall   | **84.85%**  |
+| MITRE     | **100.00%** |
+| NSA       | **80.00%**  |
+| SOC2      | **80.00%**  |
+
+The hardening defaults cover non-root execution, dropped Linux capabilities, `RuntimeDefault` seccomp, and disabled
+ServiceAccount token automount. Remaining environment-specific findings are resource limits, network policy, and
+immutable root filesystem.
 
 ## More Information
 
