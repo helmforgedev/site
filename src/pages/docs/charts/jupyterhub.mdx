@@ -31,6 +31,16 @@ helm install jupyterhub helmforge/jupyterhub --namespace jupyterhub --create-nam
 helm install jupyterhub oci://ghcr.io/helmforgedev/helm/jupyterhub --namespace jupyterhub --create-namespace
 ```
 
+## Chart References
+
+- [Chart standards PR](https://github.com/helmforgedev/charts/pull/510)
+- [Design](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/DESIGN.md)
+- [Production guide](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/docs/production.md)
+- [Networking guide](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/docs/networking.md)
+- [External Secrets guide](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/docs/external-secrets.md)
+- [Production values example](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/examples/production.yaml)
+- [Gateway API example](https://github.com/helmforgedev/charts/tree/main/charts/jupyterhub/examples/gateway.yaml)
+
 ## Examples
 
 Single-user image:
@@ -58,6 +68,16 @@ singleuser:
 ## Operations
 
 Keep the default SQLite Hub database to a single Hub replica. For HA Hub deployments, configure an external database, provide a shared cookie secret, and avoid single-writer PVC modes for shared Hub state.
+
+## Security Scan
+
+| Framework          | Score          |
+| ------------------ | -------------- |
+| MITRE + NSA + SOC2 | **81.666664%** |
+
+The chart runs Hub and proxy containers as non-root, drops Linux capabilities, keeps single-user pod service account
+tokens disabled through KubeSpawner configuration, and requires explicit opt-ins for insecure public authentication and
+anonymous public metrics.
 
 ## Architecture
 
@@ -245,7 +265,7 @@ when `hub.cleanupServers=false`.
 | `proxy.secretToken`              | `""`                            | Inline proxy token, generated when empty. |
 | `proxy.existingSecret`           | `""`                            | Existing Secret for proxy token.          |
 | `singleuser.image.name`          | `quay.io/jupyter/base-notebook` | Default notebook image.                   |
-| `singleuser.storage.enabled`     | `true`                          | Create user notebook PVCs.                |
+| `singleuser.storage.enabled`     | `false`                         | Create user notebook PVCs.                |
 | `service.ipFamilyPolicy`         | `null`                          | Optional Service dual-stack policy.       |
 | `gateway.enabled`                | `false`                         | Render Gateway API HTTPRoute.             |
 | `metrics.serviceMonitor.enabled` | `false`                         | Render ServiceMonitor.                    |
