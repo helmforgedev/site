@@ -1738,11 +1738,11 @@ const chartConfigs: Record<string, ChartConfig> = {
           description: 'Deployment architecture',
         },
         {
-          label: 'Replica Count',
-          key: 'replicaCount',
+          label: 'Replica Set Members',
+          key: 'replicaSet.members',
           type: 'number',
-          default: '1',
-          description: 'Number of replicas',
+          default: '3',
+          description: 'Data-bearing members in replica set mode',
         },
         {
           label: 'Storage Size',
@@ -1782,6 +1782,50 @@ const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Network',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Service Type',
+          key: 'service.type',
+          type: 'select',
+          default: 'ClusterIP',
+          options: ['ClusterIP', 'NodePort', 'LoadBalancer'],
+          description: 'Client Service type',
+        },
+        {
+          label: 'Dual Stack',
+          key: 'service.ipFamilyPolicy',
+          type: 'select',
+          default: '',
+          options: ['', 'SingleStack', 'PreferDualStack', 'RequireDualStack'],
+          description: 'Service IP family policy',
+        },
+      ],
+    },
+    {
+      name: 'External Secrets',
+      collapsible: true,
+      gateField: 'externalSecrets.enabled',
+      fields: [
+        {
+          label: 'SecretStore Name',
+          key: 'externalSecrets.secretStoreRef.name',
+          type: 'text',
+          default: 'vault',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+        {
+          label: 'SecretStore Kind',
+          key: 'externalSecrets.secretStoreRef.kind',
+          type: 'select',
+          default: 'ClusterSecretStore',
+          options: ['SecretStore', 'ClusterSecretStore'],
+          description: 'External Secrets store kind',
+        },
+      ],
+    },
+    {
       name: 'S3 Backup',
       collapsible: true,
       gateField: 'backup.enabled',
@@ -1797,7 +1841,7 @@ const chartConfigs: Record<string, ChartConfig> = {
           label: 'S3 Endpoint',
           key: 'backup.s3.endpoint',
           type: 'text',
-          default: 's3.amazonaws.com',
+          default: 'https://s3.amazonaws.com',
           description: 'S3-compatible endpoint',
         },
         {
