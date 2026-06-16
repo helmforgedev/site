@@ -23,6 +23,14 @@ alerts, and review job history. Job data and state are stored in flat JSON files
 - **Concurrency control** — configurable maximum concurrent jobs per server
 - **Persistent storage** — PVC for job data, history, and state JSON files
 
+## Security Scan
+
+| Framework          | Score      |
+| ------------------ | ---------- |
+| MITRE + NSA + SOC2 | **74.24%** |
+
+Security posture: acceptable.
+
 ## Installation
 
 **HTTPS repository:**
@@ -90,9 +98,9 @@ cronicle:
     # SMTP port (default is 25; use 587 for STARTTLS)
     - name: CRONICLE_smtp_port
       value: '587'
-    # SMTP authentication (if required)
-    - name: CRONICLE_smtp_secure
-      value: 'true'
+    # Cronicle nested mail_options.secure flag
+    - name: CRONICLE_mail_options__secure
+      value: '0'
 
 persistence:
   enabled: true
@@ -106,7 +114,14 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: cronicle-tls
+      hosts:
+        - cronicle.example.com
 ```
+
+Port 587 is commonly STARTTLS. Keep `CRONICLE_mail_options__secure` set to `'0'`
+unless your SMTP provider requires implicit TLS, usually on port 465.
 
 </div>
 
@@ -118,8 +133,8 @@ cronicle:
   baseUrl: 'https://cronicle.example.com'
   emailFrom: 'cronicle@example.com'
   smtpHostname: 'smtp.example.com'
-  maxJobs: 10
-  jobMemoryMax: 2147483648 # 2 GB per job
+  maxJobs: 4
+  jobMemoryMax: 268435456 # 256 MiB per job
 
 secret:
   create: false
@@ -127,11 +142,11 @@ secret:
 
 resources:
   requests:
-    memory: 256Mi
-    cpu: 100m
+    memory: 512Mi
+    cpu: 250m
   limits:
-    memory: 1Gi
-    cpu: 1000m
+    memory: 2Gi
+    cpu: '2'
 
 persistence:
   enabled: true
@@ -150,6 +165,15 @@ ingress:
 </div>
 
 </DocsTabs>
+
+The chart repository also includes copy-paste values files for these scenarios:
+
+- `examples/simple.yaml` - private scheduler with port-forward access.
+- `examples/ingress.yaml` - HTTPS ingress with bounded scheduler resources.
+- `examples/notifications.yaml` - SMTP notification settings.
+
+Architecture and operations details are maintained with the chart in
+`DESIGN.md`, `docs/architecture.md`, and `docs/operations.md`.
 
 ## Configuration Reference
 
@@ -192,8 +216,9 @@ ingress:
 
 <Callout type="tip" title="Limit maxJobs in production to avoid node overload">
   With `maxJobs: 0` (unlimited), Cronicle will run as many concurrent jobs as are scheduled, which can saturate the
-  node's CPU and memory. For production use, set `maxJobs` to a value that matches your available resources — typically
-  5–10 for a standard pod with 1–2 CPU cores.
+  node's CPU and memory. Cronicle runs jobs inside the application container, so size `maxJobs` and `jobMemoryMax`
+  together under the pod memory limit. For example, four 256 MiB jobs inside a 2 GiB pod leaves headroom for the
+  scheduler and job log buffering.
 </Callout>
 
 ### Session Secret
