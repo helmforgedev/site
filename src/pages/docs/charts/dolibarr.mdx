@@ -78,7 +78,17 @@ admin:
 mysql:
   enabled: true
   auth:
-    password: 'mysql-password'
+    password: 'change-me-now'
+  standalone:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
 
 persistence:
   documents:
@@ -257,7 +267,7 @@ persistence:
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/dolibarr/dolibarr` | Dolibarr container image.            |
-| `image.tag`        | string | `"23.0.0"`                    | Image tag.                           |
+| `image.tag`        | string | `"23.0.3"`                    | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
@@ -316,16 +326,26 @@ persistence:
 
 ### MySQL Subchart
 
-| Parameter                           | Type    | Default      | Description                                   |
-| ----------------------------------- | ------- | ------------ | --------------------------------------------- |
-| `mysql.enabled`                     | boolean | `true`       | Deploy the bundled MySQL subchart.            |
-| `mysql.architecture`                | string  | `standalone` | MySQL architecture.                           |
-| `mysql.auth.database`               | string  | `dolibarr`   | Database name created by the subchart.        |
-| `mysql.auth.username`               | string  | `dolibarr`   | Database user created by the subchart.        |
-| `mysql.auth.password`               | string  | `""`         | Database password. Auto-generated if empty.   |
-| `mysql.auth.rootPassword`           | string  | `""`         | MySQL root password. Auto-generated if empty. |
-| `mysql.primary.persistence.enabled` | boolean | `true`       | Enable persistence for MySQL data.            |
-| `mysql.primary.persistence.size`    | string  | `8Gi`        | PVC size for MySQL data.                      |
+| Parameter                                    | Type    | Default      | Description                                    |
+| -------------------------------------------- | ------- | ------------ | ---------------------------------------------- |
+| `mysql.enabled`                              | boolean | `true`       | Deploy the bundled MySQL subchart.             |
+| `mysql.architecture`                         | string  | `standalone` | MySQL architecture.                            |
+| `mysql.auth.database`                        | string  | `dolibarr`   | Database name created by the subchart.         |
+| `mysql.auth.username`                        | string  | `dolibarr`   | Database user created by the subchart.         |
+| `mysql.auth.password`                        | string  | `""`         | Database password. Auto-generated if empty.    |
+| `mysql.auth.rootPassword`                    | string  | `""`         | MySQL root password. Auto-generated if empty.  |
+| `mysql.standalone.persistence.enabled`       | boolean | `true`       | Enable persistence for MySQL data.             |
+| `mysql.standalone.persistence.size`          | string  | `8Gi`        | PVC size for MySQL data.                       |
+| `mysql.standalone.resources.requests.cpu`    | string  | `100m`       | MySQL CPU request.                             |
+| `mysql.standalone.resources.requests.memory` | string  | `256Mi`      | MySQL memory request.                          |
+| `mysql.standalone.resources.limits.cpu`      | string  | `500m`       | MySQL CPU limit.                               |
+| `mysql.standalone.resources.limits.memory`   | string  | `768Mi`      | MySQL memory limit.                            |
+| `mysql.startupProbe.initialDelaySeconds`     | integer | `30`         | MySQL startup probe delay for first bootstrap. |
+
+<Callout type="warning" title="Use mysql.standalone.* with the HelmForge MySQL 2.x dependency">
+  Older `mysql.primary.*` values are rejected by the chart so persistence and resource settings are not silently
+  ignored. Migrate those values to `mysql.standalone.*` before upgrading.
+</Callout>
 
 ### Persistence
 
@@ -403,12 +423,35 @@ Dolibarr uses two separate PVCs. Both must be preserved in backups independently
 | `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`    | TLS configuration.                               |
 
+### Gateway API
+
+| Parameter             | Type    | Default      | Description                             |
+| --------------------- | ------- | ------------ | --------------------------------------- |
+| `gateway.enabled`     | boolean | `false`      | Enable an HTTPRoute instead of Ingress. |
+| `gateway.annotations` | object  | `{}`         | Annotations for the HTTPRoute.          |
+| `gateway.parentRefs`  | array   | `[]`         | Gateway parent references.              |
+| `gateway.hostnames`   | array   | `[]`         | Hostnames matched by the HTTPRoute.     |
+| `gateway.path`        | string  | `/`          | Path prefix routed to the Service.      |
+| `gateway.pathType`    | string  | `PathPrefix` | Gateway API path match type.            |
+
+### External Secrets
+
+| Parameter                               | Type    | Default                  | Description                                     |
+| --------------------------------------- | ------- | ------------------------ | ----------------------------------------------- |
+| `externalSecrets.enabled`               | boolean | `false`                  | Enable an ExternalSecret for admin credentials. |
+| `externalSecrets.apiVersion`            | string  | `external-secrets.io/v1` | External Secrets API version.                   |
+| `externalSecrets.refreshInterval`       | string  | `0`                      | Secret refresh interval.                        |
+| `externalSecrets.secretStoreRef.name`   | string  | `""`                     | SecretStore or ClusterSecretStore name.         |
+| `externalSecrets.secretStoreRef.kind`   | string  | `ClusterSecretStore`     | Secret store kind.                              |
+| `externalSecrets.target.creationPolicy` | string  | `Owner`                  | Target Secret ownership policy.                 |
+| `externalSecrets.data`                  | array   | `[]`                     | Remote reference mappings for admin password.   |
+
 ### Probes
 
 | Parameter                            | Type    | Default | Description                        |
 | ------------------------------------ | ------- | ------- | ---------------------------------- |
 | `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `startupProbe.initialDelaySeconds`   | integer | `20`    | Startup probe initial delay.       |
+| `startupProbe.initialDelaySeconds`   | integer | `70`    | Startup probe initial delay.       |
 | `startupProbe.periodSeconds`         | integer | `10`    | Startup probe period.              |
 | `startupProbe.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
 | `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
@@ -425,11 +468,27 @@ Dolibarr uses two separate PVCs. Both must be preserved in backups independently
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                | Type   | Default          | Description                       |
+| ---------------------------------------- | ------ | ---------------- | --------------------------------- |
+| `resources.requests.cpu`                 | string | `100m`           | Application CPU request.          |
+| `resources.requests.memory`              | string | `256Mi`          | Application memory request.       |
+| `resources.limits.cpu`                   | string | `500m`           | Application CPU limit.            |
+| `resources.limits.memory`                | string | `768Mi`          | Application memory limit.         |
+| `podSecurityContext.seccompProfile.type` | string | `RuntimeDefault` | Pod seccomp profile.              |
+| `securityContext`                        | object | `{}`             | Container-level security context. |
+
+The official Dolibarr image performs first-run file ownership and Apache setup as root. The chart keeps
+`securityContext` empty by default and applies pod-level `RuntimeDefault` seccomp; operators can add stricter
+container security after validating their image and storage combination.
+
+### Security Scan
+
+| Framework          | Score          |
+| ------------------ | -------------- |
+| MITRE + NSA + SOC2 | **87.878784%** |
+| MITRE              | **100.00%**    |
+| NSA                | **82.50%**     |
+| SOC2               | **90.00%**     |
 
 ### Service Account
 

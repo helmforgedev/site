@@ -60,6 +60,13 @@ let currentValues: Record<string, string> = {};
 let expandedSections: Set<string> = new Set();
 let scenarioOnlyKeys: Set<string> = new Set();
 
+const linkedFieldValues: Record<string, Record<string, string>> = {
+  dolibarr: {
+    'externalSecrets.data[0].secretKey': 'admin.existingSecretPasswordKey',
+    'admin.existingSecretPasswordKey': 'externalSecrets.data[0].secretKey',
+  },
+};
+
 function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
 }
@@ -158,6 +165,7 @@ function updateToggleVisual(btn: HTMLButtonElement, isOn: boolean) {
 
 function setFieldValue(key: string, value: string) {
   currentValues[key] = value;
+  syncLinkedFieldValue(key, value);
   syncDerivedFieldValues();
 }
 
@@ -171,6 +179,19 @@ function syncDerivedFieldValues() {
     currentValues['tunnel.quickTunnel.enabled'] = 'false';
     const btn = controlsEl?.querySelector<HTMLButtonElement>('button[data-field-key="tunnel.quickTunnel.enabled"]');
     if (btn) updateToggleVisual(btn, false);
+  }
+}
+
+function syncLinkedFieldValue(key: string, value: string) {
+  const linkedKey = linkedFieldValues[selectedSlug]?.[key];
+  if (!linkedKey) return;
+
+  currentValues[linkedKey] = value;
+  const linkedControl = controlsEl?.querySelector<HTMLInputElement | HTMLSelectElement>(
+    `[data-field-key="${linkedKey}"]`,
+  );
+  if (linkedControl && linkedControl.value !== value) {
+    linkedControl.value = value;
   }
 }
 
@@ -453,6 +474,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         updateUrlState();
         return;
       }
+      syncLinkedFieldValue(field.key, select.value);
       updateOutput();
     });
     controlDiv.appendChild(select);
