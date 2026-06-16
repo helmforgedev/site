@@ -209,6 +209,22 @@ test.describe('Playground', () => {
     await expect(code).toContainText('externalSecrets.secretStoreRef.kind=ClusterSecretStore');
     await expect(code).toContainText('externalSecrets.data[0].remoteRef.key=changedetection/app');
   });
+
+  test('cloudflared production scenario emits secret availability and monitoring values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="cloudflared"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    const code = page.locator('#playground-code');
+
+    await expect(code).toContainText('tunnel.quickTunnel.enabled=false');
+    await expect(code).toContainText('tunnel.existingSecret=cloudflare-tunnel');
+    await expect(code).toContainText('replicaCount=2');
+    await expect(code).toContainText('pdb.enabled=true');
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('serviceMonitor.enabled=true');
+    await expect(code).toContainText('serviceMonitor.interval=30s');
+  });
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
