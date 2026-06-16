@@ -25,6 +25,15 @@ access controls, TLS, External Secrets Operator, optional replication slots, and
 - **External Secrets Operator** — Optional `external-secrets.io/v1` resources for auth, TLS, and backup credentials
 - **Persistent storage** — Configurable PVCs with storage class selection
 
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **93%** |
+
+Security posture is strong. Remaining findings are documented product exceptions for opt-in NetworkPolicy and
+PostgreSQL's writable runtime filesystem.
+
 ## Architecture
 
 <ArchitectureDiagram
@@ -366,7 +375,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | Parameter          | Type   | Default                      | Description                                         |
 | ------------------ | ------ | ---------------------------- | --------------------------------------------------- |
 | `image.repository` | string | `docker.io/library/postgres` | PostgreSQL runtime image repository.                |
-| `image.tag`        | string | `"18.3-trixie"`              | PostgreSQL runtime image tag.                       |
+| `image.tag`        | string | `"18.4-trixie"`              | PostgreSQL runtime image tag.                       |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy for PostgreSQL containers.        |
 | `imagePullSecrets` | array  | `[]`                         | Optional image pull secrets for private registries. |
 
@@ -422,7 +431,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 | Parameter                             | Type    | Default             | Description                                                |
 | ------------------------------------- | ------- | ------------------- | ---------------------------------------------------------- |
-| `standalone.resourcesPreset`          | string  | `none`              | Optional resource preset for standalone mode.              |
+| `standalone.resourcesPreset`          | string  | `small`             | Optional resource preset for standalone mode.              |
 | `standalone.persistence.enabled`      | boolean | `true`              | Enable a PVC for standalone mode.                          |
 | `standalone.persistence.storageClass` | string  | `""`                | StorageClass for the standalone PVC.                       |
 | `standalone.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes for the standalone PVC.                       |
@@ -433,7 +442,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 | Parameter                                      | Type    | Default             | Description                                                                                |
 | ---------------------------------------------- | ------- | ------------------- | ------------------------------------------------------------------------------------------ |
-| `replication.primary.resourcesPreset`          | string  | `none`              | Optional resource preset for the primary pod.                                              |
+| `replication.primary.resourcesPreset`          | string  | `small`             | Optional resource preset for the primary pod.                                              |
 | `replication.primary.persistence.enabled`      | boolean | `true`              | Enable PVCs for the primary StatefulSet.                                                   |
 | `replication.primary.persistence.storageClass` | string  | `""`                | StorageClass for primary PVCs.                                                             |
 | `replication.primary.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes for primary PVCs.                                                             |
@@ -445,7 +454,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 | Parameter                                             | Type    | Default             | Description                                                                            |
 | ----------------------------------------------------- | ------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `replication.readReplicas.resourcesPreset`            | string  | `none`              | Optional resource preset for replica pods.                                             |
+| `replication.readReplicas.resourcesPreset`            | string  | `small`             | Optional resource preset for replica pods.                                             |
 | `replication.readReplicas.replicaCount`               | integer | `2`                 | Number of asynchronous read replica pods.                                              |
 | `replication.readReplicas.persistence.enabled`        | boolean | `true`              | Enable PVCs for replica StatefulSets.                                                  |
 | `replication.readReplicas.persistence.storageClass`   | string  | `""`                | StorageClass for replica PVCs.                                                         |
@@ -490,7 +499,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | Parameter                         | Type    | Default                                         | Description                                                    |
 | --------------------------------- | ------- | ----------------------------------------------- | -------------------------------------------------------------- |
 | `metrics.enabled`                 | boolean | `false`                                         | Enable the `postgres_exporter` sidecar.                        |
-| `metrics.resourcesPreset`         | string  | `none`                                          | Optional resource preset for `postgres_exporter`.              |
+| `metrics.resourcesPreset`         | string  | `small`                                         | Optional resource preset for `postgres_exporter`.              |
 | `metrics.service.annotations`     | object  | `{}`                                            | Annotations applied to metrics Services.                       |
 | `metrics.image.repository`        | string  | `quay.io/prometheuscommunity/postgres-exporter` | Metrics sidecar image repository.                              |
 | `metrics.image.tag`               | string  | `"v0.18.0"`                                     | Metrics sidecar image tag.                                     |
@@ -502,33 +511,33 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### Backup
 
-| Parameter                              | Type    | Default                      | Description                                               |
-| -------------------------------------- | ------- | ---------------------------- | --------------------------------------------------------- |
-| `backup.enabled`                       | boolean | `false`                      | Enable the built-in backup CronJob.                       |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                | Backup schedule in cron format.                           |
-| `backup.suspend`                       | boolean | `false`                      | Suspend backup execution.                                 |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                     | CronJob concurrency policy.                               |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                          | Successful backup Jobs retained by the CronJob.           |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                          | Failed backup Jobs retained by the CronJob.               |
-| `backup.backoffLimit`                  | integer | `1`                          | Job backoff limit for backup execution.                   |
-| `backup.archivePrefix`                 | string  | `postgresql`                 | Prefix used in generated backup archive names.            |
-| `backup.resources`                     | object  | `{}`                         | Resources applied to backup dump and upload containers.   |
-| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`     | Uploader image repository for S3 copies.                  |
-| `backup.images.uploader.tag`           | string  | `"1.0.0"`                    | Uploader image tag.                                       |
-| `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`               | Pull policy for the uploader image.                       |
-| `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres` | PostgreSQL client image used for backup jobs.             |
-| `backup.images.postgresql.tag`         | string  | `"18.3-trixie"`              | PostgreSQL client image tag used for backup jobs.         |
-| `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`               | Pull policy for the PostgreSQL backup image.              |
-| `backup.s3.endpoint`                   | string  | `""`                         | S3-compatible endpoint URL.                               |
-| `backup.s3.bucket`                     | string  | `""`                         | Target bucket name.                                       |
-| `backup.s3.prefix`                     | string  | `postgresql`                 | Optional key prefix inside the bucket.                    |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                       | Create the bucket automatically when it does not exist.   |
-| `backup.s3.existingSecret`             | string  | `""`                         | Existing secret containing backup access and secret keys. |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                 | Secret key name for the S3 access key.                    |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                 | Secret key name for the S3 secret key.                    |
-| `backup.s3.accessKey`                  | string  | `""`                         | Inline S3 access key when not using an existing secret.   |
-| `backup.s3.secretKey`                  | string  | `""`                         | Inline S3 secret key when not using an existing secret.   |
-| `backup.database.pgDumpAllArgs`        | string  | `"--clean --if-exists"`      | Extra arguments passed to `pg_dumpall`.                   |
+| Parameter                              | Type    | Default                                    | Description                                               |
+| -------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`                                    | Enable the built-in backup CronJob.                       |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                              | Backup schedule in cron format.                           |
+| `backup.suspend`                       | boolean | `false`                                    | Suspend backup execution.                                 |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                                   | CronJob concurrency policy.                               |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                        | Successful backup Jobs retained by the CronJob.           |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                        | Failed backup Jobs retained by the CronJob.               |
+| `backup.backoffLimit`                  | integer | `1`                                        | Job backoff limit for backup execution.                   |
+| `backup.archivePrefix`                 | string  | `postgresql`                               | Prefix used in generated backup archive names.            |
+| `backup.resources`                     | object  | requests `100m/128Mi`, limits `500m/512Mi` | Resources applied to backup dump and upload containers.   |
+| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`                   | Uploader image repository for S3 copies.                  |
+| `backup.images.uploader.tag`           | string  | `"1.0.0"`                                  | Uploader image tag.                                       |
+| `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`                             | Pull policy for the uploader image.                       |
+| `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres`               | PostgreSQL client image used for backup jobs.             |
+| `backup.images.postgresql.tag`         | string  | `"18.4-trixie"`                            | PostgreSQL client image tag used for backup jobs.         |
+| `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`                             | Pull policy for the PostgreSQL backup image.              |
+| `backup.s3.endpoint`                   | string  | `""`                                       | S3-compatible endpoint URL.                               |
+| `backup.s3.bucket`                     | string  | `""`                                       | Target bucket name.                                       |
+| `backup.s3.prefix`                     | string  | `postgresql`                               | Optional key prefix inside the bucket.                    |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                     | Create the bucket automatically when it does not exist.   |
+| `backup.s3.existingSecret`             | string  | `""`                                       | Existing secret containing backup access and secret keys. |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                               | Secret key name for the S3 access key.                    |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                               | Secret key name for the S3 secret key.                    |
+| `backup.s3.accessKey`                  | string  | `""`                                       | Inline S3 access key when not using an existing secret.   |
+| `backup.s3.secretKey`                  | string  | `""`                                       | Inline S3 secret key when not using an existing secret.   |
+| `backup.database.pgDumpAllArgs`        | string  | `"--clean --if-exists"`                    | Extra arguments passed to `pg_dumpall`.                   |
 
 ### NetworkPolicy
 
