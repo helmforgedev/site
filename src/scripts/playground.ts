@@ -789,9 +789,21 @@ function shouldPreserveString(key: string): boolean {
 function parseKeyPath(key: string): Array<string | number> {
   const segments: Array<string | number> = [];
   let token = '';
+  let escaped = false;
 
   for (let i = 0; i < key.length; i++) {
     const char = key[i];
+
+    if (escaped) {
+      token += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
 
     if (char === '.') {
       if (token) segments.push(token);
@@ -814,6 +826,7 @@ function parseKeyPath(key: string): Array<string | number> {
     token += char;
   }
 
+  if (escaped) token += '\\';
   if (token) segments.push(token);
   return segments;
 }

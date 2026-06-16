@@ -225,6 +225,57 @@ test.describe('Playground', () => {
     await expect(code).toContainText('serviceMonitor.enabled=true');
     await expect(code).toContainText('serviceMonitor.interval=30s');
   });
+
+  test('discount-bandit playground emits chart contract fields', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="discount-bandit"]').click();
+
+    await page.locator('[data-section-toggle="Database"]').click();
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.host');
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.existingSecret');
+
+    await page.locator('.playground-scenario-btn:has-text("SQLite Dev")').click();
+    await expect(page.locator('#playground-code')).toContainText('database.mode=sqlite');
+    await expect(page.locator('#playground-code')).toContainText('database.sqlite.enabled=true');
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.host');
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.existingSecret');
+
+    await page.locator('[data-section-toggle="Resources"]').click();
+    await expect(page.locator('#playground-code')).toContainText('resources.requests.cpu=250m');
+    await expect(page.locator('#playground-code')).toContainText('resources.limits.cpu=1000m');
+    await expect(page.locator('#playground-code')).toContainText(
+      'podSecurityContext.seccompProfile.type=RuntimeDefault',
+    );
+    await expect(page.locator('#playground-code')).toContainText('securityContext.allowPrivilegeEscalation=false');
+
+    await page.locator('.playground-scenario-btn:has-text("External MySQL + ESO")').click();
+    await expect(page.locator('#playground-code')).toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).toContainText('database.external.host=mysql.example.internal');
+    await expect(page.locator('#playground-code')).toContainText('externalSecrets.database.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText(
+      'externalSecrets.database.passwordRemoteRef.key=databases/discount-bandit',
+    );
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.existingSecret');
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.password');
+
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="discount-bandit"]').click();
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    await expect(page.locator('#playground-code')).toContainText('gatewayAPI.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText(
+      String.raw`networkPolicy.ingress.extraFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=gateway-system`,
+    );
+    await page.locator('.playground-output-btn[data-output="values"]').click();
+    await expect(page.locator('#playground-code')).toContainText('kubernetes.io/metadata.name: gateway-system');
+    await page.locator('.playground-output-btn[data-output="helm"]').click();
+    await expect(page.locator('#playground-code')).toContainText(
+      'externalSecrets.app.appKeyRemoteRef.key=apps/discount-bandit',
+    );
+    await expect(page.locator('#playground-code')).not.toContainText(
+      'externalSecrets.app.exchangeRateApiKeyRemoteRef.key',
+    );
+    await expect(page.locator('#playground-code')).not.toContainText('externalSecrets.database.enabled');
+  });
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
