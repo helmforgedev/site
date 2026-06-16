@@ -9398,6 +9398,52 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  cloudflared: [
+    {
+      label: 'Production',
+      description: 'Secret-backed HA tunnel with metrics',
+      values: {
+        'tunnel.quickTunnel.enabled': 'false',
+        'tunnel.existingSecret': 'cloudflare-tunnel',
+        'tunnel.existingSecretKey': 'token',
+        replicaCount: '2',
+        'pdb.enabled': 'true',
+        'pdb.minAvailable': '1',
+        'metrics.enabled': 'true',
+        'serviceMonitor.enabled': 'true',
+        'serviceMonitor.interval': '30s',
+        'resources.requests.cpu': '50m',
+        'resources.requests.memory': '64Mi',
+        'resources.limits.cpu': '250m',
+        'resources.limits.memory': '128Mi',
+      },
+    },
+    {
+      label: 'External Secrets',
+      description: 'ESO-managed tunnel token Secret',
+      values: {
+        'tunnel.quickTunnel.enabled': 'false',
+        'tunnel.existingSecret': 'cloudflared-tunnel-token',
+        'tunnel.existingSecretKey': 'token',
+        'externalSecrets.enabled': 'true',
+        'externalSecrets.secretStoreRef.name': 'cluster-secrets',
+        'externalSecrets.secretStoreRef.kind': 'ClusterSecretStore',
+        'externalSecrets.data[0].secretKey': 'token',
+        'externalSecrets.data[0].remoteRef.key': 'cloudflared/tunnel',
+        'externalSecrets.data[0].remoteRef.property': 'token',
+      },
+    },
+    {
+      label: 'Quick Tunnel',
+      description: 'Ephemeral tunnel for smoke tests',
+      values: {
+        'tunnel.quickTunnel.enabled': 'true',
+        'tunnel.quickTunnel.helloWorld': 'true',
+        replicaCount: '1',
+        'pdb.enabled': 'false',
+      },
+    },
+  ],
   liwan: [
     {
       label: 'Production TLS',
