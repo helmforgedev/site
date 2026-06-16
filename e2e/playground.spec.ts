@@ -71,6 +71,48 @@ test.describe('Playground', () => {
     }
   });
 
+  test('activation values refresh already rendered controls', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="listmonk"]').click();
+
+    await page.locator('select[data-field-key="database.mode"]').selectOption('external');
+    await expect(page.locator('button[data-field-key="postgresql.enabled"]')).toHaveClass(/bg-border/);
+    await expect(page.locator('#playground-code')).toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=false');
+    await expect(page.locator('#playground-code')).toContainText('database.external.name=listmonk');
+    await expect(page.locator('#playground-code')).toContainText('database.external.username=listmonk');
+
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(page.locator('select[data-field-key="database.mode"]')).toHaveValue('auto');
+    await expect(page.locator('#playground-code')).not.toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).not.toContainText('postgresql.enabled=false');
+
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(page.locator('select[data-field-key="database.mode"]')).toHaveValue('external');
+    await expect(page.locator('#playground-code')).toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=false');
+    await expect(page.locator('#playground-code')).toContainText('database.external.name=listmonk');
+
+    await page.locator('select[data-field-key="database.mode"]').selectOption('auto');
+    await expect(page.locator('button[data-field-key="postgresql.enabled"]')).toHaveClass(/bg-primary/);
+
+    await page.locator('[data-section-toggle="External Database"]').click();
+    await page.locator('input[data-field-key="database.external.host"]').fill('postgres.example.com');
+    await page.locator('input[data-field-key="database.external.existingSecret"]').fill('listmonk-db');
+
+    await expect(page.locator('select[data-field-key="database.mode"]')).toHaveValue('external');
+    await expect(page.locator('button[data-field-key="postgresql.enabled"]')).toHaveClass(/bg-border/);
+    await expect(page.locator('#playground-code')).toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).toContainText('postgresql.enabled=false');
+    await expect(page.locator('#playground-code')).toContainText('database.external.host=postgres.example.com');
+    await expect(page.locator('#playground-code')).toContainText('database.external.existingSecret=listmonk-db');
+
+    await page.locator('select[data-field-key="database.mode"]').selectOption('postgresql');
+    await expect(page.locator('button[data-field-key="postgresql.enabled"]')).toHaveClass(/bg-primary/);
+    await expect(page.locator('#playground-code')).not.toContainText('database.mode=external');
+    await expect(page.locator('#playground-code')).not.toContainText('database.external.');
+  });
+
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');

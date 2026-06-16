@@ -4,6 +4,10 @@ interface FieldConfig {
   type: 'text' | 'number' | 'select' | 'toggle';
   default: string;
   options?: string[];
+  valueActivationValues?: Record<string, Record<string, string>>;
+  toggleActivationValues?: Record<string, Record<string, string>>;
+  activationExpandSections?: Record<string, string[]>;
+  activationResetSections?: Record<string, string[]>;
   description: string;
 }
 
@@ -11,6 +15,7 @@ interface GroupConfig {
   name: string;
   collapsible?: boolean;
   gateField?: string;
+  activationValues?: Record<string, string>;
   fields: FieldConfig[];
 }
 
@@ -58,6 +63,16 @@ function getGroups(slug: string): GroupConfig[] {
 
 function getScenarios(slug: string): Scenario[] {
   return scenarios[slug] ?? [];
+}
+
+function getFieldDefault(key: string): string | undefined {
+  for (const group of getGroups(selectedSlug)) {
+    for (const field of group.fields) {
+      if (field.key === key) return field.default;
+    }
+  }
+
+  return undefined;
 }
 
 function createToggleButton(isOn: boolean): HTMLButtonElement {
@@ -244,12 +259,25 @@ function toggleSection(group: GroupConfig) {
     for (const field of group.fields) {
       currentValues[field.key] = field.default;
     }
+    for (const key of Object.keys(group.activationValues ?? {})) {
+      currentValues[key] = getFieldDefault(key) ?? '';
+    }
   } else {
     // Expand: set gate to true
     expandedSections.add(group.name);
     if (group.gateField) {
       currentValues[group.gateField] = 'true';
     }
+    for (const [key, value] of Object.entries(group.activationValues ?? {})) {
+      currentValues[key] = value;
+    }
+  }
+
+  if (Object.keys(group.activationValues ?? {}).length > 0) {
+    buildControls();
+    updateOutput();
+    updateUrlState();
+    return;
   }
 
   // Update the group visuals
@@ -326,6 +354,20 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     });
     select.addEventListener('change', () => {
       currentValues[field.key] = select.value;
+      const activationValues = field.valueActivationValues?.[select.value];
+      const expandSections = field.activationExpandSections?.[select.value];
+      const resetSections = field.activationResetSections?.[select.value];
+      if (activationValues || expandSections || resetSections) {
+        for (const [key, value] of Object.entries(activationValues ?? {})) {
+          currentValues[key] = value;
+        }
+        expandConfiguredSections(expandSections);
+        resetAndCollapseSections(resetSections);
+        buildControls();
+        updateOutput();
+        updateUrlState();
+        return;
+      }
       updateOutput();
     });
     controlDiv.appendChild(select);
@@ -335,8 +377,23 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     btn.dataset.fieldKey = field.key;
     btn.addEventListener('click', () => {
       const wasOn = currentValues[field.key] === 'true';
-      currentValues[field.key] = wasOn ? 'false' : 'true';
-      updateToggleVisual(btn, !wasOn);
+      const nextValue = wasOn ? 'false' : 'true';
+      currentValues[field.key] = nextValue;
+      const activationValues = field.toggleActivationValues?.[nextValue];
+      const expandSections = field.activationExpandSections?.[nextValue];
+      const resetSections = field.activationResetSections?.[nextValue];
+      if (activationValues || expandSections || resetSections) {
+        for (const [key, value] of Object.entries(activationValues ?? {})) {
+          currentValues[key] = value;
+        }
+        expandConfiguredSections(expandSections);
+        resetAndCollapseSections(resetSections);
+        buildControls();
+        updateOutput();
+        updateUrlState();
+        return;
+      }
+      updateToggleVisual(btn, nextValue === 'true');
       updateOutput();
     });
     controlDiv.appendChild(btn);
@@ -371,6 +428,38 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
   div.appendChild(labelDiv);
   div.appendChild(controlDiv);
   return div;
+}
+
+function expandConfiguredSections(sectionNames?: string[]) {
+  if (!sectionNames?.length) return;
+
+  const sections = new Set(sectionNames);
+  for (const group of getGroups(selectedSlug)) {
+    if (!sections.has(group.name)) continue;
+    expandedSections.add(group.name);
+    for (const [key, value] of Object.entries(group.activationValues ?? {})) {
+      currentValues[key] = value;
+    }
+    if (group.gateField) {
+      currentValues[group.gateField] = 'true';
+    }
+  }
+}
+
+function resetAndCollapseSections(sectionNames?: string[]) {
+  if (!sectionNames?.length) return;
+
+  const sections = new Set(sectionNames);
+  for (const group of getGroups(selectedSlug)) {
+    if (!sections.has(group.name)) continue;
+    if (group.gateField) {
+      currentValues[group.gateField] = 'false';
+    }
+    for (const field of group.fields) {
+      currentValues[field.key] = field.default;
+    }
+    expandedSections.delete(group.name);
+  }
 }
 
 function applyScenario(scenario: Scenario) {
