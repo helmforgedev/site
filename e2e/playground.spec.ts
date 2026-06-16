@@ -192,6 +192,23 @@ test.describe('Playground', () => {
     await expect(code).not.toContainText('ingress.hostname');
   });
 
+
+  test('changedetection production scenario emits browser ingress and external secrets values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="changedetection"]').click();
+
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+    const code = page.locator('#playground-code');
+
+    await expect(code).toContainText('changedetection.baseUrl=https://changes.example.com');
+    await expect(code).toContainText('browser.enabled=true');
+    await expect(code).toContainText('browser.resources.limits.memory=2Gi');
+    await expect(code).toContainText('ingress.enabled=true');
+    await expect(code).toContainText('ingress.tls[0].secretName=changedetection-tls');
+    await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('externalSecrets.secretStoreRef.kind=ClusterSecretStore');
+    await expect(code).toContainText('externalSecrets.data[0].remoteRef.key=changedetection/app');
+  });
   test('copy button is enabled after selection', async ({ page }) => {
     await page.goto('/playground');
     const copyBtn = page.locator('#playground-copy');
