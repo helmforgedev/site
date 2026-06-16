@@ -10168,6 +10168,67 @@ const chartConfigs: Record<string, ChartConfig> = {
 
 // Pre-built scenarios per chart
 const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  gitea: [
+    {
+      label: 'SQLite Private',
+      description: 'Single-pod private Git service with PVC-backed SQLite',
+      values: {
+        'gitea.rootUrl': 'https://git.example.com/',
+        'gitea.sshDomain': 'git.example.com',
+        'gitea.disableRegistration': 'true',
+        'gitea.requireSignIn': 'true',
+        'admin.username': 'gitea-admin',
+        'admin.existingSecret': 'gitea-admin',
+        'persistence.size': '50Gi',
+      },
+    },
+    {
+      label: 'PostgreSQL Production',
+      description: 'PostgreSQL subchart, ingress, resources, and S3-compatible backup',
+      values: {
+        'gitea.rootUrl': 'https://git.example.com/',
+        'gitea.sshDomain': 'git.example.com',
+        'gitea.disableRegistration': 'true',
+        'gitea.requireSignIn': 'true',
+        'admin.username': 'gitea-admin',
+        'admin.existingSecret': 'gitea-admin',
+        'postgresql.enabled': 'true',
+        'postgresql.auth.database': 'gitea',
+        'postgresql.auth.username': 'gitea',
+        'postgresql.auth.password': 'change-me-gitea-postgresql',
+        'persistence.size': '100Gi',
+        'ingress.enabled': 'true',
+        'ingress.hosts[0].host': 'git.example.com',
+        'ingress.ingressClassName': 'traefik',
+        'ingress.tls[0].secretName': 'gitea-tls',
+        'backup.enabled': 'true',
+        'backup.schedule': '0 2 * * *',
+        'backup.s3.endpoint': 'https://s3.amazonaws.com',
+        'backup.s3.bucket': 'gitea-backups',
+        'backup.s3.existingSecret': 'gitea-s3-credentials',
+        'resources.requests.cpu': '500m',
+        'resources.requests.memory': '512Mi',
+        'resources.limits.cpu': '2000m',
+        'resources.limits.memory': '2Gi',
+      },
+    },
+    {
+      label: 'External Database',
+      description: 'Use an existing PostgreSQL service and keep credentials in a secret',
+      values: {
+        'database.mode': 'external',
+        'database.external.vendor': 'postgres',
+        'database.external.host': 'postgres.database.svc.cluster.local',
+        'database.external.name': 'gitea',
+        'database.external.username': 'gitea',
+        'database.external.existingSecret': 'gitea-db-credentials',
+        'gitea.rootUrl': 'https://git.example.com/',
+        'gitea.sshDomain': 'git.example.com',
+        'admin.existingSecret': 'gitea-admin',
+        'persistence.size': '100Gi',
+      },
+    },
+  ],
   dolibarr: [
     {
       label: 'ERP Starter',
