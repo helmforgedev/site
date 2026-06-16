@@ -40,6 +40,16 @@ presets, and automated gravity database management.
 - **Prometheus metrics** — `pihole-exporter` sidecar with ServiceMonitor
 - **S3 backup** — gravity.db, custom DNS records, and dnsmasq config
 
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **86%** |
+
+Security posture is acceptable with documented Pi-hole runtime exceptions for required DNS/network
+capabilities, root bootstrap behavior, writable Pi-hole configuration directories, and site-specific
+NetworkPolicy delegation.
+
 ## Architecture
 
 The chart runs a single Pi-hole Deployment with persistent storage at `/etc/pihole`. When
@@ -318,6 +328,20 @@ serviceDns:
 | `ingress.enabled`           | boolean | `false`        | Enable Ingress for the web admin interface.                                     |
 | `hostNetwork`               | boolean | `false`        | Use host network stack. Required for DHCP.                                      |
 | `dnsPolicy`                 | string  | `""`           | Pod DNS policy. Auto-set to `ClusterFirstWithHostNet` when `hostNetwork: true`. |
+
+### Security and Resources
+
+| Parameter                                     | Type    | Default                                    | Description                                                                  |
+| --------------------------------------------- | ------- | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `resources`                                   | object  | requests `100m/128Mi`, limits `500m/512Mi` | CPU and memory resources for the Pi-hole container.                          |
+| `gravity.resources`                           | object  | requests `50m/64Mi`, limits `200m/128Mi`   | CPU and memory resources for the gravity schema/list init container.         |
+| `gravity.updateResources`                     | object  | requests `100m/128Mi`, limits `500m/512Mi` | CPU and memory resources for the gravity update init container.              |
+| `metrics.resources`                           | object  | requests `25m/64Mi`, limits `100m/128Mi`   | CPU and memory resources for the optional pihole-exporter sidecar.           |
+| `unbound.resources`                           | object  | requests `50m/64Mi`, limits `200m/128Mi`   | CPU and memory resources for the optional Unbound sidecar.                   |
+| `backup.resources`                            | object  | requests `50m/64Mi`, limits `250m/256Mi`   | CPU and memory resources for backup and upload containers.                   |
+| `podSecurityContext.seccompProfile.type`      | string  | `RuntimeDefault`                           | Enables the Kubernetes default seccomp profile.                              |
+| `securityContext.allowPrivilegeEscalation`    | boolean | `false`                                    | Prevents privilege escalation while keeping Pi-hole's required capabilities. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`                                    | Keeps Kubernetes API tokens out of the pod unless explicitly needed.         |
 
 ### Gravity and Unbound
 
