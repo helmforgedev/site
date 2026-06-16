@@ -31,6 +31,14 @@ clean web UI, without giving users direct shell access.
 - **Icon and title customization** — human-friendly labels for each action
 - **Lightweight** — minimal resource footprint
 
+## Security Scan
+
+| Framework          | Score   |
+| ------------------ | ------- |
+| MITRE + NSA + SOC2 | **95%** |
+
+Security posture: acceptable.
+
 ## Installation
 
 **HTTPS repository:**
@@ -285,6 +293,14 @@ externalSecrets:
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
+### Config Bootstrap
+
+| Parameter              | Type    | Default             | Description                                      |
+| ---------------------- | ------- | ------------------- | ------------------------------------------------ |
+| `configInit.enabled`   | boolean | `true`              | Prepare writable OliveTin runtime files.         |
+| `configInit.resources` | object  | requests/limits set | Resource guardrails for the init container.      |
+| `configInit.image.tag` | string  | `"1.37"`            | BusyBox tag used by the config bootstrap helper. |
+
 ### OliveTin Configuration
 
 | Parameter           | Type    | Default                 | Description                                                   |
@@ -399,19 +415,20 @@ External Secrets can materialize credentials for custom actions without committi
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter            | Type   | Default             | Description                         |
+| -------------------- | ------ | ------------------- | ----------------------------------- |
+| `resources`          | object | requests/limits set | CPU and memory requests and limits. |
+| `podSecurityContext` | object | hardened defaults   | Pod-level security context.         |
+| `securityContext`    | object | hardened defaults   | Container-level security context.   |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                         |
+| --------------------------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the API token into pods.      |
 
 ### Scheduling
 
