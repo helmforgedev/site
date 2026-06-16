@@ -77,6 +77,9 @@ settings to the real application. Production installs should usually enable dist
 NetworkPolicy, PDB, metrics, alerts, explicit Service exposure, and either trusted private networking or
 authentication/TLS.
 
+The chart repository also includes a production guide at
+`charts/memcached/docs/production.md` with cache sizing notes, trust-boundary guidance, and rollout probes.
+
 <Callout type="danger" title="Do not expose Memcached directly to the internet">
   Upstream Memcached documentation explicitly warns that the server is not designed to defend itself from untrusted
   internet clients. Keep it private, restrict it with NetworkPolicy and firewalling, and use auth/TLS only as additional
@@ -331,6 +334,16 @@ kubectl logs statefulset/memcached -c memcached --tail=100
 - TLS metrics require a certificate SAN that matches `metrics.memcachedTLS.serverName`; the chart defaults that name to the Service DNS.
 - `Chart.lock` is not used because this chart has no dependencies.
 
+## Security Scan
+
+| Framework   | Score |
+| ----------- | ----- |
+| MITRE + NSA | 80%   |
+
+Kubescape reported full MITRE coverage and acceptable NSA posture for the chart's development defaults. Production
+deployments should set resource requests and limits, enable NetworkPolicy where enforced by the CNI, and use
+authentication or TLS according to the cache trust boundary.
+
 ## Validation
 
 The chart PR was validated with:
@@ -338,12 +351,15 @@ The chart PR was validated with:
 - `helm lint` and `helm lint --strict`
 - `helm unittest`
 - `helm template` for defaults and every `charts/memcached/ci/*.yaml` scenario
-- `kubeconform -strict -ignore-missing-schemas`
-- K3D installs with `--wait --timeout 90s` across standalone, distributed, auth, SASL, TLS, metrics, NetworkPolicy, extstore, HPA, LoadBalancer, dual-stack rendering, production, and External Secrets scenarios
+- `kubeconform -strict` with real CRD schemas
+- `ah lint`
+- K3D installs with `--wait --wait-for-jobs --timeout 300s` across default, auth, distributed, External Secrets,
+  extstore, metrics exporter, NetworkPolicy, production TLS, and SASL scenarios
 - Runtime log and event scans for `accept()`, `accept4()`, warnings, failures, backoff, restarts, and unhealthy events
 
 ## References
 
+- [HelmForge Memcached chart source](https://github.com/helmforgedev/charts/tree/main/charts/memcached)
 - [Memcached homepage](https://memcached.org/)
 - [Memcached configuring guide](https://docs.memcached.org/serverguide/configuring/)
 - [Official Memcached Docker image](https://hub.docker.com/_/memcached)
