@@ -229,7 +229,7 @@ export const charts: Chart[] = [
   {
     name: 'Mosquitto',
     slug: 'mosquitto',
-    description: 'MQTT broker with standalone or federated topology and WebSocket support.',
+    description: 'Eclipse Mosquitto MQTT broker with TLS/mTLS, ACLs, bridge federation, WebSocket, and MQTTX Web.',
     maturity: 'stable',
     backup: false,
   },
