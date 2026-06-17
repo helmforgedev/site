@@ -42,6 +42,13 @@ helm install metabase helmforge/metabase
 helm install metabase oci://ghcr.io/helmforgedev/helm/metabase
 ```
 
+After deploying, access Metabase:
+
+```bash
+kubectl port-forward svc/<release>-metabase 3000:80
+# Open http://localhost:3000 to complete the setup wizard
+```
+
 ## Deployment Examples
 
 <DocsTabs
@@ -201,7 +208,7 @@ ingress:
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/metabase/metabase` | Metabase container image.            |
-| `image.tag`        | string | `"v0.61.2"`                   | Image tag.                           |
+| `image.tag`        | string | `"v0.62.1"`                   | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
@@ -260,7 +267,7 @@ ingress:
 | `service.type`           | string      | `ClusterIP` | Kubernetes service type.             |
 | `service.port`           | integer     | `80`        | Service port exposed to the cluster. |
 | `service.annotations`    | object      | `{}`        | Annotations for the Service.         |
-| `service.ipFamilyPolicy` | string/null | `null`      | Service IP family policy.            |
+| `service.ipFamilyPolicy` | string/null | `~`         | Service IP family policy.            |
 | `service.ipFamilies`     | array       | `[]`        | Ordered Service IP families.         |
 
 #### Dual-Stack Service
@@ -285,28 +292,29 @@ service:
 
 ### Gateway API
 
-Set `gatewayAPI.enabled` to render a Kubernetes Gateway API `HTTPRoute` for Metabase. The chart expects an existing
+Set `gateway.enabled` to render a Kubernetes Gateway API `HTTPRoute` for Metabase. The chart expects an existing
 Gateway and does not create shared Gateway infrastructure.
 
 ```yaml
-gatewayAPI:
+gateway:
   enabled: true
-  gatewayName: shared-gateway
-  gatewayNamespace: gateway-system
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system
   hostnames:
     - metabase.example.com
 ```
 
-| Parameter                     | Type    | Default      | Description                                   |
-| ----------------------------- | ------- | ------------ | --------------------------------------------- |
-| `gatewayAPI.enabled`          | boolean | `false`      | Render a Gateway API HTTPRoute.               |
-| `gatewayAPI.gatewayName`      | string  | `""`         | Existing Gateway name, required when enabled. |
-| `gatewayAPI.gatewayNamespace` | string  | `""`         | Namespace of the parent Gateway.              |
-| `gatewayAPI.hostnames`        | array   | `[]`         | HTTPRoute hostnames.                          |
-| `gatewayAPI.path`             | string  | `/`          | HTTPRoute path match value.                   |
-| `gatewayAPI.pathType`         | string  | `PathPrefix` | HTTPRoute path match type.                    |
+| Parameter             | Type    | Default      | Description                                         |
+| --------------------- | ------- | ------------ | --------------------------------------------------- |
+| `gateway.enabled`     | boolean | `false`      | Render a Gateway API HTTPRoute.                     |
+| `gateway.parentRefs`  | array   | `[]`         | Existing Gateway parentRefs, required when enabled. |
+| `gateway.hostnames`   | array   | `[]`         | HTTPRoute hostnames.                                |
+| `gateway.path`        | string  | `/`          | HTTPRoute path match value.                         |
+| `gateway.pathType`    | string  | `PathPrefix` | HTTPRoute path match type.                          |
+| `gateway.annotations` | object  | `{}`         | Annotations added to the HTTPRoute.                 |
 
-The older `gateway` block remains supported as a compatibility alias.
+The older `gatewayAPI` block remains supported as a deprecated compatibility alias.
 
 ### Probes
 
@@ -315,7 +323,7 @@ Metabase has a slow startup — the JVM initialization and database migrations c
 | Parameter                              | Type    | Default | Description                                  |
 | -------------------------------------- | ------- | ------- | -------------------------------------------- |
 | `probes.startup.enabled`               | boolean | `true`  | Enable startup probe (uses `/api/health`).   |
-| `probes.startup.initialDelaySeconds`   | integer | `30`    | Startup probe initial delay.                 |
+| `probes.startup.initialDelaySeconds`   | integer | `90`    | Startup probe initial delay.                 |
 | `probes.startup.periodSeconds`         | integer | `10`    | Startup probe period.                        |
 | `probes.startup.timeoutSeconds`        | integer | `5`     | Startup probe timeout.                       |
 | `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold (5 minutes). |
