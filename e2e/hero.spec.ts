@@ -7,7 +7,7 @@ test.describe('Hero Section and SEO validations', () => {
     await expect(page).toHaveTitle(/HelmForge/);
 
     // Verify the chart count badge rendered properly
-    await expect(page.locator('text=Charts').first()).toBeVisible();
+    await expect(page.locator('section').first().getByText(/Charts.*Stable/)).toBeVisible();
 
     // The terminal container should exist
     const terminal = page.locator('.hero-terminal');
