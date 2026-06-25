@@ -212,6 +212,28 @@ ingress:
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
+### Air-Gapped and Proxied Registries
+
+The chart uses a `wait-for-db` init container before starting Metabase. Configure `waitForDatabase.image.*` when your
+cluster must pull helper images from an internal registry or proxy.
+
+```yaml
+image:
+  repository: registry.example.com/proxy/metabase/metabase
+  tag: v0.62.1
+
+waitForDatabase:
+  image:
+    repository: registry.example.com/proxy/library/busybox
+    tag: '1.37'
+```
+
+| Parameter                          | Type   | Default                     | Description                                   |
+| ---------------------------------- | ------ | --------------------------- | --------------------------------------------- |
+| `waitForDatabase.image.repository` | string | `docker.io/library/busybox` | Wait-for-db init container image repository.  |
+| `waitForDatabase.image.tag`        | string | `"1.37"`                    | Wait-for-db init container image tag.         |
+| `waitForDatabase.image.pullPolicy` | string | `IfNotPresent`              | Wait-for-db init container image pull policy. |
+
 ### Metabase Configuration
 
 | Parameter                      | Type    | Default                 | Description                                                           |
@@ -437,11 +459,12 @@ externalSecrets:
 
 ### Extra
 
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+| Parameter             | Type  | Default | Description                                              |
+| --------------------- | ----- | ------- | -------------------------------------------------------- |
+| `extraVolumes`        | array | `[]`    | Extra volumes to attach to the pod.                      |
+| `extraVolumeMounts`   | array | `[]`    | Extra volume mounts for the container.                   |
+| `extraInitContainers` | array | `[]`    | Additional init containers rendered after `wait-for-db`. |
+| `extraManifests`      | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Common Issues
 
