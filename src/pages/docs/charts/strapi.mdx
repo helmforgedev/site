@@ -429,16 +429,19 @@ kubectl create secret generic strapi-sendgrid-secret \
 
 ## Database Configuration
 
-### SQLite (Default)
+### SQLite Development Mode
 
 Simple filesystem-based database for development:
 
 ```yaml
 database:
-  mode: sqlite # or auto (default)
+  mode: sqlite
   sqlite:
     directory: /opt/app/.tmp
     filename: data.db
+
+postgresql:
+  enabled: false
 
 persistence:
   enabled: true
@@ -447,9 +450,9 @@ persistence:
 
 **Important:** SQLite requires `persistence.enabled: true` and `replicaCount: 1`.
 
-### PostgreSQL Subchart
+### PostgreSQL Subchart (Default)
 
-Bundled PostgreSQL for complete Helm release:
+Bundled PostgreSQL for complete Helm release. With the default `database.mode: auto` and `postgresql.enabled: true`, the chart starts Strapi with PostgreSQL.
 
 ```yaml
 postgresql:
@@ -468,7 +471,7 @@ postgresql:
 
 ### MySQL Subchart
 
-Bundled MySQL alternative:
+Bundled MySQL alternative for custom Strapi images that include the MySQL runtime driver:
 
 ```yaml
 mysql:
@@ -774,13 +777,13 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 
 ### Database Values
 
-| Key                  | Default | Description                                               |
-| -------------------- | ------- | --------------------------------------------------------- |
-| `database.mode`      | `auto`  | Database mode (auto, sqlite, external, postgresql, mysql) |
-| `database.pool.min`  | `2`     | Minimum connections per replica                           |
-| `database.pool.max`  | `10`    | Maximum connections per replica                           |
-| `postgresql.enabled` | `true`  | Deploy PostgreSQL subchart                                |
-| `mysql.enabled`      | `false` | Deploy MySQL subchart                                     |
+| Key                  | Default | Description                                                                            |
+| -------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `database.mode`      | `auto`  | Database mode. `auto` resolves to PostgreSQL while the PostgreSQL subchart is enabled. |
+| `database.pool.min`  | `2`     | Minimum connections per replica                                                        |
+| `database.pool.max`  | `10`    | Maximum connections per replica                                                        |
+| `postgresql.enabled` | `true`  | Deploy PostgreSQL subchart                                                             |
+| `mysql.enabled`      | `false` | Deploy MySQL subchart                                                                  |
 
 ### Performance Values
 
@@ -815,6 +818,9 @@ image:
 
 database:
   mode: sqlite
+
+postgresql:
+  enabled: false
 
 strapi:
   nodeEnv: development
