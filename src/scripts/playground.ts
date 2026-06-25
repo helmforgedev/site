@@ -899,7 +899,9 @@ function coerceValue(key: string, value: string): boolean | number | string {
 }
 
 function shouldPreserveString(key: string): boolean {
-  return /\.extraEnv\[\d+\]\.value$/.test(key) || /\.env\[\d+\]\.value$/.test(key);
+  return (
+    /(^|\.)extraEnv\[\d+\]\.value$/.test(key) || /(^|\.)env\[\d+\]\.value$/.test(key) || /(^|\.)image\.tag$/.test(key)
+  );
 }
 
 function parseKeyPath(key: string): Array<string | number> {
