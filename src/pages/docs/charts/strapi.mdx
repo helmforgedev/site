@@ -22,8 +22,8 @@ This chart uses the official **HelmForge Strapi base image** (`docker.io/helmfor
 - **S3-compatible upload providers** — AWS S3, MinIO, Cloudflare R2, Backblaze B2
 - **Cloudinary integration** — managed media delivery and transformation
 - **Email providers** — SMTP, SendGrid for notifications and password reset
-- **Database connection pooling** — production-grade PostgreSQL/MySQL management
-- **Multiple database backends** — SQLite, PostgreSQL, MySQL, or external databases
+- **Database connection pooling** — production-grade PostgreSQL management
+- **Multiple database backends** — PostgreSQL by default, SQLite for development, or external databases
 
 ### Production Features
 
@@ -62,7 +62,7 @@ The chart uses **HelmForge's production-ready Strapi base image** instead of the
 
 - **Strapi 5.47.1** — Latest stable version with security patches
 - **All official plugins included** — Upload providers, email, database plugins pre-installed
-- **Multi-database support** — SQLite, PostgreSQL, and MySQL drivers included
+- **Database support** — PostgreSQL for production-ready defaults and SQLite for development use
 - **Health check endpoint** — HTTP `/_health` endpoint returns HTTP 200 with JSON body containing status, uptime, database connectivity, and version
 - **Security hardened** — Non-root user (UID 1000), minimal attack surface
 - **Multi-architecture** — Supports linux/amd64 and linux/arm64
@@ -133,7 +133,7 @@ image:
 
 - Upload providers (local, AWS S3, Cloudinary)
 - Email providers (SMTP, SendGrid)
-- Database connectors (PostgreSQL, MySQL, SQLite)
+- Database connectors (PostgreSQL, SQLite)
 - Admin panel with all features
 - GraphQL plugin
 - Documentation plugin
@@ -171,14 +171,17 @@ readinessProbe:
 
 ## Quick Start Examples
 
-### Basic SQLite Deployment
+### Basic PostgreSQL Deployment
 
-Simplest deployment for development or testing:
+Default deployment for development or testing:
 
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
   tag: '5.47.1'
+
+postgresql:
+  enabled: true
 
 persistence:
   enabled: true
@@ -193,6 +196,8 @@ ingress:
         - path: /
           pathType: Prefix
 ```
+
+For single-pod local development with SQLite, set `database.mode: sqlite` and `postgresql.enabled: false`.
 
 ### Production Multi-Replica with S3
 
@@ -774,7 +779,7 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 | `database.mode`      | `auto`  | Database mode (auto, sqlite, external, postgresql, mysql) |
 | `database.pool.min`  | `2`     | Minimum connections per replica                           |
 | `database.pool.max`  | `10`    | Maximum connections per replica                           |
-| `postgresql.enabled` | `false` | Deploy PostgreSQL subchart                                |
+| `postgresql.enabled` | `true`  | Deploy PostgreSQL subchart                                |
 | `mysql.enabled`      | `false` | Deploy MySQL subchart                                     |
 
 ### Performance Values
