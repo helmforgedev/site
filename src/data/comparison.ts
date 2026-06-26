@@ -87,6 +87,26 @@ export const comparisonFull: ComparisonRow[] = [
     bitnami: 'Internal security process',
     community: 'Rare',
   },
+  {
+    aspect: 'Gateway API',
+    helmforge: 'Native HTTPRoute support (opt-in per chart)',
+    bitnami: 'Not available',
+    community: 'Rare',
+    highlight: true,
+  },
+  {
+    aspect: 'External Secrets',
+    helmforge: 'Built-in ExternalSecret integration (ESO)',
+    bitnami: 'Not available',
+    community: 'Manual setup',
+    highlight: true,
+  },
+  {
+    aspect: 'Dual-stack networking',
+    helmforge: 'IPv4/IPv6 ipFamilyPolicy support',
+    bitnami: 'Partial',
+    community: 'Rare',
+  },
 ];
 
 export interface ComparisonSummaryRow {
