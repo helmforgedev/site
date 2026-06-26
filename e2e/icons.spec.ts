@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Chart Icons', () => {
-  test('all chart icons load on homepage catalog', async ({ page }) => {
-    await page.goto('/');
+  test('all chart icons load on chart catalog page', async ({ page }) => {
+    await page.goto('/charts');
     const chartGrid = page.locator('#chart-grid-container');
     await expect(chartGrid).toBeVisible();
 
@@ -30,7 +30,7 @@ test.describe('Chart Icons', () => {
   });
 
   test('SVG icons are not corrupted', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/charts');
     const chartGrid = page.locator('#chart-grid-container');
     const svgImages = chartGrid.locator('img[src$=".svg"]');
     const count = await svgImages.count();

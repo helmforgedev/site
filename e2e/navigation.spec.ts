@@ -33,7 +33,7 @@ test.describe('Navigation and page rendering', () => {
   });
 
   test('chart catalog renders cards', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/charts');
     const chartGrid = page.locator('#chart-grid-container');
     await expect(chartGrid).toBeVisible();
     const cards = chartGrid.locator('.chart-card');
