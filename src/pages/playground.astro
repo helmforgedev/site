@@ -24,7 +24,9 @@ const siteSyncPlaygroundConfigs: Record<string, string> = {
   notediscovery: 'src/data/playground-configs.ts',
 };
 const configuredChartSlugs = new Set([...Object.keys(mergedConfigs), ...Object.keys(siteSyncPlaygroundConfigs)]);
-const stableCharts = charts.filter((c) => c.maturity === 'stable' && configuredChartSlugs.has(c.slug));
+const playgroundCharts = charts.filter(
+  (c) => configuredChartSlugs.has(c.slug) && (c.maturity === 'stable' || c.slug in siteSyncPlaygroundConfigs),
+);
 ---
 
 <BaseLayout
@@ -54,7 +56,7 @@ const stableCharts = charts.filter((c) => c.maturity === 'stable' && configuredC
           </div>
           <div id="playground-chart-list" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {
-              stableCharts.map((chart) => (
+              playgroundCharts.map((chart) => (
                 <button
                   class="playground-chart-btn w-full flex items-center gap-3 rounded-xl border border-border bg-bg-surface/40 px-4 py-3 text-left transition-all hover:border-primary/40 hover:bg-bg-surface/80"
                   data-slug={chart.slug}
