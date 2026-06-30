@@ -8148,6 +8148,120 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  notediscovery: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'HTTP Port',
+          key: 'app.port',
+          type: 'number',
+          default: '8000',
+          description: 'NoteDiscovery HTTP port',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'Markdown notes and local application data storage',
+        },
+        {
+          label: 'Allowed Origin',
+          key: 'notediscovery.allowedOrigins[0]',
+          type: 'text',
+          default: '*',
+          description: 'CORS origin for the public NoteDiscovery endpoint',
+        },
+      ],
+    },
+    {
+      name: 'Authentication',
+      collapsible: true,
+      gateField: 'auth.enabled',
+      fields: [
+        {
+          label: 'Session Secret',
+          key: 'auth.secretKey',
+          type: 'text',
+          default: '',
+          description: 'Session secret rendered into the generated config Secret',
+        },
+        {
+          label: 'Password',
+          key: 'auth.password',
+          type: 'text',
+          default: '',
+          description: 'Login password rendered into the generated config Secret',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'notes.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Ingress path',
+        },
+        {
+          label: 'Path Type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact', 'ImplementationSpecific'],
+          description: 'Ingress path type',
+        },
+      ],
+    },
+    {
+      name: 'Gateway API',
+      collapsible: true,
+      gateField: 'gatewayAPI.enabled',
+      fields: [
+        {
+          label: 'Gateway Name',
+          key: 'gatewayAPI.httpRoutes[0].parentRefs[0].name',
+          type: 'text',
+          default: 'public',
+          description: 'HTTPRoute parent Gateway',
+        },
+        {
+          label: 'Gateway Namespace',
+          key: 'gatewayAPI.httpRoutes[0].parentRefs[0].namespace',
+          type: 'text',
+          default: 'gateway-system',
+          description: 'Gateway namespace',
+        },
+        {
+          label: 'Hostname',
+          key: 'gatewayAPI.httpRoutes[0].hostnames[0]',
+          type: 'text',
+          default: 'notes.example.com',
+          description: 'HTTPRoute hostname',
+        },
+      ],
+    },
+  ],
   'github-mcp-server': [
     {
       name: 'Server',

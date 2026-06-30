@@ -460,6 +460,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'NoteDiscovery',
+    slug: 'notediscovery',
+    description: 'Self-hosted Markdown knowledge base with graph view, search, sharing, and MCP integration.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'GitHub MCP Server',
     slug: 'github-mcp-server',
     description: 'GitHub MCP server with streamable HTTP transport, toolset controls, and token secret support.',

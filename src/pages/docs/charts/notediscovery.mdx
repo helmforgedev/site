@@ -1,0 +1,204 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: NoteDiscovery Chart
+description: NoteDiscovery Helm chart for a self-hosted Markdown knowledge base with persistent storage, auth, Gateway API, and secure defaults.
+---
+
+# NoteDiscovery
+
+Deploy [NoteDiscovery](https://github.com/gamosoft/NoteDiscovery) on Kubernetes as a self-hosted Markdown knowledge base with graph view, search, sharing, and MCP integration.
+
+## Overview
+
+The HelmForge NoteDiscovery chart uses the official `ghcr.io/gamosoft/notediscovery:0.27.3` image and deploys a single-writer web application.
+NoteDiscovery listens on port `8000`, stores durable notes under `/app/data`, and reads its runtime configuration from `/app/config.yaml`.
+
+The default topology is one persistent Deployment replica with a chart-managed PVC and generated unauthenticated config. When authentication is enabled, the generated config file is stored in a Secret. Production installs should normally use `auth.existingSecret` with a complete `config.yaml`.
+
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned NoteDiscovery image and pull behavior.
+- `imagePullSecrets`: optional registry pull secrets.
+- `replicaCount`: NoteDiscovery pod count. Keep `1` unless using an operator-managed shared claim.
+- `app.port`: HTTP port.
+- `app.timezone`: timezone passed as `TZ`.
+- `app.command`, `app.args`: optional command and argument overrides.
+- `app.env`, `app.envFrom`: additional runtime environment and Secret or ConfigMap imports.
+- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
+
+NoteDiscovery application:
+
+- `notediscovery.appName`: application name rendered into `config.yaml`.
+- `notediscovery.allowedOrigins`: CORS origins. Use the public HTTPS origin for exposed deployments.
+- `notediscovery.debug`: upstream debug flag.
+- `notediscovery.searchEnabled`: built-in search index toggle.
+- `notediscovery.autosaveDelayMs`: UI autosave delay.
+
+Authentication and storage:
+
+- `auth.enabled`: stores generated authenticated config in a Secret.
+- `auth.secretKey`, `auth.password`, `auth.apiKey`, `auth.sessionMaxAge`: generated auth config values.
+- `auth.existingSecret`, `auth.existingSecretKey`: existing Secret containing a complete `config.yaml`.
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`: data directory storage.
+- `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
+- The chart rejects multiple replicas unless `persistence.existingClaim` is set.
+
+Exposure and operations:
+
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
+- `externalSecrets.enabled`, `externalSecrets.items`: materialize complete config Secrets through External Secrets Operator.
+- `pdb.enabled`, `pdb.minAvailable`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install notediscovery helmforge/notediscovery
+```
+
+OCI install:
+
+```bash
+helm install notediscovery oci://ghcr.io/helmforgedev/helm/notediscovery
+```
+
+## Production Example
+
+```yaml
+auth:
+  existingSecret: notediscovery-config
+  existingSecretKey: config.yaml
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: notes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: notediscovery-tls
+      hosts:
+        - notes.example.com
+
+networkPolicy:
+  enabled: true
+```
+
+Because this example uses `auth.existingSecret`, put every runtime setting in the
+Secret-provided `config.yaml`, including `server.allowed_origins`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notediscovery-config
+type: Opaque
+stringData:
+  config.yaml: |
+    app:
+      name: "NoteDiscovery"
+    server:
+      host: "0.0.0.0"
+      port: 8000
+      reload: false
+      allowed_origins:
+        - https://notes.example.com
+      debug: false
+    storage:
+      notes_dir: "/app/data"
+      plugins_dir: "./plugins"
+    search:
+      enabled: true
+    ui:
+      autosave_delay_ms: 1000
+    authentication:
+      enabled: true
+      secret_key: "replace-with-a-long-random-secret"
+      password: "replace-with-a-strong-password"
+      session_max_age: 604800
+      api_key: ""
+```
+
+When the chart generates `config.yaml`, set `notediscovery.allowedOrigins` to the
+public origin whenever NoteDiscovery is exposed through Ingress, Gateway API, or
+another reverse proxy.
+
+## Authentication
+
+For local bootstrap, authentication is disabled by default:
+
+```yaml
+auth:
+  enabled: false
+```
+
+For shared deployments, either let the chart generate a Secret:
+
+```yaml
+auth:
+  enabled: true
+  secretKey: replace-with-a-long-random-secret
+  password: replace-with-a-strong-password
+  apiKey: ''
+```
+
+Or reference a production Secret containing the complete upstream config:
+
+```yaml
+auth:
+  existingSecret: notediscovery-config
+  existingSecretKey: config.yaml
+```
+
+## External Secrets
+
+```yaml
+auth:
+  existingSecret: notediscovery-config
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: config
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: production
+        target:
+          name: notediscovery-config
+          creationPolicy: Owner
+        data:
+          - secretKey: config.yaml
+            remoteRef:
+              key: apps/notediscovery
+              property: config.yaml
+```
+
+`config.yaml` should include all runtime settings, not only secret fields.
+
+## Backup
+
+Back up the PVC in every production deployment. The default `/app/data` directory contains notes and local application data.
+
+## Additional Resources
+
+- [NoteDiscovery source](https://github.com/gamosoft/NoteDiscovery)
+- [NoteDiscovery website](https://www.notediscovery.com)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/notediscovery)
