@@ -76,10 +76,6 @@ helm install notediscovery oci://ghcr.io/helmforgedev/helm/notediscovery
 ## Production Example
 
 ```yaml
-notediscovery:
-  allowedOrigins:
-    - https://notes.example.com
-
 auth:
   existingSecret: notediscovery-config
   existingSecretKey: config.yaml
@@ -105,7 +101,44 @@ networkPolicy:
   enabled: true
 ```
 
-Set `notediscovery.allowedOrigins` to the public origin whenever NoteDiscovery is exposed through Ingress, Gateway API, or another reverse proxy.
+Because this example uses `auth.existingSecret`, put every runtime setting in the
+Secret-provided `config.yaml`, including `server.allowed_origins`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notediscovery-config
+type: Opaque
+stringData:
+  config.yaml: |
+    app:
+      name: "NoteDiscovery"
+    server:
+      host: "0.0.0.0"
+      port: 8000
+      reload: false
+      allowed_origins:
+        - https://notes.example.com
+      debug: false
+    storage:
+      notes_dir: "/app/data"
+      plugins_dir: "./plugins"
+    search:
+      enabled: true
+    ui:
+      autosave_delay_ms: 1000
+    authentication:
+      enabled: true
+      secret_key: "replace-with-a-long-random-secret"
+      password: "replace-with-a-strong-password"
+      session_max_age: 604800
+      api_key: ""
+```
+
+When the chart generates `config.yaml`, set `notediscovery.allowedOrigins` to the
+public origin whenever NoteDiscovery is exposed through Ingress, Gateway API, or
+another reverse proxy.
 
 ## Authentication
 
