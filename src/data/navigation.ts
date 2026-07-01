@@ -57,6 +57,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Memos', href: '/docs/charts/memos', maturity: 'stable' },
       { label: 'NoteDiscovery', href: '/docs/charts/notediscovery', maturity: 'beta' },
       { label: 'MediKeep', href: '/docs/charts/medikeep', maturity: 'beta' },
+      { label: 'Poznote', href: '/docs/charts/poznote', maturity: 'beta' },
       { label: 'Komga', href: '/docs/charts/komga', maturity: 'stable' },
       { label: 'Castopod', href: '/docs/charts/castopod', maturity: 'stable' },
       { label: 'Listmonk', href: '/docs/charts/listmonk', maturity: 'stable' },

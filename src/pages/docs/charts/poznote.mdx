@@ -1,0 +1,157 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Poznote Chart
+description: Poznote Helm chart for self-hosted note-taking and documentation with SQLite persistence, Gateway API, OIDC authentication, and secure defaults.
+---
+
+# Poznote
+
+Deploy [Poznote](https://github.com/timothepoznanski/poznote) on Kubernetes as a self-hosted note-taking and documentation platform.
+
+## Overview
+
+The HelmForge Poznote chart uses the official `ghcr.io/timothepoznanski/poznote:6.29.0` image. The container serves the web frontend and API on port `80`, stores all data (notes, attachments, configuration) in a SQLite database under `/var/www/html/data`.
+
+Poznote is designed for personal and small-team use. Data persistence relies on a single PVC. Scaling beyond one replica is not supported because SQLite does not handle concurrent writes from multiple instances.
+
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Poznote image and pull behavior.
+- `replicaCount`: pod count. The chart rejects values greater than `1` because Poznote uses SQLite.
+- `app.timezone`, `app.debug`.
+- `commonLabels`, `nameOverride`, `fullnameOverride`.
+
+Secrets:
+
+- `secrets.existingSecret`: existing Secret for Poznote OIDC credentials.
+- `secrets.oidcClientIdKey`, `secrets.oidcClientId`: OIDC client ID source.
+- `secrets.oidcClientSecretKey`, `secrets.oidcClientSecret`: OIDC client secret source.
+
+OIDC:
+
+- `poznote.oidc.disableNormalLogin`: force SSO-only mode, hiding the local login form.
+
+Persistence:
+
+- `persistence.data`: SQLite database, notes, attachments, and configuration. Single PVC, 5Gi default.
+
+Exposure and operations:
+
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
+- `externalSecrets.enabled`, `externalSecrets.items`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.egress`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`.
+- `resources`, `podSecurityContext`, `securityContext`.
+- `serviceAccount`, `pdb`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`.
+- `priorityClassName`, `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install poznote helmforge/poznote
+```
+
+OCI install:
+
+```bash
+helm install poznote oci://ghcr.io/helmforgedev/helm/poznote
+```
+
+## Production Example
+
+```yaml
+secrets:
+  existingSecret: poznote-oidc
+
+persistence:
+  data:
+    size: 10Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: notes.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: notes-tls
+      hosts:
+        - notes.example.com
+
+networkPolicy:
+  enabled: true
+```
+
+Create the OIDC Secret before enabling SSO:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: poznote-oidc
+type: Opaque
+stringData:
+  oidc-client-id: your-oidc-client-id
+  oidc-client-secret: your-oidc-client-secret
+```
+
+Default login credentials are `admin_change_me` / `admin`. Change them immediately after first login.
+
+## Gateway API
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: public
+          namespace: gateway-system
+      hostnames:
+        - notes.example.com
+```
+
+## External Secrets
+
+```yaml
+secrets:
+  existingSecret: poznote-oidc
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: poznote-oidc
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: production
+        target:
+          name: poznote-oidc
+          creationPolicy: Owner
+        data:
+          - secretKey: oidc-client-id
+            remoteRef:
+              key: poznote/oidc
+              property: client-id
+          - secretKey: oidc-client-secret
+            remoteRef:
+              key: poznote/oidc
+              property: client-secret
+```
+
+## Backup
+
+Back up the data PVC regularly. It contains the SQLite database, all notes, attachments, and application configuration. Use your storage provider's snapshot mechanism or a tool like Velero. Poznote also supports data export from the web interface (Settings > Export).
+
+## Additional Resources
+
+- [Poznote source](https://github.com/timothepoznanski/poznote)
+- [Poznote documentation](https://github.com/timothepoznanski/poznote#readme)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/poznote)
