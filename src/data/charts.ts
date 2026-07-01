@@ -475,6 +475,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Poznote',
+    slug: 'poznote',
+    description:
+      'Self-hosted note-taking and documentation platform with SQLite persistence, OIDC authentication, and Markdown support.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'GitHub MCP Server',
     slug: 'github-mcp-server',
     description: 'GitHub MCP server with streamable HTTP transport, toolset controls, and token secret support.',
