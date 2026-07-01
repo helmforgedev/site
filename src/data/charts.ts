@@ -467,6 +467,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'MediKeep',
+    slug: 'medikeep',
+    description:
+      'Self-hosted personal medical records manager with PostgreSQL, uploads, backups, and privacy controls.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'GitHub MCP Server',
     slug: 'github-mcp-server',
     description: 'GitHub MCP server with streamable HTTP transport, toolset controls, and token secret support.',
