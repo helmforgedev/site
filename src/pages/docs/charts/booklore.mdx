@@ -1,0 +1,321 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: BookLore Chart
+description: BookLore Helm chart for Kubernetes eBook library management with MariaDB, triple PVC architecture, OIDC auth, NetworkPolicy, and Gateway API support.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
+# BookLore
+
+Deploy [BookLore](https://github.com/booklore-app/booklore) on Kubernetes using the official `ghcr.io/booklore-app/booklore` container image.
+A self-hosted eBook library management application with metadata fetching, OPDS support,
+and a modern web-based reader for managing your personal digital book collection.
+
+<Callout type="danger" title="Three PVCs required -- losing /app/data destroys your library metadata">
+  BookLore uses **three separate PVCs**: `/app/data` for the application database and metadata, `/books` for the
+  physical book files (ePub, PDF, etc.), and optionally `/bookdrop` for automated book import. Losing `/app/data`
+  destroys all library metadata, reading progress, and user accounts. The `/books` PVC holds the raw files and can be
+  restored from your source collection. Always back up `/app/data`.
+</Callout>
+
+## Chart References
+
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/booklore)
+- [Chart design](https://github.com/helmforgedev/charts/blob/main/charts/booklore/DESIGN.md)
+
+## Key Features
+
+- **MariaDB bundled** -- HelmForge MariaDB subchart handles the database automatically
+- **External database** -- connect to an existing MariaDB/MySQL instance instead
+- **Triple PVC architecture** -- `/app/data` (metadata), `/books` (library files), `/bookdrop` (imports)
+- **OIDC authentication** -- optional OpenID Connect SSO integration
+- **Remote/proxy auth** -- header-based authentication for reverse proxy setups
+- **NetworkPolicy** -- egress constrained to kube-system (DNS) and MariaDB only
+- **Gateway API** -- optional HTTPRoute support for clusters using Gateway API
+- **External Secrets** -- optional ExternalSecret items for secrets management
+- **HPA guardrails** -- validation prevents multi-replica scaling with ReadWriteOnce storage
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install booklore helmforge/booklore -f values.yaml
+```
+
+**OCI registry:**
+
+```bash
+helm install booklore oci://ghcr.io/helmforgedev/helm/booklore -f values.yaml
+```
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'basic', label: 'Basic' },
+    { id: 'production', label: 'Production' },
+    { id: 'external-db', label: 'External DB' },
+    { id: 'ingress', label: 'Ingress' },
+    { id: 'gateway-api', label: 'Gateway API' },
+  ]}
+>
+
+<div data-tab-panel="basic">
+
+```yaml
+# values.yaml -- BookLore basic setup with bundled MariaDB
+# MariaDB subchart handles the database automatically.
+persistence:
+  data:
+    enabled: true
+    size: 5Gi
+
+  books:
+    enabled: true
+    size: 50Gi
+```
+
+</div>
+
+<div data-tab-panel="production">
+
+```yaml
+# values.yaml -- Production BookLore with TLS, tuning, and BookDrop
+app:
+  rootLogLevel: WARN
+  logLevel: INFO
+
+persistence:
+  data:
+    enabled: true
+    size: 10Gi
+    storageClass: longhorn
+
+  books:
+    enabled: true
+    size: 200Gi
+    storageClass: longhorn
+
+  bookdrop:
+    enabled: true
+    size: 10Gi
+    storageClass: longhorn
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: '1'
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: booklore.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: booklore-tls
+      hosts:
+        - booklore.example.com
+
+mariadb:
+  standalone:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: longhorn
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+```
+
+</div>
+
+<div data-tab-panel="external-db">
+
+```yaml
+# values.yaml -- BookLore with external MariaDB/MySQL
+mariadb:
+  enabled: false
+
+database:
+  external:
+    host: mariadb.example.com
+    port: '3306'
+    name: booklore
+    username: booklore
+    existingSecret: booklore-db-credentials
+    existingSecretPasswordKey: password
+
+persistence:
+  data:
+    enabled: true
+    size: 5Gi
+  books:
+    enabled: true
+    size: 100Gi
+```
+
+</div>
+
+<div data-tab-panel="ingress">
+
+```yaml
+# values.yaml -- BookLore with Ingress exposure
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: booklore.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: booklore-tls
+      hosts:
+        - booklore.example.com
+```
+
+</div>
+
+<div data-tab-panel="gateway-api">
+
+```yaml
+# values.yaml -- BookLore with Gateway API HTTPRoute
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: booklore
+      parentRefs:
+        - name: main-gateway
+          namespace: gateway-system
+      hostnames:
+        - booklore.example.com
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: booklore
+              port: 6060
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Application Settings
+
+| Parameter            | Description                      | Default |
+| -------------------- | -------------------------------- | ------- |
+| `app.port`           | HTTP port inside the container   | `6060`  |
+| `app.rootLogLevel`   | Root log level                   | `INFO`  |
+| `app.logLevel`       | BookLore-specific log level      | `INFO`  |
+| `app.allowedOrigins` | CORS allowed origins             | `"*"`   |
+| `app.diskType`       | Disk type for file storage       | `LOCAL` |
+| `app.env`            | Additional environment variables | `[]`    |
+| `app.envFrom`        | Additional envFrom sources       | `[]`    |
+
+### Image Configuration
+
+| Parameter          | Description                | Default                         |
+| ------------------ | -------------------------- | ------------------------------- |
+| `image.repository` | Container image repository | `ghcr.io/booklore-app/booklore` |
+| `image.tag`        | Image tag (pinned)         | `v2.3.1`                        |
+| `image.pullPolicy` | Image pull policy          | `IfNotPresent`                  |
+
+### Persistence
+
+| Parameter                        | Description                           | Default             |
+| -------------------------------- | ------------------------------------- | ------------------- |
+| `persistence.data.enabled`       | Persist application data and metadata | `true`              |
+| `persistence.data.size`          | Data PVC size                         | `10Gi`              |
+| `persistence.data.storageClass`  | Storage class for data PVC            | `""`                |
+| `persistence.data.accessModes`   | Access modes for data PVC             | `["ReadWriteOnce"]` |
+| `persistence.books.enabled`      | Persist library books                 | `true`              |
+| `persistence.books.size`         | Books PVC size                        | `50Gi`              |
+| `persistence.books.storageClass` | Storage class for books PVC           | `""`                |
+| `persistence.books.accessModes`  | Access modes for books PVC            | `["ReadWriteOnce"]` |
+| `persistence.bookdrop.enabled`   | Persist BookDrop import folder        | `false`             |
+| `persistence.bookdrop.size`      | BookDrop PVC size                     | `5Gi`               |
+
+### Database
+
+| Parameter                          | Description                                     | Default    |
+| ---------------------------------- | ----------------------------------------------- | ---------- |
+| `mariadb.enabled`                  | Use bundled MariaDB subchart                    | `true`     |
+| `mariadb.auth.database`            | MariaDB database name                           | `booklore` |
+| `mariadb.auth.username`            | MariaDB user                                    | `booklore` |
+| `database.external.host`           | External DB host (when `mariadb.enabled=false`) | `""`       |
+| `database.external.port`           | External DB port                                | `"3306"`   |
+| `database.external.name`           | External DB name                                | `booklore` |
+| `database.external.existingSecret` | Existing Secret for external DB password        | `""`       |
+
+### Authentication
+
+| Parameter                   | Description                               | Default        |
+| --------------------------- | ----------------------------------------- | -------------- |
+| `oidc.enabled`              | Enable OIDC authentication                | `false`        |
+| `oidc.forceDisable`         | Force disable OIDC even when configured   | `false`        |
+| `remoteAuth.enabled`        | Enable proxy-based authentication headers | `false`        |
+| `remoteAuth.createNewUsers` | Create users from remote auth headers     | `true`         |
+| `remoteAuth.headerName`     | Display name header                       | `Remote-Name`  |
+| `remoteAuth.headerUser`     | Username header                           | `Remote-User`  |
+| `remoteAuth.headerEmail`    | Email header                              | `Remote-Email` |
+
+### Networking
+
+| Parameter                         | Description                                                  | Default     |
+| --------------------------------- | ------------------------------------------------------------ | ----------- |
+| `service.type`                    | Service type                                                 | `ClusterIP` |
+| `service.port`                    | Service port                                                 | `6060`      |
+| `ingress.enabled`                 | Enable Kubernetes Ingress                                    | `false`     |
+| `ingress.ingressClassName`        | Ingress class                                                | `traefik`   |
+| `gatewayAPI.enabled`              | Enable Gateway API HTTPRoutes                                | `false`     |
+| `gatewayAPI.httpRoutes`           | HTTPRoute definitions (required when enabled)                | `[]`        |
+| `networkPolicy.enabled`           | Create NetworkPolicy                                         | `false`     |
+| `networkPolicy.egress.enabled`    | Restrict egress traffic                                      | `false`     |
+| `networkPolicy.egress.allowDNS`   | Allow DNS egress to kube-system                              | `true`      |
+| `networkPolicy.egress.databaseTo` | Database egress peers (required for external DB with egress) | `[]`        |
+
+### Monitoring and Scaling
+
+| Parameter                           | Description                                   | Default |
+| ----------------------------------- | --------------------------------------------- | ------- |
+| `monitoring.serviceMonitor.enabled` | Create ServiceMonitor for Prometheus          | `false` |
+| `monitoring.serviceMonitor.path`    | Metrics endpoint path (required when enabled) | `""`    |
+| `autoscaling.enabled`               | Enable HPA                                    | `false` |
+| `autoscaling.minReplicas`           | Minimum replicas                              | `1`     |
+| `autoscaling.maxReplicas`           | Maximum replicas                              | `3`     |
+
+<Callout type="warning" title="BookLore v2.3.1 does not expose Prometheus metrics">
+  The current upstream image does not include a Prometheus metrics endpoint. Enable `monitoring.serviceMonitor` only if
+  you build a custom image with `micrometer-registry-prometheus` or when upstream adds native support. You must set
+  `monitoring.serviceMonitor.path` to a real Prometheus exposition endpoint.
+</Callout>
+
+<Callout type="warning" title="HPA requires ReadWriteMany storage">
+  Enabling autoscaling with `maxReplicas > 1` while persistence uses `ReadWriteOnce` access mode
+  will cause volume scheduling failures in multi-node clusters. Set `persistence.data.accessModes`
+  and `persistence.books.accessModes` to `ReadWriteMany` before enabling HPA.
+</Callout>
