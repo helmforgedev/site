@@ -53,6 +53,18 @@ Secrets Operator integration.
 
 ## Installation
 
+For a standard Memcached pool, start three independent servers and configure the application or client library to
+spread keys across them:
+
+```yaml
+architecture: distributed
+replicaCount: 3
+```
+
+Distributed mode does not add replication or server-side sharding. It creates stable pod DNS through the headless
+Service so Memcached-aware clients can discover each server and apply client-side hashing. The regular Service remains
+available for simple connectivity checks and clients that intentionally use a single endpoint.
+
 **HTTPS repository:**
 
 ```bash
@@ -70,12 +82,12 @@ helm install memcached oci://ghcr.io/helmforgedev/helm/memcached -f values.yaml
 ## Development vs Production
 
 Defaults are intentionally development-friendly: one pod, no authentication, no TLS, no persistence, and no metrics.
-That makes quick local and CI installs simple, but it is not a production profile.
+That makes quick local and CI installs simple, but it is not a standard Memcached pool or a production profile.
 
 For production, start from the chart's `examples/production.yaml` and adapt the memory, connection, and scheduling
-settings to the real application. Production installs should usually enable distributed mode, resource requests,
-NetworkPolicy, PDB, metrics, alerts, explicit Service exposure, and either trusted private networking or
-authentication/TLS.
+settings to the real application. Production installs should usually enable distributed mode with at least three
+replicas, resource requests, NetworkPolicy, PDB, metrics, alerts, explicit Service exposure, and either trusted private
+networking or authentication/TLS.
 
 The chart repository also includes a production guide at
 `charts/memcached/docs/production.md` with cache sizing notes, trust-boundary guidance, and rollout probes.
