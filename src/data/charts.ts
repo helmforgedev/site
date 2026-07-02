@@ -361,6 +361,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'BookLore',
+    slug: 'booklore',
+    description: 'Self-hosted eBook library manager with MariaDB, OPDS, and metadata fetching.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Cronicle',
     slug: 'cronicle',
     description: 'Multi-server task scheduler with web UI and persistent job storage.',
