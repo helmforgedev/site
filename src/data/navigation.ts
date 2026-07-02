@@ -168,6 +168,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Wallabag', href: '/docs/charts/wallabag', maturity: 'stable' },
       { label: 'Statistics for Strava', href: '/docs/charts/strava-statistics', maturity: 'stable' },
       { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'stable' },
+      { label: 'BookLore', href: '/docs/charts/booklore', maturity: 'stable' },
       { label: 'Karakeep', href: '/docs/charts/karakeep', maturity: 'stable' },
       { label: 'Middleware', href: '/docs/charts/middleware', maturity: 'stable' },
     ],
