@@ -53,7 +53,7 @@ Exposure and operations:
 - `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
 - `externalSecrets.enabled`, `externalSecrets.items`: materialize complete config Secrets through External Secrets Operator.
 - `pdb.enabled`, `pdb.minAvailable`.
-- `networkPolicy.enabled`, `networkPolicy.ingressFrom`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
@@ -99,6 +99,13 @@ ingress:
 
 networkPolicy:
   enabled: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 8443
 ```
 
 Because this example uses `auth.existingSecret`, put every runtime setting in the
@@ -192,6 +199,14 @@ externalSecrets:
 ```
 
 `config.yaml` should include all runtime settings, not only secret fields.
+
+## Network Policy
+
+`networkPolicy.enabled=true` restricts inbound HTTP traffic to the configured
+`networkPolicy.ingressFrom` peers, or to all namespaces when no ingress peers
+are set. Setting `networkPolicy.extraEgress` also enables egress isolation. The
+chart keeps DNS and HTTPS egress available before appending the custom egress
+rules.
 
 ## Backup
 
