@@ -47,7 +47,8 @@ Storage and scaling:
 - `persistence.enabled`: optional data volume. The server is stateless by default.
 - `persistence.size`, `persistence.storageClass`, `persistence.accessModes`: generated PVC settings.
 - `persistence.existingClaim`, `persistence.mountPath`: existing claim and mount path.
-- `replicaCount > 1` with persistence requires `ReadWriteMany` or `persistence.enabled=false`.
+- `replicaCount > 1` with chart-created persistence requires `ReadWriteMany` or `persistence.enabled=false`.
+  When `persistence.existingClaim` is set, the external claim controls access modes.
 
 Exposure and operations:
 
@@ -58,6 +59,8 @@ Exposure and operations:
 - `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
 - `pdb.enabled`, `pdb.minAvailable`.
 - `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
+  Enabling only `networkPolicy.enabled` creates an ingress-only policy.
+  Setting `networkPolicy.extraEgress` adds egress isolation with built-in DNS and HTTPS allowances before appending the supplied rules.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
