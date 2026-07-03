@@ -857,7 +857,7 @@ When `security.networkPolicies=true`, the chart creates NetworkPolicies for:
 **Controller Policy**:
 
 - **Ingress**: Allow from proxy pods only
-- **Egress**: Allow to Kubernetes API (443, 6443) and DNS (53)
+- **Egress**: Allow to Kubernetes API (443, 6443), DNS (53), and optional complete custom rules from `security.networkPolicy.extraEgress`
 
 **Proxy Policy**:
 
@@ -874,6 +874,23 @@ When `security.networkPolicies=true`, the chart creates NetworkPolicies for:
 ```bash
 helm install envoy-gateway helmforge/envoy-gateway \
   --set security.networkPolicies=true
+```
+
+Append custom controller egress rules when the controller must reach platform services such as an observability
+collector:
+
+```yaml
+security:
+  networkPolicies: true
+  networkPolicy:
+    extraEgress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: observability
+        ports:
+          - protocol: TCP
+            port: 4317
 ```
 
 View policies:
@@ -1302,10 +1319,11 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### Security
 
-| Parameter                       | Description                 | Default |
-| ------------------------------- | --------------------------- | ------- |
-| `security.networkPolicies`      | Enable NetworkPolicies      | `false` |
-| `security.podSecurityStandards` | Enable PodSecurityStandards | `true`  |
+| Parameter                            | Description                                                | Default |
+| ------------------------------------ | ---------------------------------------------------------- | ------- |
+| `security.networkPolicies`           | Enable NetworkPolicies                                     | `false` |
+| `security.networkPolicy.extraEgress` | Additional complete egress rules for the controller policy | `[]`    |
+| `security.podSecurityStandards`      | Enable PodSecurityStandards                                | `true`  |
 
 ### High Availability
 
