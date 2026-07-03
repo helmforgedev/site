@@ -151,13 +151,15 @@ architecture:
   mode: queue
 
 flowise:
-  replicaCount: 2 # main pods (UI + API + job submission)
+  replicaCount: 1 # start with one main pod for first-boot migrations
+  startupDelaySeconds: 3
   appUrl: 'https://flowise.example.com'
 
 queue:
   name: flowise-queue
   worker:
     replicaCount: 3 # separate worker pods consuming BullMQ jobs
+    startupDelaySeconds: 30 # let the main pod own initial database migrations
     concurrency: 10 # simultaneous BullMQ jobs per worker
 
 auth:
@@ -252,19 +254,20 @@ persistence:
 | Parameter          | Type   | Default                       | Description    |
 | ------------------ | ------ | ----------------------------- | -------------- |
 | `image.repository` | string | `docker.io/flowiseai/flowise` | Flowise image. |
-| `image.tag`        | string | `"3.1.1"`                     | Image tag.     |
+| `image.tag`        | string | `"3.1.3"`                     | Image tag.     |
 
 ### Flowise Configuration
 
-| Parameter                  | Type    | Default | Description                                             |
-| -------------------------- | ------- | ------- | ------------------------------------------------------- |
-| `flowise.replicaCount`     | integer | `1`     | Main pod replicas. Use `queue` mode for more than 1.    |
-| `flowise.appUrl`           | string  | `""`    | Full public URL. Auto-detected from Ingress if empty.   |
-| `flowise.logLevel`         | string  | `info`  | Log level: `error`, `warn`, `info`, `verbose`, `debug`. |
-| `flowise.fileSizeLimit`    | string  | `50mb`  | Maximum file upload size accepted by Flowise.           |
-| `flowise.corsOrigins`      | string  | `*`     | Allowed CORS origins.                                   |
-| `flowise.disableTelemetry` | boolean | `true`  | Disable telemetry reporting.                            |
-| `flowise.extraEnv`         | array   | `[]`    | Extra environment variables for the main container.     |
+| Parameter                     | Type    | Default | Description                                             |
+| ----------------------------- | ------- | ------- | ------------------------------------------------------- |
+| `flowise.replicaCount`        | integer | `1`     | Main pod replicas. Use `queue` mode for more than 1.    |
+| `flowise.startupDelaySeconds` | integer | `3`     | Delay before starting the main Flowise server.          |
+| `flowise.appUrl`              | string  | `""`    | Full public URL. Auto-detected from Ingress if empty.   |
+| `flowise.logLevel`            | string  | `info`  | Log level: `error`, `warn`, `info`, `verbose`, `debug`. |
+| `flowise.fileSizeLimit`       | string  | `50mb`  | Maximum file upload size accepted by Flowise.           |
+| `flowise.corsOrigins`         | string  | `*`     | Allowed CORS origins.                                   |
+| `flowise.disableTelemetry`    | boolean | `true`  | Disable telemetry reporting.                            |
+| `flowise.extraEnv`            | array   | `[]`    | Extra environment variables for the main container.     |
 
 ### Auth Secrets
 
@@ -290,7 +293,7 @@ persistence:
 | `database.external.ssl`            | boolean | `false`                          | Enable SSL for external database connections.        |
 
 <Callout type="info" title="External PostgreSQL requires uuid-ossp extension">
-  Flowise 3.1.1 migrations use `uuid_generate_v4()`, which requires `uuid-ossp`. The bundled
+  Flowise 3.1.3 migrations use `uuid_generate_v4()`, which requires `uuid-ossp`. The bundled
   PostgreSQL subchart injects this extension automatically via `initdb.scripts`. For external
   PostgreSQL, run manually before installing:
 
@@ -313,18 +316,21 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 <Callout type="warning" title="Queue mode requires persistence.enabled=false and storage.type=s3">
   In queue mode, multiple main and worker pods share the same blob storage. Local PVC (`ReadWriteOnce`) cannot be shared
-  across pods. Set `persistence.enabled: false` and configure `storage.type: s3` with a shared S3-compatible bucket.
+  across pods. Set `persistence.enabled: false` and configure `storage.type: s3` with a shared S3-compatible bucket. On
+  first boot, keep `flowise.replicaCount: 1` and let `queue.worker.startupDelaySeconds` delay workers so the main server
+  owns database migrations before workers connect. Scale main pods after the database is initialized.
 </Callout>
 
-| Parameter                    | Type    | Default         | Description                                   |
-| ---------------------------- | ------- | --------------- | --------------------------------------------- |
-| `queue.name`                 | string  | `flowise-queue` | BullMQ queue name shared by main and workers. |
-| `queue.worker.replicaCount`  | integer | `1`             | Number of worker Deployment replicas.         |
-| `queue.worker.concurrency`   | integer | `100000`        | Simultaneous BullMQ jobs per worker.          |
-| `queue.worker.removeOnAge`   | integer | `86400`         | Completed job retention in seconds.           |
-| `queue.worker.removeOnCount` | integer | `10000`         | Maximum completed job count retained.         |
-| `queue.worker.extraEnv`      | array   | `[]`            | Extra environment variables for worker pods.  |
-| `queue.worker.resources`     | object  | `{}`            | CPU/memory requests and limits for workers.   |
+| Parameter                          | Type    | Default         | Description                                   |
+| ---------------------------------- | ------- | --------------- | --------------------------------------------- |
+| `queue.name`                       | string  | `flowise-queue` | BullMQ queue name shared by main and workers. |
+| `queue.worker.replicaCount`        | integer | `1`             | Number of worker Deployment replicas.         |
+| `queue.worker.startupDelaySeconds` | integer | `30`            | Delay before starting worker pods.            |
+| `queue.worker.concurrency`         | integer | `100000`        | Simultaneous BullMQ jobs per worker.          |
+| `queue.worker.removeOnAge`         | integer | `86400`         | Completed job retention in seconds.           |
+| `queue.worker.removeOnCount`       | integer | `10000`         | Maximum completed job count retained.         |
+| `queue.worker.extraEnv`            | array   | `[]`            | Extra environment variables for worker pods.  |
+| `queue.worker.resources`           | object  | `{}`            | CPU/memory requests and limits for workers.   |
 
 ### Storage
 
