@@ -10940,6 +10940,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.0.0.0/8',
+          description: 'Additional destination allowed after DNS and database baseline rules',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '443',
+          description: 'Additional TCP egress port',
+        },
+      ],
+    },
   ],
 };
 
