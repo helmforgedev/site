@@ -1330,6 +1330,48 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Egress Rules',
+          key: 'networkPolicy.egress.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Add explicit egress rules',
+        },
+        {
+          label: 'DNS Egress',
+          key: 'networkPolicy.egress.allowDNS',
+          type: 'toggle',
+          default: 'true',
+          description: 'Allow DNS egress',
+        },
+        {
+          label: 'Kubelet Egress',
+          key: 'networkPolicy.egress.allowKubelet',
+          type: 'toggle',
+          default: 'true',
+          description: 'Allow kubelet scrapes',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.80.0.0/16',
+          description: 'Additional egress destination',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '443',
+          description: 'Additional TCP egress port',
+        },
+      ],
+    },
   ],
   'oauth2-proxy': [
     {
