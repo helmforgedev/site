@@ -759,7 +759,26 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
     changes.unshift({ key: 'tunnel.quickTunnel.enabled', value: 'false', defaultValue: 'true' });
   }
 
+  pruneIncompleteApacheExtraEgress(changes);
+
   return changes;
+}
+
+function pruneIncompleteApacheExtraEgress(changes: { key: string; value: string; defaultValue: string }[]): void {
+  if (selectedSlug !== 'apache') return;
+
+  const ruleKeys = new Set([
+    'networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr',
+    'networkPolicy.egress.extraEgress[0].ports[0].protocol',
+    'networkPolicy.egress.extraEgress[0].ports[0].port',
+  ]);
+  const emittedRuleKeys = changes.filter((change) => ruleKeys.has(change.key)).map((change) => change.key);
+
+  if (emittedRuleKeys.length === 0 || emittedRuleKeys.length === ruleKeys.size) return;
+
+  for (let index = changes.length - 1; index >= 0; index -= 1) {
+    if (ruleKeys.has(changes[index].key)) changes.splice(index, 1);
+  }
 }
 
 function buildSetFlags(): string[] {
