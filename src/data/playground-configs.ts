@@ -1993,6 +1993,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Egress Policy',
+          key: 'networkPolicy.egress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Render explicit egress rules',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.80.0.0/16',
+          description: 'Additional egress destination',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.egress.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '443',
+          description: 'Additional TCP egress port',
+        },
+      ],
+    },
   ],
   valkey: [
     {
