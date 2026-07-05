@@ -2082,6 +2082,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'sentinel.gracefulFailover.maxAttempts',
           type: 'number',
           default: '12',
+          enables: 'sentinel.gracefulFailover.enabled',
           description: 'preStop failover attempts',
         },
         {
@@ -2096,6 +2097,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'sentinel.startupFailoverGuard.maxAttempts',
           type: 'number',
           default: '20',
+          enables: 'sentinel.startupFailoverGuard.enabled',
           description: 'Startup failover attempts',
         },
         {
