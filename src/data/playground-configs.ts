@@ -7440,14 +7440,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
         {
           label: 'Extra Egress CIDR',
-          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          key: 'networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr',
           type: 'text',
           default: '10.80.0.0/16',
           description: 'Additional egress destination',
         },
         {
           label: 'Extra Egress Port',
-          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          key: 'networkPolicy.egress.extraEgress[0].ports[0].port',
           type: 'number',
           default: '443',
           description: 'Additional TCP egress port',
