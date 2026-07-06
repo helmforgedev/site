@@ -8,6 +8,134 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  generic: [
+    {
+      name: 'Workload',
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Workload replicas when HPA is disabled',
+        },
+        {
+          label: 'Workload Type',
+          key: 'workload.type',
+          type: 'select',
+          default: 'Deployment',
+          options: ['Deployment', 'StatefulSet', 'DaemonSet'],
+          description: 'Primary workload controller',
+        },
+        {
+          label: 'Image Repository',
+          key: 'image.repository',
+          type: 'text',
+          default: 'docker.io/library/nginx',
+          description: 'Container image repository',
+        },
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.31.1',
+          description: 'Container image tag',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'app.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Ingress path',
+        },
+        {
+          label: 'Path Type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact', 'ImplementationSpecific'],
+          description: 'Ingress path matching mode',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['', 'traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '',
+          description: 'Default container CPU request',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '',
+          description: 'Default container memory request',
+        },
+        {
+          label: 'CPU Limit',
+          key: 'resources.limits.cpu',
+          type: 'text',
+          default: '',
+          description: 'Default container CPU limit',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '',
+          description: 'Default container memory limit',
+        },
+      ],
+    },
+    {
+      name: 'NetworkPolicy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Default Deny',
+          key: 'networkPolicy.defaultDeny',
+          type: 'toggle',
+          default: 'false',
+          description: 'Include both Ingress and Egress policy types',
+        },
+        {
+          label: 'DNS Egress',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '53',
+          description: 'Example extra egress DNS port',
+        },
+      ],
+    },
+  ],
   apache: [
     {
       name: 'General',
