@@ -8421,6 +8421,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Egress Isolation',
+          key: 'networkPolicy.egressIsolation',
+          type: 'toggle',
+          default: 'false',
+          description: 'Render baseline DNS and HTTPS egress rules',
+        },
+        {
+          label: 'HTTPS IPv4 CIDR',
+          key: 'networkPolicy.httpsEgress[0].ipBlock.cidr',
+          type: 'text',
+          default: '0.0.0.0/0',
+          description: 'IPv4 HTTPS egress destination',
+        },
+        {
+          label: 'HTTPS IPv6 CIDR',
+          key: 'networkPolicy.httpsEgress[1].ipBlock.cidr',
+          type: 'text',
+          default: '::/0',
+          description: 'IPv6 HTTPS egress destination',
+        },
+      ],
+    },
   ],
   notediscovery: [
     {

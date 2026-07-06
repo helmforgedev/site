@@ -54,10 +54,12 @@ Exposure and operations:
 - `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
 - `pdb.enabled`, `pdb.minAvailable`.
 - `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.egressIsolation`, `networkPolicy.dnsEgress`,
-  `networkPolicy.extraEgress`.
+  `networkPolicy.httpsEgress`, `networkPolicy.extraEgress`.
   Enabling only `networkPolicy.enabled` creates an ingress-only policy.
   Set `networkPolicy.egressIsolation=true` for baseline DNS and HTTPS egress rules without custom rules.
   `networkPolicy.dnsEgress` defaults to `kube-system` pods labeled `k8s-app: kube-dns` and can be overridden for different DNS labels.
+  `networkPolicy.httpsEgress` defaults to IPv4 and IPv6 internet destinations on port 443 and can be overridden for restricted webhook or
+  integration destinations.
   Setting `networkPolicy.extraEgress` also enables egress isolation and appends the supplied rules.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
@@ -106,6 +108,7 @@ networkPolicy:
 ```
 
 Set `memos.instanceUrl` when Memos is behind Ingress, Gateway API, or another reverse proxy.
+Set `networkPolicy.egressIsolation=true` when outbound DNS and HTTPS should be explicitly allowed by the chart-managed NetworkPolicy.
 
 ## External Database
 
