@@ -3754,7 +3754,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'n8n.webhookUrl',
           type: 'text',
           default: '',
-          description: 'External webhook URL, auto-detected from ingress when empty',
+          description: 'Full external URL for webhook triggers. Required for all webhook nodes.',
         },
         {
           label: 'Editor Base URL',
