@@ -8401,7 +8401,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'ingress.ingressClassName',
           type: 'select',
           default: 'traefik',
-          options: ['traefik', 'nginx'],
+          options: ['', 'traefik', 'nginx'],
           description: 'Ingress controller class',
         },
         {
