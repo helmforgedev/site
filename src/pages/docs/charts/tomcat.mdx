@@ -19,7 +19,7 @@ egress boundaries.
 
 ## Key Features
 
-- Official Tomcat image pinned to `11.0.22-jdk17-temurin-noble`
+- Official Tomcat image pinned to `11.0.23-jdk17-temurin-noble`
 - Optional ROOT health webapp for deterministic probes and Helm tests
 - Copies image-baked webapps into writable runtime volume when needed
 - Writable `webapps`, `logs`, `temp`, and `work` volumes for non-root runtime
@@ -117,6 +117,11 @@ networkPolicy:
       - namespaceSelector:
           matchLabels:
             kubernetes.io/metadata.name: gateway-system
+  egress:
+    enabled: true
+    extraTo:
+      - ipBlock:
+          cidr: 10.80.0.0/16
 ```
 
 ## Deploying Applications
@@ -229,18 +234,20 @@ webapp.
 
 ## Values
 
-| Parameter                          | Default                       | Description                                    |
-| ---------------------------------- | ----------------------------- | ---------------------------------------------- |
-| `replicaCount`                     | `1`                           | Number of Tomcat pods when HPA is disabled.    |
-| `image.repository`                 | `docker.io/library/tomcat`    | Official Tomcat image repository.              |
-| `image.tag`                        | `11.0.22-jdk17-temurin-noble` | Tomcat image tag.                              |
-| `webapps.defaultRoot.enabled`      | `true`                        | Render minimal ROOT app for health checks.     |
-| `webapps.copyImageContent.enabled` | `true`                        | Copy image-baked webapps into writable volume. |
-| `webapps.persistence.enabled`      | `false`                       | Persist `/usr/local/tomcat/webapps`.           |
-| `logs.persistence.enabled`         | `false`                       | Persist Tomcat logs.                           |
-| `jmx.enabled`                      | `false`                       | Enable JMX remote settings and Service ports.  |
-| `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                  |
-| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                          |
+| Parameter                          | Default                       | Description                                     |
+| ---------------------------------- | ----------------------------- | ----------------------------------------------- |
+| `replicaCount`                     | `1`                           | Number of Tomcat pods when HPA is disabled.     |
+| `image.repository`                 | `docker.io/library/tomcat`    | Official Tomcat image repository.               |
+| `image.tag`                        | `11.0.23-jdk17-temurin-noble` | Tomcat image tag.                               |
+| `webapps.defaultRoot.enabled`      | `true`                        | Render minimal ROOT app for health checks.      |
+| `webapps.copyImageContent.enabled` | `true`                        | Copy image-baked webapps into writable volume.  |
+| `webapps.persistence.enabled`      | `false`                       | Persist `/usr/local/tomcat/webapps`.            |
+| `logs.persistence.enabled`         | `false`                       | Persist Tomcat logs.                            |
+| `jmx.enabled`                      | `false`                       | Enable JMX remote settings and Service ports.   |
+| `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                   |
+| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                           |
+| `networkPolicy.egress.extraTo`     | `[]`                          | Additional peers for built-in egress rules.     |
+| `networkPolicy.egress.extraEgress` | `[]`                          | Additional complete NetworkPolicy egress rules. |
 
 ## Links
 
