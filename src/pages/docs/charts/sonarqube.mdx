@@ -16,6 +16,7 @@ SonarQube Community Build provides code quality and security analysis. The HelmF
 - First-class community branch plugin wiring, Java agents, and webapp replacement support
 - Gateway API, Ingress, dual-stack Service fields, NetworkPolicy, PDB, persistence, and Helm tests
 - External Secrets Operator support for database credentials
+- `extraManifests` extension point for small companion resources and self-contained validation fixtures
 
 <a id="install"></a>
 
@@ -97,6 +98,13 @@ networkPolicy:
   enabled: true
   egress:
     enabled: true
+    extraEgress:
+      - to:
+          - ipBlock:
+              cidr: 10.80.0.0/16
+        ports:
+          - protocol: TCP
+            port: 443
 
 pdb:
   enabled: true
@@ -145,6 +153,21 @@ plugins:
 ```
 
 Use an internal artifact repository for production. Startup should not depend on public internet availability.
+
+## Extension Manifests
+
+Use `extraManifests` for small companion resources that must ship with the release, such as a Service alias or a
+short-lived validation dependency:
+
+```yaml
+extraManifests:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: sonarqube-extra
+    data:
+      enabled: 'true'
+```
 
 ## Community Branch Plugin
 
@@ -225,18 +248,21 @@ is enabled.
 
 ## Values
 
-| Parameter                       | Default                       | Description                                                     |
-| ------------------------------- | ----------------------------- | --------------------------------------------------------------- |
-| `image.repository`              | `docker.io/library/sonarqube` | Official SonarQube image.                                       |
-| `image.tag`                     | `26.4.0.121862-community`     | SonarQube Community Build tag.                                  |
-| `sonarqube.databaseMode`        | `auto`                        | Database mode: `auto`, `embedded`, `postgresql`, or `external`. |
-| `postgresql.enabled`            | `false`                       | Deploy HelmForge PostgreSQL dependency.                         |
-| `waitForDatabase.enabled`       | `true`                        | Wait for PostgreSQL before startup.                             |
-| `plugins.enabled`               | `false`                       | Enable plugin download init container.                          |
-| `communityBranchPlugin.enabled` | `false`                       | Install and wire the community branch plugin.                   |
-| `persistence.data.enabled`      | `true`                        | Persist SonarQube data.                                         |
-| `gatewayAPI.enabled`            | `false`                       | Render Gateway API HTTPRoute.                                   |
-| `externalSecrets.enabled`       | `false`                       | Render ExternalSecret resources.                                |
+| Parameter                          | Default                       | Description                                                     |
+| ---------------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `image.repository`                 | `docker.io/library/sonarqube` | Official SonarQube image.                                       |
+| `image.tag`                        | `26.4.0.121862-community`     | SonarQube Community Build tag.                                  |
+| `sonarqube.databaseMode`           | `auto`                        | Database mode: `auto`, `embedded`, `postgresql`, or `external`. |
+| `postgresql.enabled`               | `false`                       | Deploy HelmForge PostgreSQL dependency.                         |
+| `waitForDatabase.enabled`          | `true`                        | Wait for PostgreSQL before startup.                             |
+| `plugins.enabled`                  | `false`                       | Enable plugin download init container.                          |
+| `communityBranchPlugin.enabled`    | `false`                       | Install and wire the community branch plugin.                   |
+| `persistence.data.enabled`         | `true`                        | Persist SonarQube data.                                         |
+| `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                                   |
+| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                                           |
+| `networkPolicy.egress.extraEgress` | `[]`                          | Additional complete NetworkPolicy egress rules.                 |
+| `externalSecrets.enabled`          | `false`                       | Render ExternalSecret resources.                                |
+| `extraManifests`                   | `[]`                          | Additional Kubernetes manifests rendered with the release.      |
 
 ## Links
 
