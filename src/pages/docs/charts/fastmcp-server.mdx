@@ -164,6 +164,13 @@ ingress:
 
 networkPolicy:
   enabled: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
 
 resources:
   requests:
@@ -198,6 +205,23 @@ auth:
 ```
 
 When using JWT with NetworkPolicy or cluster egress controls, allow the JWKS endpoint.
+
+## Network Policy
+
+`networkPolicy.enabled=true` restricts inbound traffic to the MCP service port. Use `networkPolicy.extraEgress` when
+tools, S3/Git sources, JWT JWKS discovery, or package installation need outbound access to specific destinations.
+
+```yaml
+networkPolicy:
+  enabled: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+```
 
 ## Gateway API
 
@@ -271,6 +295,7 @@ curl http://localhost:8000/mcp
 | `gatewayAPI.enabled`                          | `false`                              | Render an HTTPRoute.                             |
 | `ingress.enabled`                             | `false`                              | Render an Ingress.                               |
 | `networkPolicy.enabled`                       | `false`                              | Render a NetworkPolicy for the MCP port.         |
+| `networkPolicy.extraEgress`                   | `[]`                                 | Additional NetworkPolicy egress rules.           |
 | `autoscaling.enabled`                         | `false`                              | Render an HPA.                                   |
 | `pdb.enabled`                                 | `false`                              | Render a PodDisruptionBudget.                    |
 
