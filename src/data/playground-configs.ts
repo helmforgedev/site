@@ -4772,6 +4772,41 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'DNS Namespace',
+          key: 'networkPolicy.dnsEgressPeers[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
+          type: 'text',
+          default: 'kube-system',
+          description: 'Namespace label for cluster DNS pods',
+        },
+        {
+          label: 'DNS Pod Label',
+          key: 'networkPolicy.dnsEgressPeers[0].podSelector.matchLabels.k8s-app',
+          type: 'text',
+          default: 'kube-dns',
+          description: 'Pod label for cluster DNS',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.0.0.0/8',
+          description: 'Additional database, provider, or proxy egress destination',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '5432',
+          description: 'Additional egress port',
+        },
+      ],
+    },
   ],
   vaultwarden: [
     {
