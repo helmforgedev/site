@@ -4778,13 +4778,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
       gateField: 'networkPolicy.enabled',
       fields: [
         {
-          label: 'Network Policy',
-          key: 'networkPolicy.enabled',
-          type: 'toggle',
-          default: 'false',
-          description: 'Restrict ingress and enable egress isolation',
-        },
-        {
           label: 'DNS Namespace',
           key: 'networkPolicy.dnsEgressPeers[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
           type: 'text',
