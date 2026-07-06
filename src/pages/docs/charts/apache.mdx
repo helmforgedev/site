@@ -10,7 +10,7 @@ Apache HTTP Server chart for Kubernetes using the official `docker.io/library/ht
 
 ## Key Features
 
-- Official `httpd` image pinned to Apache HTTP Server `2.4.67`
+- Official `httpd` image pinned to Apache HTTP Server `2.4.68`
 - Non-root runtime on port `8080` with a read-only root filesystem
 - Generated Apache configuration for security headers, health checks, logging, and static content
 - Inline content, existing ConfigMap content, and extra virtual host snippets
@@ -118,6 +118,13 @@ networkPolicy:
     enabled: true
     allowDns: true
     allowInternet: false
+    extraEgress:
+      - to:
+          - ipBlock:
+              cidr: 10.0.0.0/8
+        ports:
+          - protocol: TCP
+            port: 443
 ```
 
 Use immutable content names instead of mutating a live ConfigMap. That keeps rollbacks deterministic and avoids confusing pod checksums.
@@ -247,6 +254,7 @@ networkPolicy:
 ```
 
 Set `networkPolicy.egress.allowInternet=true` only when Apache needs outbound access for reverse proxy targets or remote content integrations.
+Use `networkPolicy.egress.extraEgress` for complete additional egress rules with `to` and `ports`.
 
 ## Configuration Reference
 
@@ -260,7 +268,7 @@ Set `networkPolicy.egress.allowInternet=true` only when Apache needs outbound ac
 | `commonLabels`           | `{}`                      | Labels added to chart resources.       |
 | `serverName`             | `localhost`               | Apache `ServerName` value.             |
 | `image.repository`       | `docker.io/library/httpd` | Official Apache HTTP Server image.     |
-| `image.tag`              | `2.4.67`                  | Apache image tag.                      |
+| `image.tag`              | `2.4.68`                  | Apache image tag.                      |
 | `image.pullPolicy`       | `IfNotPresent`            | Image pull policy.                     |
 | `imagePullSecrets`       | `[]`                      | Image pull secrets.                    |
 | `containerPorts.http`    | `8080`                    | Non-root Apache listener port.         |
@@ -333,7 +341,8 @@ Set `networkPolicy.egress.allowInternet=true` only when Apache needs outbound ac
 | `networkPolicy.egress.enabled`            | `true`  | Restrict outbound traffic when policy is enabled. |
 | `networkPolicy.egress.allowDns`           | `true`  | Allow DNS egress.                                 |
 | `networkPolicy.egress.allowInternet`      | `true`  | Allow IPv4 and IPv6 internet egress.              |
-| `networkPolicy.egress.extraRules`         | `[]`    | Additional egress rules.                          |
+| `networkPolicy.egress.extraRules`         | `[]`    | Legacy additional egress rules.                   |
+| `networkPolicy.egress.extraEgress`        | `[]`    | Additional complete egress rule objects.          |
 
 ### Probes, Resources, And Scheduling
 

@@ -258,6 +258,28 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'true',
           description: 'Allow general outbound traffic',
         },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '',
+          description: 'Optional extra egress CIDR',
+        },
+        {
+          label: 'Extra Egress Protocol',
+          key: 'networkPolicy.egress.extraEgress[0].ports[0].protocol',
+          type: 'select',
+          default: '',
+          options: ['', 'TCP', 'UDP', 'SCTP'],
+          description: 'Optional extra egress protocol',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.egress.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '',
+          description: 'Optional extra egress port',
+        },
       ],
     },
     {
