@@ -154,6 +154,12 @@ pdb:
 Keep at least three Sentinels and choose a quorum that matches the failure domains. Validate application reconnect
 behavior before production rollout.
 
+The chart enables Sentinel failover hardening by default. `sentinel.gracefulFailover.enabled` triggers a bounded
+preStop failover when the active master is voluntarily terminated, and `sentinel.startupFailoverGuard.enabled` prevents
+a fresh data directory from resuming as an empty master while peers still hold data. Keep
+`sentinel.podManagementPolicy` empty for upgrade compatibility on existing StatefulSets; use `Parallel` only for new
+installs where immutable StatefulSet fields are acceptable.
+
 ## Cluster
 
 Cluster mode is for native sharding and requires Valkey Cluster-compatible clients:
@@ -292,6 +298,11 @@ client understands Sentinel discovery or Cluster redirects.
 | `standalone.persistence.enabled`            | `true`                    | Persist standalone data.                                         |
 | `replication.replicaCount`                  | `2`                       | Replica count for replication modes.                             |
 | `sentinel.replicaCount`                     | `3`                       | Number of Sentinel pods.                                         |
+| `sentinel.podManagementPolicy`              | `""`                      | Optional Sentinel StatefulSet pod management policy.             |
+| `sentinel.gracefulFailover.enabled`         | `true`                    | Trigger preStop failover when the active master shuts down.      |
+| `sentinel.gracefulFailover.maxAttempts`     | `12`                      | Failover confirmation attempts during graceful shutdown.         |
+| `sentinel.startupFailoverGuard.enabled`     | `true`                    | Prevent fresh pods from resuming as empty masters.               |
+| `sentinel.startupFailoverGuard.maxAttempts` | `20`                      | Failover confirmation attempts during startup guard handling.    |
 | `cluster.nodes`                             | `6`                       | Total cluster pods.                                              |
 | `cluster.initJob.securityContext.runAsUser` | `999`                     | Cluster bootstrap Job container user ID.                         |
 | `service.type`                              | `ClusterIP`               | Client Service type where applicable.                            |
