@@ -4773,10 +4773,17 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
-      name: 'DNS Egress',
+      name: 'Network Policy',
       collapsible: true,
       gateField: 'networkPolicy.enabled',
       fields: [
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict ingress and enable egress isolation',
+        },
         {
           label: 'DNS Namespace',
           key: 'networkPolicy.dnsEgressPeers[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
@@ -4790,6 +4797,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: 'kube-dns',
           description: 'Pod label for cluster DNS',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.0.0.0/8',
+          description: 'Additional database, provider, or proxy egress destination',
         },
         {
           label: 'Extra Egress Port',
