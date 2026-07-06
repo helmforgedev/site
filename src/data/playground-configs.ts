@@ -8363,6 +8363,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Ingress Namespace',
+          key: 'networkPolicy.ingressFrom[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
+          type: 'text',
+          default: 'rag',
+          description: 'Namespace allowed to reach Qdrant HTTP and gRPC',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.0.0.0/8',
+          description: 'Additional destination allowed after baseline DNS, HTTPS, and p2p rules',
+        },
+        {
+          label: 'Extra Egress Port',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '6333',
+          description: 'Additional TCP egress port',
+        },
+      ],
+    },
   ],
   memos: [
     {
