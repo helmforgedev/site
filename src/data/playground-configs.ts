@@ -5154,6 +5154,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '0.28.1',
+          description: 'Pinned NoteDiscovery image tag',
+        },
+        {
           label: 'HTTP Port',
           key: 'app.port',
           type: 'number',
