@@ -7423,6 +7423,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Comic and manga library PVC size',
         },
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.25.0',
+          description: 'Komga image tag',
+        },
+        {
           label: 'Timezone',
           key: 'komga.timezone',
           type: 'text',
