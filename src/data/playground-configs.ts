@@ -11325,6 +11325,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'dev uses defaults; production requires a hostname',
         },
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2026.6.0',
+          description: 'Hoppscotch image tag',
+        },
+        {
           label: 'Replica Count',
           key: 'replicaCount',
           type: 'number',
