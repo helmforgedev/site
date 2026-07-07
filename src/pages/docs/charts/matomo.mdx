@@ -1,0 +1,280 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Matomo Chart
+description: Matomo Helm chart with official image, HelmForge MySQL, external database support, archiver CronJob, Gateway API, and production controls.
+---
+
+# Matomo
+
+Matomo is a privacy-first web analytics platform. The HelmForge chart deploys the official Matomo Apache image with persistent application storage, MySQL integration, and a scheduled `core:archive` CronJob for production report processing.
+
+## Key Features
+
+- Official `docker.io/library/matomo` image pinned to `5.11.2-apache`
+- HelmForge MySQL dependency for self-contained deployments
+- External MySQL or MariaDB mode for production databases
+- Persistent `/var/www/html` storage for application files and plugins
+- CronJob-based Matomo report archiving
+- Ingress, Gateway API HTTPRoute, dual-stack Service fields, NetworkPolicy, PDB, and Helm tests
+- External Secrets Operator support for database credentials
+- `extraManifests` extension point for companion resources
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install matomo helmforge/matomo --namespace matomo --create-namespace
+```
+
+```bash
+helm install matomo oci://ghcr.io/helmforgedev/helm/matomo --namespace matomo --create-namespace
+```
+
+## Examples
+
+Bundled MySQL:
+
+```yaml
+mysql:
+  enabled: true
+matomo:
+  siteUrl: https://analytics.example.com
+```
+
+External database:
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    name: matomo
+    username: matomo
+    existingSecret: matomo-database
+    existingSecretPasswordKey: database-password
+
+matomo:
+  siteUrl: https://analytics.example.com
+  trustedHost: analytics.example.com
+```
+
+## Architecture
+
+The chart runs the Apache variant of the official Matomo container as a Deployment and stores Matomo application files on a PVC. Database connectivity is explicit:
+
+- `database.mode=auto` uses bundled MySQL when `mysql.enabled=true`
+- `database.mode=mysql` forces the HelmForge MySQL subchart path
+- `database.mode=external` uses an external MySQL or MariaDB endpoint
+
+For production, prefer a managed or platform-operated MySQL or MariaDB service and keep Matomo application files persistent. The bundled MySQL path is useful for self-contained environments and local validation.
+
+## Production Values
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql-primary.database.svc.cluster.local
+    port: 3306
+    name: matomo
+    username: matomo
+    existingSecret: matomo-database
+    existingSecretPasswordKey: database-password
+
+matomo:
+  siteUrl: https://analytics.example.com
+  trustedHost: analytics.example.com
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+archiver:
+  enabled: true
+  schedule: '5 * * * *'
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: analytics.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+    extraEgress:
+      - to:
+          - ipBlock:
+              cidr: 10.80.0.0/16
+        ports:
+          - protocol: TCP
+            port: 3306
+```
+
+## Archiver
+
+Matomo recommends scheduled archive processing for production sites. The chart renders a Kubernetes CronJob when `archiver.enabled=true`:
+
+```yaml
+archiver:
+  enabled: true
+  schedule: '5 * * * *'
+  concurrencyPolicy: Forbid
+  activeDeadlineSeconds: 7200
+  extraArgs: []
+```
+
+Set `matomo.siteUrl` to the public URL used by visitors. When it is empty, the chart derives an in-cluster service URL for the archiver.
+
+## Backups
+
+The chart does not render a dedicated backup job. Production backup plans must cover both runtime domains:
+
+- MySQL or MariaDB data, either through the external database platform or the bundled MySQL release.
+- The Matomo application PVC at `/var/www/html`, which stores configuration, plugins, and generated assets.
+
+Take consistent backups before chart upgrades, Matomo upgrades, and plugin changes. For external databases, use the database platform's native backup and restore process and validate restore into a separate namespace.
+
+## External Secrets
+
+Use External Secrets Operator to project the database password into the Secret consumed by the Deployment:
+
+```yaml
+mysql:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: mysql.database.svc.cluster.local
+    username: matomo
+    existingSecret: matomo-database
+    existingSecretPasswordKey: database-password
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: matomo-database
+      secretStoreRef:
+        name: cluster-secrets
+        kind: ClusterSecretStore
+      target:
+        name: matomo-database
+      data:
+        - secretKey: database-password
+          remoteRef:
+            key: production/matomo
+            property: database-password
+```
+
+## Networking
+
+Ingress:
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: analytics.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: matomo-tls
+      hosts:
+        - analytics.example.com
+```
+
+Gateway API:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      parentRefs:
+        - name: public-gateway
+          namespace: gateway-system
+      hostnames:
+        - analytics.example.com
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+```
+
+Dual-stack Service fields are available when the cluster supports them:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+## Validation
+
+After deployment:
+
+```bash
+helm test matomo -n matomo
+kubectl get pods -n matomo -l app.kubernetes.io/name=matomo
+kubectl logs -n matomo deploy/matomo --since=10m
+kubectl get cronjob -n matomo
+```
+
+Also validate the Matomo installer, tracking endpoint, archive job completion, database connectivity, and reverse proxy host configuration.
+
+## Common Issues
+
+| Symptom                              | Likely Cause                                 | Fix                                                 |
+| ------------------------------------ | -------------------------------------------- | --------------------------------------------------- |
+| Installer cannot connect to database | Host, Secret key, or network policy is wrong | Check database Secret, DNS, and egress rules.       |
+| Reports stay empty or slow           | Archiver CronJob is disabled or failing      | Enable `archiver.enabled` and inspect CronJob logs. |
+| Redirects use the wrong hostname     | Public URL or trusted host is incomplete     | Set `matomo.siteUrl` and `matomo.trustedHost`.      |
+| Plugins disappear after restart      | Application persistence is disabled          | Enable `persistence.enabled`.                       |
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                 | Default                    | Description                                                |
+| ------------------------- | -------------------------- | ---------------------------------------------------------- |
+| `image.repository`        | `docker.io/library/matomo` | Official Matomo image repository.                          |
+| `image.tag`               | `5.11.2-apache`            | Official Apache image tag.                                 |
+| `replicaCount`            | `1`                        | Matomo web replica count.                                  |
+| `matomo.siteUrl`          | `""`                       | Public URL used by archiver jobs.                          |
+| `database.mode`           | `auto`                     | Database mode: `auto`, `external`, or `mysql`.             |
+| `mysql.enabled`           | `true`                     | Deploy HelmForge MySQL dependency.                         |
+| `persistence.enabled`     | `true`                     | Persist `/var/www/html`.                                   |
+| `persistence.size`        | `10Gi`                     | Matomo PVC size.                                           |
+| `archiver.enabled`        | `true`                     | Render the `core:archive` CronJob.                         |
+| `archiver.schedule`       | `5 * * * *`                | Archive CronJob schedule.                                  |
+| `ingress.enabled`         | `false`                    | Render Ingress.                                            |
+| `gatewayAPI.enabled`      | `false`                    | Render Gateway API HTTPRoute resources.                    |
+| `externalSecrets.enabled` | `false`                    | Render ExternalSecret resources.                           |
+| `networkPolicy.enabled`   | `false`                    | Render NetworkPolicy.                                      |
+| `service.ipFamilyPolicy`  | `""`                       | Kubernetes Service IP family policy.                       |
+| `extraManifests`          | `[]`                       | Additional Kubernetes manifests rendered with the release. |
+
+## Links
+
+- [Matomo](https://matomo.org/)
+- [Matomo Docker image](https://hub.docker.com/_/matomo)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/matomo)

@@ -8,6 +8,165 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  clickhouse: [
+    {
+      name: 'Database',
+      fields: [
+        {
+          label: 'Database',
+          key: 'clickhouse.database',
+          type: 'text',
+          default: 'default',
+          description: 'Initial database created on empty data dir',
+        },
+        {
+          label: 'User',
+          key: 'clickhouse.user',
+          type: 'text',
+          default: 'default',
+          description: 'Initial ClickHouse user',
+        },
+        {
+          label: 'Password',
+          key: 'clickhouse.password',
+          type: 'text',
+          default: '',
+          description: 'Initial password; use a Secret for production',
+        },
+      ],
+    },
+    {
+      name: 'Storage',
+      fields: [
+        {
+          label: 'Data Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Persistent volume size for /var/lib/clickhouse',
+        },
+        {
+          label: 'Persist Logs',
+          key: 'logs.persistence.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Store /var/log/clickhouse-server on a separate PVC',
+        },
+      ],
+    },
+    {
+      name: 'Observability',
+      collapsible: true,
+      gateField: 'metrics.enabled',
+      fields: [
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create Prometheus Operator ServiceMonitor',
+        },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Egress Policy',
+          key: 'networkPolicy.egress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Render explicit egress policy',
+        },
+        {
+          label: 'Extra Egress CIDR',
+          key: 'networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '10.0.0.0/8',
+          description: 'Additional egress destination',
+        },
+      ],
+    },
+  ],
+  matomo: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Site URL',
+          key: 'matomo.siteUrl',
+          type: 'text',
+          default: 'https://analytics.example.com',
+          description: 'Public URL used by the archiver',
+        },
+        {
+          label: 'Trusted Host',
+          key: 'matomo.trustedHost',
+          type: 'text',
+          default: 'analytics.example.com',
+          description: 'Expected external host behind ingress or Gateway API',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Bundled MySQL',
+          key: 'mysql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Disable to use external MySQL or MariaDB',
+        },
+        {
+          label: 'External Host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External MySQL/MariaDB host',
+        },
+      ],
+    },
+    {
+      name: 'Archiver',
+      collapsible: true,
+      gateField: 'archiver.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'archiver.schedule',
+          type: 'text',
+          default: '5 * * * *',
+          description: 'Cron schedule for core:archive',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'analytics.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['', 'nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
   generic: [
     {
       name: 'Workload',

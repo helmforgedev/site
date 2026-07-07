@@ -34,6 +34,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Valkey', href: '/docs/charts/valkey', maturity: 'stable' },
       { label: 'Memcached', href: '/docs/charts/memcached', maturity: 'stable' },
       { label: 'Qdrant', href: '/docs/charts/qdrant', maturity: 'stable' },
+      { label: 'ClickHouse', href: '/docs/charts/clickhouse', maturity: 'beta' },
     ],
   },
   {
@@ -160,6 +161,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Apache Druid', href: '/docs/charts/druid', maturity: 'stable' },
       { label: 'Kibana', href: '/docs/charts/kibana', maturity: 'stable' },
       { label: 'Elasticsearch', href: '/docs/charts/elasticsearch', maturity: 'stable' },
+      { label: 'Matomo', href: '/docs/charts/matomo', maturity: 'beta' },
     ],
   },
   {

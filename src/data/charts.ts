@@ -56,6 +56,14 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'ClickHouse',
+    slug: 'clickhouse',
+    description:
+      'Standalone ClickHouse OLAP database with official images, persistent storage, metrics, ESO, and safety guards.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'RabbitMQ',
     slug: 'rabbitmq',
     description:
@@ -104,6 +112,13 @@ export const charts: Chart[] = [
     description: 'WordPress CMS with MySQL, Gateway API, External Secrets, Redis Object Cache, and S3 backup.',
     maturity: 'stable',
     backup: true,
+  },
+  {
+    name: 'Matomo',
+    slug: 'matomo',
+    description: 'Privacy-first analytics with official Matomo image, MySQL, archiver CronJob, Gateway API, and ESO.',
+    maturity: 'beta',
+    backup: false,
   },
   {
     name: 'Strapi',
