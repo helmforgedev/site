@@ -1600,6 +1600,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Actions',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '3000.16.2',
+          description: 'Pinned OliveTin image tag',
+        },
+        {
           label: 'HTTP Port',
           key: 'olivetin.port',
           type: 'number',
@@ -1630,7 +1637,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Init Image Tag',
           key: 'configInit.image.tag',
           type: 'text',
-          default: '1.37.0',
+          default: '1.37',
           description: 'BusyBox image tag for config bootstrap',
         },
       ],
