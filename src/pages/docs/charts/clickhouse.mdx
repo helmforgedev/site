@@ -1,0 +1,243 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: ClickHouse Chart
+description: ClickHouse Helm chart with official image, persistent standalone StatefulSet, metrics, External Secrets, NetworkPolicy, and explicit replication guardrails.
+---
+
+# ClickHouse
+
+ClickHouse is a fast column-oriented OLAP database. The HelmForge chart deploys the official ClickHouse server image as a production-safe standalone StatefulSet with persistent storage, metrics wiring, and explicit guardrails against unsafe Helm-only replication.
+
+## Key Features
+
+- Official `docker.io/clickhouse/clickhouse-server` image pinned to `25.8.28.1`
+- StatefulSet with persistent `/var/lib/clickhouse`
+- Client Service exposing HTTP `8123` and native TCP `9000`
+- Headless Service for stable pod DNS
+- Optional persistent `/var/log/clickhouse-server`
+- Built-in Prometheus metrics endpoint and ServiceMonitor support
+- External Secrets Operator support for the initial user password
+- NetworkPolicy, dual-stack Service fields, PDB, and Helm tests
+- Validation guard that blocks `replicaCount > 1`
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install clickhouse helmforge/clickhouse --namespace clickhouse --create-namespace
+```
+
+```bash
+helm install clickhouse oci://ghcr.io/helmforgedev/helm/clickhouse --namespace clickhouse --create-namespace
+```
+
+## Examples
+
+Standalone:
+
+```yaml
+persistence:
+  enabled: true
+  size: 50Gi
+```
+
+Production baseline:
+
+```yaml
+clickhouse:
+  database: analytics
+  user: analytics
+  existingSecret: clickhouse-auth
+  existingSecretPasswordKey: clickhouse-password
+
+persistence:
+  enabled: true
+  size: 200Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+```
+
+## Architecture
+
+The chart intentionally targets standalone ClickHouse. It renders one StatefulSet, one client Service, and one headless Service. This keeps the Helm chart operationally clear and avoids pretending that replica count alone creates a safe distributed ClickHouse cluster.
+
+For sharded or replicated deployments, use ClickHouse Operator or Altinity operator workflows. Replication requires Keeper or ZooKeeper, cluster definitions, failure-domain planning, and cluster-aware operations that are outside this standalone chart.
+
+## Production Values
+
+```yaml
+replicaCount: 1
+
+clickhouse:
+  database: analytics
+  user: analytics
+  existingSecret: clickhouse-auth
+  existingSecretPasswordKey: clickhouse-password
+  defaultAccessManagement: true
+
+persistence:
+  enabled: true
+  size: 200Gi
+
+logs:
+  persistence:
+    enabled: true
+    size: 20Gi
+
+resources:
+  requests:
+    cpu: '2'
+    memory: 8Gi
+  limits:
+    memory: 16Gi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  egress:
+    enabled: true
+```
+
+## Authentication
+
+The official image initializes the configured database and user on an empty data directory. Use an existing Secret or External Secrets Operator for production passwords:
+
+```yaml
+clickhouse:
+  database: analytics
+  user: analytics
+  existingSecret: clickhouse-auth
+  existingSecretPasswordKey: clickhouse-password
+```
+
+Leaving `clickhouse.password` empty leaves the initial user passwordless. That is acceptable only for isolated local evaluation.
+
+## External Secrets
+
+```yaml
+clickhouse:
+  existingSecret: clickhouse-auth
+  existingSecretPasswordKey: clickhouse-password
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: clickhouse-auth
+      secretStoreRef:
+        name: cluster-secrets
+        kind: ClusterSecretStore
+      target:
+        name: clickhouse-auth
+      data:
+        - secretKey: clickhouse-password
+          remoteRef:
+            key: production/clickhouse
+            property: password
+```
+
+## Observability
+
+ClickHouse can expose its built-in Prometheus endpoint on port `9363`:
+
+```yaml
+metrics:
+  enabled: true
+  path: /metrics
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+```
+
+The chart does not deploy a metrics sidecar. It enables the native server endpoint in the rendered ClickHouse configuration.
+
+## Networking
+
+The client Service exposes:
+
+| Port          | Default | Purpose                                         |
+| ------------- | ------- | ----------------------------------------------- |
+| `http`        | `8123`  | HTTP API and health checks.                     |
+| `tcp`         | `9000`  | Native ClickHouse TCP protocol.                 |
+| `interserver` | `9009`  | Interserver HTTP port exposed for completeness. |
+| `metrics`     | `9363`  | Prometheus metrics when enabled.                |
+
+Ingress and Gateway API are intentionally not part of this chart because ClickHouse is a database service, not a web application. Expose it through private networking, controlled Services, or platform-specific TCP routing.
+
+Dual-stack Service fields are available when the cluster supports them:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+```
+
+## Validation
+
+After deployment:
+
+```bash
+helm test clickhouse -n clickhouse
+kubectl get pods -n clickhouse -l app.kubernetes.io/name=clickhouse
+kubectl logs -n clickhouse statefulset/clickhouse --since=10m
+kubectl exec -n clickhouse statefulset/clickhouse -- clickhouse-client --query "SELECT version()"
+```
+
+Also validate persistence across restart, metrics scraping, password authentication, and backup strategy before production use.
+
+## Common Issues
+
+| Symptom                                    | Likely Cause                                           | Fix                                                                   |
+| ------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| Helm render fails with replica count error | `replicaCount` is greater than `1`                     | Use `replicaCount=1` or move to ClickHouse Operator.                  |
+| Password change does not apply             | Existing data directory already initialized            | Manage users with SQL after first initialization.                     |
+| Metrics are missing                        | Native endpoint or ServiceMonitor disabled             | Set `metrics.enabled=true` and `metrics.serviceMonitor.enabled=true`. |
+| Pod cannot write data                      | Storage class permissions or security context mismatch | Check PVC binding and volume ownership for UID/GID `101`.             |
+
+<a id="values"></a>
+
+## Values
+
+| Parameter                              | Default                                  | Description                                                |
+| -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `image.repository`                     | `docker.io/clickhouse/clickhouse-server` | Official ClickHouse image repository.                      |
+| `image.tag`                            | `25.8.28.1`                              | Official full-version image tag.                           |
+| `replicaCount`                         | `1`                                      | ClickHouse pod count. Values greater than `1` are blocked. |
+| `clickhouse.database`                  | `default`                                | Initial database on an empty data directory.               |
+| `clickhouse.user`                      | `default`                                | Initial user on an empty data directory.                   |
+| `clickhouse.password`                  | `""`                                     | Initial user password.                                     |
+| `clickhouse.existingSecret`            | `""`                                     | Existing Secret containing the initial password.           |
+| `clickhouse.existingSecretPasswordKey` | `clickhouse-password`                    | Key in the existing Secret containing the password.        |
+| `clickhouse.defaultAccessManagement`   | `true`                                   | Enables SQL-driven access management for the initial user. |
+| `persistence.enabled`                  | `true`                                   | Persist `/var/lib/clickhouse`.                             |
+| `persistence.size`                     | `20Gi`                                   | Data PVC size.                                             |
+| `logs.persistence.enabled`             | `false`                                  | Persist logs on a separate PVC.                            |
+| `metrics.enabled`                      | `false`                                  | Enable native Prometheus endpoint.                         |
+| `metrics.serviceMonitor.enabled`       | `false`                                  | Render ServiceMonitor.                                     |
+| `externalSecrets.enabled`              | `false`                                  | Render ExternalSecret resources.                           |
+| `networkPolicy.enabled`                | `false`                                  | Render NetworkPolicy.                                      |
+| `service.ipFamilyPolicy`               | `""`                                     | Kubernetes Service IP family policy.                       |
+| `extraManifests`                       | `[]`                                     | Additional Kubernetes manifests rendered with the release. |
+
+## Links
+
+- [ClickHouse](https://clickhouse.com/)
+- [ClickHouse server image](https://hub.docker.com/r/clickhouse/clickhouse-server)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/clickhouse)
