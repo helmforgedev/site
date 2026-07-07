@@ -4326,6 +4326,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2.29.7',
+          description: 'Pinned n8n image tag',
+        },
+        {
           label: 'Webhook URL',
           key: 'n8n.webhookUrl',
           type: 'text',
