@@ -1208,7 +1208,7 @@ clientTrafficPolicy:
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.8.1`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.8.2`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -1228,7 +1228,7 @@ clientTrafficPolicy:
 | `proxy.image.repository`                 | Proxy image                                                     | `docker.io/envoyproxy/envoy`   |
 | `proxy.image.tag`                        | Proxy image tag                                                 | `distroless-v1.38.0`           |
 | `proxy.shutdownManager.image.repository` | Shutdown manager sidecar image                                  | `docker.io/envoyproxy/gateway` |
-| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.8.1`                       |
+| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.8.2`                       |
 | `proxy.resources.requests.cpu`           | CPU request                                                     | `100m`                         |
 | `proxy.resources.requests.memory`        | Memory request                                                  | `128Mi`                        |
 | `proxy.resources.limits.cpu`             | CPU limit                                                       | `1000m`                        |
@@ -1257,7 +1257,7 @@ clientTrafficPolicy:
 
 | Parameter           | Description       | Default  |
 | ------------------- | ----------------- | -------- |
-| `certgen.image.tag` | Certgen image tag | `v1.8.1` |
+| `certgen.image.tag` | Certgen image tag | `v1.8.2` |
 
 ### SecurityPolicy
 
@@ -1372,24 +1372,20 @@ cleanup.
 
 ## Upgrade Notes
 
-`docker.io/envoyproxy/gateway:v1.8.1` is the upstream patch update from
-`v1.8.0`. The upstream image tag is published with the `v` prefix. This chart
-also updates the managed Envoy proxy image to
-`docker.io/envoyproxy/envoy:distroless-v1.38.0`, matching the upstream v1.8
-compatibility matrix.
+`docker.io/envoyproxy/gateway:v1.8.2` is the upstream patch update from
+`v1.8.1`. The upstream image tag is published with the `v` prefix. This chart
+keeps the managed Envoy proxy image pinned to
+`docker.io/envoyproxy/envoy:distroless-v1.38.0`, which remains aligned with the
+upstream v1.8 compatibility matrix.
 
-Envoy Gateway v1.8.1 includes security fixes for GatewayNamespaceMode xDS
-authentication, Lua validator sandbox path normalization, Wasm HTTP fetch gzip
-decompression limits, ReferenceGrant bypass handling, and related controller
-runtime issues. The chart now also pins the EG-managed `shutdown-manager`
-sidecar to `docker.io/envoyproxy/gateway:v1.8.1` through the EnvoyProxy strategic
-merge patch, avoiding the upstream-generated `gateway-dev:latest` runtime image.
-It also moves Gateway API safe-upgrades ValidatingAdmissionPolicy resources from
-the CRD bundle into the gateway Helm templates upstream. Before upgrading
-production controllers, review ownership of existing
-`safe-upgrades.gateway.networking.k8s.io` ValidatingAdmissionPolicy resources,
-verify Gateway API and Envoy Gateway CRDs in staging, and test existing Gateway,
-HTTPRoute, EnvoyProxy, and policy resources.
+Envoy Gateway v1.8.2 includes upstream bug fixes for Gateway API conditions,
+Backend TLS ALPN handling, ExternalName backends, Kubernetes 1.36 rate limit
+validation, EnvoyGateway config hot reload, and route timeout handling. It also
+tightens admission validation for `SecurityPolicy.spec.apiKeyAuth.extractFrom`:
+each entry must specify exactly one of `headers`, `params`, or `cookies`, and
+source names must be non-empty. Before upgrading production controllers, verify
+Gateway API and Envoy Gateway CRDs in staging, and test existing Gateway,
+HTTPRoute, EnvoyProxy, `BackendTrafficPolicy`, and `SecurityPolicy` resources.
 
 ---
 
@@ -2207,7 +2203,7 @@ Complete architectural redesign for EG v1.7.3 with operator-managed proxy provis
 
 **Versions Updated**:
 
-- EG: v1.8.1 (was v1.0.0)
+- EG: v1.8.2 (was v1.0.0)
 - Envoy: distroless-v1.38.0 (was v1.29.0)
 - Redis: helmforge/redis subchart v1.6.18 (replaces inline StatefulSet)
 - Gateway API CRDs: v1.2.1 (was v1.0.0)
