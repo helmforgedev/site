@@ -22,13 +22,13 @@ This chart uses `docker.io/library/drupal` because Drupal does not currently pub
 
 HelmForge pins:
 
-- `docker.io/library/drupal:11.3.11-php8.5-apache-bookworm`
+- `docker.io/library/drupal:11.4.0-php8.5-apache-bookworm`
 
 That choice is intentional:
 
 - the Apache variant already includes PHP
 - the image includes the Drupal-relevant extensions such as `pdo_mysql`, `pdo_sqlite`, `sqlite3`, `gd`, `mbstring`, `curl`, `dom`, `openssl`, and `zip`
-- Drupal 11.3 supports PHP 8.5, so the explicit PHP 8.5 tag is a better production pin than the older generic `apache-bookworm` form
+- Drupal 11.4 supports PHP 8.5, so the explicit PHP 8.5 tag is a better production pin than the older generic `apache-bookworm` form
 - `bookworm` keeps the Debian base explicit and conservative for production environments
 
 ## Official Product
@@ -38,10 +38,17 @@ That choice is intentional:
 
 ## Release Notes
 
-This chart tracks Drupal `11.3.11`, an upstream Drupal 11 patch and bugfix
-release. The bundled HelmForge MySQL dependency is aligned to the current
-`2.0.0` chart while preserving the same Drupal installer values for the default
-bundled database path.
+This chart tracks Drupal `11.4.0`, an upstream Drupal 11 feature minor release
+that upstream marks as ready for production sites. Drupal 11.4.0 also changes
+the Composer dependency policy for `drupal/core-recommended`: Guzzle, Twig, and
+Symfony polyfills are no longer pinned there, so security and patch updates can
+be applied without waiting for a new Drupal core release.
+
+The bundled HelmForge MySQL dependency is aligned to the current `2.0.2` chart
+while preserving the same Drupal installer values for the default bundled
+database path. Before upgrading production workloads, test the site in staging
+with the same PHP extensions, Composer dependency set, storage class, and
+database mode used in production.
 
 ## Installation
 
@@ -220,7 +227,7 @@ The chart still has an installer-oriented surface, but it now covers production 
 | ----------------------- | -------------------------------- | ----------------------------------------------- |
 | `replicaCount`          | `1`                              | Number of Drupal replicas                       |
 | `image.repository`      | `docker.io/library/drupal`       | Docker Official Drupal image repository         |
-| `image.tag`             | `11.3.11-php8.5-apache-bookworm` | Pinned Drupal image tag                         |
+| `image.tag`             | `11.4.0-php8.5-apache-bookworm`  | Pinned Drupal image tag                         |
 | `image.pullPolicy`      | `IfNotPresent`                   | Container pull policy                           |
 | `imagePullSecrets`      | `[]`                             | Optional image pull secrets                     |
 | `drupal.siteName`       | `Drupal`                         | Suggested site name shown in install guidance   |
