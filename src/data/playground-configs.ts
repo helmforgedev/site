@@ -7988,6 +7988,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '10Gi',
           description: 'World data storage size',
         },
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2026.7.0',
+          description: 'Minecraft server image tag',
+        },
       ],
     },
     {
