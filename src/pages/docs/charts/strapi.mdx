@@ -56,11 +56,11 @@ helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 
 The chart uses **HelmForge's production-ready Strapi base image** instead of the generic Strapi image. This provides significant advantages for Kubernetes deployments:
 
-**Image:** `docker.io/helmforge/strapi-base:5.47.1`
+**Image:** `docker.io/helmforge/strapi-base:5.49.0`
 
 ### Key Features
 
-- **Strapi 5.47.1** — Latest stable version with security patches
+- **Strapi 5.49.0** — Stable HelmForge base image with security patches
 - **All official plugins included** — Upload providers, email, database plugins pre-installed
 - **Database support** — PostgreSQL for production-ready defaults and SQLite for development use
 - **Health check endpoint** — HTTP `/_health` endpoint returns HTTP 200 with JSON body containing status, uptime, database connectivity, and version
@@ -76,7 +76,7 @@ The chart uses **HelmForge's production-ready Strapi base image** instead of the
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
 ```
 
 This provides a working Strapi instance with default configuration, perfect for:
@@ -92,7 +92,7 @@ For production deployments with custom content types and configurations:
 
 ```dockerfile
 # Dockerfile
-FROM docker.io/helmforge/strapi-base:5.47.1
+FROM docker.io/helmforge/strapi-base:5.49.0
 
 # Copy your Strapi project
 COPY --chown=strapi:strapi . /opt/app
@@ -118,8 +118,8 @@ image:
 | ------------------ | --------------------------- |
 | **Registry**       | docker.io                   |
 | **Repository**     | helmforge/strapi-base       |
-| **Current Tag**    | 5.47.1                      |
-| **Strapi Version** | 5.47.1                      |
+| **Current Tag**    | 5.49.0                      |
+| **Strapi Version** | 5.49.0                      |
 | **Base Image**     | node:22-alpine              |
 | **User**           | strapi (UID 1000, GID 1000) |
 | **Working Dir**    | /opt/app                    |
@@ -178,7 +178,7 @@ Default deployment for development or testing:
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
 
 postgresql:
   enabled: true
@@ -208,7 +208,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
 
 # S3 uploads enable multi-replica scaling
 strapi:
@@ -739,7 +739,7 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 | -------------------------- | ----------------------- | ----------------------------------------------------- |
 | `replicaCount`             | `1`                     | Number of replicas (requires S3/Cloudinary if > 1)    |
 | `image.repository`         | `helmforge/strapi-base` | Strapi application image (HelmForge production-ready) |
-| `image.tag`                | `5.47.1`                | HelmForge Strapi base image tag                       |
+| `image.tag`                | `5.49.0`                | HelmForge Strapi base image tag                       |
 | `strapi.url`               | `""`                    | Public URL (auto-detected from ingress)               |
 | `strapi.nodeEnv`           | `production`            | Node environment                                      |
 | `strapi.telemetryDisabled` | `true`                  | Disable Strapi telemetry                              |
@@ -813,7 +813,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
   pullPolicy: IfNotPresent
 
 database:
@@ -851,7 +851,7 @@ replicaCount: 2
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
 
 database:
   mode: external
@@ -896,7 +896,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.47.1'
+  tag: '5.49.0'
 
 postgresql:
   enabled: true
@@ -1037,6 +1037,15 @@ affinity:
 1. Configure `strapi.email.provider` (smtp or sendgrid)
 2. Create secret with SMTP password or SendGrid API key
 3. Test email configuration in Strapi admin panel
+
+## Upgrade Notes
+
+Strapi `5.49.0` is a stable release with MCP builder exports, upload provider
+enhancements, dashboard/admin fixes, safer large upload MIME detection, and
+dependency security updates. Upstream calls out one user-visible behavior change:
+in the Content Manager, `Cmd/Ctrl+Enter` now saves a draft, while
+`Cmd/Ctrl+Shift+Enter` publishes. Back up the database and uploads PVC before
+upgrading production workloads.
 
 ## Migration Guide
 
