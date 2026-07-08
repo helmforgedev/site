@@ -3481,6 +3481,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Runtime',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '5.2.0',
+          description: 'Pinned openHAB image tag',
+        },
+        {
           label: 'Timezone',
           key: 'env.TZ',
           type: 'text',
