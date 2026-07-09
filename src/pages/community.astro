@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
+import { chartContributors } from '../data/contributors';
 
 const ways = [
   {
@@ -132,66 +133,46 @@ const governance = [
       </div>
 
       <!-- Contributors -->
-      <div id="contributors-section" class="mt-16 hidden" data-contributors-section>
+      <div id="contributors-section" class="mt-16">
         <h3 class="text-lg font-bold text-text-base heading-font mb-6">Contributors</h3>
         <div class="glass-panel rounded-2xl p-6">
-          <div class="flex flex-wrap gap-3" data-contributors-list></div>
+          <p class="max-w-3xl text-sm text-text-muted leading-relaxed mb-5">
+            Human contributors from the charts repository history. Bot and automation accounts are excluded so the
+            community page reflects people who have contributed code, docs, tests, and chart fixes.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {
+              chartContributors.map((contributor) => (
+                <a
+                  href={contributor.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-bg-surface/40 px-3 py-3 transition-all hover:border-primary/40 hover:bg-bg-surface/80"
+                  title={`${contributor.name} - ${contributor.contributions} contributions`}
+                >
+                  <img
+                    src={contributor.avatarUrl}
+                    alt={contributor.name}
+                    class="h-10 w-10 rounded-full"
+                    loading="lazy"
+                    width="40"
+                    height="40"
+                  />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-semibold text-text-base group-hover:text-primary-light">
+                      {contributor.name}
+                    </span>
+                    <span class="block truncate text-xs text-text-muted">@{contributor.login}</span>
+                  </span>
+                  <span class="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-xs font-mono text-primary-light">
+                    {contributor.contributions}
+                  </span>
+                </a>
+              ))
+            }
+          </div>
         </div>
       </div>
-
-      <script is:inline>
-        (() => {
-          const section = document.querySelector('[data-contributors-section]');
-          const list = document.querySelector('[data-contributors-list]');
-          if (!section || !list) return;
-
-          const createContributorLink = (contributor) => {
-            const link = document.createElement('a');
-            link.href = contributor.html_url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.className =
-              'group flex items-center gap-2.5 rounded-xl border border-border bg-bg-surface/40 px-3 py-2 transition-all hover:border-primary/40 hover:bg-bg-surface/80';
-            link.title = `${contributor.login} - ${contributor.contributions} contributions`;
-
-            const avatar = document.createElement('img');
-            avatar.src = contributor.avatar_url;
-            avatar.alt = contributor.login;
-            avatar.className = 'w-7 h-7 rounded-full';
-            avatar.loading = 'lazy';
-            avatar.width = 28;
-            avatar.height = 28;
-
-            const login = document.createElement('span');
-            login.className = 'text-sm font-medium text-text-base group-hover:text-primary-light';
-            login.textContent = contributor.login;
-
-            const contributions = document.createElement('span');
-            contributions.className = 'text-xs text-text-muted font-mono';
-            contributions.textContent = String(contributor.contributions);
-
-            link.append(avatar, login, contributions);
-            return link;
-          };
-
-          fetch('https://api.github.com/repos/helmforgedev/charts/contributors?per_page=30', {
-            headers: { Accept: 'application/vnd.github+json' },
-          })
-            .then((response) => {
-              if (!response.ok) throw new Error('GitHub contributors request failed');
-              return response.json();
-            })
-            .then((contributors) => contributors.filter((contributor) => !contributor.login.includes('[bot]')))
-            .then((contributors) => {
-              if (contributors.length === 0) return;
-              list.replaceChildren(...contributors.map(createContributorLink));
-              section.classList.remove('hidden');
-            })
-            .catch(() => {
-              section.remove();
-            });
-        })();
-      </script>
 
       <!-- Governance -->
       <div class="mt-16">
