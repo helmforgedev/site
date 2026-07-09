@@ -6,6 +6,9 @@ export type Contributor = {
   contributions: number;
 };
 
+// Generated on 2026-07-09 from helmforgedev/charts origin/main with:
+// git shortlog -sne origin/main --no-merges
+// Exclude bot and automation accounts, then map GitHub-linked authors to profiles.
 export const chartContributors: Contributor[] = [
   {
     name: 'Maicon Berlofa',
