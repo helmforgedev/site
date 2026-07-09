@@ -9,6 +9,20 @@ export default [
   ...eslintPluginAstro.configs.recommended,
   eslintConfigPrettier,
   {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        AbortController: 'readonly',
+        clearTimeout: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
