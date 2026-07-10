@@ -4,7 +4,6 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
-import { chartContributors } from '../data/contributors';
 
 const ways = [
   {
@@ -139,37 +138,19 @@ const governance = [
           <p class="max-w-3xl text-sm text-text-muted leading-relaxed mb-5">
             Thanks to everyone who improves HelmForge through code, docs, tests, reviews, and chart fixes.
           </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {
-              chartContributors.map((contributor) => (
-                <a
-                  href={contributor.profileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-bg-surface/40 px-3 py-3 transition-all hover:border-primary/40 hover:bg-bg-surface/80"
-                  title={`${contributor.name} - ${contributor.contributions} contributions`}
-                >
-                  <img
-                    src={contributor.avatarUrl}
-                    alt={contributor.name}
-                    class="h-10 w-10 rounded-full"
-                    loading="lazy"
-                    width="40"
-                    height="40"
-                  />
-                  <span class="min-w-0 flex-1">
-                    <span class="block truncate text-sm font-semibold text-text-base group-hover:text-primary-light">
-                      {contributor.name}
-                    </span>
-                    <span class="block truncate text-xs text-text-muted">@{contributor.login}</span>
-                  </span>
-                  <span class="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-xs font-mono text-primary-light">
-                    {contributor.contributions}
-                  </span>
-                </a>
-              ))
-            }
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-contributors-grid aria-live="polite">
+            <div class="rounded-xl border border-border bg-bg-surface/40 px-3 py-3 text-sm text-text-muted">
+              Loading contributors...
+            </div>
           </div>
+          <a
+            href="https://github.com/helmforgedev/charts/graphs/contributors"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-5 inline-flex text-xs font-semibold text-primary-light hover:underline"
+          >
+            View all contributors on GitHub
+          </a>
         </div>
       </div>
 
@@ -254,3 +235,109 @@ const governance = [
   </main>
   <Footer />
 </BaseLayout>
+
+<script>
+  const contributorsGrid = document.querySelector('[data-contributors-grid]');
+  const contributorsUrl = 'https://api.github.com/repos/helmforgedev/charts/contributors';
+
+  function isAutomationAccount(contributor) {
+    const login = contributor.login.toLowerCase();
+    return contributor.type === 'Bot' || login.endsWith('[bot]') || /(^|[-_])bot($|[-_])/.test(login);
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function contributorCard(contributor) {
+    const login = escapeHtml(contributor.login);
+    const avatarUrl = new URL(contributor.avatar_url);
+    avatarUrl.searchParams.set('s', '96');
+    const contributions = Number(contributor.contributions).toLocaleString('en-US');
+
+    return `
+      <a
+        href="${escapeHtml(contributor.html_url)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-bg-surface/40 px-3 py-3 transition-all hover:border-primary/40 hover:bg-bg-surface/80"
+        title="${login} - ${contributions} contributions"
+      >
+        <img
+          src="${escapeHtml(avatarUrl.toString())}"
+          alt="${login}"
+          class="h-10 w-10 rounded-full"
+          loading="lazy"
+          width="40"
+          height="40"
+        />
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-sm font-semibold text-text-base group-hover:text-primary-light">
+            ${login}
+          </span>
+          <span class="block truncate text-xs text-text-muted">@${login}</span>
+        </span>
+        <span class="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-xs font-mono text-primary-light">
+          ${contributions}
+        </span>
+      </a>
+    `;
+  }
+
+  async function fetchContributorPage(page) {
+    const url = new URL(contributorsUrl);
+    url.searchParams.set('per_page', '100');
+    url.searchParams.set('page', String(page));
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub contributors request failed: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async function fetchContributors() {
+    const contributors = [];
+
+    for (let page = 1; page <= 10; page += 1) {
+      const pageContributors = await fetchContributorPage(page);
+      contributors.push(...pageContributors);
+
+      if (pageContributors.length < 100) {
+        break;
+      }
+    }
+
+    return contributors;
+  }
+
+  async function loadContributors() {
+    if (!contributorsGrid) return;
+
+    try {
+      const contributors = await fetchContributors();
+      const visibleContributors = contributors.filter((contributor) => !isAutomationAccount(contributor));
+
+      contributorsGrid.innerHTML =
+        visibleContributors.length > 0
+          ? visibleContributors.map(contributorCard).join('')
+          : '<div class="rounded-xl border border-border bg-bg-surface/40 px-3 py-3 text-sm text-text-muted">No contributors returned by GitHub.</div>';
+    } catch {
+      contributorsGrid.innerHTML =
+        '<div class="rounded-xl border border-border bg-bg-surface/40 px-3 py-3 text-sm text-text-muted">Unable to load contributors right now.</div>';
+    }
+  }
+
+  loadContributors();
+</script>
