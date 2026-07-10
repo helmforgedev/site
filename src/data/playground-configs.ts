@@ -4896,6 +4896,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: 'subchart',
           options: ['subchart', 'external'],
+          valueActivationValues: {
+            subchart: {
+              'objectCache.redis.subchart.enabled': 'true',
+            },
+            external: {
+              'objectCache.redis.subchart.enabled': 'false',
+            },
+          },
           description: 'Use Redis subchart or external Redis',
         },
         {
@@ -4918,6 +4926,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: 'subchart',
           options: ['subchart', 'external'],
+          valueActivationValues: {
+            subchart: {
+              'objectCache.memcached.subchart.enabled': 'true',
+            },
+            external: {
+              'objectCache.memcached.subchart.enabled': 'false',
+            },
+          },
           description: 'Use Memcached subchart or external Memcached',
         },
         {
