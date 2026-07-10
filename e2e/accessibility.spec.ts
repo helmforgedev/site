@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import type { Locator } from '@playwright/test';
 
 const pagesToTest = [
   { name: 'Homepage', path: '/' },
@@ -12,6 +13,10 @@ const pagesToTest = [
   { name: 'Request', path: '/request' },
   { name: 'Community', path: '/community' },
 ];
+
+async function expectDomFocus(locator: Locator) {
+  await expect.poll(async () => locator.evaluate((element) => element === document.activeElement)).toBe(true);
+}
 
 test.describe('Accessibility', () => {
   for (const pg of pagesToTest) {
@@ -80,16 +85,16 @@ test.describe('Accessibility', () => {
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab');
     }
-    await expect(toolsBtn).toBeFocused();
+    await expectDomFocus(toolsBtn);
 
     // ArrowDown should open dropdown and focus first item
     await page.keyboard.press('ArrowDown');
     const firstItem = nav.locator('[role="menuitem"]').first();
-    await expect(firstItem).toBeFocused();
+    await expectDomFocus(firstItem);
 
     // Escape should close and return focus to trigger
     await page.keyboard.press('Escape');
-    await expect(toolsBtn).toBeFocused();
+    await expectDomFocus(toolsBtn);
   });
 
   test('tab panels have proper ARIA roles', async ({ page }) => {
