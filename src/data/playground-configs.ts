@@ -240,27 +240,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
-      name: 'Bootstrap',
-      collapsible: true,
-      gateField: 'bootstrap.enabled',
-      fields: [
-        {
-          label: 'Permalink Structure',
-          key: 'bootstrap.permalinkStructure',
-          type: 'text',
-          default: '/%postname%/',
-          description: 'Permalink structure applied after install',
-        },
-        {
-          label: 'Bootstrap Locale',
-          key: 'bootstrap.language',
-          type: 'text',
-          default: 'pt_BR',
-          description: 'Optional WordPress locale',
-        },
-      ],
-    },
-    {
       name: 'Resources',
       collapsible: true,
       fields: [
@@ -4666,6 +4645,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Bootstrap',
+      collapsible: true,
+      gateField: 'bootstrap.enabled',
+      fields: [
+        {
+          label: 'Permalink Structure',
+          key: 'bootstrap.permalinkStructure',
+          type: 'text',
+          default: '/%postname%/',
+          description: 'Permalink structure applied after install',
+        },
+        {
+          label: 'Bootstrap Locale',
+          key: 'bootstrap.language',
+          type: 'text',
+          default: 'pt_BR',
+          description: 'Optional WordPress locale',
+        },
+      ],
+    },
+    {
       name: 'Database',
       collapsible: true,
       fields: [
@@ -4854,6 +4854,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: 'redis',
           options: ['redis', 'memcached'],
+          valueActivationValues: {
+            redis: {
+              'objectCache.redis.mode': 'subchart',
+              'objectCache.redis.subchart.enabled': 'true',
+              'objectCache.memcached.subchart.enabled': 'false',
+              'image.repository': '',
+              'image.tag': '',
+              'plugins.installer.image.repository': '',
+              'plugins.installer.image.tag': '',
+            },
+            memcached: {
+              'objectCache.redis.subchart.enabled': 'false',
+              'objectCache.memcached.mode': 'subchart',
+              'objectCache.memcached.subchart.enabled': 'true',
+              'image.repository': 'example.com/custom-wordpress',
+              'image.tag': '7.0.0-apache-memcached',
+              'plugins.installer.image.repository': 'example.com/custom-wordpress-cli',
+              'plugins.installer.image.tag': 'cli-php8.3-memcached',
+            },
+          },
           description: 'Cache provider',
         },
         {
@@ -4906,6 +4926,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'false',
           description: 'Deploy HelmForge Memcached dependency',
+        },
+        {
+          label: 'WordPress Image',
+          key: 'image.repository',
+          type: 'text',
+          default: '',
+          description: 'Custom image with php-memcached for Memcached provider',
+        },
+        {
+          label: 'WordPress Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '',
+          description: 'Custom WordPress image tag',
+        },
+        {
+          label: 'Installer Image',
+          key: 'plugins.installer.image.repository',
+          type: 'text',
+          default: '',
+          description: 'Custom WP-CLI image with php-memcached',
+        },
+        {
+          label: 'Installer Tag',
+          key: 'plugins.installer.image.tag',
+          type: 'text',
+          default: '',
+          description: 'Custom installer image tag',
         },
         {
           label: 'External Memcached Host',
