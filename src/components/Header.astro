@@ -299,6 +299,18 @@ function isDropdownActive(items: NavLink[]): boolean {
         }, 150);
       }
 
+      function closeForKeyboard() {
+        clearTimeout(timeout);
+        trigger.setAttribute('aria-expanded', 'false');
+        menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
+        menu.classList.remove('opacity-100', 'visible', 'translate-y-0');
+        menuItems.forEach((item) => {
+          item.tabIndex = -1;
+        });
+        const chevron = trigger.querySelector('svg:last-child');
+        if (chevron) (chevron as HTMLElement).style.transform = '';
+      }
+
       dropdown.addEventListener('mouseenter', show);
       dropdown.addEventListener('mouseleave', hide);
       trigger.addEventListener('click', () => {
@@ -339,8 +351,10 @@ function isDropdownActive(items: NavLink[]): boolean {
       menu.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
-          hide();
+          e.stopPropagation();
+          closeForKeyboard();
           trigger.focus();
+          requestAnimationFrame(() => trigger.focus());
         }
       });
 
