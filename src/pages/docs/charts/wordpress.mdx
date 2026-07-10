@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: WordPress Chart
-description: WordPress Helm chart for Kubernetes with official Apache image, HelmForge MySQL, Gateway API, External Secrets, Redis cache, plugins, and S3 backup.
+description: WordPress Helm chart for Kubernetes with official Apache image, WP-CLI bootstrap, HelmForge MySQL, Gateway API, External Secrets, object cache, plugins, and S3 backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -14,7 +14,7 @@ import WordPressDiagram from '../../../components/diagrams/WordPressDiagram.astr
 Deploy [WordPress](https://wordpress.org/) on Kubernetes with the official
 `docker.io/library/wordpress:7.0.0-apache` image. The chart keeps the default install useful for
 development while exposing explicit production controls for database selection, secrets, routing,
-storage, backup, network policy, metrics, WordPress cron, plugin installation, and Redis Object Cache.
+storage, backup, network policy, metrics, WordPress cron, WP-CLI bootstrap, plugin installation, and object cache.
 
 <Callout type="info" title="Defaults are for fast development, not a full production baseline">
   A default install creates one WordPress pod, a HelmForge MySQL subchart, generated credentials, and a ReadWriteOnce
@@ -31,8 +31,9 @@ storage, backup, network policy, metrics, WordPress cron, plugin installation, a
 - **Networking** - dual-stack Service fields and optional NetworkPolicy ingress/egress rules.
 - **Production controls** - ServiceAccount token mount control, resources, HPA, PDB, deterministic WordPress cron, probes, and scheduling.
 - **Backups** - S3-compatible CronJob that exports both the database and `wp-content`.
+- **Bootstrap** - optional WP-CLI Job for initial site install, permalinks, locale, and multisite setup.
 - **Plugins** - idempotent post-install/post-upgrade installer for official WordPress.org plugin slugs.
-- **Redis Object Cache** - optional `redis-cache` plugin and drop-in using HelmForge Redis or external Redis.
+- **Object Cache** - Redis provider for the official image, plus guarded Memcached wiring for custom images.
 - **Extensibility** - extra env, envFrom, init containers, sidecars, volumes, mounts, and raw extra manifests.
 
 ## Architecture
@@ -45,8 +46,8 @@ storage, backup, network policy, metrics, WordPress cron, plugin installation, a
 </ArchitectureDiagram>
 
 <ArchitectureDiagram
-  title="Redis Object Cache"
-  description="Redis Object Cache is enabled by installing the official plugin, creating the object-cache.php drop-in, and pointing WordPress at a subchart or external Redis endpoint."
+  title="Object Cache"
+  description="Redis is the plug-and-play provider for the official image. Memcached can use the HelmForge subchart when the WordPress and installer images include php-memcached."
 >
   <WordPressDiagram mode="cache" />
 </ArchitectureDiagram>
@@ -82,6 +83,7 @@ For production, make the choices explicit:
 
 - Use existing Secrets or External Secrets Operator for admin, database, backup, and Redis credentials.
 - Set `wordpress.siteUrl`, `wordpress.forceSSLAdmin`, `wordpress.disallowFileEdit`, and `wordpress.disableWpCron`.
+- Enable `bootstrap.enabled` when Helm should run the initial WP-CLI install.
 - Use Gateway API or Ingress with TLS and route-aware NetworkPolicy ingress rules.
 - Set CPU and memory requests, limits, PDB, and HPA only after storage is safe for multiple pods.
 - Use `ReadWriteMany` storage or an immutable media/plugin strategy before running multiple replicas.
@@ -99,10 +101,11 @@ For production, make the choices explicit:
 <DocsTabs
   tabs={[
     { id: 'dev', label: 'Dev' },
+    { id: 'bootstrap', label: 'Bootstrap' },
     { id: 'production', label: 'Production' },
     { id: 'external-db', label: 'External DB' },
     { id: 'gateway-secrets', label: 'Gateway + ESO' },
-    { id: 'redis', label: 'Redis Cache' },
+    { id: 'cache', label: 'Object Cache' },
     { id: 'plugins', label: 'Plugins' },
     { id: 'backup', label: 'Backup' },
   ]}
@@ -295,7 +298,27 @@ gatewayAPI:
 
 </div>
 
-<div data-tab-panel="redis">
+<div data-tab-panel="bootstrap">
+
+```yaml
+# values.yaml - first install bootstrap with WP-CLI
+wordpress:
+  siteUrl: https://blog.example.com
+  siteTitle: Example Blog
+  adminUser: admin
+  adminEmail: admin@example.com
+
+admin:
+  existingSecret: wordpress-admin
+
+bootstrap:
+  enabled: true
+  permalinkStructure: /%postname%/
+```
+
+</div>
+
+<div data-tab-panel="cache">
 
 ```yaml
 # values.yaml - Redis Object Cache using HelmForge Redis subchart
@@ -306,6 +329,7 @@ plugins:
 
 objectCache:
   enabled: true
+  provider: redis
   redis:
     mode: subchart
     subchart:
@@ -327,6 +351,7 @@ plugins:
 
 objectCache:
   enabled: true
+  provider: redis
   redis:
     mode: external
     external:
@@ -334,6 +359,32 @@ objectCache:
     auth:
       existingSecret: wordpress-redis
       existingSecretPasswordKey: redis-password
+```
+
+```yaml
+# values.yaml - Memcached provider using a custom image with php-memcached
+image:
+  repository: example.com/custom-wordpress
+  tag: 7.0.0-apache-memcached
+
+plugins:
+  enabled: true
+  installer:
+    enabled: true
+    image:
+      repository: example.com/custom-wordpress-cli
+      tag: cli-php8.3-memcached
+
+objectCache:
+  enabled: true
+  provider: memcached
+  memcached:
+    mode: subchart
+    subchart:
+      enabled: true
+
+memcached:
+  architecture: standalone
 ```
 
 </div>
@@ -427,15 +478,24 @@ When `database.mode: auto`, the chart resolves the database path in this order:
 Set `wordpress.disableWpCron: true` and enable `wpCron.cronJob.enabled` when you want deterministic
 cron execution from Kubernetes instead of request-driven `wp-cron.php`.
 
-### Redis Object Cache
+### Bootstrap
 
-The chart installs the official `redis-cache` plugin, writes the `object-cache.php` drop-in, and sets
+The official WordPress image creates files and `wp-config.php`, but it does not create the initial site.
+Enable `bootstrap.enabled` when Helm should run `wp core install`. The Job requires `wordpress.siteUrl`
+or `bootstrap.siteUrl`, and it skips work when WordPress is already installed.
+
+### Object Cache
+
+For Redis, the chart installs the official `redis-cache` plugin, writes the `object-cache.php` drop-in, and sets
 `WP_CACHE` plus `WP_REDIS_*` constants. Redis is only functionally validated when WordPress can create
 cache keys in Redis; a running Redis pod alone is not enough.
 
 If the Redis subchart is used and `redis.auth.enabled=false`, WordPress does not reference a Redis
 password Secret. If the subchart uses `redis.auth.existingSecret`, WordPress and the plugin installer
 read the same Secret and key.
+
+Memcached is guarded because the official WordPress image does not include the PHP `memcached` extension.
+Use custom WordPress and installer images before enabling `objectCache.provider: memcached`.
 
 ### NetworkPolicy
 
@@ -470,24 +530,38 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 
 ### WordPress
 
-| Parameter                    | Type    | Default             | Description                                      |
-| ---------------------------- | ------- | ------------------- | ------------------------------------------------ |
-| `wordpress.siteUrl`          | string  | `""`                | Full external site URL.                          |
-| `wordpress.siteTitle`        | string  | `WordPress`         | Site title.                                      |
-| `wordpress.adminUser`        | string  | `admin`             | Initial admin user.                              |
-| `wordpress.adminPassword`    | string  | `""`                | Initial admin password, generated when empty.    |
-| `wordpress.adminEmail`       | string  | `admin@example.com` | Initial admin email.                             |
-| `wordpress.tablePrefix`      | string  | `wp_`               | Database table prefix.                           |
-| `wordpress.debug`            | boolean | `false`             | Enables `WP_DEBUG`.                              |
-| `wordpress.forceSSLAdmin`    | boolean | `false`             | Sets `FORCE_SSL_ADMIN`.                          |
-| `wordpress.disallowFileEdit` | boolean | `false`             | Sets `DISALLOW_FILE_EDIT`.                       |
-| `wordpress.disableWpCron`    | boolean | `false`             | Sets `DISABLE_WP_CRON`.                          |
-| `wordpress.memoryLimit`      | string  | `""`                | Sets `WP_MEMORY_LIMIT`.                          |
-| `wordpress.maxMemoryLimit`   | string  | `""`                | Sets `WP_MAX_MEMORY_LIMIT`.                      |
-| `wordpress.configExtra`      | string  | `""`                | Extra PHP appended to `wp-config.php`.           |
-| `wordpress.extraEnv`         | array   | `[]`                | Extra container environment variables.           |
-| `wordpress.extraEnvFrom`     | array   | `[]`                | Extra `envFrom` sources.                         |
-| `php.ini`                    | string  | `""`                | Custom PHP ini settings mounted into Apache PHP. |
+| Parameter                     | Type    | Default             | Description                                      |
+| ----------------------------- | ------- | ------------------- | ------------------------------------------------ |
+| `wordpress.siteUrl`           | string  | `""`                | Full external site URL.                          |
+| `wordpress.siteTitle`         | string  | `WordPress`         | Site title.                                      |
+| `wordpress.adminUser`         | string  | `admin`             | Initial admin user.                              |
+| `wordpress.adminPassword`     | string  | `""`                | Initial admin password, generated when empty.    |
+| `wordpress.adminEmail`        | string  | `admin@example.com` | Initial admin email.                             |
+| `wordpress.tablePrefix`       | string  | `wp_`               | Database table prefix.                           |
+| `wordpress.debug`             | boolean | `false`             | Enables `WP_DEBUG`.                              |
+| `wordpress.forceSSLAdmin`     | boolean | `false`             | Sets `FORCE_SSL_ADMIN`.                          |
+| `wordpress.disallowFileEdit`  | boolean | `false`             | Sets `DISALLOW_FILE_EDIT`.                       |
+| `wordpress.disableWpCron`     | boolean | `false`             | Sets `DISABLE_WP_CRON`.                          |
+| `wordpress.multisite.enabled` | boolean | `false`             | Enables WordPress multisite constants.           |
+| `wordpress.multisite.mode`    | string  | `subdirectory`      | Bootstrap multisite mode.                        |
+| `wordpress.memoryLimit`       | string  | `""`                | Sets `WP_MEMORY_LIMIT`.                          |
+| `wordpress.maxMemoryLimit`    | string  | `""`                | Sets `WP_MAX_MEMORY_LIMIT`.                      |
+| `wordpress.configExtra`       | string  | `""`                | Extra PHP appended to `wp-config.php`.           |
+| `wordpress.extraEnv`          | array   | `[]`                | Extra container environment variables.           |
+| `wordpress.extraEnvFrom`      | array   | `[]`                | Extra `envFrom` sources.                         |
+| `php.ini`                     | string  | `""`                | Custom PHP ini settings mounted into Apache PHP. |
+
+### Bootstrap
+
+| Parameter                         | Type    | Default                       | Description                                      |
+| --------------------------------- | ------- | ----------------------------- | ------------------------------------------------ |
+| `bootstrap.enabled`               | boolean | `false`                       | Create WP-CLI bootstrap Job.                     |
+| `bootstrap.siteUrl`               | string  | `""`                          | Site URL used by bootstrap, defaults to siteUrl. |
+| `bootstrap.permalinkStructure`    | string  | `""`                          | Optional permalink structure after install.      |
+| `bootstrap.language`              | string  | `""`                          | Optional locale installed and activated.         |
+| `bootstrap.image.repository`      | string  | `docker.io/library/wordpress` | WP-CLI image repository.                         |
+| `bootstrap.image.tag`             | string  | `cli-php8.3`                  | WP-CLI image tag.                                |
+| `bootstrap.activeDeadlineSeconds` | integer | `180`                         | Bootstrap Job timeout.                           |
 
 ### Credentials and External Secrets
 
@@ -564,27 +638,32 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `podSecurityContext`                          | object  | `{}`          | Pod security context.                        |
 | `securityContext`                             | object  | `{}`          | Container security context.                  |
 
-### Plugins and Redis Object Cache
+### Plugins and Object Cache
 
-| Parameter                                  | Type    | Default       | Description                                              |
-| ------------------------------------------ | ------- | ------------- | -------------------------------------------------------- |
-| `plugins.enabled`                          | boolean | `false`       | Enable plugin installer support.                         |
-| `plugins.installer.enabled`                | boolean | `false`       | Create post-install/post-upgrade installer Job.          |
-| `plugins.installer.activeDeadlineSeconds`  | integer | `60`          | Installer timeout.                                       |
-| `plugins.installer.backoffLimit`           | integer | `1`           | Installer retry limit.                                   |
-| `plugins.installer.preferWordPressPodNode` | boolean | `true`        | Prefer node with WordPress pod for RWO PVCs.             |
-| `plugins.items`                            | array   | `[]`          | Official WordPress.org plugin slugs.                     |
-| `objectCache.enabled`                      | boolean | `false`       | Enable object cache integration.                         |
-| `objectCache.provider`                     | string  | `redis-cache` | Supported provider.                                      |
-| `objectCache.installPlugin`                | boolean | `true`        | Install and activate `redis-cache`.                      |
-| `objectCache.enableDropIn`                 | boolean | `true`        | Create `wp-content/object-cache.php`.                    |
-| `objectCache.redis.mode`                   | string  | `subchart`    | `subchart` or `external`.                                |
-| `objectCache.redis.subchart.enabled`       | boolean | `false`       | Deploy HelmForge Redis dependency.                       |
-| `objectCache.redis.external.host`          | string  | `""`          | External Redis hostname.                                 |
-| `objectCache.redis.port`                   | integer | `6379`        | Redis port.                                              |
-| `objectCache.redis.database`               | integer | `0`           | Redis database number.                                   |
-| `objectCache.redis.auth.enabled`           | boolean | `true`        | Use Redis password when effective Redis auth is enabled. |
-| `objectCache.redis.auth.existingSecret`    | string  | `""`          | Existing Redis password Secret.                          |
+| Parameter                                                  | Type    | Default    | Description                                              |
+| ---------------------------------------------------------- | ------- | ---------- | -------------------------------------------------------- |
+| `plugins.enabled`                                          | boolean | `false`    | Enable plugin installer support.                         |
+| `plugins.installer.enabled`                                | boolean | `false`    | Create post-install/post-upgrade installer Job.          |
+| `plugins.installer.activeDeadlineSeconds`                  | integer | `60`       | Installer timeout.                                       |
+| `plugins.installer.backoffLimit`                           | integer | `1`        | Installer retry limit.                                   |
+| `plugins.installer.preferWordPressPodNode`                 | boolean | `true`     | Prefer node with WordPress pod for RWO PVCs.             |
+| `plugins.items`                                            | array   | `[]`       | Official WordPress.org plugin slugs.                     |
+| `objectCache.enabled`                                      | boolean | `false`    | Enable object cache integration.                         |
+| `objectCache.provider`                                     | string  | `redis`    | `redis` or `memcached`.                                  |
+| `objectCache.installPlugin`                                | boolean | `true`     | Install and activate provider plugin.                    |
+| `objectCache.enableDropIn`                                 | boolean | `true`     | Create `wp-content/object-cache.php`.                    |
+| `objectCache.redis.mode`                                   | string  | `subchart` | `subchart` or `external`.                                |
+| `objectCache.redis.subchart.enabled`                       | boolean | `false`    | Deploy HelmForge Redis dependency.                       |
+| `objectCache.redis.external.host`                          | string  | `""`       | External Redis hostname.                                 |
+| `objectCache.redis.port`                                   | integer | `6379`     | Redis port.                                              |
+| `objectCache.redis.database`                               | integer | `0`        | Redis database number.                                   |
+| `objectCache.redis.auth.enabled`                           | boolean | `true`     | Use Redis password when effective Redis auth is enabled. |
+| `objectCache.redis.auth.existingSecret`                    | string  | `""`       | Existing Redis password Secret.                          |
+| `objectCache.memcached.mode`                               | string  | `subchart` | `subchart` or `external`.                                |
+| `objectCache.memcached.subchart.enabled`                   | boolean | `false`    | Deploy HelmForge Memcached dependency.                   |
+| `objectCache.memcached.external.host`                      | string  | `""`       | External Memcached hostname.                             |
+| `objectCache.memcached.port`                               | integer | `11211`    | Memcached port.                                          |
+| `objectCache.memcached.allowOfficialImageWithoutExtension` | boolean | `false`    | Acknowledge official image limitation.                   |
 
 ### NetworkPolicy, Metrics, and Backup
 

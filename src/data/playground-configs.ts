@@ -4645,6 +4645,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Bootstrap',
+      collapsible: true,
+      gateField: 'bootstrap.enabled',
+      fields: [
+        {
+          label: 'Permalink Structure',
+          key: 'bootstrap.permalinkStructure',
+          type: 'text',
+          default: '/%postname%/',
+          description: 'Permalink structure applied after install',
+        },
+        {
+          label: 'Bootstrap Locale',
+          key: 'bootstrap.language',
+          type: 'text',
+          default: 'pt_BR',
+          description: 'Optional WordPress locale',
+        },
+      ],
+    },
+    {
       name: 'Database',
       collapsible: true,
       fields: [
@@ -4823,16 +4844,44 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
-      name: 'Redis Object Cache',
+      name: 'Object Cache',
       collapsible: true,
       gateField: 'objectCache.enabled',
       fields: [
+        {
+          label: 'Provider',
+          key: 'objectCache.provider',
+          type: 'select',
+          default: 'redis',
+          options: ['redis', 'memcached'],
+          valueActivationValues: {
+            redis: {
+              'objectCache.redis.mode': 'subchart',
+              'objectCache.redis.subchart.enabled': 'true',
+              'objectCache.memcached.subchart.enabled': 'false',
+              'image.repository': '',
+              'image.tag': '',
+              'plugins.installer.image.repository': '',
+              'plugins.installer.image.tag': '',
+            },
+            memcached: {
+              'objectCache.redis.subchart.enabled': 'false',
+              'objectCache.memcached.mode': 'subchart',
+              'objectCache.memcached.subchart.enabled': 'true',
+              'image.repository': 'example.com/custom-wordpress',
+              'image.tag': '7.0.0-apache-memcached',
+              'plugins.installer.image.repository': 'example.com/custom-wordpress-cli',
+              'plugins.installer.image.tag': 'cli-php8.3-memcached',
+            },
+          },
+          description: 'Cache provider',
+        },
         {
           label: 'Plugin Installer',
           key: 'plugins.installer.enabled',
           type: 'toggle',
           default: 'true',
-          description: 'Install redis-cache plugin and drop-in',
+          description: 'Install provider plugin and drop-in when supported',
         },
         {
           label: 'Plugins Enabled',
@@ -4847,6 +4896,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: 'subchart',
           options: ['subchart', 'external'],
+          valueActivationValues: {
+            subchart: {
+              'objectCache.redis.subchart.enabled': 'true',
+            },
+            external: {
+              'objectCache.redis.subchart.enabled': 'false',
+            },
+          },
           description: 'Use Redis subchart or external Redis',
         },
         {
@@ -4862,6 +4919,64 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: 'redis.example.com',
           description: 'External Redis hostname',
+        },
+        {
+          label: 'Memcached Mode',
+          key: 'objectCache.memcached.mode',
+          type: 'select',
+          default: 'subchart',
+          options: ['subchart', 'external'],
+          valueActivationValues: {
+            subchart: {
+              'objectCache.memcached.subchart.enabled': 'true',
+            },
+            external: {
+              'objectCache.memcached.subchart.enabled': 'false',
+            },
+          },
+          description: 'Use Memcached subchart or external Memcached',
+        },
+        {
+          label: 'Memcached Subchart',
+          key: 'objectCache.memcached.subchart.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy HelmForge Memcached dependency',
+        },
+        {
+          label: 'WordPress Image',
+          key: 'image.repository',
+          type: 'text',
+          default: '',
+          description: 'Custom image with php-memcached for Memcached provider',
+        },
+        {
+          label: 'WordPress Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '',
+          description: 'Custom WordPress image tag',
+        },
+        {
+          label: 'Installer Image',
+          key: 'plugins.installer.image.repository',
+          type: 'text',
+          default: '',
+          description: 'Custom WP-CLI image with php-memcached',
+        },
+        {
+          label: 'Installer Tag',
+          key: 'plugins.installer.image.tag',
+          type: 'text',
+          default: '',
+          description: 'Custom installer image tag',
+        },
+        {
+          label: 'External Memcached Host',
+          key: 'objectCache.memcached.external.host',
+          type: 'text',
+          default: 'memcached.example.com',
+          description: 'External Memcached hostname',
         },
       ],
     },
