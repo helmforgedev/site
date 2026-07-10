@@ -240,6 +240,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Bootstrap',
+      collapsible: true,
+      gateField: 'bootstrap.enabled',
+      fields: [
+        {
+          label: 'Permalink Structure',
+          key: 'bootstrap.permalinkStructure',
+          type: 'text',
+          default: '/%postname%/',
+          description: 'Permalink structure applied after install',
+        },
+        {
+          label: 'Bootstrap Locale',
+          key: 'bootstrap.language',
+          type: 'text',
+          default: 'pt_BR',
+          description: 'Optional WordPress locale',
+        },
+      ],
+    },
+    {
       name: 'Resources',
       collapsible: true,
       fields: [
@@ -4823,16 +4844,24 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
-      name: 'Redis Object Cache',
+      name: 'Object Cache',
       collapsible: true,
       gateField: 'objectCache.enabled',
       fields: [
+        {
+          label: 'Provider',
+          key: 'objectCache.provider',
+          type: 'select',
+          default: 'redis',
+          options: ['redis', 'memcached'],
+          description: 'Cache provider',
+        },
         {
           label: 'Plugin Installer',
           key: 'plugins.installer.enabled',
           type: 'toggle',
           default: 'true',
-          description: 'Install redis-cache plugin and drop-in',
+          description: 'Install provider plugin and drop-in when supported',
         },
         {
           label: 'Plugins Enabled',
@@ -4862,6 +4891,28 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: 'redis.example.com',
           description: 'External Redis hostname',
+        },
+        {
+          label: 'Memcached Mode',
+          key: 'objectCache.memcached.mode',
+          type: 'select',
+          default: 'subchart',
+          options: ['subchart', 'external'],
+          description: 'Use Memcached subchart or external Memcached',
+        },
+        {
+          label: 'Memcached Subchart',
+          key: 'objectCache.memcached.subchart.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy HelmForge Memcached dependency',
+        },
+        {
+          label: 'External Memcached Host',
+          key: 'objectCache.memcached.external.host',
+          type: 'text',
+          default: 'memcached.example.com',
+          description: 'External Memcached hostname',
         },
       ],
     },

@@ -109,7 +109,8 @@ export const charts: Chart[] = [
   {
     name: 'WordPress',
     slug: 'wordpress',
-    description: 'WordPress CMS with MySQL, Gateway API, External Secrets, Redis Object Cache, and S3 backup.',
+    description:
+      'WordPress CMS with MySQL, WP-CLI bootstrap, Gateway API, External Secrets, object cache, and S3 backup.',
     maturity: 'stable',
     backup: true,
   },
