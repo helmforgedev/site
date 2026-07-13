@@ -5486,7 +5486,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v1.69.2',
+          default: 'v1.70.0',
           description: 'Homarr image tag',
         },
         {
