@@ -10,7 +10,7 @@ ClickHouse is a fast column-oriented OLAP database. The HelmForge chart deploys 
 
 ## Key Features
 
-- Official `docker.io/clickhouse/clickhouse-server` image pinned to `25.8.28.1`
+- Official `docker.io/clickhouse/clickhouse-server` image pinned to `26.6.1`
 - StatefulSet with persistent `/var/lib/clickhouse`
 - Client Service exposing HTTP `8123` and native TCP `9000`
 - Headless Service for stable pod DNS
@@ -191,6 +191,14 @@ service:
 
 ## Validation
 
+### Upgrading from 25.8
+
+This chart now uses ClickHouse 26.6 stable instead of the 25.8 LTS line. Before
+upgrading a production release, review the upstream 26.6 release notes and test
+application queries, persisted data, and backup restoration. Take a verified
+backup before allowing the StatefulSet rolling update to reuse the existing
+data volume.
+
 After deployment:
 
 ```bash
@@ -218,7 +226,7 @@ Also validate persistence across restart, metrics scraping, password authenticat
 | Parameter                              | Default                                  | Description                                                |
 | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------- |
 | `image.repository`                     | `docker.io/clickhouse/clickhouse-server` | Official ClickHouse image repository.                      |
-| `image.tag`                            | `25.8.28.1`                              | Official full-version image tag.                           |
+| `image.tag`                            | `26.6.1`                                 | Official full-version image tag.                           |
 | `replicaCount`                         | `1`                                      | ClickHouse pod count. Values greater than `1` are blocked. |
 | `clickhouse.database`                  | `default`                                | Initial database on an empty data directory.               |
 | `clickhouse.user`                      | `default`                                | Initial user on an empty data directory.                   |
