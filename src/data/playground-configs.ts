@@ -808,6 +808,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Controller pod count' },
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2.568.1-lts-jdk21',
+          description: 'Pinned Jenkins LTS image tag',
+        },
+        {
           label: 'Jenkins URL',
           key: 'controller.jenkinsUrl',
           type: 'text',
