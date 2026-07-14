@@ -8925,6 +8925,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  poznote: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '6.33.0',
+          description: 'Pinned Poznote image tag',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '1Gi',
+          description: 'SQLite database and attachments storage',
+        },
+      ],
+    },
+  ],
   qdrant: [
     {
       name: 'General',
