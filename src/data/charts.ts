@@ -182,7 +182,7 @@ export const charts: Chart[] = [
     name: 'NetBird',
     slug: 'netbird',
     description: 'Self-hosted WireGuard overlay control plane with dashboard, API, gRPC, signal, relay, and STUN.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {

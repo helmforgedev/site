@@ -154,6 +154,48 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Database',
+      fields: [
+        {
+          label: 'Mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'postgresql', 'external', 'sqlite'],
+          description: 'Store mode; auto uses bundled PostgreSQL unless external database values are set',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge PostgreSQL as the production store',
+        },
+        {
+          label: 'PostgreSQL Size',
+          key: 'postgresql.standalone.persistence.size',
+          type: 'text',
+          default: '8Gi',
+          description: 'PVC size for the bundled PostgreSQL store',
+        },
+        {
+          label: 'External Engine',
+          key: 'database.external.engine',
+          type: 'select',
+          default: 'postgres',
+          options: ['postgres', 'mysql'],
+          description: 'External database engine when database.mode=external',
+        },
+        {
+          label: 'External Host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External PostgreSQL or MySQL host',
+        },
+      ],
+    },
+    {
       name: 'Ingress',
       collapsible: true,
       gateField: 'ingress.enabled',
