@@ -5297,6 +5297,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.10.2',
+          description: 'Pinned Langflow image tag',
+        },
+        {
           label: 'HTTP Port',
           key: 'app.port',
           type: 'number',
