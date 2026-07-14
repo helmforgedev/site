@@ -7835,6 +7835,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.6.45',
+          description: 'Pinned Memcached image tag',
+        },
+        {
           label: 'Architecture',
           key: 'architecture',
           type: 'select',
