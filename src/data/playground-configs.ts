@@ -5936,6 +5936,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2026.07.2',
+          description: 'Pinned Pi-hole image tag',
+        },
+        {
           label: 'Admin Password',
           key: 'admin.password',
           type: 'text',
