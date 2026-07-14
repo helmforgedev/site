@@ -1610,7 +1610,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '3000.16.2',
+          default: '3000.17.0',
           description: 'Pinned OliveTin image tag',
         },
         {
