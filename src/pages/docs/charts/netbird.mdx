@@ -96,24 +96,11 @@ ingress:
   hosts:
     - host: netbird.example.com
       paths:
-        - path: /api
+        - path: /
           pathType: Prefix
           service: server
-        - path: /oauth2
-          pathType: Prefix
-          service: server
-        - path: /relay
-          pathType: Prefix
-          service: server
-        - path: /signalexchange.SignalExchange/
-          pathType: Prefix
-          service: server
-        - path: /management.ManagementService/
-          pathType: Prefix
-          service: server
-        - path: /management.ProxyService/
-          pathType: Prefix
-          service: server
+    - host: dashboard.netbird.example.com
+      paths:
         - path: /
           pathType: Prefix
           service: dashboard
@@ -121,11 +108,12 @@ ingress:
     - secretName: netbird-tls
       hosts:
         - netbird.example.com
+        - dashboard.netbird.example.com
 ```
 
 Expose UDP `3478` for STUN with a LoadBalancer Service, Gateway implementation, or infrastructure-specific UDP listener. Kubernetes Ingress does not handle UDP.
 
-For path-based routing, keep dashboard-only traffic on the dashboard service and send NetBird backend paths to the server service. The server paths include `/api`, `/oauth2`, `/relay`, `/signalexchange.SignalExchange/`, `/management.ManagementService/`, and `/management.ProxyService/`. Configure the ingress controller or gateway to preserve HTTP/2 or h2c behavior for gRPC routes.
+Prefer separate hosts for production ingress: route the NetBird backend host to the server service and the dashboard host to the dashboard service. If you use one host with path-based routing, send `/api`, `/oauth2`, `/relay`, `/ws-proxy/management`, `/ws-proxy/signal`, `/signalexchange.SignalExchange/`, `/management.ManagementService/`, and `/management.ProxyService/` to the server service before any dashboard route. Configure the ingress controller or gateway to preserve HTTP/2 or h2c behavior for gRPC routes.
 
 ## External Secrets
 
