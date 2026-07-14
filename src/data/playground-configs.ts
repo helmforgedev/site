@@ -100,6 +100,125 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  netbird: [
+    {
+      name: 'Server',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'server.publicUrl',
+          type: 'text',
+          default: 'https://netbird.example.com',
+          description: 'External URL used by peers, dashboard, API, gRPC, signal, and relay',
+        },
+        {
+          label: 'Server Tag',
+          key: 'server.image.tag',
+          type: 'text',
+          default: '0.74.4',
+          description: 'Pinned NetBird server image tag',
+        },
+        {
+          label: 'Auth Issuer',
+          key: 'server.auth.issuer',
+          type: 'text',
+          default: 'https://netbird.example.com/oauth2',
+          description: 'OIDC issuer used by the embedded or external identity provider',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Persistent server data under /var/lib/netbird',
+        },
+      ],
+    },
+    {
+      name: 'Dashboard',
+      fields: [
+        {
+          label: 'Dashboard Tag',
+          key: 'dashboard.image.tag',
+          type: 'text',
+          default: 'v2.90.3',
+          description: 'Pinned NetBird dashboard image tag',
+        },
+        {
+          label: 'Client ID',
+          key: 'dashboard.auth.clientId',
+          type: 'text',
+          default: 'netbird',
+          description: 'Dashboard OIDC client ID',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'netbird.example.com',
+          description: 'Ingress host for dashboard and server routes',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'ingress.tls[0].secretName',
+          type: 'text',
+          default: 'netbird-tls',
+          description: 'TLS Secret served by the ingress controller',
+        },
+      ],
+    },
+    {
+      name: 'External Secrets',
+      collapsible: true,
+      gateField: 'externalSecrets.enabled',
+      fields: [
+        {
+          label: 'Secret Name',
+          key: 'externalSecrets.items[0].name',
+          type: 'text',
+          default: 'config',
+          description: 'ExternalSecret suffix for the NetBird config Secret',
+        },
+        {
+          label: 'Store Kind',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.kind',
+          type: 'select',
+          default: 'ClusterSecretStore',
+          options: ['ClusterSecretStore', 'SecretStore'],
+          description: 'External Secrets store scope',
+        },
+        {
+          label: 'Store Name',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.name',
+          type: 'text',
+          default: 'platform-secrets',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+        {
+          label: 'Remote Key',
+          key: 'externalSecrets.items[0].spec.data[0].remoteRef.key',
+          type: 'text',
+          default: 'apps/netbird/config.yaml',
+          description: 'Remote secret key containing config.yaml',
+        },
+      ],
+    },
+  ],
   clickhouse: [
     {
       name: 'Database',
