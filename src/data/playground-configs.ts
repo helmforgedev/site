@@ -8809,6 +8809,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '5.50.0',
+          description: 'Pinned HelmForge Strapi base image tag',
+        },
+        {
           label: 'Replica Count',
           key: 'replicaCount',
           type: 'number',
