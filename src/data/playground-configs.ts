@@ -10781,6 +10781,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v0.62.4',
+          description: 'Pinned Metabase image tag',
+        },
+        {
           label: 'Site URL',
           key: 'metabase.siteUrl',
           type: 'text',
