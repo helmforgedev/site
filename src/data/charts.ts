@@ -172,6 +172,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Certimate',
+    slug: 'certimate',
+    description: 'Self-hosted certificate automation for ACME issuance, renewal, deployment, and monitoring.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'DDNS Updater',
     slug: 'ddns-updater',
     description: 'Dynamic DNS updater with web UI and provider coverage.',

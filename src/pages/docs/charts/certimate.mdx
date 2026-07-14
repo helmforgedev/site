@@ -1,0 +1,144 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Certimate Chart
+description: Certimate Helm chart for self-hosted ACME certificate issuance, deployment, renewal, and monitoring.
+---
+
+# Certimate
+
+Deploy [Certimate](https://github.com/certimate-go/certimate) on Kubernetes as a self-hosted certificate automation platform for ACME issuance, deployment, renewal, and monitoring.
+
+## Overview
+
+The HelmForge Certimate chart uses the official `certimate/certimate:v0.4.26` image. Certimate listens on port `8090` and stores PocketBase state under `/app/pb_data`.
+
+The default topology is a single persistent Deployment replica with a chart-managed PVC. The chart intentionally does not invent an extra application configuration layer: Certimate manages users, provider credentials, ACME accounts, workflows, and issued certificate material inside PocketBase.
+
+## Configuration Reference
+
+Core runtime:
+
+- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Certimate image and pull behavior.
+- `imagePullSecrets`: optional registry pull secrets.
+- `replicaCount`: Certimate pod count. Keep `1` unless using an operator-managed shared claim.
+- `app.port`: HTTP port, default `8090`.
+- `app.timezone`: timezone passed as `TZ`.
+- `app.command`, `app.args`: optional command and argument overrides.
+- `app.env`, `app.envFrom`: additional runtime environment and Secret or ConfigMap imports.
+- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
+
+Storage:
+
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`: data directory storage.
+- `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
+- The chart rejects multiple replicas unless `persistence.existingClaim` is set.
+
+Exposure and operations:
+
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
+- `externalSecrets.enabled`, `externalSecrets.items`: materialize deployment-specific environment secrets with External Secrets Operator.
+- `pdb.enabled`, `pdb.minAvailable`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install certimate helmforge/certimate
+```
+
+OCI install:
+
+```bash
+helm install certimate oci://ghcr.io/helmforgedev/helm/certimate
+```
+
+## Production Example
+
+```yaml
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: certs.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: certimate-tls
+      hosts:
+        - certs.example.com
+
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+  extraEgress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+## External Secrets
+
+Use External Secrets for deployment-specific environment variables when workflows require credentials outside the PocketBase data store:
+
+```yaml
+externalSecrets:
+  enabled: true
+  items:
+    - name: env
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: production
+        target:
+          name: certimate-env
+          creationPolicy: Owner
+        data:
+          - secretKey: CERTIMATE_SMTP_PASSWORD
+            remoteRef:
+              key: apps/certimate
+              property: smtpPassword
+
+app:
+  envFrom:
+    - secretRef:
+        name: certimate-env
+```
+
+## Network Policy
+
+`networkPolicy.enabled=true` restricts inbound HTTP traffic to the configured `networkPolicy.ingressFrom` peers, or to all namespaces when no ingress peers are set. Setting `networkPolicy.extraEgress` also enables egress isolation.
+
+Certimate workflows commonly need HTTPS egress to ACME endpoints, DNS provider APIs, SMTP relays, webhook receivers, SSH/API deployment targets, and internal Kubernetes services. Model those destinations explicitly before enabling strict egress isolation.
+
+## Backup
+
+Back up the PVC in every production deployment. The default `/app/pb_data` directory contains application users, provider credentials, ACME account state, workflow definitions, issued certificates, and audit-relevant history.
+
+## Upgrade Notes
+
+Keep `persistence.mountPath` stable across upgrades. Certimate runs PocketBase migrations on startup, so take a PVC snapshot before upgrading production installs.
+
+## Additional Resources
+
+- [Certimate source](https://github.com/certimate-go/certimate)
+- [Certimate documentation](https://docs.certimate.me)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/certimate)

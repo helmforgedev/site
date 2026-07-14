@@ -8,6 +8,98 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  certimate: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v0.4.26',
+          description: 'Pinned Certimate image tag',
+        },
+        {
+          label: 'HTTP Port',
+          key: 'app.port',
+          type: 'number',
+          default: '8090',
+          description: 'Certimate HTTP port',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'PocketBase data, workflows, credentials, and certificate material',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'certs.example.com',
+          description: 'Ingress host',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'traefik',
+          options: ['traefik', 'nginx'],
+          description: 'Ingress controller class',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'ingress.tls[0].secretName',
+          type: 'text',
+          default: 'certimate-tls',
+          description: 'TLS Secret served by the ingress controller',
+        },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'HTTPS Egress Port',
+          key: 'networkPolicy.extraEgress[0].ports[0].port',
+          type: 'number',
+          default: '443',
+          description: 'Allow ACME, DNS provider APIs, webhooks, and deployment targets over HTTPS',
+        },
+      ],
+    },
+    {
+      name: 'External Secrets',
+      collapsible: true,
+      gateField: 'externalSecrets.enabled',
+      fields: [
+        {
+          label: 'Secret Name',
+          key: 'externalSecrets.items[0].name',
+          type: 'text',
+          default: 'env',
+          description: 'ExternalSecret suffix for deployment-specific environment secrets',
+        },
+        {
+          label: 'Store Name',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.name',
+          type: 'text',
+          default: 'production',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+      ],
+    },
+  ],
   clickhouse: [
     {
       name: 'Database',
