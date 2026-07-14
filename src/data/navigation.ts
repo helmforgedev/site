@@ -84,7 +84,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
       { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'stable' },
       { label: 'NetBird', href: '/docs/charts/netbird', maturity: 'alpha' },
-      { label: 'Certimate', href: '/docs/charts/certimate', maturity: 'alpha' },
+      { label: 'Certimate', href: '/docs/charts/certimate', maturity: 'stable' },
       { label: 'DDNS Updater', href: '/docs/charts/ddns-updater', maturity: 'stable' },
       { label: 'Pi-hole', href: '/docs/charts/pihole', maturity: 'stable' },
       { label: 'AdGuard Home', href: '/docs/charts/adguard-home', maturity: 'stable' },
