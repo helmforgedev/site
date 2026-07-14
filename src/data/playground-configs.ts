@@ -4495,6 +4495,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v2.26.0',
+          description: 'Pinned ntfy image tag',
+        },
+        {
           label: 'Base URL',
           key: 'ntfy.baseUrl',
           type: 'text',
