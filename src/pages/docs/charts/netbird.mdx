@@ -15,6 +15,7 @@ The HelmForge NetBird chart follows the current upstream combined self-hosted ar
 - `netbirdio/netbird-server:0.74.4` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
 - `netbirdio/dashboard:v2.90.3` for the web dashboard
 - Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
+- HelmForge PostgreSQL subchart as the default production store
 - persistent server data under `/var/lib/netbird`
 - separate server and dashboard Services
 - Ingress and Gateway API HTTPRoute support
@@ -33,9 +34,17 @@ Server:
 - `server.config.existingSecret`, `server.config.existingSecretKey`, `server.config.extraYaml`: generated or externally supplied `config.yaml`.
 - `server.auth.issuer`, `server.auth.localAuthDisabled`, `server.auth.signKeyRefreshEnabled`: embedded or external OIDC settings.
 - `server.auth.owner.email`, `server.auth.owner.password`: optional local owner bootstrap.
-- `server.store.engine`, `server.store.dsn`, `server.store.encryptionKey`: sqlite, postgres, or mysql store settings.
+- `server.store.engine`, `server.store.dsn`, `server.store.encryptionKey`: legacy direct sqlite, postgres, or mysql store settings.
 - `server.service.type`, `server.service.httpPort`, `server.service.stunPort`, `server.service.metricsPort`, `server.service.healthPort`.
 - `server.probes.enabled`: opt-in health probes for environments where first boot completes within the configured timeout.
+
+Database:
+
+- `database.mode`: `auto`, `sqlite`, `postgresql`, or `external`.
+- `database.external.engine`: external `postgres` or `mysql`.
+- `database.external.host`, `database.external.port`, `database.external.name`, `database.external.username`.
+- `database.external.password`, `database.external.existingSecret`, `database.external.existingSecretPasswordKey`, `database.external.dsn`.
+- `postgresql.enabled`, `postgresql.auth`, `postgresql.standalone.persistence`: bundled HelmForge PostgreSQL store.
 
 Dashboard:
 
@@ -83,8 +92,15 @@ server:
   auth:
     issuer: https://netbird.example.com/oauth2
   store:
-    engine: sqlite
     encryptionKey: replace-with-a-persistent-encryption-key
+
+database:
+  mode: postgresql
+postgresql:
+  enabled: true
+  auth:
+    database: netbird
+    username: netbird
 
 persistence:
   enabled: true
@@ -143,9 +159,28 @@ externalSecrets:
 
 ## Scaling
 
-The default sqlite store is single-writer. Keep `server.replicaCount: 1` unless you configure an external postgres or mysql store through `server.store`.
+The v1 chart defaults to PostgreSQL through the HelmForge PostgreSQL subchart.
+Use `database.mode=external` for a managed PostgreSQL or MySQL database. Use
+`database.mode=sqlite` with `postgresql.enabled=false` only for lab or small
+single-replica installs.
 
-Even with an external database, scaling `server.replicaCount` above `1` requires a complete HA topology for the combined server components. Plan signal, relay, and STUN exposure with load-balancer affinity and protocol-aware routing before enabling multiple server replicas. If that topology is not in place, keep `server.replicaCount: 1`.
+Even with PostgreSQL or MySQL, scaling `server.replicaCount` above `1` requires a complete HA topology for the combined server components. Plan signal, relay, and STUN exposure with load-balancer affinity and protocol-aware routing before enabling multiple server replicas. If that topology is not in place, keep `server.replicaCount: 1`.
+
+## Upgrade Notes
+
+This v1 hardening release changes the default store from sqlite to PostgreSQL
+subchart mode. Existing sqlite installs that want to keep sqlite should set:
+
+```yaml
+database:
+  mode: sqlite
+postgresql:
+  enabled: false
+```
+
+To migrate production data from sqlite to PostgreSQL, follow the upstream
+NetBird PostgreSQL migration guidance and back up `/var/lib/netbird` before
+switching modes.
 
 Dashboard replicas can scale independently when the backing server and ingress layer are ready for the traffic.
 
