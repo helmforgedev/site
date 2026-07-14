@@ -96,12 +96,27 @@ ingress:
   hosts:
     - host: netbird.example.com
       paths:
-        - path: /
-          pathType: Prefix
-          service: dashboard
         - path: /api
           pathType: Prefix
           service: server
+        - path: /oauth2
+          pathType: Prefix
+          service: server
+        - path: /relay
+          pathType: Prefix
+          service: server
+        - path: /signalexchange.SignalExchange/
+          pathType: Prefix
+          service: server
+        - path: /management.ManagementService/
+          pathType: Prefix
+          service: server
+        - path: /management.ProxyService/
+          pathType: Prefix
+          service: server
+        - path: /
+          pathType: Prefix
+          service: dashboard
   tls:
     - secretName: netbird-tls
       hosts:
@@ -109,6 +124,8 @@ ingress:
 ```
 
 Expose UDP `3478` for STUN with a LoadBalancer Service, Gateway implementation, or infrastructure-specific UDP listener. Kubernetes Ingress does not handle UDP.
+
+For path-based routing, keep dashboard-only traffic on the dashboard service and send NetBird backend paths to the server service. The server paths include `/api`, `/oauth2`, `/relay`, `/signalexchange.SignalExchange/`, `/management.ManagementService/`, and `/management.ProxyService/`. Configure the ingress controller or gateway to preserve HTTP/2 or h2c behavior for gRPC routes.
 
 ## External Secrets
 
@@ -139,6 +156,8 @@ externalSecrets:
 ## Scaling
 
 The default sqlite store is single-writer. Keep `server.replicaCount: 1` unless you configure an external postgres or mysql store through `server.store`.
+
+Even with an external database, scaling `server.replicaCount` above `1` requires a complete HA topology for the combined server components. Plan signal, relay, and STUN exposure with load-balancer affinity and protocol-aware routing before enabling multiple server replicas. If that topology is not in place, keep `server.replicaCount: 1`.
 
 Dashboard replicas can scale independently when the backing server and ingress layer are ready for the traffic.
 

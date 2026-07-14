@@ -195,6 +195,21 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'ExternalSecret suffix for the NetBird config Secret',
         },
         {
+          label: 'Store Kind',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.kind',
+          type: 'select',
+          default: 'ClusterSecretStore',
+          options: ['ClusterSecretStore', 'SecretStore'],
+          description: 'External Secrets store scope',
+        },
+        {
+          label: 'Store Name',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.name',
+          type: 'text',
+          default: 'platform-secrets',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+        {
           label: 'Remote Key',
           key: 'externalSecrets.items[0].spec.data[0].remoteRef.key',
           type: 'text',
