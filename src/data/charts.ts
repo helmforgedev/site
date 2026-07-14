@@ -175,7 +175,7 @@ export const charts: Chart[] = [
     name: 'Certimate',
     slug: 'certimate',
     description: 'Self-hosted certificate automation for ACME issuance, renewal, deployment, and monitoring.',
-    maturity: 'alpha',
+    maturity: 'stable',
     backup: false,
   },
   {
