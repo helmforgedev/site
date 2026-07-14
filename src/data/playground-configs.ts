@@ -193,6 +193,21 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '',
           description: 'External PostgreSQL or MySQL host',
         },
+        {
+          label: 'External Port',
+          key: 'database.external.port',
+          type: 'text',
+          default: '5432',
+          description: 'External database port; MySQL users should set 3306',
+        },
+        {
+          label: 'PostgreSQL SSL Mode',
+          key: 'database.external.sslMode',
+          type: 'select',
+          default: 'prefer',
+          options: ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'],
+          description: 'PostgreSQL sslmode when using an external PostgreSQL database',
+        },
       ],
     },
     {
