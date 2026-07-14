@@ -4349,20 +4349,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
-  'kubernetes-mcp-server': [
-    {
-      name: 'General',
-      fields: [
-        {
-          label: 'Image Tag',
-          key: 'image.tag',
-          type: 'text',
-          default: 'v0.0.64',
-          description: 'Pinned Kubernetes MCP Server image tag',
-        },
-      ],
-    },
-  ],
   n8n: [
     {
       name: 'General',
@@ -9342,6 +9328,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
     {
       name: 'Server',
       fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v0.0.64',
+          description: 'Pinned Kubernetes MCP Server image tag',
+        },
         {
           label: 'HTTP Port',
           key: 'app.port',
