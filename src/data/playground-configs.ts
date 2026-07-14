@@ -4247,6 +4247,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Deployment mode',
         },
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '26.7.0',
+          description: 'Pinned Keycloak image tag',
+        },
+        {
           label: 'Replica Count',
           key: 'replicaCount',
           type: 'number',
