@@ -2135,6 +2135,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
     {
       name: 'General',
       fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '11.0.24-jdk17-temurin-noble',
+          description: 'Pinned Tomcat image tag',
+        },
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Tomcat pod count' },
         {
           label: 'Default ROOT',
