@@ -179,6 +179,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'NetBird',
+    slug: 'netbird',
+    description: 'Self-hosted WireGuard overlay control plane with dashboard, API, gRPC, signal, relay, and STUN.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'DDNS Updater',
     slug: 'ddns-updater',
     description: 'Dynamic DNS updater with web UI and provider coverage.',

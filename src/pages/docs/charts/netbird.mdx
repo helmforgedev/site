@@ -1,0 +1,149 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: NetBird Chart
+description: NetBird Helm chart for a self-hosted WireGuard overlay control plane with dashboard, API, gRPC, signal, relay, and STUN exposure.
+---
+
+# NetBird
+
+Deploy [NetBird](https://github.com/netbirdio/netbird) on Kubernetes as a self-hosted WireGuard overlay control plane for device management, identity-aware access, and peer coordination.
+
+## Overview
+
+The HelmForge NetBird chart follows the current upstream combined self-hosted architecture:
+
+- `netbirdio/netbird-server:0.74.4` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
+- `netbirdio/dashboard:v2.90.3` for the web dashboard
+- Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
+- persistent server data under `/var/lib/netbird`
+- separate server and dashboard Services
+- Ingress and Gateway API HTTPRoute support
+- UDP `3478` Service exposure for STUN
+- External Secrets Operator, NetworkPolicy, PDB, dual-stack service fields, and Helm tests
+
+## Configuration Reference
+
+Server:
+
+- `server.image.repository`, `server.image.tag`, `server.image.pullPolicy`: official pinned NetBird server image.
+- `server.replicaCount`: server pod count. Keep `1` with the default sqlite store.
+- `server.publicUrl`: externally reachable URL for dashboard, API, gRPC, signal, and relay traffic.
+- `server.authSecret`: shared server auth secret. Replace the default before production use.
+- `server.disableAnonymousMetrics`, `server.disableGeoliteUpdate`: upstream telemetry and GeoLite controls.
+- `server.config.existingSecret`, `server.config.existingSecretKey`, `server.config.extraYaml`: generated or externally supplied `config.yaml`.
+- `server.auth.issuer`, `server.auth.localAuthDisabled`, `server.auth.signKeyRefreshEnabled`: embedded or external OIDC settings.
+- `server.auth.owner.email`, `server.auth.owner.password`: optional local owner bootstrap.
+- `server.store.engine`, `server.store.dsn`, `server.store.encryptionKey`: sqlite, postgres, or mysql store settings.
+- `server.service.type`, `server.service.httpPort`, `server.service.stunPort`, `server.service.metricsPort`, `server.service.healthPort`.
+- `server.probes.enabled`: opt-in health probes for environments where first boot completes within the configured timeout.
+
+Dashboard:
+
+- `dashboard.enabled`: deploy the dashboard UI.
+- `dashboard.image.repository`, `dashboard.image.tag`, `dashboard.image.pullPolicy`: official pinned dashboard image.
+- `dashboard.replicaCount`: dashboard pod count.
+- `dashboard.auth.clientId`, `dashboard.auth.audience`, `dashboard.auth.supportedScopes`, `dashboard.auth.tokenSource`, `dashboard.auth.useAuth0`: dashboard OIDC environment.
+- `dashboard.securityContext`: dashboard-specific runtime security context for upstream supervisord and nginx.
+- `dashboard.service.type`, `dashboard.service.port`, `dashboard.service.annotations`, `dashboard.service.ipFamilyPolicy`, `dashboard.service.ipFamilies`.
+
+Shared operations:
+
+- `imagePullSecrets`, `commonLabels`, `nameOverride`, `fullnameOverride`.
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`, `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
+- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
+- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
+- `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
+- `externalSecrets.enabled`, `externalSecrets.items`.
+- `pdb.enabled`, `pdb.minAvailable`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
+- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
+- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install netbird helmforge/netbird --namespace netbird --create-namespace
+```
+
+OCI install:
+
+```bash
+helm install netbird oci://ghcr.io/helmforgedev/helm/netbird --namespace netbird --create-namespace
+```
+
+## Production Example
+
+```yaml
+server:
+  publicUrl: https://netbird.example.com
+  authSecret: replace-with-a-strong-random-secret
+  auth:
+    issuer: https://netbird.example.com/oauth2
+  store:
+    engine: sqlite
+    encryptionKey: replace-with-a-persistent-encryption-key
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: netbird.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: dashboard
+        - path: /api
+          pathType: Prefix
+          service: server
+  tls:
+    - secretName: netbird-tls
+      hosts:
+        - netbird.example.com
+```
+
+Expose UDP `3478` for STUN with a LoadBalancer Service, Gateway implementation, or infrastructure-specific UDP listener. Kubernetes Ingress does not handle UDP.
+
+## External Secrets
+
+Use External Secrets for a full upstream `config.yaml` or sensitive bootstrap data:
+
+```yaml
+server:
+  config:
+    existingSecret: netbird-config
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: config
+      spec:
+        secretStoreRef:
+          kind: ClusterSecretStore
+          name: production
+        target:
+          name: netbird-config
+          creationPolicy: Owner
+        data:
+          - secretKey: config.yaml
+            remoteRef:
+              key: apps/netbird/config.yaml
+```
+
+## Scaling
+
+The default sqlite store is single-writer. Keep `server.replicaCount: 1` unless you configure an external postgres or mysql store through `server.store`.
+
+Dashboard replicas can scale independently when the backing server and ingress layer are ready for the traffic.
+
+## Additional Resources
+
+- [NetBird source](https://github.com/netbirdio/netbird)
+- [NetBird self-hosting docs](https://docs.netbird.io/selfhosted/selfhosted-quickstart)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/netbird)
