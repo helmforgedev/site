@@ -13,6 +13,12 @@ Deploy [Gitea](https://gitea.io/) on Kubernetes — a lightweight self-hosted Gi
 web UI, issue tracking, CI/CD (Gitea Actions), package registry, and SSH access. The chart uses the
 official **rootless** image (UID 1000) for improved security.
 
+<Callout type="warning" title="Gitea 1.27 upgrade">
+  Gitea 1.27 changes reusable Actions workflow behavior and requires per-request CSP nonces for inline scripts. Review
+  custom workflows, templates, themes, and embeds before upgrading. Back up repositories and the database first because
+  Gitea applies required database migrations during the initial startup.
+</Callout>
+
 <Callout type="warning" title="gitea.rootUrl is required — wrong value breaks all clone URLs and webhooks">
   Gitea uses `gitea.rootUrl` to construct all clone URLs, webhook callback addresses, and OAuth redirect URIs. If this
   value is wrong or missing, users will see incorrect clone URLs and webhooks will fail silently. Always set it to the
@@ -265,7 +271,7 @@ backup:
 | Parameter          | Type   | Default                 | Description                    |
 | ------------------ | ------ | ----------------------- | ------------------------------ |
 | `image.repository` | string | `docker.io/gitea/gitea` | Gitea image.                   |
-| `image.tag`        | string | `"1.26.2-rootless"`     | Rootless image tag (UID 1000). |
+| `image.tag`        | string | `"1.27.0-rootless"`     | Rootless image tag (UID 1000). |
 
 ### Gitea Configuration
 
