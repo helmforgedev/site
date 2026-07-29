@@ -15,6 +15,8 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
   - Production HA profile (DaemonSet, anti-affinity)
 
 - **Gateway API Native**: First-class Gateway API support
+  - Envoy Gateway and Gateway API experimental v1.5.1 CRDs installed by default
+  - `crds.enabled=false` support for platform-managed CRDs
   - Working Gateway and HTTPRoute examples
   - Global `gatewayAPI.enabled` gate for helper resources
   - Automated GatewayClass creation
@@ -77,7 +79,6 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 - Kubernetes 1.24+ (Gateway API v1 support)
 - Helm 3.8+
-- Gateway API CRDs installed (see Quick Start)
 
 ### HTTPS Repository (Recommended)
 
@@ -105,11 +106,11 @@ kubectl get gateway,httproute -A
 
 ## Quick Start
 
-### 1. Install Gateway API CRDs
+### 1. Install Envoy Gateway
 
-```bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
-```
+The chart installs the Envoy Gateway and Gateway API experimental v1.5.1 CRDs
+by default. Use `--set crds.enabled=false` only when all required CRDs are
+managed externally.
 
 ### 2. Choose a Profile
 
@@ -1196,6 +1197,7 @@ clientTrafficPolicy:
 | ------------------------ | -------------------------------------------------------------------------- | -------- |
 | `profile`                | Profile preset (dev/production-ha/custom)                                  | `custom` |
 | `namespaceOverride`      | Namespace for chart-managed resources; target namespace must already exist | `""`     |
+| `crds.enabled`           | Install bundled Envoy Gateway and Gateway API experimental CRDs            | `true`   |
 | `nameOverride`           | Override chart name                                                        | `""`     |
 | `fullnameOverride`       | Override full name                                                         | `""`     |
 | `imagePullSecrets`       | Image pull secrets                                                         | `[]`     |
@@ -1396,10 +1398,7 @@ HTTPRoute, EnvoyProxy, `BackendTrafficPolicy`, and `SecurityPolicy` resources.
 Deploy Envoy Gateway for local testing:
 
 ```bash
-# Install Gateway API CRDs
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
-
-# Install with dev profile
+# Install CRDs and the controller with the dev profile
 helm install envoy-gateway helmforge/envoy-gateway \
   --set profile=dev
 
@@ -2303,8 +2302,8 @@ First stable release with complete P1 (MVP) and P2 (Production) features.
 
 | Field                  | Value      |
 | ---------------------- | ---------- |
-| **Chart Version**      | 1.3.0      |
-| **App Version**        | v1.7.3     |
+| **Chart Version**      | 1.7.4      |
+| **App Version**        | v1.8.2     |
 | **Kubernetes Version** | >= 1.24    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |
