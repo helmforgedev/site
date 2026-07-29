@@ -97,6 +97,24 @@ This is useful for local clusters, demos, and CI smoke tests. For production, us
 operator-managed PostgreSQL, TLS termination, resource requests and limits, backup or database-native backup, and
 NetworkPolicy rules aligned with your cluster networking.
 
+### Database readiness init container
+
+Umami waits for the configured PostgreSQL socket before starting. The readiness
+container uses the pinned official BusyBox image by default, and its image and
+pull policy can be replaced for private-registry or air-gapped environments:
+
+```yaml
+initContainers:
+  waitForDatabase:
+    enabled: true
+    image: registry.example.com/platform/busybox:1.37
+    pullPolicy: IfNotPresent
+```
+
+Disable `initContainers.waitForDatabase.enabled` only when another platform
+component guarantees database readiness, such as an injected init container or
+an externally managed startup dependency.
+
 ## Deployment Examples
 
 <DocsTabs
@@ -456,26 +474,29 @@ state.
 
 ### Database
 
-| Parameter                                                | Type    | Default                                    | Description                                                           |
-| -------------------------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------------------------------- |
-| `postgresql.enabled`                                     | boolean | `true`                                     | Deploy bundled HelmForge PostgreSQL.                                  |
-| `postgresql.architecture`                                | string  | `standalone`                               | PostgreSQL subchart architecture.                                     |
-| `postgresql.auth.database`                               | string  | `umami`                                    | Database created by the subchart.                                     |
-| `postgresql.auth.username`                               | string  | `umami`                                    | Application database user.                                            |
-| `postgresql.auth.password`                               | string  | `""`                                       | PostgreSQL password, generated when empty.                            |
-| `postgresql.serviceAccount.automountServiceAccountToken` | boolean | `false`                                    | Disable API token mount in PostgreSQL pods by default.                |
-| `database.external.host`                                 | string  | `""`                                       | External PostgreSQL host.                                             |
-| `database.external.port`                                 | string  | `"5432"`                                   | External PostgreSQL port.                                             |
-| `database.external.name`                                 | string  | `umami`                                    | External database name.                                               |
-| `database.external.username`                             | string  | `umami`                                    | External database user.                                               |
-| `database.external.password`                             | string  | `""`                                       | Inline external database password. Prefer Secret or External Secrets. |
-| `database.external.existingSecret`                       | string  | `""`                                       | Existing Secret with the database password.                           |
-| `database.external.existingSecretPasswordKey`            | string  | `password`                                 | Password key in the existing Secret.                                  |
-| `database.external.init.enabled`                         | boolean | `false`                                    | Run external database preparation before Umami starts.                |
-| `database.external.init.image`                           | string  | `docker.io/library/postgres:18-alpine`     | PostgreSQL client image for init.                                     |
-| `database.external.init.adminUsername`                   | string  | `postgres`                                 | Admin user used only by init.                                         |
-| `database.external.init.adminExistingSecret`             | string  | `""`                                       | Secret containing the admin password.                                 |
-| `database.external.init.sql`                             | string  | `CREATE EXTENSION IF NOT EXISTS pgcrypto;` | SQL executed by the init container.                                   |
+| Parameter                                                | Type    | Default                                    | Description                                                            |
+| -------------------------------------------------------- | ------- | ------------------------------------------ | ---------------------------------------------------------------------- |
+| `postgresql.enabled`                                     | boolean | `true`                                     | Deploy bundled HelmForge PostgreSQL.                                   |
+| `postgresql.architecture`                                | string  | `standalone`                               | PostgreSQL subchart architecture.                                      |
+| `postgresql.auth.database`                               | string  | `umami`                                    | Database created by the subchart.                                      |
+| `postgresql.auth.username`                               | string  | `umami`                                    | Application database user.                                             |
+| `postgresql.auth.password`                               | string  | `""`                                       | PostgreSQL password, generated when empty.                             |
+| `postgresql.serviceAccount.automountServiceAccountToken` | boolean | `false`                                    | Disable API token mount in PostgreSQL pods by default.                 |
+| `database.external.host`                                 | string  | `""`                                       | External PostgreSQL host.                                              |
+| `database.external.port`                                 | string  | `"5432"`                                   | External PostgreSQL port.                                              |
+| `database.external.name`                                 | string  | `umami`                                    | External database name.                                                |
+| `database.external.username`                             | string  | `umami`                                    | External database user.                                                |
+| `database.external.password`                             | string  | `""`                                       | Inline external database password. Prefer Secret or External Secrets.  |
+| `database.external.existingSecret`                       | string  | `""`                                       | Existing Secret with the database password.                            |
+| `database.external.existingSecretPasswordKey`            | string  | `password`                                 | Password key in the existing Secret.                                   |
+| `database.external.init.enabled`                         | boolean | `false`                                    | Run external database preparation before Umami starts.                 |
+| `database.external.init.image`                           | string  | `docker.io/library/postgres:18-alpine`     | PostgreSQL client image for init.                                      |
+| `database.external.init.adminUsername`                   | string  | `postgres`                                 | Admin user used only by init.                                          |
+| `database.external.init.adminExistingSecret`             | string  | `""`                                       | Secret containing the admin password.                                  |
+| `database.external.init.sql`                             | string  | `CREATE EXTENSION IF NOT EXISTS pgcrypto;` | SQL executed by the init container.                                    |
+| `initContainers.waitForDatabase.enabled`                 | boolean | `true`                                     | Wait for the database socket before Umami starts.                      |
+| `initContainers.waitForDatabase.image`                   | string  | `docker.io/library/busybox:1.37`           | Image used by the database readiness check; private mirrors supported. |
+| `initContainers.waitForDatabase.pullPolicy`              | string  | `IfNotPresent`                             | Pull policy for the database readiness image.                          |
 
 ### Service, Ingress, Gateway, and PDB
 
