@@ -51,7 +51,9 @@ Dashboard:
 - `dashboard.enabled`: deploy the dashboard UI.
 - `dashboard.image.repository`, `dashboard.image.tag`, `dashboard.image.pullPolicy`: official pinned dashboard image.
 - `dashboard.replicaCount`: dashboard pod count.
-- `dashboard.auth.clientId`, `dashboard.auth.audience`, `dashboard.auth.supportedScopes`, `dashboard.auth.tokenSource`, `dashboard.auth.useAuth0`: dashboard OIDC environment.
+- `dashboard.auth.clientId`, `dashboard.auth.audience`, `dashboard.auth.supportedScopes`: dashboard OIDC identity and scopes.
+- `dashboard.auth.redirectUri`, `dashboard.auth.silentRedirectUri`: interactive and silent dashboard callbacks.
+- `dashboard.auth.tokenSource`, `dashboard.auth.useAuth0`: dashboard token and provider mode.
 - `dashboard.securityContext`: dashboard-specific runtime security context for upstream supervisord and nginx.
 - `dashboard.service.type`, `dashboard.service.port`, `dashboard.service.annotations`, `dashboard.service.ipFamilyPolicy`, `dashboard.service.ipFamilies`.
 
@@ -85,6 +87,10 @@ helm install netbird oci://ghcr.io/helmforgedev/helm/netbird --namespace netbird
 
 ## Production Example
 
+The embedded identity provider expects dashboard and server callbacks on the
+same public hostname. The defaults use the `netbird-dashboard` client and the
+`/nb-auth` and `/nb-silent-auth` callback paths:
+
 ```yaml
 server:
   publicUrl: https://netbird.example.com
@@ -93,6 +99,14 @@ server:
     issuer: https://netbird.example.com/oauth2
   store:
     encryptionKey: replace-with-a-persistent-encryption-key
+
+dashboard:
+  auth:
+    clientId: netbird-dashboard
+    audience: netbird-dashboard
+    supportedScopes: openid profile email groups
+    redirectUri: /nb-auth
+    silentRedirectUri: /nb-silent-auth
 
 database:
   mode: postgresql
@@ -114,17 +128,14 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-          service: server
-    - host: dashboard.netbird.example.com
-      paths:
-        - path: /
-          pathType: Prefix
           service: dashboard
+        - path: /api
+          pathType: Prefix
+          service: server
   tls:
     - secretName: netbird-tls
       hosts:
         - netbird.example.com
-        - dashboard.netbird.example.com
 ```
 
 Expose UDP `3478` for STUN with a LoadBalancer Service, Gateway implementation, or infrastructure-specific UDP listener. Kubernetes Ingress does not handle UDP.
