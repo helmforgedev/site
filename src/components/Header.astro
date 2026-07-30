@@ -348,13 +348,13 @@ function isDropdownActive(items: NavLink[]): boolean {
             focusMenuItem(firstItem);
             focusFrame = requestAnimationFrame(() => {
               focusFrame = undefined;
-              if (document.activeElement !== firstItem) {
+              if (document.activeElement === trigger) {
                 focusMenuItem(firstItem);
               }
             });
             focusTimeouts = [50, 150].map((delay) =>
               setTimeout(() => {
-                if (document.activeElement !== firstItem) {
+                if (document.activeElement === trigger) {
                   focusMenuItem(firstItem);
                 }
               }, delay),
@@ -381,17 +381,21 @@ function isDropdownActive(items: NavLink[]): boolean {
         item.addEventListener('keydown', (e) => {
           if (e.key === 'Home') {
             e.preventDefault();
+            clearPendingFocusRetries();
             if (menuItems[0]) focusMenuItem(menuItems[0]);
           } else if (e.key === 'End') {
             e.preventDefault();
+            clearPendingFocusRetries();
             const lastItem = menuItems[menuItems.length - 1];
             if (lastItem) focusMenuItem(lastItem);
           } else if (e.key === 'ArrowDown') {
             e.preventDefault();
+            clearPendingFocusRetries();
             const nextItem = menuItems[Math.min(i + 1, menuItems.length - 1)];
             if (nextItem) focusMenuItem(nextItem);
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
+            clearPendingFocusRetries();
             if (i === 0) {
               trigger.focus();
               hide();

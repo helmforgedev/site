@@ -99,8 +99,16 @@ test.describe('Accessibility', () => {
 
     // ArrowDown should open dropdown and focus first item
     await page.keyboard.press('ArrowDown');
-    const firstItem = nav.locator('[role="menuitem"]').first();
+    const menuItems = toolsBtn.locator('..').getByRole('menuitem');
+    const firstItem = menuItems.first();
     await expectDomFocus(firstItem);
+
+    // Pending focus retries must not override subsequent menu navigation.
+    await page.keyboard.press('End');
+    const lastItem = menuItems.last();
+    await expectDomFocus(lastItem);
+    await page.waitForTimeout(200);
+    await expectDomFocus(lastItem);
 
     // Escape should close and return focus to trigger
     await page.keyboard.press('Escape');
