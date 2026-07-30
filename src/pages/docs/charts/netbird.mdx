@@ -12,7 +12,7 @@ Deploy [NetBird](https://github.com/netbirdio/netbird) on Kubernetes as a self-h
 
 The HelmForge NetBird chart follows the current upstream combined self-hosted architecture:
 
-- `netbirdio/netbird-server:0.74.7` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
+- `netbirdio/netbird-server:0.75.0` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
 - `netbirdio/dashboard:v2.90.3` for the web dashboard
 - Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
 - HelmForge PostgreSQL subchart as the default production store
@@ -178,6 +178,28 @@ single-replica installs.
 Even with PostgreSQL or MySQL, scaling `server.replicaCount` above `1` requires a complete HA topology for the combined server components. Plan signal, relay, and STUN exposure with load-balancer affinity and protocol-aware routing before enabling multiple server replicas. If that topology is not in place, keep `server.replicaCount: 1`.
 
 ## Upgrade Notes
+
+NetBird `0.75.0` improves the combined server's management, relay, and
+self-hosting paths. It adds account settings for dashboard and agent-network
+features, source and destination traffic filters, trusted-proxy handling for
+relay client addresses, and a unified admin CLI. The redesigned desktop client
+announced in this upstream release is distributed separately and is not part of
+this server chart.
+
+No chart value migration is required when upgrading from `0.74.7`. Back up the
+configured database and `/var/lib/netbird`, then apply the new chart defaults
+while preserving your explicit overrides:
+
+```bash
+helm repo update helmforge
+helm upgrade netbird helmforge/netbird \
+  --version 1.0.3 \
+  --namespace netbird \
+  --reset-then-reuse-values
+```
+
+Using `--reuse-values` alone retains the previous image tag and does not deploy
+NetBird `0.75.0`.
 
 This v1 hardening release changes the default store from sqlite to PostgreSQL
 subchart mode. Existing sqlite installs that want to keep sqlite should set:
