@@ -19,13 +19,14 @@ backed by MySQL.
 - **Memberships and newsletters** — built-in subscription tiers and email newsletter delivery
 - **Headless CMS API** — Content API and Admin API for frontend frameworks and integrations
 - **MySQL backend** — bundled subchart or external MySQL database
-- **Content persistence** — PVC-backed content directory for images, media, and uploaded files
+- **Content persistence** — PVC-backed content directory for media, themes, routes, and redirects
 - **S3 content backup** — scheduled archive of the Ghost content directory to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
 
-<Callout type="info" title="Ghost 6.53.0">
-  This release strengthens spam-signup protection, adds adapter boot-time validation, improves author selection and
-  analytics performance, and fixes expired-session and editor-state issues. No chart configuration changes are required.
+<Callout type="info" title="Ghost 6.54.0">
+  This release adds inline editing for routes and redirects, support for adapters installed outside the content
+  directory, member labels, complimentary subscriptions, and member avatars in themes. It also hardens filename
+  generation and fixes unsafe helper output and CSV import edge cases.
 </Callout>
 
 ## Installation
@@ -50,8 +51,10 @@ helm install ghost oci://ghcr.io/helmforgedev/helm/ghost
   tabs={[
     { id: 'basic', label: 'Basic' },
     { id: 'external-db', label: 'External MySQL' },
+    { id: 'external-secrets', label: 'External Secrets' },
     { id: 'email', label: 'With Email (SMTP)' },
     { id: 'backup', label: 'With S3 Backup' },
+    { id: 'custom-adapter', label: 'Custom Adapter Image' },
   ]}
 >
 
@@ -113,6 +116,41 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+# values.yaml — external MySQL password synchronized by External Secrets Operator
+ghost:
+  url: 'https://blog.example.com'
+
+mysql:
+  enabled: false
+
+database:
+  external:
+    host: mysql.database.svc
+    port: '3306'
+    name: ghost
+    username: ghost
+    existingSecret: ghost-db-credentials
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: ghost-db-credentials
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        data:
+          - secretKey: password
+            remoteRef:
+              key: ghost/database
+              property: password
 ```
 
 </div>
@@ -191,6 +229,27 @@ backup:
 
 </div>
 
+<div data-tab-panel="custom-adapter">
+
+```yaml
+# values.yaml — custom Ghost image with adapters outside the content PVC
+image:
+  repository: registry.example.com/ghost-with-adapters
+  tag: '6.54.0'
+
+ghost:
+  url: 'https://blog.example.com'
+  extraEnv:
+    - name: paths__installedAdaptersPath
+      value: /opt/ghost/adapters
+```
+
+Build `/opt/ghost/adapters` into the custom image. Keeping installed adapters
+outside `/var/lib/ghost/content` prevents the content PVC from shadowing them
+when the container starts.
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -208,7 +267,7 @@ backup:
 | Parameter          | Type   | Default                   | Description                          |
 | ------------------ | ------ | ------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/ghost` | Ghost container image.               |
-| `image.tag`        | string | `"6.53.0"`                | Image tag.                           |
+| `image.tag`        | string | `"6.54.0"`                | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                      | Pull secrets for private registries. |
 
@@ -236,6 +295,12 @@ backup:
   (SMTP)" example above.
 </Callout>
 
+<Callout type="tip" title="Keep installed adapters outside the content PVC">
+  Ghost 6.54.0 accepts `paths__installedAdaptersPath` for custom container images. Set it through `ghost.extraEnv` to
+  the directory baked into the image. Do not place that directory under `/var/lib/ghost/content`, because the content
+  PVC replaces that path at runtime.
+</Callout>
+
 ### Database — Embedded Subchart
 
 | Parameter             | Type    | Default      | Description                                  |
@@ -258,23 +323,42 @@ backup:
 | `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
 | `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
 
+### External Secrets
+
+Install [External Secrets Operator](https://external-secrets.io/latest/) separately before enabling this integration.
+The chart renders `external-secrets.io/v1` resources and supports multiple complete definitions through
+`externalSecrets.items`. Each item must set `name` or `fullnameOverride` so every resource has a unique identity.
+
+| Parameter                         | Type    | Default | Description                                                     |
+| --------------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `externalSecrets.enabled`         | boolean | `false` | Render ExternalSecret resources.                                |
+| `externalSecrets.refreshInterval` | string  | `1h`    | Default sync interval for items without `spec.refreshInterval`. |
+| `externalSecrets.items`           | array   | `[]`    | Complete ExternalSecret definitions with metadata and `spec`.   |
+
+<Callout type="warning" title="Keep the projected Secret name aligned">
+  Set `database.external.existingSecret` to the same name rendered by the database ExternalSecret. Using
+  `items[].fullnameOverride` provides a stable literal name. The matching item must project the configured password key
+  through `spec.data`, or use `spec.dataFrom`. The legacy `secretStoreRef` and `data` fields remain compatible for
+  existing releases, but new configurations should use `externalSecrets.items`.
+</Callout>
+
 ### Content Persistence
 
-| Parameter                   | Type    | Default             | Description                                                        |
-| --------------------------- | ------- | ------------------- | ------------------------------------------------------------------ |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/lib/ghost/content` (images, media, themes). |
-| `persistence.size`          | string  | `10Gi`              | PVC size.                                                          |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                          |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                  |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                       |
+| Parameter                   | Type    | Default             | Description                                                                   |
+| --------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/lib/ghost/content` (media, themes, routes, redirects). |
+| `persistence.size`          | string  | `10Gi`              | PVC size.                                                                     |
+| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                                     |
+| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                             |
+| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                                  |
 
 ### Backup
 
 <Callout type="warning" title="S3 backup covers content files only — not the MySQL database">
   The S3 backup CronJob archives the Ghost content directory (`/var/lib/ghost/content`) — uploaded images, media files,
-  and custom themes. It does **not** back up the MySQL database, which contains posts, members, settings, and newsletter
-  data. Configure a separate MySQL backup strategy (e.g. the HelmForge MySQL chart backup feature) to protect the full
-  Ghost dataset.
+  custom themes, `routes.yaml`, and `redirects.yaml`. It does **not** back up the MySQL database, which contains posts,
+  members, settings, and newsletter data. Configure a separate MySQL backup strategy (e.g. the HelmForge MySQL chart
+  backup feature) to protect the full Ghost dataset.
 </Callout>
 
 | Parameter                              | Type    | Default                          | Description                                                  |

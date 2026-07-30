@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import type { Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 const pagesToTest = [
   { name: 'Homepage', path: '/' },
@@ -16,6 +16,17 @@ const pagesToTest = [
 
 async function expectDomFocus(locator: Locator) {
   await expect.poll(async () => locator.evaluate((element) => element === document.activeElement)).toBe(true);
+}
+
+async function tabTo(page: Page, locator: Locator, maxTabs = 12) {
+  for (let i = 0; i < maxTabs; i++) {
+    await page.keyboard.press('Tab');
+    if (await locator.evaluate((element) => element === document.activeElement)) {
+      return;
+    }
+  }
+
+  await expectDomFocus(locator);
 }
 
 test.describe('Accessibility', () => {
@@ -81,20 +92,28 @@ test.describe('Accessibility', () => {
 
     const toolsBtn = nav.getByRole('button', { name: 'Tools' });
 
-    // Keyboard users reach Tools after skip link, logo, Docs, and Blog.
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press('Tab');
-    }
+    // Keyboard users can reach Tools even when browsers expose a different
+    // number of focusable controls before the desktop navigation.
+    await tabTo(page, toolsBtn);
     await expectDomFocus(toolsBtn);
 
     // ArrowDown should open dropdown and focus first item
     await page.keyboard.press('ArrowDown');
-    const firstItem = nav.locator('[role="menuitem"]').first();
+    const menuItems = toolsBtn.locator('..').getByRole('menuitem');
+    const firstItem = menuItems.first();
     await expectDomFocus(firstItem);
+
+    // Pending focus retries must not override subsequent menu navigation.
+    await page.keyboard.press('End');
+    const lastItem = menuItems.last();
+    await expectDomFocus(lastItem);
+    await page.waitForTimeout(200);
+    await expectDomFocus(lastItem);
 
     // Escape should close and return focus to trigger
     await page.keyboard.press('Escape');
     await expectDomFocus(toolsBtn);
+    await expect(toolsBtn).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('tab panels have proper ARIA roles', async ({ page }) => {

@@ -268,6 +268,18 @@ function isDropdownActive(items: NavLink[]): boolean {
       const menu = dropdown.querySelector('.nav-dropdown-menu') as HTMLElement;
       const menuItems = menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
       let timeout: ReturnType<typeof setTimeout>;
+      let focusFrame: number | undefined;
+      let focusTimeouts: ReturnType<typeof setTimeout>[] = [];
+      let returningFocusToTrigger = false;
+
+      function clearPendingFocusRetries() {
+        if (focusFrame !== undefined) {
+          cancelAnimationFrame(focusFrame);
+          focusFrame = undefined;
+        }
+        focusTimeouts.forEach(clearTimeout);
+        focusTimeouts = [];
+      }
 
       function focusMenuItem(item: HTMLAnchorElement) {
         menuItems.forEach((menuItem) => {
@@ -287,6 +299,7 @@ function isDropdownActive(items: NavLink[]): boolean {
       }
 
       function hide() {
+        clearPendingFocusRetries();
         timeout = setTimeout(() => {
           trigger.setAttribute('aria-expanded', 'false');
           menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
@@ -301,6 +314,7 @@ function isDropdownActive(items: NavLink[]): boolean {
 
       function closeForKeyboard() {
         clearTimeout(timeout);
+        clearPendingFocusRetries();
         trigger.setAttribute('aria-expanded', 'false');
         menu.classList.add('opacity-0', 'invisible', 'translate-y-1');
         menu.classList.remove('opacity-100', 'visible', 'translate-y-0');
@@ -317,7 +331,9 @@ function isDropdownActive(items: NavLink[]): boolean {
         const isOpen = trigger.getAttribute('aria-expanded') === 'true';
         isOpen ? hide() : show();
       });
-      trigger.addEventListener('focus', show);
+      trigger.addEventListener('focus', () => {
+        if (!returningFocusToTrigger) show();
+      });
       menu.addEventListener('mouseenter', () => clearTimeout(timeout));
 
       // Keyboard navigation within dropdown
@@ -328,22 +344,21 @@ function isDropdownActive(items: NavLink[]): boolean {
           show();
           const firstItem = menu.querySelector<HTMLAnchorElement>('[role="menuitem"]');
           if (firstItem) {
+            clearPendingFocusRetries();
             focusMenuItem(firstItem);
-            requestAnimationFrame(() => {
-              if (document.activeElement !== firstItem) {
+            focusFrame = requestAnimationFrame(() => {
+              focusFrame = undefined;
+              if (document.activeElement === trigger) {
                 focusMenuItem(firstItem);
               }
             });
-            setTimeout(() => {
-              if (document.activeElement !== firstItem) {
-                focusMenuItem(firstItem);
-              }
-            }, 50);
-            setTimeout(() => {
-              if (document.activeElement !== firstItem) {
-                focusMenuItem(firstItem);
-              }
-            }, 150);
+            focusTimeouts = [50, 150].map((delay) =>
+              setTimeout(() => {
+                if (document.activeElement === trigger) {
+                  focusMenuItem(firstItem);
+                }
+              }, delay),
+            );
           }
         }
       });
@@ -353,8 +368,12 @@ function isDropdownActive(items: NavLink[]): boolean {
           e.preventDefault();
           e.stopPropagation();
           closeForKeyboard();
+          returningFocusToTrigger = true;
           trigger.focus();
-          requestAnimationFrame(() => trigger.focus());
+          requestAnimationFrame(() => {
+            trigger.focus();
+            returningFocusToTrigger = false;
+          });
         }
       });
 
@@ -362,17 +381,21 @@ function isDropdownActive(items: NavLink[]): boolean {
         item.addEventListener('keydown', (e) => {
           if (e.key === 'Home') {
             e.preventDefault();
+            clearPendingFocusRetries();
             if (menuItems[0]) focusMenuItem(menuItems[0]);
           } else if (e.key === 'End') {
             e.preventDefault();
+            clearPendingFocusRetries();
             const lastItem = menuItems[menuItems.length - 1];
             if (lastItem) focusMenuItem(lastItem);
           } else if (e.key === 'ArrowDown') {
             e.preventDefault();
+            clearPendingFocusRetries();
             const nextItem = menuItems[Math.min(i + 1, menuItems.length - 1)];
             if (nextItem) focusMenuItem(nextItem);
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
+            clearPendingFocusRetries();
             if (i === 0) {
               trigger.focus();
               hide();
