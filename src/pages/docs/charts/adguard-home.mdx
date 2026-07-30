@@ -28,7 +28,7 @@ for first-time manual setup.
 
 - **Two deployment modes** — interactive wizard or full pre-configured via values
 - **Dual PVC** — separate `conf` (config + TLS certs) and `work` (query log + stats + filters) volumes
-- **Dedicated DNS service** — separate LoadBalancer for UDP/TCP port 53
+- **Dedicated DNS service** — separate LoadBalancer for UDP/TCP port 53 with optional named ports such as DNS-over-TLS
 - **adguardhome-sync** — multi-instance config synchronization (primary → replicas)
 - **Full-volume backup** — `tar` archives both PVCs to S3 (no database involved)
 
@@ -70,6 +70,11 @@ service:
   dns:
     type: LoadBalancer
     loadBalancerIP: '192.168.1.53' # static IP for DNS (optional, MetalLB/cloud LB)
+    extraPorts:
+      - name: dns-tls
+        port: 853
+        targetPort: 853
+        protocol: TCP
 
 persistence:
   conf:
@@ -322,13 +327,14 @@ pre-seeded mode runs with non-root UID and `podSecurityContext.fsGroup`.
 
 ### Services
 
-| Parameter                    | Type    | Default        | Description                                                      |
-| ---------------------------- | ------- | -------------- | ---------------------------------------------------------------- |
-| `service.web.type`           | string  | `ClusterIP`    | Web UI service type.                                             |
-| `service.web.port`           | integer | `80`           | Web UI port.                                                     |
-| `service.dns.type`           | string  | `LoadBalancer` | DNS service type. Use `NodePort` for bare-metal without MetalLB. |
-| `service.dns.port`           | integer | `53`           | DNS service port (UDP + TCP).                                    |
-| `service.dns.loadBalancerIP` | string  | `""`           | Static IP for the DNS LoadBalancer.                              |
+| Parameter                    | Type    | Default        | Description                                                                                         |
+| ---------------------------- | ------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| `service.web.type`           | string  | `ClusterIP`    | Web UI service type.                                                                                |
+| `service.web.port`           | integer | `80`           | Web UI port.                                                                                        |
+| `service.dns.type`           | string  | `LoadBalancer` | DNS service type. Use `NodePort` for bare-metal without MetalLB.                                    |
+| `service.dns.port`           | integer | `53`           | Built-in DNS service port, exposed over UDP and TCP.                                                |
+| `service.dns.extraPorts`     | array   | `[]`           | Additional explicit `name`, `port`, `targetPort`, and `protocol` entries, such as DoT on TCP `853`. |
+| `service.dns.loadBalancerIP` | string  | `""`           | Static IP for the DNS LoadBalancer.                                                                 |
 
 ### Ingress
 
