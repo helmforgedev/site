@@ -10,7 +10,7 @@ ClickHouse is a fast column-oriented OLAP database. The HelmForge chart deploys 
 
 ## Key Features
 
-- Official `docker.io/clickhouse/clickhouse-server` image pinned to `26.6.1`
+- Official `docker.io/clickhouse/clickhouse-server` image pinned to `26.7.1`
 - StatefulSet with persistent `/var/lib/clickhouse`
 - Client Service exposing HTTP `8123` and native TCP `9000`
 - Headless Service for stable pod DNS
@@ -191,13 +191,32 @@ service:
 
 ## Validation
 
-### Upgrading from 25.8
+### Upgrading to 26.7
 
-This chart now uses ClickHouse 26.6 stable instead of the 25.8 LTS line. Before
-upgrading a production release, review the upstream 26.6 release notes and test
-application queries, persisted data, and backup restoration. Take a verified
-backup before allowing the StatefulSet rolling update to reuse the existing
-data volume.
+This chart now uses ClickHouse 26.7 stable. Before upgrading a production
+release, review the upstream
+[ClickHouse 26.7 release notes](https://github.com/ClickHouse/ClickHouse/releases/tag/v26.7.1.1315-stable)
+and backward-incompatible changes. Take a verified backup before allowing the
+StatefulSet rolling update to reuse the existing data volume.
+
+In particular:
+
+- User SQL that accesses S3 no longer inherits server cloud credentials by
+  default. Provide explicit credentials, use `NOSIGN`, or deliberately enable
+  the appropriate server/environment credential setting.
+- ZIP and ZIPX backups on object storage are rejected; migrate backup workflows
+  to a supported tar format.
+- `AggregatingMergeTree` rejects dimensions outside the sorting key unless
+  `allow_dimensions_outside_sorting_key=1` is explicitly enabled.
+- XML `resources` and `workload_classifiers` are no longer supported; define
+  resources and workloads with SQL.
+- Servers with a legacy `insert_deduplication_version` configuration can refuse
+  to start. Follow the upstream compatibility migration before rolling out.
+
+Also test S3 glob behavior, `DateTime64` boundary handling, and any use of
+removed deprecated functions. The chart's Helm test authenticates through the
+configured Secret, verifies the running version, and executes the new
+`EXPLAIN ANALYZE` query.
 
 After deployment:
 
@@ -226,7 +245,7 @@ Also validate persistence across restart, metrics scraping, password authenticat
 | Parameter                              | Default                                  | Description                                                |
 | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------- |
 | `image.repository`                     | `docker.io/clickhouse/clickhouse-server` | Official ClickHouse image repository.                      |
-| `image.tag`                            | `26.6.1`                                 | Official full-version image tag.                           |
+| `image.tag`                            | `26.7.1`                                 | Official full-version image tag.                           |
 | `replicaCount`                         | `1`                                      | ClickHouse pod count. Values greater than `1` are blocked. |
 | `clickhouse.database`                  | `default`                                | Initial database on an empty data directory.               |
 | `clickhouse.user`                      | `default`                                | Initial user on an empty data directory.                   |
