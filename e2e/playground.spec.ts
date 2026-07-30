@@ -18,6 +18,14 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText('helm install postgresql');
   });
 
+  test('certimate defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="certimate"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v0.4.28');
+    await expect(page.locator('input[data-field-key="persistence.size"]')).toHaveValue('10Gi');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();

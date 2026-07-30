@@ -16,7 +16,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.4.26',
+          default: 'v0.4.28',
           description: 'Pinned Certimate image tag',
         },
         {
@@ -30,7 +30,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Storage Size',
           key: 'persistence.size',
           type: 'text',
-          default: '5Gi',
+          default: '10Gi',
           description: 'PocketBase data, workflows, credentials, and certificate material',
         },
       ],
