@@ -22,12 +22,13 @@ multi-workload chart (~20 Kubernetes Deployments) with bundled MariaDB and Redis
 
 ## Key Features
 
-- **Full Appwrite stack** — API, Console v8.7.5, Realtime WebSocket, 12 workers, schedulers, maintenance
+- **Full Appwrite stack** — API, Console v8.7.30, Realtime WebSocket, 12 workers, schedulers, maintenance
 - **~20 Kubernetes workloads** — each component runs independently and scales separately
 - **MariaDB + Redis** — bundled subcharts or external connections
 - **Shared PVCs** — uploads, cache, certificates, functions, builds, and sites shared across pods
 - **Root DB access required** — Appwrite needs MariaDB root credentials for schema migrations
 - **Ingress routing** — Console at `/`, API at `/v1`, Realtime WebSocket at `/v1/realtime`
+- **Side-effect-free health probes** — API health uses the public `/v1/health/version` endpoint
 - **mysqldump backup** — scheduled CronJob to S3
 
 <Callout type="info" title="Functions execution requires openruntimes-executor">
@@ -236,11 +237,11 @@ ingress:
 
 ## Upgrade Notes
 
-<Callout type="warning" title="Appwrite 1.9.5 requires database migrations">
-  Appwrite 1.9.5 requires the upstream migration step even when upgrading from Appwrite 1.9.0. After `helm
-  upgrade`, run the Appwrite migrate command against an Appwrite API pod before returning production traffic to the
-  release, for example `kubectl exec deploy/<release>-appwrite-api -- appwrite migrate` adjusted to your release name
-  and namespace.
+<Callout type="warning" title="Run the Appwrite 1.9.6 database migration">
+  Appwrite 1.9.6 repairs missing Functions and Sites Git-provider attributes left by upgrades from 1.9.5 and makes
+  migration batches idempotent. After `helm upgrade`, run the Appwrite migrate command against an Appwrite API pod
+  before returning production traffic to the release, for example `kubectl exec
+  deploy/<release>-appwrite-api -- appwrite migrate` adjusted to your release name and namespace.
 </Callout>
 
 ## Configuration Reference
@@ -258,9 +259,9 @@ ingress:
 | Parameter                  | Type   | Default                       | Description            |
 | -------------------------- | ------ | ----------------------------- | ---------------------- |
 | `image.repository`         | string | `docker.io/appwrite/appwrite` | Appwrite server image. |
-| `image.tag`                | string | `"1.9.5"`                     | Appwrite image tag.    |
+| `image.tag`                | string | `"1.9.6"`                     | Appwrite image tag.    |
 | `console.image.repository` | string | `docker.io/appwrite/console`  | Console image.         |
-| `console.image.tag`        | string | `"8.7.5"`                     | Console image tag.     |
+| `console.image.tag`        | string | `"8.7.30"`                    | Console image tag.     |
 
 ### Appwrite Configuration
 
