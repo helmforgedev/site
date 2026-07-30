@@ -21,7 +21,8 @@ TLS listeners.
 
 ## Key Features
 
-- **Official Alpine image** — default `docker.io/library/rabbitmq:4.3.1-alpine` with chart-managed plugins
+- **Official Alpine image** — default `docker.io/library/rabbitmq:4.3.4-alpine` with chart-managed plugins
+- **Hardened Management UI** — CSP excludes `unsafe-eval` and `unsafe-inline`, with a configurable Referrer-Policy
 - **Two architectures** — `single-node` (one StatefulSet replica) or `cluster` (StatefulSet with peer discovery)
 - **Quorum queues by default** — `queueDefaults.type: quorum` for durable, replicated HA queues
 - **Dedicated management ingress** — `management.ingress` is separate from the AMQP service
@@ -61,6 +62,10 @@ RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +sbwt none +sbwtdcpu none +sbwtdio none
 
 This lowers idle CPU in containerized RabbitMQ deployments. Startup, liveness, and readiness probes use TCP checks
 against the active AMQP listener instead of repeatedly starting `rabbitmq-diagnostics`.
+
+RabbitMQ 4.3.4 also hardens the Management UI Content Security Policy by removing `unsafe-eval` and `unsafe-inline`.
+The chart renders `management.headers.referrer_policy = no-referrer` by default. Set
+`management.referrerPolicy: ""` only when you intentionally want the browser's default policy.
 
 ## Installation
 
@@ -314,20 +319,20 @@ management:
 
 ### Core
 
-| Parameter          | Type   | Default         | Description                                                             |
-| ------------------ | ------ | --------------- | ----------------------------------------------------------------------- |
-| `architecture`     | string | `single-node`   | Deployment mode: `single-node` (Deployment) or `cluster` (StatefulSet). |
-| `nameOverride`     | string | `""`            | Override the chart name.                                                |
-| `fullnameOverride` | string | `""`            | Override the full release name.                                         |
-| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                                    |
-| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                                              |
+| Parameter          | Type   | Default         | Description                                         |
+| ------------------ | ------ | --------------- | --------------------------------------------------- |
+| `architecture`     | string | `single-node`   | Deployment mode: one-node or clustered StatefulSet. |
+| `nameOverride`     | string | `""`            | Override the chart name.                            |
+| `fullnameOverride` | string | `""`            | Override the full release name.                     |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                          |
 
 ### Image
 
 | Parameter          | Type   | Default                      | Description                          |
 | ------------------ | ------ | ---------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/rabbitmq` | Official RabbitMQ image repository.  |
-| `image.tag`        | string | `"4.3.1-alpine"`             | Official Alpine RabbitMQ image tag.  |
+| `image.tag`        | string | `"4.3.4-alpine"`             | Official Alpine RabbitMQ image tag.  |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                         | Pull secrets for private registries. |
 
@@ -387,15 +392,16 @@ management:
 
 ### Management UI
 
-| Parameter                             | Type    | Default   | Description                                             |
-| ------------------------------------- | ------- | --------- | ------------------------------------------------------- |
-| `management.enabled`                  | boolean | `true`    | Enable the management plugin and UI (port 15672/15671). |
-| `management.ingress.enabled`          | boolean | `false`   | Enable Ingress for the management UI.                   |
-| `management.ingress.ingressClassName` | string  | `traefik` | Ingress class for the management UI.                    |
-| `management.ingress.annotations`      | object  | `{}`      | Annotations for the management Ingress.                 |
-| `management.ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                            |
-| `management.ingress.tls`              | array   | `[]`      | TLS configuration for the management Ingress.           |
-| `management.ingress.useTlsPort`       | boolean | `false`   | Route ingress to the TLS management port (15671).       |
+| Parameter                             | Type    | Default       | Description                                             |
+| ------------------------------------- | ------- | ------------- | ------------------------------------------------------- |
+| `management.enabled`                  | boolean | `true`        | Enable the management plugin and UI (port 15672/15671). |
+| `management.referrerPolicy`           | string  | `no-referrer` | Referrer-Policy header; empty uses the browser default. |
+| `management.ingress.enabled`          | boolean | `false`       | Enable Ingress for the management UI.                   |
+| `management.ingress.ingressClassName` | string  | `traefik`     | Ingress class for the management UI.                    |
+| `management.ingress.annotations`      | object  | `{}`          | Annotations for the management Ingress.                 |
+| `management.ingress.hosts`            | array   | `[]`          | Ingress host and path rules.                            |
+| `management.ingress.tls`              | array   | `[]`          | TLS configuration for the management Ingress.           |
+| `management.ingress.useTlsPort`       | boolean | `false`       | Route ingress to the TLS management port (15671).       |
 
 ### TLS
 
