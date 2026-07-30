@@ -34,6 +34,14 @@ test.describe('Playground', () => {
     await expect(page.locator('input[data-field-key="dashboard.auth.clientId"]')).toHaveValue('netbird-dashboard');
   });
 
+  test('notediscovery defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="notediscovery"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.28.4');
+    await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();

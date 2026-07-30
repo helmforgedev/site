@@ -9455,7 +9455,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.28.2',
+          default: '0.28.4',
           description: 'Pinned NoteDiscovery image tag',
         },
         {
@@ -9478,6 +9478,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '*',
           description: 'CORS origin for the public NoteDiscovery endpoint',
+        },
+        {
+          label: 'Default Theme',
+          key: 'notediscovery.defaultTheme',
+          type: 'select',
+          default: 'light',
+          options: ['light', 'dark', 'dracula', 'nord', 'monokai'],
+          description: 'Theme used when the browser has no saved preference',
         },
       ],
     },
