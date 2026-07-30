@@ -27,6 +27,8 @@ clean web UI, without giving users direct shell access.
 - **Gateway API and Ingress** — expose the UI with either classic Ingress or HTTPRoute
 - **External Secrets Operator** — render ExternalSecret resources for credentials used by custom actions
 - **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
+- **Authoritative application port** — `olivetin.port` configures Kubernetes and OliveTin through `PORT`
+- **Optional persistence** — dynamically provision a data PVC or attach an existing claim
 - **Confirmation prompts** — require user confirmation before running destructive commands
 - **Icon and title customization** — human-friendly labels for each action
 - **Lightweight** — minimal resource footprint
@@ -244,12 +246,13 @@ config: |
     - title: "Trigger API"
       shell: "curl -H \"Authorization: Bearer ${API_TOKEN}\" https://api.example.com/jobs"
 
-extraEnv:
-  - name: API_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: olivetin-command-credentials
-        key: API_TOKEN
+olivetin:
+  extraEnv:
+    - name: API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: olivetin-command-credentials
+          key: API_TOKEN
 
 externalSecrets:
   enabled: true
@@ -289,7 +292,7 @@ externalSecrets:
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/jamesread/olivetin` | OliveTin container image.            |
-| `image.tag`        | string | `"3000.17.2"`                  | Image tag.                           |
+| `image.tag`        | string | `"3000.18.1"`                  | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
@@ -303,11 +306,11 @@ externalSecrets:
 
 ### OliveTin Configuration
 
-| Parameter           | Type    | Default                 | Description                                                   |
-| ------------------- | ------- | ----------------------- | ------------------------------------------------------------- |
-| `olivetin.port`     | integer | `1337`                  | Internal HTTP port for the OliveTin container.                |
-| `olivetin.extraEnv` | array   | `[]`                    | Extra environment variables injected into the container.      |
-| `config`            | string  | _(default ping action)_ | OliveTin YAML configuration mounted at `/config/config.yaml`. |
+| Parameter           | Type    | Default                 | Description                                                            |
+| ------------------- | ------- | ----------------------- | ---------------------------------------------------------------------- |
+| `olivetin.port`     | integer | `1337`                  | HTTP port propagated to OliveTin through the reserved `PORT` variable. |
+| `olivetin.extraEnv` | array   | `[]`                    | Extra environment variables; do not add the chart-managed `PORT`.      |
+| `config`            | string  | _(default ping action)_ | OliveTin YAML configuration mounted at `/config/config.yaml`.          |
 
 <Callout type="info" title="config is mounted as a ConfigMap">
   The entire `config` block is stored in a Kubernetes ConfigMap and mounted at `/config/config.yaml`. Any change to
@@ -326,15 +329,30 @@ The `config` block supports the full OliveTin configuration schema. Key action o
 | `timeout`            | Execution timeout in seconds (default: `3`).                           |
 | `arguments`          | List of user-provided arguments interpolated into `shell` via `{{ }}`. |
 
+OliveTin 3000.18 adds the `dnsname` argument type for RFC 1123 hostnames:
+
+```yaml
+config: |
+  actions:
+    - title: "Resolve host"
+      shell: "getent hosts {{ hostname }}"
+      arguments:
+        - name: hostname
+          type: dnsname
+          default: example.com
+```
+
 See the [full OliveTin configuration reference](https://docs.olivetin.app/config.html) for all available options.
 
 ## Upgrade Notes
 
-OliveTin `3000.17.2` fixes dashboard ACLs and includes security
-hardening for shell execution, argument types, log access control, and OAuth2
-state growth. Upstream reports no upgrade warnings or breaking changes; keep
-chart-managed config and persistent data paths unchanged when rolling
-production deployments.
+OliveTin `3000.18.1` adds `dnsname` action arguments, configuration issues in
+diagnostics, dashboard categories, persistent log filters, and `PORT` support.
+It also fixes `shellAfterCompleted` output injection, HTTP timeout and path
+traversal weaknesses, and unsafe theme permissions. Upstream reports no
+breaking changes. The chart now propagates `olivetin.port` through `PORT`;
+remove duplicate `PORT` entries from `olivetin.extraEnv`. Persistence-enabled
+installs now create the data PVC when `persistence.existingClaim` is empty.
 
 ### Metrics
 
