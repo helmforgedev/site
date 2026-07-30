@@ -575,7 +575,8 @@ Create the secret:
 
 ```bash
 kubectl create secret generic redis-auth \
-  --from-literal=password=your-redis-password
+  --from-literal=password=your-redis-password \
+  -n <namespace>
 ```
 
 #### Rate Limit Presets
@@ -621,7 +622,8 @@ rateLimiting:
 
 #### Attaching Rate Limits to Routes
 
-Attach a rate limit policy to an HTTPRoute using ExtensionRef:
+The built-in presets target the chart's Gateway. HTTPRoutes attached to that
+Gateway inherit the policy; no `ExtensionRef` filter is required:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -639,12 +641,6 @@ spec:
       backendRefs:
         - name: api-service
           port: 80
-      filters:
-        - type: ExtensionRef
-          extensionRef:
-            group: gateway.envoyproxy.io
-            kind: BackendTrafficPolicy
-            name: envoy-gateway-ratelimit-api
 ```
 
 #### Custom Rate Limit Policies
@@ -695,8 +691,8 @@ kubectl exec envoy-gateway-redis-0 -- redis-cli info clients
 View rate limit metrics:
 
 ```bash
-kubectl port-forward svc/envoy-gateway-controller 8081:8081
-curl http://localhost:8081/metrics | grep ratelimit
+kubectl -n <namespace> port-forward svc/envoy-ratelimit 19001:19001
+curl http://localhost:19001/metrics | grep ratelimit
 ```
 
 ---
@@ -1215,7 +1211,7 @@ clientTrafficPolicy:
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.8.2`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.8.3`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -1235,7 +1231,7 @@ clientTrafficPolicy:
 | `proxy.image.repository`                 | Proxy image                                                     | `docker.io/envoyproxy/envoy`   |
 | `proxy.image.tag`                        | Proxy image tag                                                 | `distroless-v1.38.0`           |
 | `proxy.shutdownManager.image.repository` | Shutdown manager sidecar image                                  | `docker.io/envoyproxy/gateway` |
-| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.8.2`                       |
+| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.8.3`                       |
 | `proxy.resources.requests.cpu`           | CPU request                                                     | `100m`                         |
 | `proxy.resources.requests.memory`        | Memory request                                                  | `128Mi`                        |
 | `proxy.resources.limits.cpu`             | CPU limit                                                       | `1000m`                        |
@@ -1264,7 +1260,7 @@ clientTrafficPolicy:
 
 | Parameter           | Description       | Default  |
 | ------------------- | ----------------- | -------- |
-| `certgen.image.tag` | Certgen image tag | `v1.8.2` |
+| `certgen.image.tag` | Certgen image tag | `v1.8.3` |
 
 ### SecurityPolicy
 
@@ -1291,13 +1287,18 @@ clientTrafficPolicy:
 
 ### Rate Limiting
 
-| Parameter                         | Description                                      | Default |
-| --------------------------------- | ------------------------------------------------ | ------- |
-| `rateLimiting.enabled`            | Enable rate limiting                             | `false` |
-| `rateLimiting.externalRedis.host` | External Redis host (when `redis.enabled=false`) | `""`    |
-| `rateLimiting.externalRedis.port` | External Redis port                              | `6379`  |
-| `rateLimiting.presets.api`        | Enable API preset (100 req/min per IP)           | `false` |
-| `rateLimiting.presets.strict`     | Enable strict preset (10 req/min per IP)         | `false` |
+| Parameter                                    | Description                                      | Default                          |
+| -------------------------------------------- | ------------------------------------------------ | -------------------------------- |
+| `rateLimiting.enabled`                       | Enable rate limiting                             | `false`                          |
+| `rateLimiting.service.image.repository`      | Rate limit service image repository              | `docker.io/envoyproxy/ratelimit` |
+| `rateLimiting.service.image.tag`             | Rate limit service image tag                     | `1e50889b`                       |
+| `rateLimiting.externalRedis.host`            | External Redis host (when `redis.enabled=false`) | `""`                             |
+| `rateLimiting.externalRedis.port`            | External Redis port                              | `6379`                           |
+| `rateLimiting.externalRedis.auth.enabled`    | Read external Redis password from a Secret       | `false`                          |
+| `rateLimiting.externalRedis.auth.secretName` | External Redis credential Secret                 | `""`                             |
+| `rateLimiting.externalRedis.auth.secretKey`  | Password key in the credential Secret            | `password`                       |
+| `rateLimiting.presets.api`                   | Enable API preset (100 req/min per IP)           | `false`                          |
+| `rateLimiting.presets.strict`                | Enable strict preset (10 req/min per IP)         | `false`                          |
 
 ### Redis Subchart
 
@@ -1326,11 +1327,13 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### Security
 
-| Parameter                            | Description                                                | Default |
-| ------------------------------------ | ---------------------------------------------------------- | ------- |
-| `security.networkPolicies`           | Enable NetworkPolicies                                     | `false` |
-| `security.networkPolicy.extraEgress` | Additional complete egress rules for the controller policy | `[]`    |
-| `security.podSecurityStandards`      | Enable PodSecurityStandards                                | `true`  |
+| Parameter                              | Description                                                      | Default                  |
+| -------------------------------------- | ---------------------------------------------------------------- | ------------------------ |
+| `security.networkPolicies`             | Enable NetworkPolicies                                           | `false`                  |
+| `security.networkPolicy.dns.namespace` | Namespace containing cluster DNS pods allowed by NetworkPolicies | `kube-system`            |
+| `security.networkPolicy.dns.podLabels` | Labels selecting cluster DNS pods allowed by NetworkPolicies     | `{"k8s-app":"kube-dns"}` |
+| `security.networkPolicy.extraEgress`   | Additional complete egress rules for the controller policy       | `[]`                     |
+| `security.podSecurityStandards`        | Enable PodSecurityStandards                                      | `true`                   |
 
 ### High Availability
 
@@ -1341,11 +1344,11 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### RBAC and ServiceAccount
 
-| Parameter               | Description           | Default |
-| ----------------------- | --------------------- | ------- |
-| `serviceAccount.create` | Create ServiceAccount | `true`  |
-| `serviceAccount.name`   | ServiceAccount name   | `""`    |
-| `rbac.create`           | Create RBAC resources | `true`  |
+| Parameter               | Description                                                     | Default |
+| ----------------------- | --------------------------------------------------------------- | ------- |
+| `serviceAccount.create` | Create ServiceAccount                                           | `true`  |
+| `serviceAccount.name`   | ServiceAccount name; must be `envoy-gateway` with rate limiting | `""`    |
+| `rbac.create`           | Create RBAC resources                                           | `true`  |
 
 ### GatewayClass
 
@@ -1379,20 +1382,33 @@ cleanup.
 
 ## Upgrade Notes
 
-`docker.io/envoyproxy/gateway:v1.8.2` is the upstream patch update from
-`v1.8.1`. The upstream image tag is published with the `v` prefix. This chart
+`docker.io/envoyproxy/gateway:v1.8.3` is the upstream patch update from
+`v1.8.2`. The upstream image tag is published with the `v` prefix. This chart
 keeps the managed Envoy proxy image pinned to
 `docker.io/envoyproxy/envoy:distroless-v1.38.0`, which remains aligned with the
-upstream v1.8 compatibility matrix.
+upstream v1.8 compatibility matrix. The rate limit deployment now uses the
+upstream v1.8.3 default `docker.io/envoyproxy/ratelimit:1e50889b` and honors the
+`rateLimiting.service.image` override through the EnvoyGateway configuration.
+When rate limiting is enabled, the chart also uses the upstream-required
+`envoy-gateway` names for the controller Deployment and ServiceAccount. For an
+externally managed ServiceAccount, set
+`serviceAccount.create=false,serviceAccount.name=envoy-gateway`.
+The controller Service exposes the rate-limit xDS port `18001`, bundled Redis
+uses its `-redis-client` endpoint, and Redis authentication is injected into the
+managed rate-limit Deployment through `REDIS_AUTH` from either the bundled or
+external Secret.
 
-Envoy Gateway v1.8.2 includes upstream bug fixes for Gateway API conditions,
-Backend TLS ALPN handling, ExternalName backends, Kubernetes 1.36 rate limit
-validation, EnvoyGateway config hot reload, and route timeout handling. It also
-tightens admission validation for `SecurityPolicy.spec.apiKeyAuth.extractFrom`:
-each entry must specify exactly one of `headers`, `params`, or `cookies`, and
-source names must be non-empty. Before upgrading production controllers, verify
-Gateway API and Envoy Gateway CRDs in staging, and test existing Gateway,
-HTTPRoute, EnvoyProxy, `BackendTrafficPolicy`, and `SecurityPolicy` resources.
+Envoy Gateway v1.8.3 updates its distroless base and fixes backend TLS 1.3
+defaults, mismatched or malformed listener certificates, IPv6 literal OIDC
+endpoints, translator status races, and Wasm fetch retries. It also moves
+EnvoyExtensionPolicy Lua source from per-route overrides to listener-level
+filters. This changes generated xDS Lua filter names and layout; update any
+EnvoyPatchPolicy or extension server that matches the previous
+`envoy.filters.http.lua/` keys. Review the
+[upstream v1.8.3 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.8.3)
+before upgrading, verify Gateway API and Envoy Gateway CRDs in staging, and test
+existing Gateway, HTTPRoute, EnvoyProxy, `BackendTrafficPolicy`,
+`SecurityPolicy`, EnvoyExtensionPolicy, and EnvoyPatchPolicy resources.
 
 ---
 
@@ -1938,11 +1954,12 @@ kubectl get statefulset envoy-gateway-redis
    kubectl logs envoy-gateway-redis-0
    ```
 
-2. **Rate limit policy not attached**:
+2. **Policy and route target different Gateways**:
 
    ```bash
-   kubectl get httproute <route-name> -o yaml | grep -A 10 filters
-   # Should see ExtensionRef with BackendTrafficPolicy
+   kubectl get backendtrafficpolicy <policy-name> -n <namespace> -o yaml
+   kubectl get httproute <route-name> -n <namespace> -o yaml
+   # The policy targetRef and route parentRef must identify the same Gateway
    ```
 
 3. **Wrong client selector**:
@@ -2169,7 +2186,7 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
 
 ## Version History
 
-### Version 1.3.0 (Current)
+### Version 1.8.1 (Current)
 
 Functional validation release with k3d-verified fixes for xDS connectivity, health probes, certgen, and RBAC.
 
@@ -2207,10 +2224,10 @@ Complete architectural redesign for EG v1.7.3 with operator-managed proxy provis
 
 **Versions Updated**:
 
-- EG: v1.8.2 (was v1.0.0)
+- EG: v1.8.3 (was v1.0.0)
 - Envoy: distroless-v1.38.0 (was v1.29.0)
-- Redis: helmforge/redis subchart v1.6.18 (replaces inline StatefulSet)
-- Gateway API CRDs: v1.2.1 (was v1.0.0)
+- Redis: helmforge/redis subchart v1.6.19 (replaces inline StatefulSet)
+- Gateway API CRDs: v1.5.1 (was v1.0.0)
 - PrometheusRule: 6 alerts (was 7)
 
 **Deployment Options**:
@@ -2307,8 +2324,8 @@ First stable release with complete P1 (MVP) and P2 (Production) features.
 
 | Field                  | Value      |
 | ---------------------- | ---------- |
-| **Chart Version**      | 1.7.4      |
-| **App Version**        | v1.8.2     |
+| **Chart Version**      | 1.8.1      |
+| **App Version**        | v1.8.3     |
 | **Kubernetes Version** | >= 1.24    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |
