@@ -4091,6 +4091,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '8.8.1',
+          description: 'Pinned Redis image tag',
+        },
+        {
           label: 'Architecture',
           key: 'architecture',
           type: 'select',
