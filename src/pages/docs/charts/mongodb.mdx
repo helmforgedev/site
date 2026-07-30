@@ -40,6 +40,7 @@ horizontal scalability.
 - **WiredTiger tuning** — custom `mongod.conf` via `config` block
 - **Prometheus exporter** — `percona/mongodb_exporter` sidecar with ServiceMonitor
 - **`mongodump` backup** — scheduled S3 backup CronJob
+- **Pinned upstream image** — official MongoDB `8.3.7` security and reliability patch
 
 ## Installation
 
@@ -224,7 +225,7 @@ config:
 | Parameter          | Type   | Default                   | Description    |
 | ------------------ | ------ | ------------------------- | -------------- |
 | `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
-| `image.tag`        | string | `"8.3.2"`                 | Image tag.     |
+| `image.tag`        | string | `"8.3.7"`                 | Image tag.     |
 
 ### Authentication
 
@@ -326,12 +327,14 @@ Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
 
 ## Upgrade Notes
 
-MongoDB `8.3.2` is an upstream minor release update from `8.2.7`. Review the
-MongoDB 8.3 release notes before upgrading production clusters, take a backup,
-and verify existing PVC data files are compatible with the target `mongod`
-version. Keep replica set keyFiles and root credentials stable across
-`helm upgrade`; rotate them with MongoDB administrative commands instead of
-changing chart values.
+MongoDB `8.3.7` is a security and reliability patch within the `8.3` release
+line. It addresses upstream CVEs plus authorization, input validation,
+memory-bound, query-planning, and crash fixes. Review the
+[MongoDB 8.3 release notes](https://www.mongodb.com/docs/manual/release-notes/8.3/)
+before upgrading production clusters, take a backup, and verify existing PVC
+data files are compatible with the target `mongod` version. Keep replica set
+keyFiles and root credentials stable across `helm upgrade`; rotate them with
+MongoDB administrative commands instead of changing chart values.
 
 <Callout type="warning" title="Switching from standalone to replicaset requires a full dump and restore">
   MongoDB cannot automatically convert a standalone instance to a replica set with data. You must:
