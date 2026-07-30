@@ -575,7 +575,8 @@ Create the secret:
 
 ```bash
 kubectl create secret generic redis-auth \
-  --from-literal=password=your-redis-password
+  --from-literal=password=your-redis-password \
+  -n <namespace>
 ```
 
 #### Rate Limit Presets
@@ -1326,11 +1327,13 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### Security
 
-| Parameter                            | Description                                                | Default |
-| ------------------------------------ | ---------------------------------------------------------- | ------- |
-| `security.networkPolicies`           | Enable NetworkPolicies                                     | `false` |
-| `security.networkPolicy.extraEgress` | Additional complete egress rules for the controller policy | `[]`    |
-| `security.podSecurityStandards`      | Enable PodSecurityStandards                                | `true`  |
+| Parameter                              | Description                                                      | Default                  |
+| -------------------------------------- | ---------------------------------------------------------------- | ------------------------ |
+| `security.networkPolicies`             | Enable NetworkPolicies                                           | `false`                  |
+| `security.networkPolicy.dns.namespace` | Namespace containing cluster DNS pods allowed by NetworkPolicies | `kube-system`            |
+| `security.networkPolicy.dns.podLabels` | Labels selecting cluster DNS pods allowed by NetworkPolicies     | `{"k8s-app":"kube-dns"}` |
+| `security.networkPolicy.extraEgress`   | Additional complete egress rules for the controller policy       | `[]`                     |
+| `security.podSecurityStandards`        | Enable PodSecurityStandards                                      | `true`                   |
 
 ### High Availability
 
@@ -1954,8 +1957,8 @@ kubectl get statefulset envoy-gateway-redis
 2. **Policy and route target different Gateways**:
 
    ```bash
-   kubectl get backendtrafficpolicy <policy-name> -o yaml
-   kubectl get httproute <route-name> -o yaml
+   kubectl get backendtrafficpolicy <policy-name> -n <namespace> -o yaml
+   kubectl get httproute <route-name> -n <namespace> -o yaml
    # The policy targetRef and route parentRef must identify the same Gateway
    ```
 
