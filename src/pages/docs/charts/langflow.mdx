@@ -11,8 +11,16 @@ integrations.
 
 ## Overview
 
-The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow:1.10.2` image and exposes the web/API server on port `7860`.
+The HelmForge Langflow chart uses the official `docker.io/langflowai/langflow:1.11.1` image and exposes the web/API server on port `7860`.
 The default deployment persists `/app/langflow` because flows, local SQLite state, provider settings, and local configuration are not stateless.
+
+Langflow 1.11 introduces native v2 workflow execution, trusted JWT authentication with just-in-time user mapping, RBAC-aware interfaces,
+A2A and human-in-the-loop workflows, and additional provider and vector-store bundles. The 1.11.1 maintenance release adds authentication,
+tracing, MCP, SSRF, and component-loading fixes. Configure optional runtime capabilities through `app.env` or `app.envFrom`.
+
+When no existing or inline authentication credentials are provided, the chart generates a strong secret key and initial superuser password on
+the first install and preserves them across upgrades. The startup, liveness, and readiness probes use Langflow's reliable `/health_check`
+endpoint, which verifies application services and the database instead of only checking whether the port is open.
 
 The chart generates the core Langflow runtime environment:
 
@@ -36,7 +44,7 @@ Core runtime:
 
 Secrets and database:
 
-- `auth.secretKey`, `auth.superuser`, `auth.superuserPassword`: inline lab credentials.
+- `auth.secretKey`, `auth.superuser`, `auth.superuserPassword`: optional inline credentials. Empty values are generated and preserved.
 - `auth.existingSecret`, `auth.secretKeyKey`, `auth.superuserKey`, `auth.superuserPasswordKey`: production Secret wiring.
 - `database.mode`: `sqlite` or `external`.
 - `database.url`: inline SQLAlchemy database URL for labs.
@@ -61,7 +69,7 @@ Exposure and operations:
   Enabling `networkPolicy.enabled` creates ingress restrictions plus egress isolation with built-in DNS and HTTPS allowances.
   `networkPolicy.dnsEgressPeers` defaults to kube-system/kube-dns and can be changed for clusters with different DNS labels.
   `networkPolicy.extraEgress` appends database, provider, or proxy rules after the built-in allowances.
-- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
+- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags, HTTP health-check paths, and timing values.
 - `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
 - `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
@@ -110,13 +118,21 @@ networkPolicy:
 
 ## Secrets
 
-Use `auth.existingSecret` for production. It can hold:
+Use `auth.existingSecret` for production so credentials remain under your secret-management lifecycle. It must hold:
 
 - `LANGFLOW_SECRET_KEY`
 - `LANGFLOW_SUPERUSER`
 - `LANGFLOW_SUPERUSER_PASSWORD`
 
 Keep `LANGFLOW_SECRET_KEY` stable across upgrades. Rotating it can make encrypted provider credentials unusable.
+For a default installation, retrieve the generated username and password from the chart-managed Secret:
+
+```bash
+kubectl get secret RELEASE-langflow -o jsonpath='{.data.superuser}' | base64 --decode
+kubectl get secret RELEASE-langflow -o jsonpath='{.data.superuser-password}' | base64 --decode
+```
+
+Replace `RELEASE` with the Helm release name and add `-n NAMESPACE` when installed outside the current namespace.
 
 ## Database And Scaling
 
