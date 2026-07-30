@@ -124,8 +124,11 @@ provisioning:
   existingSecret: memos-provisioning
 ```
 
-The Secret keys become filenames under `/etc/secrets` and must match `memos-idp-<label>.json` or
-`memos-instance-setting-<label>.json`. For example:
+The Secret keys become filenames under `/etc/secrets`. Identity-provider files use
+`memos-idp-<label>.json`; instance settings use the fixed filenames
+`memos-instance-setting-general.json`, `memos-instance-setting-storage.json`,
+`memos-instance-setting-memo-related.json`, `memos-instance-setting-notification.json`, and
+`memos-instance-setting-ai.json`. Unsupported instance-setting suffixes are ignored. For example:
 
 ```yaml
 apiVersion: v1
@@ -145,9 +148,10 @@ stringData:
     }
 ```
 
-Memos validates the complete file set before serving traffic. Files override matching database-backed resources for the process lifetime, cannot be
-edited through the UI/API while mounted, and require a pod restart after changes. Supported setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`,
-`NOTIFICATION`, and `AI`.
+Memos validates the complete file set before serving traffic. Each setting file replaces its complete database-backed group rather than merging with
+it; omitted scalar fields reset to defaults, so include every required field needed to preserve the intended configuration. Files cannot be edited
+through the UI/API while mounted. Every replica must mount identical files, and Secret changes require an orderly restart of every replica. Supported
+setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`.
 
 ## External Database
 
@@ -181,11 +185,12 @@ The chart blocks unsafe configurations:
 
 ## Upgrading To Memos 0.30
 
-Back up the PVC and any external database first. Check these upstream compatibility changes:
+Back up the PVC, any external database, and the Secret selected by `provisioning.existingSecret` first. The Secret backup must preserve the mounted
+OAuth2/IdP and instance-setting JSON files. Check these upstream compatibility changes:
 
 - set `memos.instanceUrl` to preserve public anonymous access and RSS
 - shared-memo clients must use `GET /api/v1/shares/{share_token}/memo`
-- saved time filters use the `now` timestamp variable instead of `now()`
+- saved time filters use CEL timestamp fields and `now` instead of `now()`; for example, `created_ts >= now - duration("24h")`
 - MCP clients must use the stateless tools-only `/mcp` endpoint and service-prefixed tool names
 
 ## Security
