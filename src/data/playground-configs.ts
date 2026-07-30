@@ -1878,7 +1878,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '3000.17.0',
+          default: '3000.18.1',
           description: 'Pinned OliveTin image tag',
         },
         {
@@ -1886,7 +1886,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'olivetin.port',
           type: 'number',
           default: '1337',
-          description: 'OliveTin web UI port',
+          description: 'OliveTin web UI port propagated through PORT',
         },
         {
           label: 'Config Template',
