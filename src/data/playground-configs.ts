@@ -115,7 +115,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Server Tag',
           key: 'server.image.tag',
           type: 'text',
-          default: '0.74.4',
+          default: '0.75.0',
           description: 'Pinned NetBird server image tag',
         },
         {
@@ -148,7 +148,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Client ID',
           key: 'dashboard.auth.clientId',
           type: 'text',
-          default: 'netbird',
+          default: 'netbird-dashboard',
           description: 'Dashboard OIDC client ID',
         },
       ],

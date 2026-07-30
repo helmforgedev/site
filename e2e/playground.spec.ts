@@ -26,6 +26,14 @@ test.describe('Playground', () => {
     await expect(page.locator('input[data-field-key="persistence.size"]')).toHaveValue('10Gi');
   });
 
+  test('netbird defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="netbird"]').click();
+
+    await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.75.0');
+    await expect(page.locator('input[data-field-key="dashboard.auth.clientId"]')).toHaveValue('netbird-dashboard');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
