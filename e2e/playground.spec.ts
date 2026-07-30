@@ -54,6 +54,17 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText('ntfy.banFeed.file=/var/cache/ntfy/ban.log');
   });
 
+  test('poznote defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.45.0');
+    await expect(page.locator('input[data-field-key="persistence.data.size"]')).toHaveValue('5Gi');
+    await expect(page.locator('#playground-code')).not.toContainText('poznote.sharing.hideRestrictUsers');
+    await page.locator('button[data-field-key="poznote.sharing.hideRestrictUsers"]').click();
+    await expect(page.locator('#playground-code')).toContainText('poznote.sharing.hideRestrictUsers=true');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
