@@ -584,4 +584,12 @@ test.describe('Playground', () => {
     await page.locator('[data-section-toggle="Production Security"]').click();
     await expect(page.locator('#playground-code')).not.toContainText('replication.wal.maxSlotWalKeepSize');
   });
+
+  test('RabbitMQ exposes the Management UI Referrer-Policy', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="rabbitmq"]').click();
+    await page.locator('select[data-field-key="management.referrerPolicy"]').selectOption('same-origin');
+
+    await expect(page.locator('#playground-code')).toContainText('management.referrerPolicy=same-origin');
+  });
 });
