@@ -10,8 +10,11 @@ Deploy [Memos](https://github.com/usememos/memos) on Kubernetes as a lightweight
 
 ## Overview
 
-The HelmForge Memos chart uses the official `docker.io/neosmemo/memos:0.29.1` image and deploys a StatefulSet.
+The HelmForge Memos chart uses the official `docker.io/neosmemo/memos:0.30.0` image and deploys a StatefulSet.
 Memos listens on port `5230` and stores durable data under `/var/opt/memos`.
+
+Memos 0.30 adds the Web Clipper, a rebuilt Markdown editor, multi-column feeds, signed webhooks, a rebuilt MCP toolset, and file-backed deployment
+configuration. The chart uses the upstream `/healthz` endpoint for startup, readiness, and liveness probes.
 
 The default topology is one persistent pod with SQLite. PostgreSQL and MySQL are supported through `MEMOS_DRIVER` and `MEMOS_DSN`, but the
 data PVC remains required because Memos can still store local assets and instance data on disk.
@@ -44,6 +47,7 @@ Database and storage:
 - `persistence.enabled`, `persistence.size`, `persistence.storageClass`: Memos data directory storage.
 - `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
 - The chart rejects SQLite scaling, external database without DSN, external database without a data volume, and scaled MySQL/PostgreSQL without `persistence.existingClaim`.
+- `provisioning.existingSecret`, `provisioning.defaultMode`: read-only Memos deployment-configuration files mounted at `/etc/secrets`.
 
 Exposure and operations:
 
@@ -108,7 +112,46 @@ networkPolicy:
 ```
 
 Set `memos.instanceUrl` when Memos is behind Ingress, Gateway API, or another reverse proxy.
+In Memos 0.30, an unset instance URL also selects private mode, redirects anonymous visitors to sign in, and disables RSS.
 Set `networkPolicy.egressIsolation=true` when outbound DNS and HTTPS should be explicitly allowed by the chart-managed NetworkPolicy.
+
+## Deployment Configuration
+
+Memos can load OAuth2 identity providers and instance settings from a Kubernetes Secret:
+
+```yaml
+provisioning:
+  existingSecret: memos-provisioning
+```
+
+The Secret keys become filenames under `/etc/secrets`. Identity-provider files use
+`memos-idp-<label>.json`; instance settings use the fixed filenames
+`memos-instance-setting-general.json`, `memos-instance-setting-storage.json`,
+`memos-instance-setting-memo-related.json`, `memos-instance-setting-notification.json`, and
+`memos-instance-setting-ai.json`. Unsupported instance-setting suffixes are ignored. For example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: memos-provisioning
+type: Opaque
+stringData:
+  memos-instance-setting-general.json: |
+    {
+      "key": "GENERAL",
+      "generalSetting": {
+        "disallowUserRegistration": false,
+        "disallowPasswordAuth": false,
+        "weekStartDayOffset": 1
+      }
+    }
+```
+
+Memos validates the complete file set before serving traffic. Each setting file replaces its complete database-backed group rather than merging with
+it; omitted scalar fields reset to defaults, so include every required field needed to preserve the intended configuration. Files cannot be edited
+through the UI/API while mounted. Every replica must mount identical files, and Secret changes require an orderly restart of every replica. Supported
+setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`.
 
 ## External Database
 
@@ -139,6 +182,16 @@ The chart blocks unsafe configurations:
 - multiple replicas with MySQL/PostgreSQL and no shared existing data claim
 - MySQL/PostgreSQL without a DSN Secret or inline DSN
 - external database with no data volume
+
+## Upgrading To Memos 0.30
+
+Back up the PVC, any external database, and the Secret selected by `provisioning.existingSecret` first. The Secret backup must preserve the mounted
+OAuth2/IdP and instance-setting JSON files. Check these upstream compatibility changes:
+
+- set `memos.instanceUrl` to preserve public anonymous access and RSS
+- shared-memo clients must use `GET /api/v1/shares/{share_token}/memo`
+- saved time filters use CEL timestamp fields and `now` instead of `now()`; for example, `created_ts >= now - duration("24h")`
+- MCP clients must use the stateless tools-only `/mcp` endpoint and service-prefixed tool names
 
 ## Security
 
