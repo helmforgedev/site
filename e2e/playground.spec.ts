@@ -42,6 +42,18 @@ test.describe('Playground', () => {
     await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
   });
 
+  test('ntfy defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="ntfy"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v2.26.3');
+    await page.locator('[data-section-toggle="Abuse Ban-Feed"]').click();
+    await expect(page.locator('input[data-field-key="ntfy.banFeed.file"]')).toHaveValue('/var/cache/ntfy/ban.log');
+    await expect(page.locator('input[data-field-key="ntfy.banFeed.threshold"]')).toHaveValue('100');
+    await expect(page.locator('#playground-code')).toContainText('ntfy.banFeed.enabled=true');
+    await expect(page.locator('#playground-code')).toContainText('ntfy.banFeed.file=/var/cache/ntfy/ban.log');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
@@ -286,7 +298,6 @@ test.describe('Playground', () => {
     await expect(code).toContainText('ingress.hosts[0].paths[0].pathType=Prefix');
     await expect(code).not.toContainText('ingress.hostname');
   });
-
 
   test('changedetection production scenario emits browser ingress and external secrets values', async ({ page }) => {
     await page.goto('/playground');

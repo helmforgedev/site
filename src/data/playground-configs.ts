@@ -4780,7 +4780,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v2.26.0',
+          default: 'v2.26.3',
           description: 'Pinned ntfy image tag',
         },
         {
@@ -4804,6 +4804,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'true',
           description: 'Trust reverse proxy headers',
+        },
+      ],
+    },
+    {
+      name: 'Abuse Ban-Feed',
+      collapsible: true,
+      gateField: 'ntfy.banFeed.enabled',
+      fields: [
+        {
+          label: 'Ban File',
+          key: 'ntfy.banFeed.file',
+          type: 'text',
+          default: '/var/cache/ntfy/ban.log',
+          description: 'Writable offender feed for external enforcement',
+        },
+        {
+          label: 'Strike Window',
+          key: 'ntfy.banFeed.window',
+          type: 'text',
+          default: '10m',
+          description: 'Rolling weighted-strike window',
+        },
+        {
+          label: 'Strike Threshold',
+          key: 'ntfy.banFeed.threshold',
+          type: 'number',
+          default: '100',
+          description: 'Weighted strikes before emitting a visitor prefix',
         },
       ],
     },
