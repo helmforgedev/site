@@ -9318,6 +9318,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '0.30.0',
+          description: 'Pinned Memos image tag',
+        },
+        {
           label: 'HTTP Port',
           key: 'app.port',
           type: 'number',
@@ -9330,6 +9337,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '5Gi',
           description: 'SQLite and attachment storage',
+        },
+        {
+          label: 'Public Instance URL',
+          key: 'memos.instanceUrl',
+          type: 'text',
+          default: '',
+          description: 'Set to retain public anonymous access and RSS',
+        },
+      ],
+    },
+    {
+      name: 'Deployment Configuration',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Existing Secret',
+          key: 'provisioning.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret with Memos JSON files for /etc/secrets',
         },
       ],
     },
