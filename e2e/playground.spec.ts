@@ -82,6 +82,20 @@ test.describe('Playground', () => {
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
   });
 
+  test('vaultwarden security defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="vaultwarden"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('1.37.1');
+    await expect(page.locator('input[data-field-key="vaultwarden.proxy.trustedProxies"]')).toHaveValue('local');
+    await expect(page.locator('input[data-field-key="vaultwarden.rateLimit.unauthenticated.seconds"]')).toHaveValue(
+      '60',
+    );
+    await expect(page.locator('input[data-field-key="vaultwarden.rateLimit.unauthenticated.maxBurst"]')).toHaveValue(
+      '50',
+    );
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
