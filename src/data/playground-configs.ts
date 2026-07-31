@@ -2475,6 +2475,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '9.1.1',
+          description: 'Pinned Valkey image tag',
+        },
+        {
+          label: 'Helm Test Image Tag',
+          key: 'tests.image.tag',
+          type: 'text',
+          default: '9.1.1',
+          description: 'Pinned Valkey image tag for helm test',
+        },
+        {
           label: 'Architecture',
           key: 'architecture',
           type: 'select',
