@@ -1,0 +1,471 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: NetBox Chart
+description: NetBox Helm chart with separate web and RQ worker workloads, PostgreSQL, Redis, persistent media, housekeeping, Gateway API, metrics, and External Secrets.
+---
+
+# NetBox
+
+[NetBox](https://github.com/netbox-community/netbox) is an open-source
+infrastructure resource modeling platform and network source of truth. It
+combines DCIM, IPAM, circuits, virtualization, tenancy, inventory, REST and
+GraphQL APIs, custom fields, scripts, and background jobs.
+
+The HelmForge chart uses the official NetBox Docker image and preserves the
+product's process boundaries:
+
+- a web Deployment runs the Granian WSGI server;
+- an RQ worker Deployment handles asynchronous jobs and schedules;
+- a CronJob runs the upstream `housekeeping` command nightly;
+- PostgreSQL stores authoritative data;
+- Redis database 0 carries trusted jobs and database 1 provides cache;
+- a PVC stores user-uploaded media.
+
+## Key Features
+
+- Exact official image `docker.io/netboxcommunity/netbox:v4.6.5-5.0.2`
+- Separate web and RQ worker scaling
+- HelmForge PostgreSQL and Redis dependencies by default
+- External PostgreSQL and Redis modes
+- Stable generated application, API-pepper, and bootstrap credentials
+- External Secrets Operator `items[]` contract
+- Persistent media with safe multi-replica validation
+- Nightly NetBox housekeeping CronJob
+- Ingress and Gateway API HTTPRoute
+- Native `/metrics` and optional ServiceMonitor
+- NetworkPolicy, PDB, dual-stack Service, hardened containers, and Helm tests
+
+<a id="install"></a>
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install netbox helmforge/netbox --namespace netbox --create-namespace
+```
+
+OCI:
+
+```bash
+helm install netbox oci://ghcr.io/helmforgedev/helm/netbox \
+  --namespace netbox --create-namespace
+```
+
+The first install applies the complete NetBox database migration history and
+can take several minutes. The RQ worker waits until all migrations are
+complete, avoiding access to a partially migrated schema.
+
+Retrieve the generated administrator password:
+
+```bash
+kubectl get secret netbox-superuser -n netbox \
+  -o jsonpath='{.data.password}' | base64 -d
+```
+
+Access the UI:
+
+```bash
+kubectl port-forward -n netbox svc/netbox 8080:80
+```
+
+Open `http://127.0.0.1:8080/` and sign in as `admin`.
+
+## Architecture
+
+The Service selects only pods labeled `app.kubernetes.io/component=web`.
+Worker and housekeeping pods cannot receive HTTP traffic. Web and workers use
+the same immutable image and configuration, while their commands and resource
+profiles remain independent.
+
+The official image runs database migrations in the web entrypoint. A worker
+init container runs `manage.py migrate --check` until the schema is ready,
+then starts `rqworker`. Housekeeping runs `manage.py housekeeping` on the
+configured Cron schedule.
+
+With chart-managed ReadWriteOnce media, worker pods use a `Recreate` rollout
+and required pod affinity to stay on the web pod's node. ReadWriteMany media
+removes that placement constraint and allows independent multi-node scaling.
+
+## Production Values
+
+Apply this profile after the initial administrator has been created and its
+bootstrap credentials have been rotated into your identity-management flow:
+
+```yaml
+auth:
+  existingSecret: netbox-application
+  superuser:
+    enabled: false
+
+web:
+  replicaCount: 2
+  workers: 3
+
+worker:
+  replicaCount: 2
+
+persistence:
+  existingClaim: netbox-media-rwx
+  accessModes:
+    - ReadWriteMany
+
+netbox:
+  allowedHosts:
+    - netbox.example.com
+  metricsEnabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: netbox.example.com
+
+metrics:
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+```
+
+Two web replicas require media storage that is safe for concurrent mounts.
+The chart rejects `web.replicaCount > 1` unless `ReadWriteMany` is declared.
+You can instead configure an external media backend through a Python
+configuration file.
+
+## PostgreSQL and Redis
+
+The default installation is self-contained:
+
+```yaml
+postgresql:
+  enabled: true
+redis:
+  enabled: true
+```
+
+For platform-operated services:
+
+```yaml
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+
+database:
+  mode: external
+  external:
+    host: postgresql.database.svc
+    port: 5432
+    name: netbox
+    username: netbox
+    existingSecret: netbox-postgresql
+    existingSecretPasswordKey: password
+
+cache:
+  mode: external
+  tasksDatabase: 0
+  cacheDatabase: 1
+  external:
+    host: redis.cache.svc
+    port: 6379
+    existingSecret: netbox-redis
+    existingSecretPasswordKey: password
+```
+
+Redis database 0 must be treated as trusted: writers can enqueue serialized
+jobs. Do not expose it to untrusted clients.
+
+When egress policy is enabled, the chart selects only bundled PostgreSQL and
+Redis pods. Add explicit `networkPolicy.egress.extraEgress` peers for external
+data services and any other required destination.
+
+## Secrets and External Secrets
+
+NetBox requires a stable Django `SECRET_KEY`. An API token pepper of at least
+50 characters is optional upstream and enables v2 API token hashing; v1 tokens
+continue to work without it. The chart provisions both values so v2 tokens are
+available by default and retains them on upgrades. Production operators can
+supply existing Secrets or use the External Secrets Operator:
+
+```yaml
+auth:
+  existingSecret: netbox-application
+  superuser:
+    existingSecret: netbox-superuser
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: application
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: netbox-application
+        data:
+          - secretKey: secret-key
+            remoteRef:
+              key: netbox/application
+              property: secret-key
+          - secretKey: api-token-pepper
+            remoteRef:
+              key: netbox/application
+              property: api-token-pepper
+    - name: superuser
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: netbox-superuser
+        data:
+          - secretKey: password
+            remoteRef:
+              key: netbox/bootstrap
+              property: password
+```
+
+Disable `auth.superuser.enabled` after provisioning and manage administrator
+accounts through NetBox.
+
+## Plugins and Custom Configuration
+
+The chart does not download plugins at startup. Build a derived immutable image
+with pinned plugin versions, then add their Python settings:
+
+```yaml
+image:
+  repository: registry.example.com/platform/netbox
+  tag: 4.6.5-company.1
+
+netbox:
+  extraConfiguration:
+    plugins.py: |
+      PLUGINS = ["netbox_topology_views"]
+      PLUGINS_CONFIG = {}
+```
+
+The image loads Python files under `/etc/netbox/config`. Every map key is
+mounted as an individual file so the base image configuration remains present.
+
+## Gateway API
+
+Use the canonical HTTPRoute contract:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - netbox.example.com
+```
+
+When no `backendRefs` are supplied, the route targets the chart Service.
+Ingress and Gateway API can coexist during migration.
+
+## Observability
+
+Enable the native Prometheus endpoint and ServiceMonitor together:
+
+```yaml
+netbox:
+  metricsEnabled: true
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+```
+
+Monitor web and worker replica availability, queue depth, failed background
+jobs, database health, migration duration, media capacity, and housekeeping
+completion. Web and worker logs are emitted to standard output.
+
+## Backup and Restore
+
+NetBox has two durable backup domains:
+
+1. PostgreSQL contains the authoritative object model, users, jobs, and
+   configuration.
+2. The media PVC contains user-uploaded files.
+
+Back up both in the same recovery window. Redis cache is rebuildable; queued
+jobs can affect recovery sequencing. Test restores into an isolated namespace
+and verify login, API, media, scripts, and workers.
+
+The catalog does not mark this chart as having built-in backup automation. The
+chart documents the state domains and restore contract but does not create an
+opinionated backup CronJob for an external database platform.
+
+## Upgrades
+
+The combined image tag encodes the NetBox and netbox-docker versions. Read both
+release notes and keep them compatible. Before changing the image:
+
+1. back up PostgreSQL and media;
+2. verify plugin compatibility;
+3. deploy to a non-production namespace;
+4. wait for migrations and all probes;
+5. test login, API, worker jobs, media, metrics, and housekeeping.
+
+Major releases may require staged application upgrades. The default chart
+never uses a moving image tag.
+
+<a id="values"></a>
+
+## Configuration Reference
+
+| Parameter                                         | Default                            | Description                                                       |
+| ------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------- |
+| `nameOverride`                                    | `""`                               | Override the chart name.                                          |
+| `fullnameOverride`                                | `""`                               | Override generated resource names.                                |
+| `namespaceOverride`                               | `""`                               | Override the release namespace for namespaced resources.          |
+| `clusterDomain`                                   | `cluster.local`                    | Kubernetes cluster DNS suffix.                                    |
+| `commonLabels`                                    | `{}`                               | Labels added to all chart resources.                              |
+| `image.repository`                                | `docker.io/netboxcommunity/netbox` | Official NetBox image repository.                                 |
+| `image.tag`                                       | `v4.6.5-5.0.2`                     | Immutable NetBox and netbox-docker version pair.                  |
+| `image.pullPolicy`                                | `IfNotPresent`                     | NetBox image pull policy.                                         |
+| `imagePullSecrets`                                | `[]`                               | Registry credentials for all NetBox workloads.                    |
+| `web.replicaCount`                                | `1`                                | Web Deployment replica count.                                     |
+| `web.workers`                                     | `3`                                | Granian worker processes per web pod.                             |
+| `web.requestTimeout`                              | `120`                              | Granian request timeout in seconds.                               |
+| `web.resources`                                   | See values                         | Web requests and limits.                                          |
+| `worker.enabled`                                  | `true`                             | Deploy RQ background workers.                                     |
+| `worker.replicaCount`                             | `1`                                | RQ worker replica count.                                          |
+| `worker.strategy.type`                            | `Recreate`                         | Avoid concurrent worker mounts on RWO media.                      |
+| `worker.queues`                                   | `[]`                               | Queue allowlist; empty consumes configured queues.                |
+| `worker.resources`                                | See values                         | Worker and migration-gate requests and limits.                    |
+| `housekeeping.enabled`                            | `true`                             | Run the upstream housekeeping command.                            |
+| `housekeeping.schedule`                           | `0 0 * * *`                        | Housekeeping Cron schedule.                                       |
+| `housekeeping.concurrencyPolicy`                  | `Forbid`                           | CronJob concurrency policy.                                       |
+| `housekeeping.successfulJobsHistoryLimit`         | `3`                                | Successful job history.                                           |
+| `housekeeping.failedJobsHistoryLimit`             | `3`                                | Failed job history.                                               |
+| `housekeeping.resources`                          | See values                         | Housekeeping requests and limits.                                 |
+| `netbox.allowedHosts`                             | `["localhost", "127.0.0.1"]`       | Django Host-header allowlist.                                     |
+| `netbox.timeZone`                                 | `UTC`                              | NetBox application time zone.                                     |
+| `netbox.isolatedDeployment`                       | `false`                            | Disable upstream outbound checks.                                 |
+| `netbox.metricsEnabled`                           | `false`                            | Expose the native `/metrics` endpoint.                            |
+| `netbox.copilotEnabled`                           | `false`                            | Enable NetBox Copilot integrations.                               |
+| `netbox.extraEnv`                                 | `[]`                               | Additional environment variables for every NetBox process.        |
+| `netbox.extraEnvFrom`                             | `[]`                               | ConfigMap/Secret environment sources for every NetBox process.    |
+| `netbox.extraConfiguration`                       | `{}`                               | Python files mounted under `/etc/netbox/config`.                  |
+| `auth.existingSecret`                             | `""`                               | Existing application Secret.                                      |
+| `auth.secretKeyKey`                               | `secret-key`                       | Django secret key within the application Secret.                  |
+| `auth.apiTokenPepperKey`                          | `api-token-pepper`                 | v2 token pepper key within the application Secret.                |
+| `auth.secretKey`                                  | `""`                               | Inline Django secret; generated when empty.                       |
+| `auth.apiTokenPepper`                             | `""`                               | Inline token pepper; generated when empty.                        |
+| `auth.superuser.enabled`                          | `true`                             | Bootstrap the initial administrator.                              |
+| `auth.superuser.name`                             | `admin`                            | Bootstrap username.                                               |
+| `auth.superuser.email`                            | `admin@example.com`                | Bootstrap email.                                                  |
+| `auth.superuser.existingSecret`                   | `""`                               | Existing bootstrap Secret.                                        |
+| `auth.superuser.passwordKey`                      | `password`                         | Password key within the bootstrap Secret.                         |
+| `auth.superuser.apiTokenKey`                      | `api-token`                        | Optional API token key.                                           |
+| `database.mode`                                   | `auto`                             | Select bundled PostgreSQL or an external service.                 |
+| `database.external.host`                          | `""`                               | External PostgreSQL hostname.                                     |
+| `database.external.port`                          | `5432`                             | External PostgreSQL port.                                         |
+| `database.external.name`                          | `netbox`                           | External database name.                                           |
+| `database.external.username`                      | `netbox`                           | External database user.                                           |
+| `database.external.existingSecret`                | `""`                               | External database credential Secret.                              |
+| `database.external.existingSecretPasswordKey`     | `password`                         | Password key in that Secret.                                      |
+| `database.external.sslMode`                       | `prefer`                           | PostgreSQL client SSL mode.                                       |
+| `postgresql.enabled`                              | `true`                             | Deploy the HelmForge PostgreSQL dependency.                       |
+| `postgresql.*`                                    | See values                         | HelmForge PostgreSQL subchart configuration.                      |
+| `cache.mode`                                      | `auto`                             | Select bundled Redis or an external service.                      |
+| `cache.tasksDatabase`                             | `0`                                | Trusted RQ job database index.                                    |
+| `cache.cacheDatabase`                             | `1`                                | Cache database index.                                             |
+| `cache.external.host`                             | `""`                               | External Redis hostname.                                          |
+| `cache.external.port`                             | `6379`                             | External Redis port.                                              |
+| `cache.external.existingSecret`                   | `""`                               | External Redis credential Secret.                                 |
+| `cache.external.existingSecretPasswordKey`        | `password`                         | Password key in that Secret.                                      |
+| `cache.external.ssl`                              | `false`                            | Use TLS for both Redis connections.                               |
+| `redis.enabled`                                   | `true`                             | Deploy the HelmForge Redis dependency.                            |
+| `redis.*`                                         | See values                         | HelmForge Redis subchart configuration.                           |
+| `persistence.enabled`                             | `true`                             | Persist user-uploaded media.                                      |
+| `persistence.storageClass`                        | `""`                               | Media PVC storage class.                                          |
+| `persistence.accessModes`                         | `["ReadWriteOnce"]`                | Media access modes.                                               |
+| `persistence.size`                                | `10Gi`                             | Media PVC capacity.                                               |
+| `persistence.existingClaim`                       | `""`                               | Existing media PVC.                                               |
+| `persistence.annotations`                         | `{}`                               | Additional media PVC annotations.                                 |
+| `service.type`                                    | `ClusterIP`                        | Kubernetes Service type.                                          |
+| `service.port`                                    | `80`                               | Service port mapped to NetBox 8080.                               |
+| `service.annotations`                             | `{}`                               | Service annotations.                                              |
+| `service.ipFamilyPolicy`                          | `""`                               | Optional dual-stack policy.                                       |
+| `service.ipFamilies`                              | `[]`                               | Requested IP families.                                            |
+| `ingress.enabled`                                 | `false`                            | Create an Ingress.                                                |
+| `ingress.ingressClassName`                        | `""`                               | Ingress controller class.                                         |
+| `ingress.hosts`                                   | `[]`                               | Ingress host and path rules.                                      |
+| `ingress.tls`                                     | `[]`                               | Ingress TLS entries.                                              |
+| `gatewayAPI.enabled`                              | `false`                            | Create Gateway API HTTPRoutes.                                    |
+| `gatewayAPI.httpRoutes`                           | `[]`                               | Routes with required parent references.                           |
+| `externalSecrets.enabled`                         | `false`                            | Create ExternalSecret resources.                                  |
+| `externalSecrets.refreshInterval`                 | `1h`                               | Default secret refresh interval.                                  |
+| `externalSecrets.items`                           | `[]`                               | Canonical HelmForge ExternalSecret items.                         |
+| `metrics.serviceMonitor.enabled`                  | `false`                            | Create a Prometheus ServiceMonitor.                               |
+| `metrics.serviceMonitor.interval`                 | `30s`                              | Metrics scrape interval.                                          |
+| `metrics.serviceMonitor.scrapeTimeout`            | `10s`                              | Metrics scrape timeout.                                           |
+| `networkPolicy.enabled`                           | `false`                            | Isolate web and worker pods.                                      |
+| `networkPolicy.ingressFrom`                       | `[]`                               | Allowed ingress peers; empty means release namespace only.        |
+| `networkPolicy.egress.enabled`                    | `false`                            | Enforce egress isolation.                                         |
+| `networkPolicy.egress.allowDNS`                   | `true`                             | Allow CoreDNS.                                                    |
+| `networkPolicy.egress.extraEgress`                | `[]`                               | Explicit external-service and integration egress rules.           |
+| `podDisruptionBudget.enabled`                     | `true`                             | Create PDBs for replicated workloads.                             |
+| `podDisruptionBudget.maxUnavailable`              | `1`                                | Maximum unavailable replicas.                                     |
+| `serviceAccount.create`                           | `true`                             | Create the NetBox ServiceAccount.                                 |
+| `serviceAccount.automountServiceAccountToken`     | `false`                            | Mount Kubernetes API credentials.                                 |
+| `podSecurityContext`                              | See values                         | Pod-level security settings.                                      |
+| `securityContext`                                 | See values                         | Container-level security settings.                                |
+| `startupProbe`, `livenessProbe`, `readinessProbe` | See values                         | `/login/` probe timing controls.                                  |
+| `podLabels`, `podAnnotations`                     | `{}`                               | Additional pod metadata.                                          |
+| `nodeSelector`, `affinity`, `tolerations`         | Empty                              | Workload scheduling controls; custom affinity requires RWX media. |
+| `topologySpreadConstraints`                       | `[]`                               | Web and worker topology spread rules.                             |
+| `extraInitContainers`, `extraContainers`          | `[]`                               | Additional web pod containers.                                    |
+| `extraVolumes`, `extraVolumeMounts`               | `[]`                               | Additional web and worker storage.                                |
+| `extraManifests`                                  | `[]`                               | Additional Kubernetes objects rendered with the release.          |
+
+## Troubleshooting
+
+### Web waits during the first install
+
+Inspect migration progress:
+
+```bash
+kubectl logs -n netbox deploy/netbox
+```
+
+The initial migration history can take several minutes on slow storage.
+
+### Worker remains in init
+
+The worker intentionally waits for `manage.py migrate --check`:
+
+```bash
+kubectl logs -n netbox deploy/netbox-worker -c wait-for-migrations
+```
+
+Check web migration and PostgreSQL logs before restarting anything.
+
+### Probe returns HTTP 400
+
+Set the public hostname in `netbox.allowedHosts`. The chart sends
+`Host: localhost` for probes, which the official image permits.
+
+### ExternalSecret is not Ready
+
+```bash
+kubectl get externalsecret -n netbox
+kubectl describe externalsecret -n netbox
+```
+
+Confirm the store reference, remote keys, target names, and that both
+application secret values contain at least 50 characters.
+
+### Multiple replicas are rejected
+
+Use an RWX media PVC or configure external object storage. Do not bypass the
+guard while using a single-writer volume across nodes.

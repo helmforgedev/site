@@ -435,6 +435,131 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  netbox: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Allowed Host',
+          key: 'netbox.allowedHosts[0]',
+          type: 'text',
+          default: 'netbox.example.com',
+          description: 'Hostname accepted by Django',
+        },
+        {
+          label: 'Time Zone',
+          key: 'netbox.timeZone',
+          type: 'text',
+          default: 'UTC',
+          description: 'NetBox application time zone',
+        },
+        {
+          label: 'Native Metrics',
+          key: 'netbox.metricsEnabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose the NetBox Prometheus endpoint',
+        },
+      ],
+    },
+    {
+      name: 'Workloads',
+      fields: [
+        {
+          label: 'Web Replicas',
+          key: 'web.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Requires RWX media storage when greater than one',
+        },
+        {
+          label: 'Granian Workers',
+          key: 'web.workers',
+          type: 'number',
+          default: '3',
+          description: 'HTTP worker processes per web pod',
+        },
+        {
+          label: 'RQ Worker Replicas',
+          key: 'worker.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Independent background job workers',
+        },
+        {
+          label: 'Housekeeping',
+          key: 'housekeeping.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Run the nightly upstream housekeeping command',
+        },
+      ],
+    },
+    {
+      name: 'State',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge PostgreSQL',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy HelmForge Redis for queues and cache',
+        },
+        {
+          label: 'Media Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Persistent user-uploaded media capacity',
+        },
+        {
+          label: 'Media Access Mode',
+          key: 'persistence.accessModes[0]',
+          type: 'select',
+          default: 'ReadWriteOnce',
+          options: ['ReadWriteOnce', 'ReadWriteMany'],
+          description: 'Choose ReadWriteMany before scaling web replicas',
+        },
+        {
+          label: 'Existing Media Claim',
+          key: 'persistence.existingClaim',
+          type: 'text',
+          default: '',
+          description: 'Pre-created shared media PVC, when managed externally',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'netbox.example.com',
+          description: 'Public NetBox hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['', 'nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+  ],
   generic: [
     {
       name: 'Workload',

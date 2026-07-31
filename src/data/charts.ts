@@ -122,6 +122,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'NetBox',
+    slug: 'netbox',
+    description:
+      'Infrastructure source of truth for DCIM and IPAM with separate web, RQ worker, housekeeping, PostgreSQL, Redis, Gateway API, and ESO.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Strapi',
     slug: 'strapi',
     description: 'Headless CMS with SQLite, PostgreSQL, MySQL, and persistent uploads.',
