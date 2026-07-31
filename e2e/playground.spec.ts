@@ -73,6 +73,15 @@ test.describe('Playground', () => {
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
   });
 
+  test('valkey defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="valkey"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('9.1.1');
+    await expect(page.locator('input[data-field-key="tests.image.tag"]')).toHaveValue('9.1.1');
+    await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
