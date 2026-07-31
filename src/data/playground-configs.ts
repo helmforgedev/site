@@ -8,6 +8,148 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  pimcore: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Application Image',
+          key: 'image.repository',
+          type: 'text',
+          default: 'docker.io/pimcore/pimcore',
+          description: 'Use an immutable project image for production',
+        },
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'php8.5.9-max-v5.2-hardened',
+          description: 'Pinned official PHP 8.5 hardened runtime tag',
+        },
+        {
+          label: 'Web Replicas',
+          key: 'web.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Requires immutable project code and RWX assets above one replica',
+        },
+      ],
+    },
+    {
+      name: 'Project bootstrap',
+      fields: [
+        {
+          label: 'Bootstrap Skeleton',
+          key: 'project.bootstrap.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Download the pinned skeleton for evaluation and first installation',
+        },
+        {
+          label: 'Persist Project',
+          key: 'project.persistence.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Persist bootstrapped project code',
+        },
+        {
+          label: 'Project Volume Size',
+          key: 'project.persistence.size',
+          type: 'text',
+          default: '4Gi',
+          description: 'Storage requested by the bootstrap project PVC',
+        },
+      ],
+    },
+    {
+      name: 'Background operations',
+      fields: [
+        {
+          label: 'Messenger Workers',
+          key: 'worker.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Enable only after Pimcore installation completes',
+        },
+        {
+          label: 'Worker Replicas',
+          key: 'worker.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Number of Symfony Messenger consumers',
+        },
+        {
+          label: 'Maintenance CronJob',
+          key: 'maintenance.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Run pimcore:maintenance every five minutes',
+        },
+      ],
+    },
+    {
+      name: 'Storage and services',
+      fields: [
+        {
+          label: 'Asset Volume Size',
+          key: 'assets.persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Persistent public assets and generated variants',
+        },
+        {
+          label: 'Redis Integration',
+          key: 'cache.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Expose Redis connection values for project cache or sessions',
+        },
+        {
+          label: 'Mercure',
+          key: 'mercure.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Real-time updates for Pimcore Studio',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'pimcore.example.com',
+          description: 'Public Pimcore hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Network policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Enforce Egress',
+          key: 'networkPolicy.egress.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Restrict egress to declared rules',
+        },
+      ],
+    },
+  ],
   certimate: [
     {
       name: 'General',
