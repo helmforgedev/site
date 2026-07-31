@@ -144,9 +144,9 @@ maintenance:
   enabled: true
 ```
 
-The web pod copies the immutable image project into a pod-local `emptyDir` so
-nginx and PHP-FPM see the same files. Workers and maintenance run directly from
-the same image.
+With project persistence disabled, nginx, PHP-FPM, workers, and maintenance use
+the project code directly from the immutable image. Only public assets remain
+mounted from their dedicated persistent volume.
 
 ## Database
 
@@ -168,6 +168,7 @@ mariadb:
 
 database:
   mode: external
+  serverVersion: mariadb-11.4.7
   external:
     host: mariadb.database.svc
     name: pimcore
@@ -177,7 +178,9 @@ database:
 ```
 
 The chart constructs `DATABASE_URL` at process start so passwords remain
-Secret-backed and do not appear in rendered manifests.
+Secret-backed and do not appear in rendered manifests. Set
+`database.serverVersion` to the exact Doctrine-compatible external engine
+version; the default matches the bundled MariaDB 12.3.2 dependency.
 
 ## RabbitMQ and workers
 
@@ -339,8 +342,9 @@ gatewayAPI:
 ## Network policy
 
 NetworkPolicy is opt-in. When egress enforcement is enabled, the chart permits
-DNS and chart-managed MariaDB, RabbitMQ, Redis, and Mercure traffic. Bootstrap
-also requires outbound HTTPS:
+DNS only to the configured cluster DNS namespace/pod selectors, plus
+chart-managed MariaDB, RabbitMQ, Redis, and Mercure traffic. Bootstrap also
+requires outbound HTTPS:
 
 ```yaml
 networkPolicy:
@@ -376,7 +380,7 @@ project.
 
 | Framework          | Score      |
 | ------------------ | ---------- |
-| MITRE + NSA + SOC2 | **88.82%** |
+| MITRE + NSA + SOC2 | **89.43%** |
 
 Security posture acceptable.
 
@@ -384,12 +388,16 @@ Local details:
 
 - Tool: Kubescape v4.0.9
 - Command: `kubescape scan framework mitre,nsa,soc2 .tmp/pimcore-render.yaml`
-- Result: 0 critical and 0 high failed resources, resource summary score 88.82%.
+- Result: 0 critical and 0 high failed resources, resource summary score 89.43%.
 
 Runtime images are official, exact, multi-architecture tags. The default PHP
 image is the upstream hardened variant. Containers drop all Linux capabilities,
 disable privilege escalation, run as non-root users, and do not automount
-ServiceAccount tokens.
+ServiceAccount tokens. nginx and the Helm test use read-only root filesystems.
+PHP workloads retain a writable root because upstream Pimcore and Composer
+write project/runtime paths without a complete relocation contract; immutable
+project images should minimize those paths and keep application data on
+explicit volumes.
 
 ## Validation
 
@@ -417,29 +425,33 @@ deployment.
 
 ### Application and nginx images
 
-| Value                     | Default                      | Description                                 |
-| ------------------------- | ---------------------------- | ------------------------------------------- |
-| `image.repository`        | `docker.io/pimcore/pimcore`  | Runtime or custom project image repository. |
-| `image.tag`               | `php8.5.9-max-v5.2-hardened` | Exact official hardened runtime tag.        |
-| `image.pullPolicy`        | `IfNotPresent`               | Application image pull policy.              |
-| `imagePullSecrets`        | `[]`                         | Registry pull Secrets.                      |
-| `nginx.image.repository`  | `docker.io/library/nginx`    | Official nginx repository.                  |
-| `nginx.image.tag`         | `1.30.4-alpine3.24`          | Exact nginx tag.                            |
-| `nginx.clientMaxBodySize` | `100m`                       | Maximum HTTP request body.                  |
-| `nginx.resources`         | See values                   | nginx requests and limits.                  |
+| Value                                  | Default                      | Description                                 |
+| -------------------------------------- | ---------------------------- | ------------------------------------------- |
+| `image.repository`                     | `docker.io/pimcore/pimcore`  | Runtime or custom project image repository. |
+| `image.tag`                            | `php8.5.9-max-v5.2-hardened` | Exact official hardened runtime tag.        |
+| `image.pullPolicy`                     | `IfNotPresent`               | Application image pull policy.              |
+| `imagePullSecrets`                     | `[]`                         | Registry pull Secrets.                      |
+| `waitForDependencies.image.repository` | `docker.io/library/busybox`  | Dependency-check image repository.          |
+| `waitForDependencies.image.tag`        | `1.37.0`                     | Exact dependency-check image tag.           |
+| `nginx.image.repository`               | `docker.io/library/nginx`    | Official nginx repository.                  |
+| `nginx.image.tag`                      | `1.30.4-alpine3.24`          | Exact nginx tag.                            |
+| `nginx.clientMaxBodySize`              | `100m`                       | Maximum HTTP request body.                  |
+| `nginx.resources`                      | See values                   | nginx requests and limits.                  |
 
 ### Project lifecycle
 
-| Value                               | Default           | Description                                                  |
-| ----------------------------------- | ----------------- | ------------------------------------------------------------ |
-| `project.bootstrap.enabled`         | `true`            | Bootstrap the pinned skeleton when the image has no project. |
-| `project.bootstrap.skeletonVersion` | `2026.2.0`        | Exact skeleton release.                                      |
-| `project.persistence.enabled`       | `true`            | Persist bootstrapped project code.                           |
-| `project.persistence.storageClass`  | `""`              | Project PVC storage class.                                   |
-| `project.persistence.accessModes`   | `[ReadWriteOnce]` | Project PVC access modes.                                    |
-| `project.persistence.size`          | `4Gi`             | Project PVC request.                                         |
-| `project.persistence.existingClaim` | `""`              | Reuse an existing project claim.                             |
-| `project.persistence.annotations`   | `{}`              | Project PVC annotations.                                     |
+| Value                               | Default                      | Description                                                  |
+| ----------------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| `project.runtimeImage.repository`   | `docker.io/pimcore/pimcore`  | Immutable project base-image repository.                     |
+| `project.runtimeImage.tag`          | `php8.5.9-max-v5.2-hardened` | Immutable project base-image tag.                            |
+| `project.bootstrap.enabled`         | `true`                       | Bootstrap the pinned skeleton when the image has no project. |
+| `project.bootstrap.skeletonVersion` | `2026.2.0`                   | Exact skeleton release.                                      |
+| `project.persistence.enabled`       | `true`                       | Persist bootstrapped project code.                           |
+| `project.persistence.storageClass`  | `""`                         | Project PVC storage class.                                   |
+| `project.persistence.accessModes`   | `[ReadWriteOnce]`            | Project PVC access modes.                                    |
+| `project.persistence.size`          | `4Gi`                        | Project PVC request.                                         |
+| `project.persistence.existingClaim` | `""`                         | Reuse an existing project claim.                             |
+| `project.persistence.annotations`   | `{}`                         | Project PVC annotations.                                     |
 
 ### Web and workers
 
@@ -503,17 +515,18 @@ deployment.
 
 ### Database
 
-| Value                                 | Default   | Description               |
-| ------------------------------------- | --------- | ------------------------- |
-| `database.mode`                       | `mariadb` | `mariadb` or `external`.  |
-| `database.external.host`              | `""`      | External MariaDB host.    |
-| `database.external.port`              | `3306`    | External MariaDB port.    |
-| `database.external.name`              | `pimcore` | Database name.            |
-| `database.external.username`          | `pimcore` | Database user.            |
-| `database.external.password`          | `""`      | Inline external password. |
-| `database.external.existingSecret`    | `""`      | External password Secret. |
-| `mariadb.enabled`                     | `true`    | Deploy HelmForge MariaDB. |
-| `mariadb.standalone.persistence.size` | `8Gi`     | MariaDB volume request.   |
+| Value                                 | Default          | Description                         |
+| ------------------------------------- | ---------------- | ----------------------------------- |
+| `database.mode`                       | `mariadb`        | `mariadb` or `external`.            |
+| `database.serverVersion`              | `mariadb-12.3.2` | Doctrine-compatible engine version. |
+| `database.external.host`              | `""`             | External MariaDB host.              |
+| `database.external.port`              | `3306`           | External MariaDB port.              |
+| `database.external.name`              | `pimcore`        | Database name.                      |
+| `database.external.username`          | `pimcore`        | Database user.                      |
+| `database.external.password`          | `""`             | Inline external password.           |
+| `database.external.existingSecret`    | `""`             | External password Secret.           |
+| `mariadb.enabled`                     | `true`           | Deploy HelmForge MariaDB.           |
+| `mariadb.standalone.persistence.size` | `8Gi`            | MariaDB volume request.             |
 
 ### Queue and cache
 
@@ -536,39 +549,41 @@ deployment.
 
 ### Mercure and assets
 
-| Value                              | Default           | Description                      |
-| ---------------------------------- | ----------------- | -------------------------------- |
-| `mercure.enabled`                  | `true`            | Deploy the internal Mercure hub. |
-| `mercure.image.tag`                | `v0.24.2`         | Exact official Mercure tag.      |
-| `mercure.replicaCount`             | `1`               | Mercure replicas.                |
-| `mercure.anonymous`                | `true`            | Allow anonymous subscribers.     |
-| `assets.persistence.enabled`       | `true`            | Persist public assets.           |
-| `assets.persistence.accessModes`   | `[ReadWriteOnce]` | Asset PVC access modes.          |
-| `assets.persistence.size`          | `20Gi`            | Asset PVC request.               |
-| `assets.persistence.existingClaim` | `""`              | Reuse an existing asset claim.   |
+| Value                              | Default           | Description                                   |
+| ---------------------------------- | ----------------- | --------------------------------------------- |
+| `mercure.enabled`                  | `true`            | Deploy the internal Mercure hub.              |
+| `mercure.image.tag`                | `v0.24.2`         | Exact official Mercure tag.                   |
+| `mercure.replicaCount`             | `1`               | Fixed at one for the bundled local transport. |
+| `mercure.anonymous`                | `true`            | Allow anonymous subscribers.                  |
+| `assets.persistence.enabled`       | `true`            | Persist public assets.                        |
+| `assets.persistence.accessModes`   | `[ReadWriteOnce]` | Asset PVC access modes.                       |
+| `assets.persistence.size`          | `20Gi`            | Asset PVC request.                            |
+| `assets.persistence.existingClaim` | `""`              | Reuse an existing asset claim.                |
 
 ### Routing, policy, and scheduling
 
-| Value                                         | Default     | Description                           |
-| --------------------------------------------- | ----------- | ------------------------------------- |
-| `service.type`                                | `ClusterIP` | Kubernetes Service type.              |
-| `service.port`                                | `80`        | Public Service port.                  |
-| `service.ipFamilyPolicy`                      | `""`        | Optional dual-stack policy.           |
-| `service.ipFamilies`                          | `[]`        | Optional IP families.                 |
-| `ingress.enabled`                             | `false`     | Create an Ingress.                    |
-| `ingress.ingressClassName`                    | `""`        | Ingress class.                        |
-| `gatewayAPI.enabled`                          | `false`     | Create HTTPRoutes.                    |
-| `externalSecrets.enabled`                     | `false`     | Create ExternalSecret resources.      |
-| `externalSecrets.items`                       | `[]`        | Canonical ExternalSecret definitions. |
-| `networkPolicy.enabled`                       | `false`     | Create workload policy.               |
-| `networkPolicy.egress.enabled`                | `false`     | Enforce egress rules.                 |
-| `networkPolicy.egress.extraEgress`            | `[]`        | Complete extra egress rules.          |
-| `podDisruptionBudget.enabled`                 | `true`      | Create PDBs for scaled workloads.     |
-| `serviceAccount.automountServiceAccountToken` | `false`     | Disable API credentials.              |
-| `nodeSelector`                                | `{}`        | Node selection constraints.           |
-| `tolerations`                                 | `[]`        | Pod tolerations.                      |
-| `affinity`                                    | `{}`        | Pod affinity rules.                   |
-| `topologySpreadConstraints`                   | `[]`        | Pod distribution rules.               |
+| Value                                         | Default                      | Description                           |
+| --------------------------------------------- | ---------------------------- | ------------------------------------- |
+| `service.type`                                | `ClusterIP`                  | Kubernetes Service type.              |
+| `service.port`                                | `80`                         | Public Service port.                  |
+| `service.ipFamilyPolicy`                      | `""`                         | Optional dual-stack policy.           |
+| `service.ipFamilies`                          | `[]`                         | Optional IP families.                 |
+| `ingress.enabled`                             | `false`                      | Create an Ingress.                    |
+| `ingress.ingressClassName`                    | `""`                         | Ingress class.                        |
+| `gatewayAPI.enabled`                          | `false`                      | Create HTTPRoutes.                    |
+| `externalSecrets.enabled`                     | `false`                      | Create ExternalSecret resources.      |
+| `externalSecrets.items`                       | `[]`                         | Canonical ExternalSecret definitions. |
+| `networkPolicy.enabled`                       | `false`                      | Create workload policy.               |
+| `networkPolicy.egress.enabled`                | `false`                      | Enforce egress rules.                 |
+| `networkPolicy.egress.dns.namespaceSelector`  | `kube-system` label selector | Cluster DNS namespace selector.       |
+| `networkPolicy.egress.dns.podSelector`        | `k8s-app: kube-dns`          | Cluster DNS pod selector.             |
+| `networkPolicy.egress.extraEgress`            | `[]`                         | Complete extra egress rules.          |
+| `podDisruptionBudget.enabled`                 | `true`                       | Create PDBs for scaled workloads.     |
+| `serviceAccount.automountServiceAccountToken` | `false`                      | Disable API credentials.              |
+| `nodeSelector`                                | `{}`                         | Node selection constraints.           |
+| `tolerations`                                 | `[]`                         | Pod tolerations.                      |
+| `affinity`                                    | `{}`                         | Pod affinity rules.                   |
+| `topologySpreadConstraints`                   | `[]`                         | Pod distribution rules.               |
 
 ## Troubleshooting guide
 

@@ -27,6 +27,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Pinned official PHP 8.5 hardened runtime tag',
         },
         {
+          label: 'Dependency Check Image',
+          key: 'waitForDependencies.image.repository',
+          type: 'text',
+          default: 'docker.io/library/busybox',
+          description: 'Mirrorable BusyBox repository for dependency readiness checks',
+        },
+        {
+          label: 'Dependency Check Tag',
+          key: 'waitForDependencies.image.tag',
+          type: 'text',
+          default: '1.37.0',
+          description: 'Pinned BusyBox release tag',
+        },
+        {
           label: 'Web Replicas',
           key: 'web.replicaCount',
           type: 'number',
@@ -38,6 +52,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
     {
       name: 'Project bootstrap',
       fields: [
+        {
+          label: 'Runtime Base Image',
+          key: 'project.runtimeImage.repository',
+          type: 'text',
+          default: 'docker.io/pimcore/pimcore',
+          description: 'Official base used to build immutable project images',
+        },
+        {
+          label: 'Runtime Base Tag',
+          key: 'project.runtimeImage.tag',
+          type: 'text',
+          default: 'php8.5.9-max-v5.2-hardened',
+          description: 'Pinned hardened runtime base tag',
+        },
         {
           label: 'Bootstrap Skeleton',
           key: 'project.bootstrap.enabled',
