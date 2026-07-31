@@ -134,7 +134,7 @@ export const charts: Chart[] = [
     description:
       'PIM, MDM, DAM, and DXP platform with PHP-FPM, Messenger workers, MariaDB, RabbitMQ, Mercure, and ESO.',
     maturity: 'beta',
-    backup: true,
+    backup: false,
   },
   {
     name: 'Drupal',

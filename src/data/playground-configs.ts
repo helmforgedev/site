@@ -41,15 +41,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Bootstrap Skeleton',
           key: 'project.bootstrap.enabled',
-          type: 'boolean',
-          default: true,
+          type: 'toggle',
+          default: 'true',
           description: 'Download the pinned skeleton for evaluation and first installation',
         },
         {
           label: 'Persist Project',
           key: 'project.persistence.enabled',
-          type: 'boolean',
-          default: true,
+          type: 'toggle',
+          default: 'true',
           description: 'Persist bootstrapped project code',
         },
         {
@@ -67,8 +67,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Messenger Workers',
           key: 'worker.enabled',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Enable only after Pimcore installation completes',
         },
         {
@@ -81,8 +81,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Maintenance CronJob',
           key: 'maintenance.enabled',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Run pimcore:maintenance every five minutes',
         },
       ],
@@ -100,15 +100,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Redis Integration',
           key: 'cache.enabled',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Expose Redis connection values for project cache or sessions',
         },
         {
           label: 'Mercure',
           key: 'mercure.enabled',
-          type: 'boolean',
-          default: true,
+          type: 'toggle',
+          default: 'true',
           description: 'Real-time updates for Pimcore Studio',
         },
       ],
@@ -143,8 +143,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Enforce Egress',
           key: 'networkPolicy.egress.enabled',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Restrict egress to declared rules',
         },
       ],
