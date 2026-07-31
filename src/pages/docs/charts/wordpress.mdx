@@ -12,9 +12,12 @@ import WordPressDiagram from '../../../components/diagrams/WordPressDiagram.astr
 # WordPress
 
 Deploy [WordPress](https://wordpress.org/) on Kubernetes with the official
-`docker.io/library/wordpress:7.0.1-apache` image. The chart keeps the default install useful for
+`docker.io/library/wordpress:7.0.2-apache` image. The chart keeps the default install useful for
 development while exposing explicit production controls for database selection, secrets, routing,
 storage, backup, network policy, metrics, WordPress cron, WP-CLI bootstrap, plugin installation, and object cache.
+
+WordPress 7.0.2 is an [urgent security release](https://wordpress.org/news/2026/07/wordpress-7-0-2-release/)
+that fixes one critical and one high-severity vulnerability. Upgrade affected installations immediately.
 
 <Callout type="info" title="Defaults are for fast development, not a full production baseline">
   A default install creates one WordPress pod, a HelmForge MySQL subchart, generated credentials, and a ReadWriteOnce
@@ -524,7 +527,7 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `commonLabels`     | object  | `{}`                          | Labels added to every rendered resource. |
 | `replicaCount`     | integer | `1`                           | WordPress replicas when HPA is disabled. |
 | `image.repository` | string  | `docker.io/library/wordpress` | WordPress image repository.              |
-| `image.tag`        | string  | `7.0.1-apache`                | Image tag.                               |
+| `image.tag`        | string  | `7.0.2-apache`                | Image tag.                               |
 | `image.pullPolicy` | string  | `IfNotPresent`                | Image pull policy.                       |
 | `imagePullSecrets` | array   | `[]`                          | Pull secrets for private registries.     |
 
@@ -678,6 +681,7 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `networkPolicy.egress.allowSameNamespaceDatabase` | boolean | `true`                                                             | Allow same-namespace DB egress.      |
 | `networkPolicy.egress.allowHTTPS`                 | boolean | `false`                                                            | Allow HTTPS egress.                  |
 | `networkPolicy.egress.allowSMTP`                  | boolean | `false`                                                            | Allow SMTP egress.                   |
+| `networkPolicy.egress.extraEgress`                | array   | `[]`                                                               | Complete custom egress rules.        |
 | `metrics.enabled`                                 | boolean | `false`                                                            | Enable Apache exporter sidecar.      |
 | `metrics.serviceMonitor.enabled`                  | boolean | `false`                                                            | Create ServiceMonitor.               |
 | `backup.enabled`                                  | boolean | `false`                                                            | Create S3-compatible backup CronJob. |

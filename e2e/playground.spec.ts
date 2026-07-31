@@ -374,6 +374,35 @@ test.describe('Playground', () => {
     await expect(code).toContainText('serviceMonitor.interval=30s');
   });
 
+  test('wordpress playground emits the security update and complete custom egress rule', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="wordpress"]').click();
+
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('7.0.2-apache');
+    await page.locator('[data-section-toggle="Production Controls"]').click();
+    await page.locator('button[data-field-key="networkPolicy.enabled"]').click();
+    await page.locator('button[data-field-key="networkPolicy.egress.enabled"]').click();
+    await page
+      .locator('input[data-field-key="networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr"]')
+      .fill('10.30.0.0/16');
+    await page
+      .locator('select[data-field-key="networkPolicy.egress.extraEgress[0].ports[0].protocol"]')
+      .selectOption('UDP');
+    await page.locator('input[data-field-key="networkPolicy.egress.extraEgress[0].ports[0].port"]').fill('5353');
+
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('networkPolicy.enabled=true');
+    await expect(code).toContainText('networkPolicy.egress.enabled=true');
+    await expect(code).toContainText('networkPolicy.egress.extraEgress[0].to[0].ipBlock.cidr=10.30.0.0/16');
+    await expect(code).toContainText('networkPolicy.egress.extraEgress[0].ports[0].protocol=UDP');
+    await expect(code).toContainText('networkPolicy.egress.extraEgress[0].ports[0].port=5353');
+
+    await page.locator('.playground-output-btn[data-output="values"]').click();
+    await expect(code).toContainText('cidr: 10.30.0.0/16');
+    await expect(code).toContainText('protocol: UDP');
+    await expect(code).toContainText('port: 5353');
+  });
+
   test('discount-bandit playground emits chart contract fields', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="discount-bandit"]').click();
