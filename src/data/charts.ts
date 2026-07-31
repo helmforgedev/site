@@ -129,6 +129,14 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Pimcore',
+    slug: 'pimcore',
+    description:
+      'PIM, MDM, DAM, and DXP platform with PHP-FPM, Messenger workers, MariaDB, RabbitMQ, Mercure, and ESO.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Drupal',
     slug: 'drupal',
     description:
