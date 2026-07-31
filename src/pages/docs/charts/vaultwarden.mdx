@@ -16,7 +16,15 @@ desktop apps). Supports SQLite, PostgreSQL, and MySQL backends.
 <Callout type="danger" title="Set domain before creating any user accounts">
   Vaultwarden 1.33+ crashes at startup if `domain` is empty. Even when the server starts, leaving `domain` unset breaks
   WebSocket notifications, attachment URLs, and all email links (invites, 2FA, password reset). Always configure
-  `domain` with your full public HTTPS URL before first use.
+  `domain` with your full public HTTPS URL before first use. When that URL includes a path, the chart automatically
+  prefixes startup, readiness, and liveness probe paths with it.
+</Callout>
+
+<Callout type="danger" title="Vaultwarden 1.37.1 security update">
+  Vaultwarden 1.37.0 fixes security advisories covering icon-endpoint SSRF, cross-organization access, organization
+  policy and import authorization, Send access counts, and unauthenticated WebSocket flooding. It is also required for
+  Bitwarden clients 2026.7.0 and newer. HelmForge pins 1.37.1 because it includes the follow-up invitation-flow and
+  Alpine/OpenSSL fixes. Upgrade all older deployments.
 </Callout>
 
 ## Key Features
@@ -265,7 +273,7 @@ ingress:
   Argon2 is significantly more secure. Generate one using the container itself:
 
 ```bash
-docker run --rm -it vaultwarden/server:1.35.4 /vaultwarden hash
+docker run --rm -it vaultwarden/server:1.37.1 /vaultwarden hash
 # or with argon2 CLI:
 echo -n 'your-password' | argon2 "$(openssl rand -base64 32)" -e -id -k 65540 -t 3 -p 4
 ```
@@ -292,31 +300,34 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/vaultwarden/server` | Vaultwarden container image.         |
-| `image.tag`        | string | `"1.35.4"`                     | Image tag.                           |
+| `image.tag`        | string | `"1.37.1"`                     | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
 ### Vaultwarden Settings
 
-| Parameter                               | Type    | Default       | Description                                                                    |
-| --------------------------------------- | ------- | ------------- | ------------------------------------------------------------------------------ |
-| `vaultwarden.signupsAllowed`            | boolean | `false`       | Allow new user self-registration. Disabled by default.                         |
-| `vaultwarden.signupsVerify`             | boolean | `false`       | Require email verification for new signups.                                    |
-| `vaultwarden.signupsDomainsWhitelist`   | array   | `[]`          | Restrict signups to specific email domains when `signupsAllowed: false`.       |
-| `vaultwarden.invitationsAllowed`        | boolean | `true`        | Allow admin to invite users by email.                                          |
-| `vaultwarden.invitationOrgName`         | string  | `Vaultwarden` | Organization name shown in invitation emails.                                  |
-| `vaultwarden.invitationExpirationHours` | integer | `120`         | Hours before invite and verification tokens expire.                            |
-| `vaultwarden.sendsAllowed`              | boolean | `true`        | Allow Bitwarden Send file and text sharing.                                    |
-| `vaultwarden.emergencyAccessAllowed`    | boolean | `true`        | Allow emergency access features.                                               |
-| `vaultwarden.emailChangeAllowed`        | boolean | `true`        | Allow users to change their email addresses.                                   |
-| `vaultwarden.orgEventsEnabled`          | boolean | `false`       | Enable organization event logging.                                             |
-| `vaultwarden.orgCreationUsers`          | string  | `""`          | Who may create organizations: `""` (all), `"none"`, or comma-separated emails. |
-| `vaultwarden.passwordIterations`        | integer | `600000`      | Server-side PBKDF2 iterations for password hashing.                            |
-| `vaultwarden.passwordHintsAllowed`      | boolean | `true`        | Allow users to set password hints.                                             |
-| `vaultwarden.showPasswordHint`          | boolean | `false`       | Show hints on the login page (avoid if SMTP is configured).                    |
-| `vaultwarden.websocket.enabled`         | boolean | `true`        | Enable WebSocket notifications for real-time vault sync.                       |
-| `vaultwarden.logLevel`                  | string  | `info`        | Log verbosity.                                                                 |
-| `vaultwarden.proxy.ipHeader`            | string  | `X-Real-IP`   | Header used to identify the real client IP behind a reverse proxy.             |
+| Parameter                                        | Type    | Default       | Description                                                                    |
+| ------------------------------------------------ | ------- | ------------- | ------------------------------------------------------------------------------ |
+| `vaultwarden.signupsAllowed`                     | boolean | `false`       | Allow new user self-registration. Disabled by default.                         |
+| `vaultwarden.signupsVerify`                      | boolean | `false`       | Require email verification for new signups.                                    |
+| `vaultwarden.signupsDomainsWhitelist`            | array   | `[]`          | Restrict signups to specific email domains when `signupsAllowed: false`.       |
+| `vaultwarden.invitationsAllowed`                 | boolean | `true`        | Allow admin to invite users by email.                                          |
+| `vaultwarden.invitationOrgName`                  | string  | `Vaultwarden` | Organization name shown in invitation emails.                                  |
+| `vaultwarden.invitationExpirationHours`          | integer | `120`         | Hours before invite and verification tokens expire.                            |
+| `vaultwarden.sendsAllowed`                       | boolean | `true`        | Allow Bitwarden Send file and text sharing.                                    |
+| `vaultwarden.emergencyAccessAllowed`             | boolean | `true`        | Allow emergency access features.                                               |
+| `vaultwarden.emailChangeAllowed`                 | boolean | `true`        | Allow users to change their email addresses.                                   |
+| `vaultwarden.orgEventsEnabled`                   | boolean | `false`       | Enable organization event logging.                                             |
+| `vaultwarden.orgCreationUsers`                   | string  | `""`          | Who may create organizations: `""` (all), `"none"`, or comma-separated emails. |
+| `vaultwarden.passwordIterations`                 | integer | `600000`      | Server-side PBKDF2 iterations for password hashing.                            |
+| `vaultwarden.passwordHintsAllowed`               | boolean | `true`        | Allow users to set password hints.                                             |
+| `vaultwarden.showPasswordHint`                   | boolean | `false`       | Show hints on the login page (avoid if SMTP is configured).                    |
+| `vaultwarden.websocket.enabled`                  | boolean | `true`        | Enable WebSocket notifications for real-time vault sync.                       |
+| `vaultwarden.logLevel`                           | string  | `info`        | Log verbosity.                                                                 |
+| `vaultwarden.proxy.ipHeader`                     | string  | `X-Real-IP`   | Header used to identify the real client IP behind a reverse proxy.             |
+| `vaultwarden.proxy.trustedProxies`               | string  | `local`       | Peers allowed to supply the configured client IP header.                       |
+| `vaultwarden.rateLimit.unauthenticated.seconds`  | integer | `60`          | Average seconds between protected unauthenticated requests from one IP.        |
+| `vaultwarden.rateLimit.unauthenticated.maxBurst` | integer | `50`          | Shared burst budget for protected unauthenticated endpoints.                   |
 
 <Callout type="tip" title="signupsAllowed defaults to false">
   New user self-registration is disabled by default. To create the first accounts, either temporarily set
@@ -448,6 +459,9 @@ The backup CronJob automatically selects the correct dump tool based on the acti
 
 ### Probes
 
+If `domain` includes a path such as `https://example.com/vaultwarden`, the chart renders the default health endpoint
+as `/vaultwarden/alive`. Custom probe paths that already include the domain path are preserved.
+
 | Parameter                              | Type    | Default | Description                         |
 | -------------------------------------- | ------- | ------- | ----------------------------------- |
 | `probes.startup.enabled`               | boolean | `true`  | Enable startup probe on `/alive`.   |
@@ -511,6 +525,8 @@ Vaultwarden runs fully hardened: non-root (`UID 1000`), all capabilities dropped
 ## More Information
 
 - [Vaultwarden GitHub Repository](https://github.com/dani-garcia/vaultwarden)
+- [Vaultwarden 1.37.0 security release](https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0)
+- [Vaultwarden 1.37.1 hotfix release](https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.1)
 - [Vaultwarden Wiki](https://github.com/dani-garcia/vaultwarden/wiki)
 - [Enabling Admin Page](https://github.com/dani-garcia/vaultwarden/wiki/Enabling-admin-page)
 - [Bitwarden Client Apps](https://bitwarden.com/download/)

@@ -5713,6 +5713,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.37.1',
+          description: 'Pinned Vaultwarden image tag',
+        },
+        {
           label: 'Replica Count',
           key: 'replicaCount',
           type: 'number',
@@ -5725,6 +5732,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '5Gi',
           description: 'PVC storage size',
+        },
+        {
+          label: 'Trusted Proxies',
+          key: 'vaultwarden.proxy.trustedProxies',
+          type: 'text',
+          default: 'local',
+          description: 'Peers allowed to supply the client IP header',
+        },
+        {
+          label: 'Unauthenticated Rate Limit Seconds',
+          key: 'vaultwarden.rateLimit.unauthenticated.seconds',
+          type: 'number',
+          default: '60',
+          description: 'Average seconds between protected unauthenticated requests',
+        },
+        {
+          label: 'Unauthenticated Rate Limit Burst',
+          key: 'vaultwarden.rateLimit.unauthenticated.maxBurst',
+          type: 'number',
+          default: '50',
+          description: 'Shared burst budget for protected unauthenticated endpoints',
         },
       ],
     },
