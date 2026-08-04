@@ -996,13 +996,15 @@ kubectl get rolebinding -n <namespace>
 
 2. **Enable TLS** with an external cert-manager Certificate resource referencing your Gateway listener's `certificateRefs`.
 
-3. **Restrict service access** with Gateway allowedRoutes:
+3. **Restrict route attachment** with the chart-managed Gateway:
 
    ```yaml
-   listeners:
-     - allowedRoutes:
-         namespaces:
-           from: Same # Only same namespace
+   gateway:
+     listeners:
+       http:
+         allowedRoutes:
+           namespaces:
+             from: Same # Only the Gateway namespace
    ```
 
 4. **Use JWT authentication** (via SecurityPolicy):
@@ -1250,11 +1252,13 @@ clientTrafficPolicy:
 
 ### Gateway Resource
 
-| Parameter                         | Description                     | Default |
-| --------------------------------- | ------------------------------- | ------- |
-| `gateway.create`                  | Create default Gateway resource | `true`  |
-| `gateway.listeners.http.enabled`  | Enable HTTP listener            | `true`  |
-| `gateway.listeners.https.enabled` | Enable HTTPS listener           | `false` |
+| Parameter                               | Description                                  | Default               |
+| --------------------------------------- | -------------------------------------------- | --------------------- |
+| `gateway.create`                        | Create default Gateway resource              | `true`                |
+| `gateway.listeners.http.enabled`        | Enable HTTP listener                         | `true`                |
+| `gateway.listeners.http.allowedRoutes`  | Route kinds and namespaces allowed to attach | `{}` (same namespace) |
+| `gateway.listeners.https.enabled`       | Enable HTTPS listener                        | `false`               |
+| `gateway.listeners.https.allowedRoutes` | Route kinds and namespaces allowed to attach | `{}` (same namespace) |
 
 ### Certgen Job
 
@@ -1597,31 +1601,12 @@ spec:
 Deploy with namespace-based routing isolation:
 
 ```bash
-# Install Envoy Gateway
+# Install Envoy Gateway and allow selected namespaces to attach Routes
 helm install envoy-gateway helmforge/envoy-gateway \
   --set profile=production-ha \
-  --set gatewayAPI.examples.enabled=false
-
-# Create Gateway with namespace isolation
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: tenant-gateway
-  namespace: gateway-system
-spec:
-  gatewayClassName: envoy-gateway
-  listeners:
-  - name: http
-    protocol: HTTP
-    port: 80
-    allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            tenant: enabled
-EOF
+  --set gatewayAPI.examples.enabled=false \
+  --set gateway.listeners.http.allowedRoutes.namespaces.from=Selector \
+  --set gateway.listeners.http.allowedRoutes.namespaces.selector.matchLabels.tenant=enabled
 ```
 
 Label tenant namespaces:
