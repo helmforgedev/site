@@ -486,7 +486,7 @@ export const charts: Chart[] = [
   {
     name: 'ntfy',
     slug: 'ntfy',
-    description: 'Self-hosted push notification server with Prometheus metrics and REST API.',
+    description: 'Self-hosted push notifications with PostgreSQL, Secret integration, metrics, and REST API.',
     maturity: 'stable',
     backup: false,
   },

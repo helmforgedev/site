@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: ntfy Chart
-description: ntfy Helm chart for Kubernetes push notifications with HTTP pub-sub, metrics, attachments, access control, persistence, ingress, and Gateway API.
+description: ntfy Helm chart for Kubernetes push notifications with PostgreSQL, Secret integration, metrics, attachments, persistence, ingress, and Gateway API.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -29,6 +29,8 @@ third-party service — all traffic stays on your infrastructure.
 - **Behind-proxy mode** — correct client IP identification via `X-Forwarded-For`
 - **Prometheus metrics** — optional `/metrics` endpoint with ServiceMonitor support
 - **Persistent storage** — PVC-backed SQLite cache and authentication databases
+- **PostgreSQL** — external database URL loaded from a Kubernetes Secret
+- **External Secrets** — optional credential reconciliation from provider-backed stores
 - **Gateway API** — optional HTTPRoute rendering for modern ingress controllers
 
 ## Installation
@@ -67,6 +69,7 @@ helm upgrade ntfy helmforge/ntfy \
     { id: 'auth', label: 'With Authentication' },
     { id: 'attachments', label: 'With Attachments' },
     { id: 'ban-feed', label: 'Abuse Ban-Feed' },
+    { id: 'postgresql', label: 'PostgreSQL' },
     { id: 'metrics', label: 'With Metrics' },
     { id: 'gateway', label: 'Gateway API' },
   ]}
@@ -193,6 +196,43 @@ rules.
 
 </div>
 
+<div data-tab-panel="postgresql">
+
+```yaml
+# values.yaml — PostgreSQL URL from a provider-managed Secret
+ntfy:
+  authDefaultAccess: deny-all
+  database:
+    enabled: true
+    existingSecret: ntfy-database
+    existingSecretKey: database-url
+
+persistence:
+  enabled: false
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: ntfy-database
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: ntfy-database
+        data:
+          - secretKey: database-url
+            remoteRef:
+              key: ntfy/database
+              property: url
+```
+
+The provider value must be a complete PostgreSQL connection URL. PostgreSQL replaces the message cache, access control,
+and web push SQLite stores. Keep persistence enabled if attachments, the abuse ban-feed, or other local files must
+survive pod replacement.
+
+</div>
+
 <div data-tab-panel="metrics">
 
 ```yaml
@@ -270,29 +310,55 @@ gateway:
 
 ### ntfy Configuration
 
-| Parameter                       | Type    | Default                   | Description                                                                      |
-| ------------------------------- | ------- | ------------------------- | -------------------------------------------------------------------------------- |
-| `ntfy.baseUrl`                  | string  | `""`                      | Public base URL of the instance (e.g. `https://ntfy.example.com`).               |
-| `ntfy.authDefaultAccess`        | string  | `read-write`              | Default access for unauthenticated users: `read-write`, `read-only`, `deny-all`. |
-| `ntfy.behindProxy`              | boolean | `true`                    | Trust `X-Forwarded-For` headers for correct client IP and rate limiting.         |
-| `ntfy.enableMetrics`            | boolean | `false`                   | Enable Prometheus metrics at `/metrics`.                                         |
-| `ntfy.metricsListenHttp`        | string  | `""`                      | Separate listen address for the metrics endpoint (e.g. `:9090`).                 |
-| `ntfy.attachmentTotalSizeLimit` | string  | `""`                      | Total attachment storage limit per visitor (e.g. `100M`).                        |
-| `ntfy.attachmentFileSizeLimit`  | string  | `""`                      | Maximum size per attachment file (e.g. `15M`).                                   |
-| `ntfy.attachmentExpiryDuration` | string  | `""`                      | How long attachments are retained (e.g. `3h`).                                   |
-| `ntfy.banFeed.enabled`          | boolean | `false`                   | Enable the weighted abuse ban-feed.                                              |
-| `ntfy.banFeed.file`             | string  | `/var/cache/ntfy/ban.log` | Writable file where confirmed offenders are appended.                            |
-| `ntfy.banFeed.window`           | string  | `10m`                     | Rolling window used to count weighted strikes per visitor prefix.                |
-| `ntfy.banFeed.threshold`        | integer | `100`                     | Weighted strikes per window before a prefix is emitted.                          |
-| `ntfy.banFeed.weights`          | array   | `["42909:10"]`            | Per-code weights in `KEY:WEIGHT` format; longest match wins.                     |
-| `ntfy.extraConfig`              | string  | `""`                      | Raw `server.yml` configuration appended to the generated ConfigMap.              |
-| `ntfy.extraEnv`                 | array   | `[]`                      | Extra environment variables injected into the container.                         |
+| Parameter                         | Type    | Default                   | Description                                                                                    |
+| --------------------------------- | ------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `ntfy.baseUrl`                    | string  | `""`                      | Public base URL of the instance (e.g. `https://ntfy.example.com`).                             |
+| `ntfy.authDefaultAccess`          | string  | `read-write`              | Default access for unauthenticated users: `read-write`, `read-only`, `write-only`, `deny-all`. |
+| `ntfy.behindProxy`                | boolean | `true`                    | Trust `X-Forwarded-For` headers for correct client IP and rate limiting.                       |
+| `ntfy.enableMetrics`              | boolean | `false`                   | Enable Prometheus metrics at `/metrics`.                                                       |
+| `ntfy.metricsListenHttp`          | string  | `""`                      | Separate listen address for the metrics endpoint (e.g. `:9090`).                               |
+| `ntfy.attachmentTotalSizeLimit`   | string  | `""`                      | Total attachment storage limit per visitor (e.g. `100M`).                                      |
+| `ntfy.attachmentFileSizeLimit`    | string  | `""`                      | Maximum size per attachment file (e.g. `15M`).                                                 |
+| `ntfy.attachmentExpiryDuration`   | string  | `""`                      | How long attachments are retained (e.g. `3h`).                                                 |
+| `ntfy.banFeed.enabled`            | boolean | `false`                   | Enable the weighted abuse ban-feed.                                                            |
+| `ntfy.banFeed.file`               | string  | `/var/cache/ntfy/ban.log` | Writable file where confirmed offenders are appended.                                          |
+| `ntfy.banFeed.window`             | string  | `10m`                     | Rolling window used to count weighted strikes per visitor prefix.                              |
+| `ntfy.banFeed.threshold`          | integer | `100`                     | Weighted strikes per window before a prefix is emitted.                                        |
+| `ntfy.banFeed.weights`            | array   | `["42909:10"]`            | Per-code weights in `KEY:WEIGHT` format; longest match wins.                                   |
+| `ntfy.database.enabled`           | boolean | `false`                   | Use PostgreSQL instead of the SQLite-backed stores.                                            |
+| `ntfy.database.existingSecret`    | string  | `""`                      | Secret containing the PostgreSQL connection URL.                                               |
+| `ntfy.database.existingSecretKey` | string  | `database-url`            | Secret key exposed to ntfy as `NTFY_DATABASE_URL`.                                             |
+| `ntfy.extraConfig`                | string  | `""`                      | Raw `server.yml` configuration appended to the generated ConfigMap.                            |
+| `ntfy.extraEnv`                   | array   | `[]`                      | Extra environment variables injected into the container.                                       |
 
 <Callout type="info" title="Append arbitrary configuration with extraConfig">
   The `ntfy.extraConfig` field appends raw `server.yml` lines to the generated ConfigMap. Use it for any ntfy server
   option not exposed as a dedicated value, such as authentication providers, Firebase credentials, or per-topic limits.
   See the [ntfy server configuration reference](https://docs.ntfy.sh/config/) for all available options.
 </Callout>
+
+<Callout type="info" title="PostgreSQL replaces all SQLite stores">
+  When `ntfy.database.enabled` is true, the chart omits `cache-file`, `auth-file`, and `web-push-file` and loads the
+  database URL from the selected Secret. PostgreSQL stores messages, users, access control, and web push subscriptions.
+</Callout>
+
+<Callout type="warning" title="PostgreSQL does not automatically enable HA">
+  This chart still deploys one ntfy replica. Local filesystem attachments are not shared, so PostgreSQL alone is not a
+  complete highly available architecture.
+</Callout>
+
+### External Secrets
+
+| Parameter                         | Type    | Default | Description                                     |
+| --------------------------------- | ------- | ------- | ----------------------------------------------- |
+| `externalSecrets.enabled`         | boolean | `false` | Render ExternalSecret resources.                |
+| `externalSecrets.refreshInterval` | string  | `1h`    | Default provider synchronization interval.      |
+| `externalSecrets.items`           | array   | `[]`    | ExternalSecret definitions with complete specs. |
+
+Each item supports `name`, `fullnameOverride`, `labels`, `annotations`, and a complete ExternalSecret `spec`. Configure
+either `spec.secretStoreRef` or a per-source `sourceRef`. The target Secret name must match
+`ntfy.database.existingSecret`. See the
+[External Secrets Operator documentation](https://external-secrets.io/latest/) for provider configuration.
 
 <Callout type="tip" title="behindProxy should stay true on Kubernetes">
   When running behind a Kubernetes Ingress controller, all requests arrive from the Ingress pod IP unless
@@ -308,8 +374,9 @@ gateway:
 
 ### Persistence
 
-ntfy stores its SQLite cache database and authentication database in `/var/cache/ntfy`. Persistence is enabled by
-default to survive pod restarts without losing message history and user accounts.
+By default, ntfy stores its SQLite cache and authentication databases in `/var/cache/ntfy`. Persistence survives pod
+restarts. With PostgreSQL, the PVC may be disabled only when attachments, the ban-feed, and custom file-backed options
+do not require durable local storage.
 
 | Parameter                   | Type    | Default             | Description                                  |
 | --------------------------- | ------- | ------------------- | -------------------------------------------- |
