@@ -69,8 +69,22 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="redis"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('8.8.1');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('8.10.0');
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
+  });
+
+  test('redis production scenario uses role-neutral Sentinel nodes', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="redis"]').click();
+    await page.locator('.playground-scenario-btn:has-text("Production")').click();
+
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('architecture=sentinel');
+    await expect(page.locator('input[data-field-key="node.replicaCount"]')).toHaveValue('3');
+    await expect(code).toContainText('node.persistence.enabled=true');
+    await expect(code).toContainText('node.resources.limits.memory=2Gi');
+    await expect(code).not.toContainText('replication.primary');
+    await expect(code).not.toContainText('replication.replica');
   });
 
   test('valkey defaults stay aligned with the chart', async ({ page }) => {

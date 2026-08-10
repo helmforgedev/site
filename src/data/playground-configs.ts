@@ -4403,7 +4403,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '8.8.1',
+          default: '8.10.0',
           description: 'Pinned Redis image tag',
         },
         {
@@ -4415,11 +4415,18 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Deployment architecture',
         },
         {
-          label: 'Replica Count',
+          label: 'Replication Replicas',
           key: 'replication.replicaCount',
           type: 'number',
           default: '2',
-          description: 'Replica count for replication and Sentinel modes',
+          description: 'Replica count for replication mode',
+        },
+        {
+          label: 'Sentinel Data Nodes',
+          key: 'node.replicaCount',
+          type: 'number',
+          default: '3',
+          description: 'Role-neutral data-node count for Sentinel mode',
         },
         {
           label: 'Standalone Storage',

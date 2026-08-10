@@ -48,7 +48,7 @@ Secrets Operator integration.
 | ------------- | -------------------------------------------- | --- | ---------------- |
 | `standalone`  | Development, low-traffic caching.            | ✗   | ✗                |
 | `replication` | Read scaling via replicas, manual failover.  | ✗   | Read only        |
-| `sentinel`    | Automatic failover HA for persistent data.   | ✓   | Read only        |
+| `sentinel`    | Automatic failover with role-neutral nodes.  | ✓   | Read only        |
 | `cluster`     | Large datasets exceeding single-node memory. | ✓   | Full             |
 
 <ArchitectureDiagram title="Standalone" description="Single Redis instance with persistent storage (RDB/AOF).">
@@ -57,7 +57,7 @@ Secrets Operator integration.
 
 <ArchitectureDiagram
   title="Sentinel"
-  description="Redis primary with replicas, monitored by Sentinel for automatic failover."
+  description="Role-neutral Redis data nodes monitored by independently scaled Sentinel pods."
 >
   <RedisDiagram mode="sentinel" />
 </ArchitectureDiagram>
@@ -67,6 +67,7 @@ Secrets Operator integration.
 - **Four architectures** — standalone, replication, Sentinel, cluster
 - **Sentinel quorum** — configurable failover quorum (default: 2 out of 3 Sentinels)
 - **Sentinel master set** — configurable primary discovery name for Sentinel-aware clients
+- **Safe Sentinel lifecycle** — stable hostname announcements, graceful failover, and an empty-data startup guard
 - **Cluster mode** — 6 nodes by default (3 master + 3 replica), auto-initialized via init Job
 - **TLS encryption** — mutual TLS for all Redis connections
 - **`existingSecret`** — keep credentials out of the values file
@@ -145,7 +146,7 @@ metrics:
 <div data-tab-panel="sentinel">
 
 ```yaml
-# values.yaml — Redis Sentinel HA (primary + 3 replicas + 3 Sentinels)
+# values.yaml — Redis Sentinel HA (3 role-neutral data nodes + 3 Sentinels)
 # Requires Sentinel-aware client (redis-py, Jedis, ioredis with Sentinel option)
 # Connect to port 26379 (Sentinel) — clients discover the current primary dynamically
 architecture: sentinel
@@ -155,19 +156,14 @@ auth:
   existingSecret: redis-credentials
   existingSecretPasswordKey: redis-password
 
-replication:
+node:
   replicaCount: 3
-  primary:
-    persistence:
-      enabled: true
-      size: 20Gi
-    resources:
-      limits:
-        memory: 2Gi
-  replica:
-    persistence:
-      enabled: true
-      size: 20Gi
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    limits:
+      memory: 2Gi
 
 sentinel:
   replicaCount: 3 # always deploy an ODD number of Sentinels
@@ -175,6 +171,10 @@ sentinel:
   quorum: 2 # minimum Sentinels that must agree to trigger failover
   downAfterMilliseconds: 60000 # time without response before marking as down
   failoverTimeout: 180000
+  gracefulFailover:
+    enabled: true
+  startupFailoverGuard:
+    enabled: true
 
 config:
   redis: |
@@ -311,7 +311,7 @@ clustered deployments.
 | Parameter          | Type   | Default                   | Description  |
 | ------------------ | ------ | ------------------------- | ------------ |
 | `image.repository` | string | `docker.io/library/redis` | Redis image. |
-| `image.tag`        | string | `"8.8.1"`                 | Image tag.   |
+| `image.tag`        | string | `"8.10.0"`                | Image tag.   |
 
 ### Authentication
 
@@ -321,6 +321,7 @@ clustered deployments.
 | `auth.password`                  | string  | `""`             | Redis password. Auto-generated if empty.     |
 | `auth.existingSecret`            | string  | `""`             | Existing secret with Redis password.         |
 | `auth.existingSecretPasswordKey` | string  | `redis-password` | Key for the password in the existing secret. |
+| `auth.sentinel`                  | boolean | `false`          | Require password authentication on Sentinel. |
 
 ### TLS
 
@@ -350,14 +351,22 @@ clustered deployments.
 
 ### Sentinel
 
-| Parameter                        | Type    | Default    | Description                                            |
-| -------------------------------- | ------- | ---------- | ------------------------------------------------------ |
-| `sentinel.replicaCount`          | integer | `3`        | Number of Sentinel pods (always use an odd number).    |
-| `sentinel.masterSet`             | string  | `mymaster` | Master set name used by Sentinel-aware clients.        |
-| `sentinel.quorum`                | integer | `2`        | Minimum Sentinels that must agree to trigger failover. |
-| `sentinel.downAfterMilliseconds` | integer | `60000`    | Milliseconds before marking a primary as down.         |
-| `sentinel.failoverTimeout`       | integer | `180000`   | Failover timeout in milliseconds.                      |
-| `sentinel.parallelSyncs`         | integer | `1`        | Replicas that sync in parallel during failover.        |
+| Parameter                                   | Type    | Default    | Description                                                   |
+| ------------------------------------------- | ------- | ---------- | ------------------------------------------------------------- |
+| `node.replicaCount`                         | integer | `3`        | Number of role-neutral Redis data nodes.                      |
+| `node.persistence.enabled`                  | boolean | `true`     | Persist AOF/RDB data for Sentinel nodes.                      |
+| `node.persistence.size`                     | string  | `8Gi`      | PVC size for each Sentinel data node.                         |
+| `node.resources`                            | object  | `{}`       | CPU and memory resources applied to every Sentinel data node. |
+| `sentinel.replicaCount`                     | integer | `3`        | Number of Sentinel pods (always use an odd number).           |
+| `sentinel.masterSet`                        | string  | `mymaster` | Master set name used by Sentinel-aware clients.               |
+| `sentinel.quorum`                           | integer | `2`        | Minimum Sentinels that must agree to trigger failover.        |
+| `sentinel.downAfterMilliseconds`            | integer | `60000`    | Milliseconds before marking a primary as down.                |
+| `sentinel.failoverTimeout`                  | integer | `180000`   | Failover timeout in milliseconds.                             |
+| `sentinel.parallelSyncs`                    | integer | `1`        | Replicas that sync in parallel during failover.               |
+| `sentinel.gracefulFailover.enabled`         | boolean | `true`     | Request failover before voluntary active-master termination.  |
+| `sentinel.gracefulFailover.maxAttempts`     | integer | `12`       | Attempts to confirm graceful failover.                        |
+| `sentinel.startupFailoverGuard.enabled`     | boolean | `true`     | Prevent an empty node from resuming as master.                |
+| `sentinel.startupFailoverGuard.maxAttempts` | integer | `20`       | Attempts to force safe promotion before startup.              |
 
 ### Cluster
 
@@ -419,10 +428,11 @@ service:
 
 ## Upgrade Notes
 
-<Callout type="warning" title="Sentinel failover during rolling upgrades is expected behavior">
-  In Sentinel mode, rolling upgrades restart the primary pod and trigger a failover. Sentinel promotes a replica to
-  primary. Applications using Sentinel-aware clients handle this transparently. Expect a brief connection interruption
-  (seconds) during master pod restart.
+<Callout type="warning" title="Redis Sentinel 2.0 uses a breaking role-neutral topology">
+  Sentinel mode no longer renders `-primary` and `-replica` StatefulSets or Services. It renders a `-node` StatefulSet,
+  and clients must discover the elected master through the `-sentinel` Service. StatefulSet and PVC identities cannot be
+  renamed in place: back up data, use a maintenance window, reinstall the 2.x topology, and restore data when upgrading
+  from 1.x.
 </Callout>
 
 - Switching from `standalone` to `sentinel` or `cluster` requires a fresh deployment and data migration (`redis-cli --rdb`, Valkey migration tools, or a `DUMP`/`RESTORE` approach)
@@ -432,6 +442,6 @@ service:
 ## More Information
 
 - [Redis Official Documentation](https://redis.io/docs/)
-- [Redis 8.8.1 Security Release](https://github.com/redis/redis/releases/tag/8.8.1)
+- [Redis 8.10.0 Release](https://github.com/redis/redis/releases/tag/8.10.0)
 - [Redis Docker Hub](https://hub.docker.com/_/redis)
 - [HelmForge Redis Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/redis)
