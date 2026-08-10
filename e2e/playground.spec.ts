@@ -46,7 +46,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="ntfy"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v2.26.3');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v2.27.0');
     await page.locator('[data-section-toggle="Abuse Ban-Feed"]').click();
     await expect(page.locator('input[data-field-key="ntfy.banFeed.file"]')).toHaveValue('/var/cache/ntfy/ban.log');
     await expect(page.locator('input[data-field-key="ntfy.banFeed.threshold"]')).toHaveValue('100');
