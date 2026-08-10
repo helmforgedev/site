@@ -8329,7 +8329,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.25.0',
+          default: '1.26.1',
           description: 'Komga image tag',
         },
         {
