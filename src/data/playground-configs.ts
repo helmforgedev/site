@@ -4855,7 +4855,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '26.7.0',
+          default: '26.7.1',
           description: 'Pinned Keycloak image tag',
         },
         {
