@@ -311,7 +311,7 @@ clustered deployments.
 | Parameter          | Type   | Default                   | Description  |
 | ------------------ | ------ | ------------------------- | ------------ |
 | `image.repository` | string | `docker.io/library/redis` | Redis image. |
-| `image.tag`        | string | `"8.8.1"`                 | Image tag.   |
+| `image.tag`        | string | `"8.10.0"`                | Image tag.   |
 
 ### Authentication
 
@@ -321,6 +321,7 @@ clustered deployments.
 | `auth.password`                  | string  | `""`             | Redis password. Auto-generated if empty.     |
 | `auth.existingSecret`            | string  | `""`             | Existing secret with Redis password.         |
 | `auth.existingSecretPasswordKey` | string  | `redis-password` | Key for the password in the existing secret. |
+| `auth.sentinel`                  | boolean | `false`          | Require password authentication on Sentinel. |
 
 ### TLS
 
@@ -350,21 +351,22 @@ clustered deployments.
 
 ### Sentinel
 
-| Parameter                                   | Type    | Default    | Description                                                  |
-| ------------------------------------------- | ------- | ---------- | ------------------------------------------------------------ |
-| `node.replicaCount`                         | integer | `3`        | Number of role-neutral Redis data nodes.                     |
-| `node.persistence.enabled`                  | boolean | `false`    | Persist AOF/RDB data for Sentinel nodes.                     |
-| `node.persistence.size`                     | string  | `8Gi`      | PVC size for each Sentinel data node.                        |
-| `sentinel.replicaCount`                     | integer | `3`        | Number of Sentinel pods (always use an odd number).          |
-| `sentinel.masterSet`                        | string  | `mymaster` | Master set name used by Sentinel-aware clients.              |
-| `sentinel.quorum`                           | integer | `2`        | Minimum Sentinels that must agree to trigger failover.       |
-| `sentinel.downAfterMilliseconds`            | integer | `60000`    | Milliseconds before marking a primary as down.               |
-| `sentinel.failoverTimeout`                  | integer | `180000`   | Failover timeout in milliseconds.                            |
-| `sentinel.parallelSyncs`                    | integer | `1`        | Replicas that sync in parallel during failover.              |
-| `sentinel.gracefulFailover.enabled`         | boolean | `true`     | Request failover before voluntary active-master termination. |
-| `sentinel.gracefulFailover.maxAttempts`     | integer | `12`       | Attempts to confirm graceful failover.                       |
-| `sentinel.startupFailoverGuard.enabled`     | boolean | `true`     | Prevent an empty node from resuming as master.               |
-| `sentinel.startupFailoverGuard.maxAttempts` | integer | `20`       | Attempts to force safe promotion before startup.             |
+| Parameter                                   | Type    | Default    | Description                                                   |
+| ------------------------------------------- | ------- | ---------- | ------------------------------------------------------------- |
+| `node.replicaCount`                         | integer | `3`        | Number of role-neutral Redis data nodes.                      |
+| `node.persistence.enabled`                  | boolean | `true`     | Persist AOF/RDB data for Sentinel nodes.                      |
+| `node.persistence.size`                     | string  | `8Gi`      | PVC size for each Sentinel data node.                         |
+| `node.resources`                            | object  | `{}`       | CPU and memory resources applied to every Sentinel data node. |
+| `sentinel.replicaCount`                     | integer | `3`        | Number of Sentinel pods (always use an odd number).           |
+| `sentinel.masterSet`                        | string  | `mymaster` | Master set name used by Sentinel-aware clients.               |
+| `sentinel.quorum`                           | integer | `2`        | Minimum Sentinels that must agree to trigger failover.        |
+| `sentinel.downAfterMilliseconds`            | integer | `60000`    | Milliseconds before marking a primary as down.                |
+| `sentinel.failoverTimeout`                  | integer | `180000`   | Failover timeout in milliseconds.                             |
+| `sentinel.parallelSyncs`                    | integer | `1`        | Replicas that sync in parallel during failover.               |
+| `sentinel.gracefulFailover.enabled`         | boolean | `true`     | Request failover before voluntary active-master termination.  |
+| `sentinel.gracefulFailover.maxAttempts`     | integer | `12`       | Attempts to confirm graceful failover.                        |
+| `sentinel.startupFailoverGuard.enabled`     | boolean | `true`     | Prevent an empty node from resuming as master.                |
+| `sentinel.startupFailoverGuard.maxAttempts` | integer | `20`       | Attempts to force safe promotion before startup.              |
 
 ### Cluster
 
