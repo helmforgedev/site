@@ -69,7 +69,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="redis"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('8.8.1');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('8.10.0');
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
   });
 
