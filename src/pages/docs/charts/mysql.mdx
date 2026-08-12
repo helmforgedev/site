@@ -18,7 +18,7 @@ production hardening controls that can be enabled without changing the developme
 ## Key Features
 
 - **Standalone and source-replica** - Single instance or source with read replicas.
-- **Official MySQL image** - Uses `docker.io/library/mysql:9.7.0` by default.
+- **Official MySQL image** - Uses `docker.io/library/mysql:9.7.2` by default.
 - **Deterministic credentials** - Inline values for development or existing Secrets/External Secrets for production.
 - **TLS** - Server TLS, optional secure transport requirement, internal client TLS, and private-key permission normalization.
 - **NetworkPolicy** - Optional ingress rules plus explicit egress for DNS, same-namespace MySQL, HTTPS, and custom targets.
@@ -319,7 +319,8 @@ restricts the private key before `mysqld` starts.
 
 `networkPolicy.egress.enabled=false` preserves default CNI egress behavior. When enabled, use the structured switches for
 DNS, same-namespace MySQL replication/internal clients, HTTPS to object storage or external secret backends, and
-`networkPolicy.egress.extraTo` for platform-specific destinations.
+`networkPolicy.egress.extraTo` for additional destinations on the built-in rules. Use `networkPolicy.extraEgress` to
+append complete Kubernetes egress rules when a platform needs selectors, IP blocks, or ports outside that structure.
 
 ### ServiceAccount token mount
 
@@ -334,7 +335,7 @@ platform integration inside the pod needs Kubernetes API credentials.
 | ------------------ | ------ | ------------------------- | ---------------------------------------------------------- |
 | `architecture`     | string | `standalone`              | Deployment architecture: `standalone` or `replication`.    |
 | `image.repository` | string | `docker.io/library/mysql` | MySQL runtime image repository.                            |
-| `image.tag`        | string | `"9.7.0"`                 | MySQL runtime image tag.                                   |
+| `image.tag`        | string | `"9.7.2"`                 | MySQL runtime image tag.                                   |
 | `clusterDomain`    | string | `cluster.local`           | Kubernetes cluster DNS domain.                             |
 | `commonLabels`     | object | `{}`                      | Extra labels added to all resources.                       |
 | `extraManifests`   | array  | `[]`                      | Extra Kubernetes manifests rendered after chart resources. |
@@ -383,6 +384,7 @@ platform integration inside the pod needs Kubernetes API credentials.
 | `metrics.enabled`                             | boolean | `false`     | Enable `mysqld-exporter`.                                                                                    |
 | `metrics.image.tag`                           | string  | `"v0.17.2"` | `mysqld-exporter` image tag.                                                                                 |
 | `networkPolicy.enabled`                       | boolean | `false`     | Create a NetworkPolicy for MySQL pods.                                                                       |
+| `networkPolicy.extraEgress`                   | array   | `[]`        | Complete additional egress rules appended when egress is enabled.                                            |
 | `networkPolicy.egress.enabled`                | boolean | `false`     | Add explicit egress rules to the NetworkPolicy.                                                              |
 | `serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount Kubernetes API credentials into workload pods.                                                         |
 
