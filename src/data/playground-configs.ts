@@ -203,6 +203,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '10Gi',
           description: 'PocketBase data, workflows, credentials, and certificate material',
         },
+        {
+          label: 'Temporary Storage Limit',
+          key: 'tmpStorage.sizeLimit',
+          type: 'text',
+          default: '',
+          description: 'Optional /tmp size limit and matching ephemeral-storage request and limit',
+        },
       ],
     },
     {
