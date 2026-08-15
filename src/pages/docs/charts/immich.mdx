@@ -4,13 +4,15 @@ title: Immich Chart
 description: Immich Helm chart with official Immich images, HelmForge PostgreSQL, Redis-compatible cache, machine learning, Gateway API, and production controls.
 ---
 
+import Callout from '../../../components/Callout.astro';
+
 # Immich
 
 Immich is a self-hosted photo and video management platform. The HelmForge chart deploys Immich server, machine learning, PostgreSQL, and a Redis-compatible cache with production-oriented Kubernetes defaults.
 
 ## Key Features
 
-- Official Immich images pinned to `v2.7.5`
+- Official Immich images pinned to `v3.1.0`
 - HelmForge PostgreSQL dependency using Immich's VectorChord PostgreSQL image defaults
 - HelmForge Redis chart aliased as `valkey` for Redis-compatible cache support
 - Machine learning service with persistent model cache
@@ -30,6 +32,20 @@ helm install immich helmforge/immich --namespace immich --create-namespace
 ```bash
 helm install immich oci://ghcr.io/helmforgedev/helm/immich --namespace immich --create-namespace
 ```
+
+## Upgrading to Immich 3
+
+<Callout type="warning" title="Complete the VectorChord migration before upgrading older installations">
+  Immich 3 removes support for `pgvecto.rs`. Check the active database extension and the effective `DB_VECTOR_EXTENSION`
+  setting, whose valid values are `vectorchord` and `pgvector`. If the database still uses `pgvecto.rs`, migrate it
+  before upgrading. Back up PostgreSQL and uploads first. The bundled PostgreSQL image already uses VectorChord;
+  external PostgreSQL migrations must be completed outside Helm. The Immich server runs its application migrations
+  during startup.
+</Callout>
+
+Review the [Immich 3 migration guide](https://immich.app/blog/v3-migration) and
+[VectorChord upgrade instructions](https://docs.immich.app/install/upgrading/#migrating-to-vectorchord). For external
+databases, follow the [standalone PostgreSQL migration guide](https://docs.immich.app/administration/postgres-standalone).
 
 ## Examples
 
@@ -254,7 +270,7 @@ test library.
 | Parameter                   | Default                            | Description                               |
 | --------------------------- | ---------------------------------- | ----------------------------------------- |
 | `image.repository`          | `ghcr.io/immich-app/immich-server` | Immich server image repository.           |
-| `image.tag`                 | `v2.7.5`                           | Immich server image tag.                  |
+| `image.tag`                 | `v3.1.0`                           | Immich server image tag.                  |
 | `machineLearning.enabled`   | `true`                             | Deploy the machine learning service.      |
 | `postgresql.enabled`        | `true`                             | Deploy HelmForge PostgreSQL dependency.   |
 | `valkey.internal.enabled`   | `true`                             | Deploy Redis-compatible cache dependency. |
