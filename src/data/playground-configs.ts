@@ -2180,7 +2180,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '3000.18.1',
+          default: '3000.19.0',
           description: 'Pinned OliveTin image tag',
         },
         {
@@ -4488,7 +4488,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '8.3.7',
+          default: '8.3.8',
           description: 'Pinned MongoDB image tag',
         },
         {
@@ -5335,7 +5335,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '7.0.2-apache',
+          default: '7.0.4-apache',
           description: 'Pinned WordPress image tag',
         },
         {
@@ -6025,7 +6025,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.11.2',
+          default: '1.11.3',
           description: 'Pinned Langflow image tag',
         },
         {
@@ -8336,7 +8336,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.26.1',
+          default: '1.26.3',
           description: 'Komga image tag',
         },
         {

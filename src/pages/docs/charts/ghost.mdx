@@ -23,10 +23,9 @@ backed by MySQL.
 - **S3 content backup** — scheduled archive of the Ghost content directory to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
 
-<Callout type="info" title="Ghost 6.54.0">
-  This release adds inline editing for routes and redirects, support for adapters installed outside the content
-  directory, member labels, complimentary subscriptions, and member avatars in themes. It also hardens filename
-  generation and fixes unsafe helper output and CSV import edge cases.
+<Callout type="info" title="Adapter paths">
+  Ghost supports adapters installed outside the content directory. Keep custom adapters in the image rather than the
+  content PVC so application code and user-managed content retain separate lifecycles.
 </Callout>
 
 ## Installation
@@ -235,7 +234,7 @@ backup:
 # values.yaml — custom Ghost image with adapters outside the content PVC
 image:
   repository: registry.example.com/ghost-with-adapters
-  tag: '6.54.0'
+  tag: '6.57.1'
 
 ghost:
   url: 'https://blog.example.com'
@@ -267,7 +266,7 @@ when the container starts.
 | Parameter          | Type   | Default                   | Description                          |
 | ------------------ | ------ | ------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/ghost` | Ghost container image.               |
-| `image.tag`        | string | `"6.54.0"`                | Image tag.                           |
+| `image.tag`        | string | `"6.57.1"`                | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                      | Pull secrets for private registries. |
 
@@ -296,9 +295,9 @@ when the container starts.
 </Callout>
 
 <Callout type="tip" title="Keep installed adapters outside the content PVC">
-  Ghost 6.54.0 accepts `paths__installedAdaptersPath` for custom container images. Set it through `ghost.extraEnv` to
-  the directory baked into the image. Do not place that directory under `/var/lib/ghost/content`, because the content
-  PVC replaces that path at runtime.
+  Ghost accepts `paths__installedAdaptersPath` for custom container images. Set it through `ghost.extraEnv` to the
+  directory baked into the image. Do not place that directory under `/var/lib/ghost/content`, because the content PVC
+  replaces that path at runtime.
 </Callout>
 
 ### Database — Embedded Subchart
