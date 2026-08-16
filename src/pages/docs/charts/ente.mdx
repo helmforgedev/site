@@ -146,7 +146,7 @@ Prepare these services and records before setting `productionMode=true`:
 
 `productionMode=true` rejects:
 
-- `*.example.com` Museum and S3 endpoints
+- `*.example.com` Museum, S3, and enabled web application endpoints
 - inline `change-me` S3 credentials
 - the upstream `localBuckets` compatibility mode
 
@@ -656,7 +656,14 @@ networkPolicy:
     allowDNS: true
     allowSameNamespacePostgresql: true
     allowObjectStorage: true
+    objectStoragePorts:
+      - 443
 ```
+
+The default object-storage rule permits public IPv4 and IPv6 destinations on
+TCP 443 while excluding private and link-local ranges. Private or in-cluster S3
+requires explicit peers in `objectStorageDestinations`; add ports 80 or 9000
+only for an intentionally accepted plaintext endpoint.
 
 For private S3, external PostgreSQL, or SMTP CIDRs:
 
@@ -783,6 +790,37 @@ Do not confuse Ente's application replication with point-in-time backup.
 11. Compare object and database counts.
 12. Perform the production cutover only after the drill passes.
 
+Create a dedicated restore values file so the release cannot silently select a
+new bundled database or generate different cryptographic keys:
+
+```yaml
+museum:
+  existingSecret: ente-restored-museum
+
+storage:
+  s3:
+    endpoint: https://s3-restore.company.tld
+    region: us-east-1
+    bucket: ente-restore-test
+    existingSecret: ente-restored-s3
+
+database:
+  mode: external
+  external:
+    host: ente-restore-rw.database.svc.cluster.local
+    name: ente
+    username: ente
+    existingSecret: ente-restored-postgresql
+    sslMode: require
+
+postgresql:
+  enabled: false
+```
+
+Render this file before installation. Inspect the Museum Deployment's Secret
+references and the ConfigMap's database host, S3 endpoint, and bucket before
+starting the restored workload.
+
 Run a complete restore drill at least quarterly. A successful CronJob is not
 proof that the recovery set works.
 
@@ -797,13 +835,13 @@ Secrets, SMTP, and TLS Ingress.
 productionMode: true
 
 museum:
-  externalUrl: https://api.ente.example.com
+  externalUrl: https://api.ente.company.tld
   existingSecret: ente-museum
   config:
     webauthn:
-      rpid: accounts.ente.example.com
+      rpid: accounts.ente.company.tld
       rporigins:
-        - https://accounts.ente.example.com
+        - https://accounts.ente.company.tld
 
 storage:
   s3:
@@ -814,25 +852,34 @@ storage:
 
 smtp:
   enabled: true
-  host: smtp.example.com
+  host: smtp.company.tld
   port: 587
-  email: ente@example.com
+  email: ente@company.tld
   existingSecret: ente-smtp
+
+web:
+  apps:
+    photos:
+      externalUrl: https://photos.ente.company.tld
+    accounts:
+      externalUrl: https://accounts.ente.company.tld
+    albums:
+      externalUrl: https://albums.ente.company.tld
 
 ingress:
   enabled: true
   ingressClassName: nginx
   hosts:
-    - host: api.ente.example.com
+    - host: api.ente.company.tld
       service: museum
       paths: [{ path: /, pathType: Prefix }]
-    - host: photos.ente.example.com
+    - host: photos.ente.company.tld
       service: photos
       paths: [{ path: /, pathType: Prefix }]
-    - host: accounts.ente.example.com
+    - host: accounts.ente.company.tld
       service: accounts
       paths: [{ path: /, pathType: Prefix }]
-    - host: albums.ente.example.com
+    - host: albums.ente.company.tld
       service: albums
       paths: [{ path: /, pathType: Prefix }]
 ```
@@ -855,7 +902,7 @@ postgresql:
   enabled: false
 
 museum:
-  externalUrl: https://api.ente.example.com
+  externalUrl: https://api.ente.company.tld
   existingSecret: ente-museum
   api:
     replicaCount: 3
@@ -865,10 +912,17 @@ museum:
 
 web:
   replicaCount: 3
+  apps:
+    photos:
+      externalUrl: https://photos.ente.company.tld
+    accounts:
+      externalUrl: https://accounts.ente.company.tld
+    albums:
+      externalUrl: https://albums.ente.company.tld
 
 storage:
   s3:
-    endpoint: https://objects.example.com
+    endpoint: https://objects.company.tld
     bucket: ente-photos
     existingSecret: ente-s3
 
@@ -1050,34 +1104,36 @@ backup:
 
 ### Platform integration
 
-| Value                             | Default                  | Description                     |
-| --------------------------------- | ------------------------ | ------------------------------- |
-| `externalSecrets.enabled`         | `false`                  | Render ExternalSecrets          |
-| `externalSecrets.apiVersion`      | `external-secrets.io/v1` | ESO API version                 |
-| `externalSecrets.refreshInterval` | `1h`                     | Default refresh interval        |
-| `externalSecrets.items`           | `[]`                     | Complete ExternalSecret entries |
-| `ingress.enabled`                 | `false`                  | Create Ingress                  |
-| `ingress.ingressClassName`        | `""`                     | Ingress class                   |
-| `ingress.hosts`                   | `[]`                     | Host and service routes         |
-| `ingress.tls`                     | `[]`                     | Ingress TLS entries             |
-| `gateway.enabled`                 | `false`                  | Create HTTPRoutes               |
-| `gateway.parentRefs`              | `[]`                     | Shared Gateway parents          |
-| `gateway.routes`                  | `[]`                     | Per-service HTTPRoutes          |
-| `networkPolicy.enabled`           | `false`                  | Create workload policies        |
-| `pdb.museum.enabled`              | `false`                  | Museum API PDB                  |
-| `pdb.web.enabled`                 | `false`                  | Web PDB                         |
-| `autoscaling.museum.enabled`      | `false`                  | Museum API HPA                  |
-| `autoscaling.web.enabled`         | `false`                  | Web HPA                         |
-| `metrics.enabled`                 | `false`                  | Metrics Service                 |
-| `metrics.serviceMonitor.enabled`  | `false`                  | Prometheus Operator discovery   |
-| `metrics.prometheusRule.enabled`  | `false`                  | Baseline alerts                 |
-| `backup.enabled`                  | `false`                  | PostgreSQL backup CronJob       |
-| `backup.schedule`                 | `0 3 * * *`              | Backup schedule                 |
-| `backup.s3.endpoint`              | `""`                     | Backup endpoint                 |
-| `backup.s3.bucket`                | `""`                     | Backup bucket                   |
-| `backup.s3.prefix`                | `ente/postgresql`        | Backup object prefix            |
-| `backup.s3.existingSecret`        | `""`                     | Backup S3 Secret                |
-| `extraManifests`                  | `[]`                     | Additional templated resources  |
+| Value                                            | Default                  | Description                     |
+| ------------------------------------------------ | ------------------------ | ------------------------------- |
+| `externalSecrets.enabled`                        | `false`                  | Render ExternalSecrets          |
+| `externalSecrets.apiVersion`                     | `external-secrets.io/v1` | ESO API version                 |
+| `externalSecrets.refreshInterval`                | `1h`                     | Default refresh interval        |
+| `externalSecrets.items`                          | `[]`                     | Complete ExternalSecret entries |
+| `ingress.enabled`                                | `false`                  | Create Ingress                  |
+| `ingress.ingressClassName`                       | `""`                     | Ingress class                   |
+| `ingress.hosts`                                  | `[]`                     | Host and service routes         |
+| `ingress.tls`                                    | `[]`                     | Ingress TLS entries             |
+| `gateway.enabled`                                | `false`                  | Create HTTPRoutes               |
+| `gateway.parentRefs`                             | `[]`                     | Shared Gateway parents          |
+| `gateway.routes`                                 | `[]`                     | Per-service HTTPRoutes          |
+| `networkPolicy.enabled`                          | `false`                  | Create workload policies        |
+| `networkPolicy.egress.objectStorageDestinations` | public IPv4/IPv6 peers   | S3 destination peers            |
+| `networkPolicy.egress.objectStoragePorts`        | `[443]`                  | S3 destination ports            |
+| `pdb.museum.enabled`                             | `false`                  | Museum API PDB                  |
+| `pdb.web.enabled`                                | `false`                  | Web PDB                         |
+| `autoscaling.museum.enabled`                     | `false`                  | Museum API HPA                  |
+| `autoscaling.web.enabled`                        | `false`                  | Web HPA                         |
+| `metrics.enabled`                                | `false`                  | Metrics Service                 |
+| `metrics.serviceMonitor.enabled`                 | `false`                  | Prometheus Operator discovery   |
+| `metrics.prometheusRule.enabled`                 | `false`                  | Baseline alerts                 |
+| `backup.enabled`                                 | `false`                  | PostgreSQL backup CronJob       |
+| `backup.schedule`                                | `0 3 * * *`              | Backup schedule                 |
+| `backup.s3.endpoint`                             | `""`                     | Backup endpoint                 |
+| `backup.s3.bucket`                               | `""`                     | Backup bucket                   |
+| `backup.s3.prefix`                               | `ente/postgresql`        | Backup object prefix            |
+| `backup.s3.existingSecret`                       | `""`                     | Backup S3 Secret                |
+| `extraManifests`                                 | `[]`                     | Additional templated resources  |
 
 ## 17. Upgrade procedure
 
