@@ -116,7 +116,8 @@ test.describe('Playground', () => {
 
     await expect(page.locator('#playground-chart-title')).toContainText('Ente');
     await expect(page.locator('input[data-field-key="museum.api.replicaCount"]')).toHaveValue('1');
-    await expect(page.locator('input[data-field-key="storage.s3.existingSecret"]')).toHaveValue('ente-s3');
+    await expect(page.locator('input[data-field-key="storage.s3.bucket"]')).toHaveValue('ente');
+    await expect(page.locator('input[data-field-key="storage.s3.existingSecret"]')).toHaveValue('');
     await expect(page.locator('#playground-code')).not.toContainText('storage.s3.existingSecret');
 
     await page.locator('.playground-scenario-btn:has-text("Application HA")').click();
@@ -130,6 +131,9 @@ test.describe('Playground', () => {
     await expect(code).toContainText('database.mode=external');
     await expect(code).toContainText('postgresql.enabled=false');
     await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('externalSecrets.items[1].spec.target.name=ente-s3');
+    await expect(code).toContainText('externalSecrets.items[2].spec.target.name=ente-postgresql');
+    await expect(code).toContainText('externalSecrets.items[3].spec.target.name=ente-backup-s3');
     await expect(code).toContainText('gateway.enabled=true');
     await expect(code).toContainText('backup.enabled=true');
   });

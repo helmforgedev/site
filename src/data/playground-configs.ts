@@ -63,14 +63,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'S3 Bucket',
           key: 'storage.s3.bucket',
           type: 'text',
-          default: 'ente-photos',
+          default: 'ente',
           description: 'Primary hot-storage bucket',
         },
         {
           label: 'S3 Secret',
           key: 'storage.s3.existingSecret',
           type: 'text',
-          default: 'ente-s3',
+          default: '',
           description: 'Existing Secret containing access-key and secret-key',
         },
         {
