@@ -9,6 +9,63 @@ export interface PlaygroundScenario {
 }
 
 export const scenarios: Record<string, { label: string; description: string; values: Record<string, string> }[]> = {
+  ente: [
+    {
+      label: 'Secure Single Instance',
+      description: 'Museum, web apps, PostgreSQL, existing Secrets, and external S3',
+      values: {
+        productionMode: 'true',
+        'museum.externalUrl': 'https://api.ente.test',
+        'museum.existingSecret': 'ente-museum',
+        'storage.s3.endpoint': 'https://objects.ente.test',
+        'storage.s3.bucket': 'ente-photos',
+        'storage.s3.existingSecret': 'ente-s3',
+        'web.apps.photos.externalUrl': 'https://photos.ente.test',
+        'web.apps.accounts.externalUrl': 'https://accounts.ente.test',
+        'web.apps.albums.externalUrl': 'https://albums.ente.test',
+      },
+    },
+    {
+      label: 'Application HA',
+      description: 'Replicated API and web with one safe background worker',
+      values: {
+        'museum.api.replicaCount': '3',
+        'museum.api.skipBackgroundJobs': 'true',
+        'museum.worker.enabled': 'true',
+        'web.replicaCount': '3',
+        'pdb.museum.enabled': 'true',
+        'pdb.web.enabled': 'true',
+        'networkPolicy.enabled': 'true',
+        'metrics.enabled': 'true',
+      },
+    },
+    {
+      label: 'Managed Services',
+      description: 'External PostgreSQL, ESO-managed credentials, and Gateway API',
+      values: {
+        'postgresql.enabled': 'false',
+        'database.mode': 'external',
+        'database.external.host': 'ente-rw.database.svc.cluster.local',
+        'database.external.existingSecret': 'ente-postgresql',
+        'database.external.sslMode': 'verify-full',
+        'museum.existingSecret': 'ente-museum',
+        'storage.s3.existingSecret': 'ente-s3',
+        'externalSecrets.enabled': 'true',
+        'externalSecrets.items[0].name': 'museum',
+        'externalSecrets.items[0].spec.secretStoreRef.name': 'production',
+        'externalSecrets.items[0].spec.dataFrom[0].extract.key': 'ente/museum',
+        'gateway.enabled': 'true',
+        'gateway.parentRefs[0].name': 'public',
+        'gateway.routes[0].name': 'museum',
+        'gateway.routes[0].service': 'museum',
+        'gateway.routes[0].hostnames[0]': 'api.ente.test',
+        'backup.enabled': 'true',
+        'backup.s3.endpoint': 'https://backup.ente.test',
+        'backup.s3.bucket': 'platform-backups',
+        'backup.s3.existingSecret': 'ente-backup-s3',
+      },
+    },
+  ],
   gitea: [
     {
       label: 'SQLite Private',

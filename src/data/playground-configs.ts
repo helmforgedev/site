@@ -8,6 +8,156 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  ente: [
+    {
+      name: 'Museum',
+      fields: [
+        {
+          label: 'API Origin',
+          key: 'museum.externalUrl',
+          type: 'text',
+          default: 'https://api.ente.example.com',
+          description: 'Public HTTPS origin used by Ente web and mobile clients',
+        },
+        {
+          label: 'API Replicas',
+          key: 'museum.api.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Use the singleton worker before scaling above one replica',
+        },
+        {
+          label: 'Skip API Jobs',
+          key: 'museum.api.skipBackgroundJobs',
+          type: 'toggle',
+          default: 'false',
+          description: 'Required when the singleton worker is enabled',
+        },
+        {
+          label: 'Singleton Worker',
+          key: 'museum.worker.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Runs cron and cleanup jobs exactly once',
+        },
+      ],
+    },
+    {
+      name: 'Object Storage',
+      fields: [
+        {
+          label: 'S3 Endpoint',
+          key: 'storage.s3.endpoint',
+          type: 'text',
+          default: 'https://s3.example.com',
+          description: 'Endpoint reachable by Museum and end-user clients',
+        },
+        {
+          label: 'S3 Region',
+          key: 'storage.s3.region',
+          type: 'text',
+          default: 'us-east-1',
+          description: 'Object storage region',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'storage.s3.bucket',
+          type: 'text',
+          default: 'ente-photos',
+          description: 'Primary hot-storage bucket',
+        },
+        {
+          label: 'S3 Secret',
+          key: 'storage.s3.existingSecret',
+          type: 'text',
+          default: 'ente-s3',
+          description: 'Existing Secret containing access-key and secret-key',
+        },
+        {
+          label: 'Path-style URLs',
+          key: 'storage.s3.usePathStyle',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable only when required by the S3 provider',
+        },
+      ],
+    },
+    {
+      name: 'PostgreSQL and email',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the HelmForge PostgreSQL dependency',
+        },
+        {
+          label: 'PostgreSQL Volume',
+          key: 'postgresql.standalone.persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Durable metadata and encryption-key database capacity',
+        },
+        {
+          label: 'SMTP',
+          key: 'smtp.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deliver one-time login codes by email',
+        },
+        {
+          label: 'SMTP Host',
+          key: 'smtp.host',
+          type: 'text',
+          default: 'smtp.example.com',
+          description: 'SMTP relay hostname',
+        },
+      ],
+    },
+    {
+      name: 'Exposure and operations',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create routes for Museum and web applications',
+        },
+        {
+          label: 'API Host',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'api.ente.example.com',
+          description: 'Ingress hostname for Museum',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict Museum and web traffic',
+        },
+        {
+          label: 'Metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Museum Prometheus metrics',
+        },
+        {
+          label: 'PostgreSQL Backup',
+          key: 'backup.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Schedule PostgreSQL dumps to S3-compatible storage',
+        },
+      ],
+    },
+  ],
   pimcore: [
     {
       name: 'Application',

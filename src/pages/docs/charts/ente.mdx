@@ -1,0 +1,1246 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Ente Chart
+description: Production-ready Ente Photos Helm chart with official Museum and web images, PostgreSQL, external S3, safe HA, External Secrets, and backup.
+---
+
+import Callout from '../../../components/Callout.astro';
+
+# Ente
+
+[Ente](https://ente.io) is an open-source, end-to-end encrypted platform for
+photos. The HelmForge chart deploys Ente's Museum API, the official web bundle,
+and PostgreSQL with a production-oriented contract for external S3-compatible
+object storage.
+
+The chart is released directly as **stable**. It uses official immutable images,
+preserves cryptographic keys during upgrades, supports a safe application HA
+topology, and validates insecure production placeholders before installation.
+
+## Key features
+
+- Official `ghcr.io/ente/server` Museum image pinned to the commit running in
+  upstream Ente production
+- Official `ghcr.io/ente/web` image pinned to an immutable upstream commit
+- Linux amd64 and arm64 image manifests
+- HelmForge PostgreSQL dependency or external PostgreSQL
+- External S3-compatible object storage with explicit client-reachability and
+  CORS guidance
+- Stable generated Museum keys or user-managed existing Secrets
+- External Secrets Operator support through complete `items[]` specifications
+- Museum API replicas with cron disabled plus a singleton background worker
+- Photos, Accounts, and Albums enabled by default
+- Auth, Cast, Share, Embed, and Memories available as optional web apps
+- One web Deployment serving all selected apps without duplicate images
+- Ingress and Gateway API HTTPRoute exposure
+- Dual-stack Services, PDB, HPA, NetworkPolicy, and scheduling controls
+- Native Museum metrics, optional ServiceMonitor, and optional PrometheusRule
+- PostgreSQL dump-to-S3 CronJob
+- Non-root containers, read-only root filesystems, RuntimeDefault seccomp, and
+  service accounts without API token mounts
+- Helm tests, schema validation, 53 unit tests, and ten CI scenarios
+
+<Callout type="warning" title="External object storage is mandatory for real use">
+  Ente clients upload encrypted objects directly through presigned S3 URLs. The endpoint must be reachable from Museum
+  and from browsers and mobile clients. The chart does not bundle MinIO because Ente recommends external storage for
+  long-lived installations.
+</Callout>
+
+## 1. Architecture
+
+Ente has four durable or runtime responsibilities:
+
+1. Museum serves the API on port 8080 and Prometheus metrics on port 2112.
+2. The web image serves separate static applications on ports 3000 through 3010.
+3. PostgreSQL stores account metadata, encryption metadata, and application
+   state.
+4. S3-compatible storage holds the encrypted photo objects.
+
+The normal data path is:
+
+```text
+Browser or mobile app
+        | HTTPS
+        +--------------------> Photos / Accounts / Albums web
+        |
+        +--------------------> Museum API
+                                  | PostgreSQL protocol
+                                  +------> PostgreSQL
+                                  |
+                                  | S3 control operations
+                                  +------> S3-compatible storage
+        |
+        | presigned S3 URL
+        +------------------------> S3-compatible storage
+```
+
+Museum is stateless with respect to pod-local storage. The web application is
+also stateless after its startup content preparation. Durable recovery depends
+on PostgreSQL, S3, and Museum Secrets.
+
+### Museum configuration
+
+Museum supports layered YAML and environment configuration. This chart mounts an
+explicit `/museum.yaml` and injects secrets through `ENTE_*` environment
+variables.
+
+The chart intentionally does not set `ENVIRONMENT=production`. Upstream's
+production configuration enables internal TLS and file logging. Kubernetes
+deployments should use HTTP inside the cluster, TLS at the Ingress or Gateway,
+and logs on stdout.
+
+### Health checks
+
+Museum's `GET /ping` executes `SELECT 1` against PostgreSQL. The chart uses it
+for startup and readiness. Liveness is a TCP probe so a temporary database
+outage does not create a restart loop.
+
+`/ping` does not contact S3. A Ready Museum pod can still fail uploads when S3
+is unreachable or misconfigured.
+
+## 2. Installation
+
+### Helm repository
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install ente helmforge/ente \
+  --namespace ente \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+### OCI registry
+
+```bash
+helm install ente oci://ghcr.io/helmforgedev/helm/ente \
+  --namespace ente \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+### Verify the installation
+
+```bash
+kubectl get deploy,pod,svc -n ente
+helm test ente -n ente --logs
+```
+
+The Helm test calls Museum `/ping` and the root path of every enabled web
+application.
+
+## 3. Production prerequisites
+
+Prepare these services and records before setting `productionMode=true`:
+
+1. A PostgreSQL 14 or newer service, or durable storage for the bundled
+   PostgreSQL chart.
+2. An external S3-compatible bucket.
+3. Bucket CORS for every Ente web origin.
+4. Public HTTPS DNS for Museum.
+5. Public HTTPS DNS for Photos, Accounts, and Albums.
+6. SMTP credentials for one-time login codes.
+7. Museum encryption, hash, and JWT key storage.
+8. A backup destination independent from the live data path.
+
+`productionMode=true` rejects:
+
+- `*.example.com` Museum and S3 endpoints
+- inline `change-me` S3 credentials
+- the upstream `localBuckets` compatibility mode
+
+It does not claim that every external service is reachable. Run functional
+tests after installation.
+
+## 4. Secret preparation
+
+Museum needs three long-lived cryptographic values:
+
+- `encryption-key`: standard base64 for 32 random bytes
+- `hash-key`: standard base64 for 64 random bytes
+- `jwt-secret`: URL-safe base64 for 32 random bytes
+
+<Callout type="danger" title="Do not rotate Museum keys during a normal upgrade">
+  PostgreSQL, S3 objects, and Museum keys form one recovery identity. Deleting the managed Secret before an upgrade
+  generates new keys and can make existing data unusable.
+</Callout>
+
+Create a production Secret using values from your secret manager:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ente-museum
+  namespace: ente
+type: Opaque
+stringData:
+  encryption-key: REPLACE_WITH_STANDARD_BASE64_32_BYTES
+  hash-key: REPLACE_WITH_STANDARD_BASE64_64_BYTES
+  jwt-secret: REPLACE_WITH_URL_SAFE_BASE64_32_BYTES
+```
+
+Reference it:
+
+```yaml
+museum:
+  existingSecret: ente-museum
+```
+
+When `existingSecret` is empty, Helm generates cryptographically random values
+on the first install and preserves them with Kubernetes `lookup` on upgrades.
+
+## 5. PostgreSQL
+
+Museum applies database migrations automatically during startup.
+
+### Bundled PostgreSQL
+
+```yaml
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: ente
+    username: ente
+  standalone:
+    persistence:
+      enabled: true
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+```
+
+The bundled dependency provides durable standalone PostgreSQL. It does not
+provide automatic database failover.
+
+### External PostgreSQL
+
+```yaml
+database:
+  mode: external
+  external:
+    host: ente-rw.database.svc.cluster.local
+    port: 5432
+    name: ente
+    username: ente
+    existingSecret: ente-postgresql
+    existingSecretPasswordKey: database-password
+    sslMode: verify-full
+
+postgresql:
+  enabled: false
+```
+
+Use a managed service or PostgreSQL operator with a stable read-write endpoint
+for database HA. Prefer `verify-full` when the runtime has the required CA
+material and hostname verification path.
+
+### Selection modes
+
+| Value        | Behavior                                                           |
+| ------------ | ------------------------------------------------------------------ |
+| `auto`       | Select external configuration when present, otherwise the subchart |
+| `postgresql` | Require `postgresql.enabled=true`                                  |
+| `external`   | Require `database.external.host`                                   |
+
+The chart rejects ambiguous `auto` configuration when both external settings and
+the subchart are active.
+
+## 6. Object storage
+
+### Basic configuration
+
+```yaml
+storage:
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    region: us-east-1
+    bucket: company-ente-photos
+    usePathStyle: false
+    existingSecret: ente-s3
+```
+
+The referenced Secret contains:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ente-s3
+  namespace: ente
+type: Opaque
+stringData:
+  access-key: REPLACE_WITH_ACCESS_KEY
+  secret-key: REPLACE_WITH_SECRET_KEY
+```
+
+Museum historically names its primary logical provider `b2-eu-cen`. The chart
+uses that required logical key even when the actual provider is AWS, Backblaze,
+Wasabi, Ceph, Garage, or another compatible service.
+
+### Client reachability
+
+The endpoint appears in presigned URLs returned to clients. Do not configure a
+cluster-only Service name for production unless clients resolve and reach it.
+
+### Path-style URLs
+
+Virtual-hosted bucket addressing is the default. Enable `usePathStyle` only when
+required by the provider:
+
+```yaml
+storage:
+  s3:
+    usePathStyle: true
+```
+
+`localBuckets` enables additional upstream workarounds intended for local MinIO
+testing. Production validation rejects it.
+
+### CORS policy
+
+Allow the exact HTTPS origins used by Photos, Accounts, Albums, and any optional
+web applications.
+
+Required methods:
+
+- `GET`
+- `HEAD`
+- `POST`
+- `PUT`
+- `DELETE`
+
+Required request headers include:
+
+- `Content-Type`
+- `Content-MD5`
+- `UPLOAD-URL`
+
+Expose provider response headers required by the Ente client. Do not use `*`
+origins for a credentialed production application.
+
+### Bucket settings
+
+Do not enable object lock or versioning on Ente file-data buckets. Upstream does
+not handle those delete semantics.
+
+### S3 acceptance test
+
+After installation:
+
+1. Create an Ente account.
+2. Upload a photo from the browser or mobile client.
+3. Open the original photo on a second client.
+4. Create and open a public album.
+5. Inspect Museum logs for S3 errors.
+6. Restart Museum and repeat the download.
+
+## 7. SMTP and authentication
+
+Ente uses one-time codes for login. Without SMTP, Museum writes the code to its
+logs. That behavior is useful for evaluation but inappropriate for production.
+
+```yaml
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 587
+  email: ente@example.com
+  senderName: Ente
+  encryption: tls
+  existingSecret: ente-smtp
+```
+
+The SMTP Secret contains `username` and `password` by default.
+
+### Disable registration
+
+After controlled administrator bootstrap:
+
+```yaml
+museum:
+  config:
+    disableRegistration: true
+```
+
+### WebAuthn and passkeys
+
+The relying-party ID should be the Accounts hostname, without scheme or path.
+Origins include the full HTTPS scheme:
+
+```yaml
+museum:
+  config:
+    webauthn:
+      rpid: accounts.ente.example.com
+      rporigins:
+        - https://accounts.ente.example.com
+```
+
+Changing these values after passkeys are enrolled can prevent authentication.
+
+## 8. Web applications
+
+The official web image contains ten applications. This chart scopes its public
+contract to Ente Photos and supporting experiences.
+
+| Application | Value               | Port | Default  |
+| ----------- | ------------------- | ---: | -------- |
+| Photos      | `web.apps.photos`   | 3000 | enabled  |
+| Accounts    | `web.apps.accounts` | 3001 | enabled  |
+| Albums      | `web.apps.albums`   | 3002 | enabled  |
+| Auth        | `web.apps.auth`     | 3003 | disabled |
+| Cast        | `web.apps.cast`     | 3004 | disabled |
+| Share       | `web.apps.share`    | 3005 | disabled |
+| Embed       | `web.apps.embed`    | 3006 | disabled |
+| Memories    | `web.apps.memories` | 3010 | disabled |
+
+Ente Paste and Locker are separate product surfaces and are not exposed by this
+chart.
+
+Enable Memories:
+
+```yaml
+web:
+  apps:
+    memories:
+      enabled: true
+      port: 3010
+      externalUrl: https://memories.ente.example.com
+```
+
+One web Deployment serves all enabled apps. The chart creates one Service per
+enabled app so routes remain explicit.
+
+## 9. Ingress
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+  hosts:
+    - host: api.ente.example.com
+      service: museum
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: photos.ente.example.com
+      service: photos
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: accounts.ente.example.com
+      service: accounts
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: albums.ente.example.com
+      service: albums
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: ente-tls
+      hosts:
+        - api.ente.example.com
+        - photos.ente.example.com
+        - accounts.ente.example.com
+        - albums.ente.example.com
+```
+
+Keep `museum.externalUrl`, app external URLs, Ingress hosts, S3 CORS origins,
+and WebAuthn settings consistent.
+
+## 10. Gateway API
+
+The chart creates one HTTPRoute for each configured route. TLS belongs to the
+referenced Gateway listener.
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+      sectionName: https
+  routes:
+    - name: museum
+      service: museum
+      hostnames:
+        - api.ente.example.com
+    - name: photos
+      service: photos
+      hostnames:
+        - photos.ente.example.com
+    - name: accounts
+      service: accounts
+      hostnames:
+        - accounts.ente.example.com
+    - name: albums
+      service: albums
+      hostnames:
+        - albums.ente.example.com
+```
+
+Use per-route `parentRefs` when apps attach to different Gateway listeners.
+
+## 11. High availability
+
+### Why a singleton worker is required
+
+Museum starts cron jobs and background cleanup inside every process. Some jobs
+use PostgreSQL locks, but not all jobs are safe to duplicate. Scaling the default
+API Deployment directly can execute work multiple times.
+
+### Supported topology
+
+```yaml
+museum:
+  api:
+    replicaCount: 3
+    skipBackgroundJobs: true
+  worker:
+    enabled: true
+
+web:
+  replicaCount: 3
+
+pdb:
+  museum:
+    enabled: true
+    maxUnavailable: 1
+  web:
+    enabled: true
+    maxUnavailable: 1
+```
+
+The singleton worker:
+
+- runs the same official Museum image
+- has cron and cleanup enabled
+- has no public Service
+- always has exactly one replica
+- uses `Recreate` to avoid overlapping schedulers during rollout
+
+The API replicas use `jobs.cron.skip=true`. The chart rejects an unsafe replica
+or worker combination.
+
+### Horizontal autoscaling
+
+```yaml
+museum:
+  api:
+    skipBackgroundJobs: true
+  worker:
+    enabled: true
+
+autoscaling:
+  museum:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+  web:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+```
+
+HPA utilization requires non-empty resource requests and a working metrics API.
+
+### Migration behavior
+
+Every Museum process checks migrations during startup. Concurrent processes can
+conflict on migrations such as `CREATE INDEX CONCURRENTLY` and leave the
+database version dirty.
+
+For HA and HPA topologies, the chart adds a hardened PostgreSQL client sidecar
+to every Museum pod. It polls `pg_try_advisory_lock` without holding an active
+transaction, starts one local Museum process, waits for port 8080, and then
+releases the next pod. The chart rejects concurrent Museum processes when
+`museum.migrationGate.enabled=false`.
+
+### Replication limitation
+
+Ente's application-level bucket replication starts workers inside Museum even
+when cron is skipped. It needs multiple hot and derived buckets. This chart does
+not enable replication by default and does not treat it as backup.
+
+## 12. Security
+
+### Pod security
+
+Museum and web default to:
+
+- non-root user and group
+- read-only root filesystem
+- all Linux capabilities dropped
+- privilege escalation disabled
+- RuntimeDefault seccomp
+- service account token disabled
+
+The upstream images run as root by default. The chart explicitly proves their
+non-root runtime in behavioral tests.
+
+### Hardened web startup
+
+The upstream nginx entrypoint replaces a build placeholder under `/out` and
+writes nginx PID, cache, and temporary files. A read-only root filesystem would
+normally fail.
+
+The chart:
+
+1. Copies `/out` into a pod-local emptyDir with a non-root init container.
+2. Mounts the emptyDir at `/out`.
+3. Performs API-origin substitution as UID 101.
+4. Uses dedicated emptyDirs for nginx cache, run, and temporary paths.
+5. Starts nginx with a chart-controlled configuration.
+
+### External Secrets Operator
+
+```yaml
+museum:
+  existingSecret: ente-museum
+
+storage:
+  s3:
+    existingSecret: ente-s3
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: museum
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: ente-museum
+        dataFrom:
+          - extract:
+              key: ente/museum
+    - name: s3
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: ente-s3
+        dataFrom:
+          - extract:
+              key: ente/s3
+```
+
+Each `items[]` entry accepts a complete ExternalSecret `spec`. The chart supplies
+a default refresh interval and target name when omitted, validates store
+references, and rejects duplicate resource names.
+
+### NetworkPolicy
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    allowExternal: true
+  egress:
+    allowDNS: true
+    allowSameNamespacePostgresql: true
+    allowObjectStorage: true
+```
+
+For private S3, external PostgreSQL, or SMTP CIDRs:
+
+```yaml
+networkPolicy:
+  egress:
+    museumExtraRules:
+      - to:
+          - ipBlock:
+              cidr: 10.20.0.0/16
+        ports:
+          - protocol: TCP
+            port: 5432
+          - protocol: TCP
+            port: 587
+```
+
+Kubernetes NetworkPolicy cannot select a DNS hostname. Use provider CIDRs,
+namespace/pod selectors, or a controlled egress gateway.
+
+## 13. Observability
+
+Museum exposes native Prometheus metrics at `/metrics` on port 2112.
+
+```yaml
+metrics:
+  enabled: true
+  service:
+    annotations: {}
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+```
+
+ServiceMonitor and PrometheusRule are opt-in because they require Prometheus
+Operator CRDs.
+
+The baseline rule alerts when Museum's metrics target remains unavailable for
+five minutes. Add complete Prometheus rules through
+`metrics.prometheusRule.rules`.
+
+### Logs
+
+Museum logs to stdout in Kubernetes:
+
+```bash
+kubectl logs -n ente deploy/ente-museum-api -c museum --tail=200
+kubectl logs -n ente deploy/ente-museum-worker -c museum --tail=200
+kubectl logs -n ente deploy/ente-web -c web --tail=200
+```
+
+Do not configure upstream file logging unless an explicit persistent logging
+architecture owns rotation and collection.
+
+## 14. Backup and restore
+
+### Recovery set
+
+Back up these assets as one set:
+
+1. Museum configuration and cryptographic Secrets.
+2. PostgreSQL.
+3. Every S3 object.
+
+S3 objects are encrypted and cannot be recovered without PostgreSQL metadata and
+Museum keys.
+
+### PostgreSQL backup CronJob
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 3 * * *'
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  s3:
+    endpoint: https://backup.example.com
+    bucket: platform-backups
+    prefix: ente/postgresql
+    existingSecret: ente-backup-s3
+```
+
+The Job runs `pg_dump` in custom format and uploads the result with the MinIO
+client. It works with S3-compatible providers and can use credentials distinct
+from the live Ente bucket.
+
+### Manual backup test
+
+```bash
+kubectl create job ente-backup-test \
+  --from=cronjob/ente-postgresql-backup \
+  -n ente
+kubectl wait --for=condition=complete \
+  job/ente-backup-test \
+  -n ente \
+  --timeout=10m
+kubectl logs job/ente-backup-test -n ente --all-containers --prefix
+```
+
+### S3 object backup
+
+The chart does not copy the live Ente object bucket. Use provider-native backup,
+cross-account replication, immutable backup storage, or an audited object sync.
+Do not confuse Ente's application replication with point-in-time backup.
+
+### Restore order
+
+1. Create an isolated restore namespace.
+2. Restore Museum Secrets.
+3. Restore S3 objects to a test bucket.
+4. Restore PostgreSQL with `pg_restore`.
+5. Install Ente against the restored endpoints.
+6. Keep external notifications disabled during validation.
+7. Test account login.
+8. Test thumbnails and original downloads.
+9. Test upload and deletion.
+10. Test public albums.
+11. Compare object and database counts.
+12. Perform the production cutover only after the drill passes.
+
+Run a complete restore drill at least quarterly. A successful CronJob is not
+proof that the recovery set works.
+
+## 15. Common scenarios
+
+### Scenario A: secure single instance
+
+This scenario uses the bundled PostgreSQL dependency, external S3, existing
+Secrets, SMTP, and TLS Ingress.
+
+```yaml
+productionMode: true
+
+museum:
+  externalUrl: https://api.ente.example.com
+  existingSecret: ente-museum
+  config:
+    webauthn:
+      rpid: accounts.ente.example.com
+      rporigins:
+        - https://accounts.ente.example.com
+
+storage:
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    region: us-east-1
+    bucket: company-ente-photos
+    existingSecret: ente-s3
+
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 587
+  email: ente@example.com
+  existingSecret: ente-smtp
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: api.ente.example.com
+      service: museum
+      paths: [{ path: /, pathType: Prefix }]
+    - host: photos.ente.example.com
+      service: photos
+      paths: [{ path: /, pathType: Prefix }]
+    - host: accounts.ente.example.com
+      service: accounts
+      paths: [{ path: /, pathType: Prefix }]
+    - host: albums.ente.example.com
+      service: albums
+      paths: [{ path: /, pathType: Prefix }]
+```
+
+### Scenario B: application HA with managed PostgreSQL
+
+```yaml
+productionMode: true
+
+database:
+  mode: external
+  external:
+    host: ente-rw.database.svc.cluster.local
+    name: ente
+    username: ente
+    existingSecret: ente-postgresql
+    sslMode: verify-full
+
+postgresql:
+  enabled: false
+
+museum:
+  externalUrl: https://api.ente.example.com
+  existingSecret: ente-museum
+  api:
+    replicaCount: 3
+    skipBackgroundJobs: true
+  worker:
+    enabled: true
+
+web:
+  replicaCount: 3
+
+storage:
+  s3:
+    endpoint: https://objects.example.com
+    bucket: ente-photos
+    existingSecret: ente-s3
+
+pdb:
+  museum: { enabled: true, maxUnavailable: 1 }
+  web: { enabled: true, maxUnavailable: 1 }
+
+networkPolicy:
+  enabled: true
+```
+
+### Scenario C: Gateway API, ESO, metrics, and backup
+
+```yaml
+museum:
+  externalUrl: https://api.ente.example.com
+  existingSecret: ente-museum
+
+storage:
+  s3:
+    endpoint: https://objects.example.com
+    bucket: ente-photos
+    existingSecret: ente-s3
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: museum
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target: { name: ente-museum }
+        dataFrom: [{ extract: { key: ente/museum } }]
+    - name: s3
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target: { name: ente-s3 }
+        dataFrom: [{ extract: { key: ente/s3 } }]
+
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+      sectionName: https
+  routes:
+    - name: museum
+      service: museum
+      hostnames: [api.ente.example.com]
+    - name: photos
+      service: photos
+      hostnames: [photos.ente.example.com]
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels: { release: kube-prometheus-stack }
+  prometheusRule:
+    enabled: true
+
+backup:
+  enabled: true
+  s3:
+    endpoint: https://backup.example.com
+    bucket: platform-backups
+    existingSecret: ente-backup-s3
+```
+
+## 16. Configuration reference
+
+### Global
+
+| Value                           | Default | Description                     |
+| ------------------------------- | ------- | ------------------------------- |
+| `nameOverride`                  | `""`    | Override resource name base     |
+| `fullnameOverride`              | `""`    | Override complete resource name |
+| `commonLabels`                  | `{}`    | Labels on chart resources       |
+| `productionMode`                | `false` | Reject evaluation placeholders  |
+| `imagePullSecrets`              | `[]`    | Private registry pull Secrets   |
+| `priorityClassName`             | `""`    | Shared pod priority class       |
+| `nodeSelector`                  | `{}`    | Shared node selector            |
+| `tolerations`                   | `[]`    | Shared tolerations              |
+| `affinity`                      | `{}`    | Shared affinity rules           |
+| `topologySpreadConstraints`     | `[]`    | Shared topology spread rules    |
+| `terminationGracePeriodSeconds` | `30`    | Workload pod termination grace  |
+
+### Museum
+
+| Value                                 | Default                        | Description                      |
+| ------------------------------------- | ------------------------------ | -------------------------------- |
+| `museum.image.repository`             | `ghcr.io/ente/server`          | Official Museum image            |
+| `museum.image.tag`                    | production commit              | Immutable upstream commit        |
+| `museum.image.pullPolicy`             | `IfNotPresent`                 | Image pull policy                |
+| `museum.externalUrl`                  | `https://api.ente.example.com` | Public API origin                |
+| `museum.existingSecret`               | `""`                           | Existing cryptographic Secret    |
+| `museum.secretKeys.encryptionKey`     | `encryption-key`               | Encryption-key field name        |
+| `museum.secretKeys.hashKey`           | `hash-key`                     | Hash-key field name              |
+| `museum.secretKeys.jwtSecret`         | `jwt-secret`                   | JWT-secret field name            |
+| `museum.api.replicaCount`             | `1`                            | Public API replicas              |
+| `museum.api.skipBackgroundJobs`       | `false`                        | Disable jobs in API replicas     |
+| `museum.api.resources`                | production defaults            | API requests and limits          |
+| `museum.worker.enabled`               | `false`                        | Singleton job worker             |
+| `museum.worker.resources`             | production defaults            | Worker requests and limits       |
+| `museum.migrationGate.enabled`        | `true`                         | Serialize HA Museum startup      |
+| `museum.migrationGate.image`          | PostgreSQL `18.4-trixie`       | Advisory-lock client image       |
+| `museum.migrationGate.advisoryLockId` | `724336836`                    | Shared PostgreSQL lock ID        |
+| `museum.config.logLevel`              | `info`                         | Museum log level                 |
+| `museum.config.disableRegistration`   | `false`                        | Block new accounts               |
+| `museum.config.admins`                | `[]`                           | Museum admin user IDs            |
+| `museum.config.trustedClientIpHeader` | `X-Forwarded-For`              | Proxy client-IP header           |
+| `museum.config.webauthn.rpid`         | example Accounts host          | Passkey RP ID                    |
+| `museum.config.webauthn.rporigins`    | example Accounts origin        | Passkey origins                  |
+| `museum.config.extraYaml`             | `""`                           | Advanced raw Museum YAML         |
+| `museum.service.type`                 | `ClusterIP`                    | API Service type                 |
+| `museum.service.port`                 | `8080`                         | API Service port                 |
+| `museum.service.metricsPort`          | `2112`                         | Metrics Service port             |
+| `museum.service.ipFamilyPolicy`       | `""`                           | Service family policy            |
+| `museum.service.ipFamilies`           | `[]`                           | Ordered IP families              |
+| `museum.probes.*`                     | enabled                        | Museum probe controls            |
+| `museum.podSecurityContext`           | restricted                     | Pod security context             |
+| `museum.securityContext`              | restricted                     | Container security context       |
+| `museum.extraEnv`                     | `[]`                           | Additional environment variables |
+| `museum.extraVolumes`                 | `[]`                           | Additional volumes               |
+| `museum.extraVolumeMounts`            | `[]`                           | Additional Museum mounts         |
+
+### Database and storage
+
+| Value                                         | Default             | Description                 |
+| --------------------------------------------- | ------------------- | --------------------------- |
+| `database.mode`                               | `auto`              | PostgreSQL selection mode   |
+| `database.external.host`                      | `""`                | External PostgreSQL host    |
+| `database.external.port`                      | `5432`              | External PostgreSQL port    |
+| `database.external.name`                      | `ente`              | Database name               |
+| `database.external.username`                  | `ente`              | Database user               |
+| `database.external.password`                  | `""`                | Inline password             |
+| `database.external.existingSecret`            | `""`                | Password Secret             |
+| `database.external.existingSecretPasswordKey` | `database-password` | Password field              |
+| `database.external.sslMode`                   | `require`           | libpq SSL mode              |
+| `postgresql.enabled`                          | `true`              | Deploy HelmForge PostgreSQL |
+| `postgresql.standalone.persistence.size`      | `20Gi`              | PostgreSQL PVC size         |
+| `storage.s3.endpoint`                         | example endpoint    | Public S3 endpoint          |
+| `storage.s3.region`                           | `us-east-1`         | S3 region                   |
+| `storage.s3.bucket`                           | `ente`              | Primary bucket              |
+| `storage.s3.usePathStyle`                     | `false`             | Path-style addressing       |
+| `storage.s3.localBuckets`                     | `false`             | Local MinIO workarounds     |
+| `storage.s3.accessKey`                        | `change-me`         | Evaluation access key       |
+| `storage.s3.secretKey`                        | `change-me`         | Evaluation secret key       |
+| `storage.s3.existingSecret`                   | `""`                | S3 credential Secret        |
+
+### Web and SMTP
+
+| Value                       | Default             | Description             |
+| --------------------------- | ------------------- | ----------------------- |
+| `web.image.repository`      | `ghcr.io/ente/web`  | Official web image      |
+| `web.image.tag`             | upstream commit     | Immutable web build     |
+| `web.replicaCount`          | `1`                 | Web replicas            |
+| `web.apps.photos.enabled`   | `true`              | Enable Photos           |
+| `web.apps.accounts.enabled` | `true`              | Enable Accounts         |
+| `web.apps.albums.enabled`   | `true`              | Enable Albums           |
+| `web.apps.auth.enabled`     | `false`             | Enable Auth             |
+| `web.apps.cast.enabled`     | `false`             | Enable Cast             |
+| `web.apps.share.enabled`    | `false`             | Enable Share            |
+| `web.apps.embed.enabled`    | `false`             | Enable Embed            |
+| `web.apps.memories.enabled` | `false`             | Enable Memories         |
+| `web.service.type`          | `ClusterIP`         | Web Service type        |
+| `web.service.port`          | `80`                | Per-app Service port    |
+| `web.resources`             | production defaults | Web requests and limits |
+| `smtp.enabled`              | `false`             | Enable email delivery   |
+| `smtp.host`                 | `""`                | SMTP host               |
+| `smtp.port`                 | `587`               | SMTP port               |
+| `smtp.email`                | `""`                | Sender address          |
+| `smtp.senderName`           | `Ente`              | Sender name             |
+| `smtp.encryption`           | `tls`               | SMTP encryption mode    |
+| `smtp.existingSecret`       | `""`                | SMTP credential Secret  |
+
+### Platform integration
+
+| Value                             | Default                  | Description                     |
+| --------------------------------- | ------------------------ | ------------------------------- |
+| `externalSecrets.enabled`         | `false`                  | Render ExternalSecrets          |
+| `externalSecrets.apiVersion`      | `external-secrets.io/v1` | ESO API version                 |
+| `externalSecrets.refreshInterval` | `1h`                     | Default refresh interval        |
+| `externalSecrets.items`           | `[]`                     | Complete ExternalSecret entries |
+| `ingress.enabled`                 | `false`                  | Create Ingress                  |
+| `ingress.ingressClassName`        | `""`                     | Ingress class                   |
+| `ingress.hosts`                   | `[]`                     | Host and service routes         |
+| `ingress.tls`                     | `[]`                     | Ingress TLS entries             |
+| `gateway.enabled`                 | `false`                  | Create HTTPRoutes               |
+| `gateway.parentRefs`              | `[]`                     | Shared Gateway parents          |
+| `gateway.routes`                  | `[]`                     | Per-service HTTPRoutes          |
+| `networkPolicy.enabled`           | `false`                  | Create workload policies        |
+| `pdb.museum.enabled`              | `false`                  | Museum API PDB                  |
+| `pdb.web.enabled`                 | `false`                  | Web PDB                         |
+| `autoscaling.museum.enabled`      | `false`                  | Museum API HPA                  |
+| `autoscaling.web.enabled`         | `false`                  | Web HPA                         |
+| `metrics.enabled`                 | `false`                  | Metrics Service                 |
+| `metrics.serviceMonitor.enabled`  | `false`                  | Prometheus Operator discovery   |
+| `metrics.prometheusRule.enabled`  | `false`                  | Baseline alerts                 |
+| `backup.enabled`                  | `false`                  | PostgreSQL backup CronJob       |
+| `backup.schedule`                 | `0 3 * * *`              | Backup schedule                 |
+| `backup.s3.endpoint`              | `""`                     | Backup endpoint                 |
+| `backup.s3.bucket`                | `""`                     | Backup bucket                   |
+| `backup.s3.prefix`                | `ente/postgresql`        | Backup object prefix            |
+| `backup.s3.existingSecret`        | `""`                     | Backup S3 Secret                |
+| `extraManifests`                  | `[]`                     | Additional templated resources  |
+
+## 17. Upgrade procedure
+
+1. Back up Museum Secrets, PostgreSQL, and S3.
+2. Read HelmForge and upstream changes.
+3. Render the new chart with the complete production values file.
+4. Review image commit changes.
+5. Run `helm upgrade` without `--reuse-values` so new defaults are merged.
+6. Wait for Museum API rollout.
+7. Verify the singleton worker rollout.
+8. Verify all web replicas.
+9. Run the Helm test.
+10. Test login, upload, download, and public albums.
+
+```bash
+helm upgrade ente oci://ghcr.io/helmforgedev/helm/ente \
+  --namespace ente \
+  -f values-production.yaml \
+  --wait \
+  --timeout 10m
+
+helm test ente -n ente --logs
+```
+
+Museum keys should remain byte-for-byte identical across a normal upgrade.
+
+## 18. Troubleshooting
+
+### 1. Museum does not become Ready
+
+`/ping` checks PostgreSQL. Verify database DNS, port, password Secret, database
+name, user, SSL mode, and CA requirements.
+
+```bash
+kubectl logs -n ente deploy/ente-museum-api -c museum --tail=200
+kubectl get events -n ente --sort-by=.lastTimestamp
+```
+
+### 2. Museum is Ready but uploads fail
+
+Readiness does not check S3. Verify endpoint reachability from Museum and from
+the client, credentials, region, bucket, TLS, addressing mode, and CORS.
+
+### 3. Browser reports a CORS error
+
+Match the exact HTTPS origin and allow GET, HEAD, POST, PUT, DELETE,
+`Content-Type`, `Content-MD5`, and `UPLOAD-URL`.
+
+### 4. One-time login code does not arrive
+
+Verify SMTP host, port, encryption, sender policy, and credential Secret. Without
+SMTP, inspect Museum logs for the development fallback code.
+
+### 5. Passkey enrollment or login fails
+
+Confirm the Accounts hostname equals `webauthn.rpid` and the exact HTTPS origin
+is in `rporigins`. Do not include a path in the RP ID.
+
+### 6. Chart rejects multiple Museum replicas
+
+Enable `museum.api.skipBackgroundJobs=true` and
+`museum.worker.enabled=true`. This prevents duplicate cron work.
+
+### 7. More than one background job appears
+
+Inspect the API and worker ConfigMap entries. API must show `skip: true`; the
+singleton worker must show `skip: false`. Verify no unmanaged Museum Deployment
+exists.
+
+### 8. Museum reports a dirty database version
+
+Stop concurrent Museum starts and repair or restore PostgreSQL using the
+upstream migration procedure. Keep `museum.migrationGate.enabled=true` for HA.
+Inspect both containers before retrying:
+
+```bash
+kubectl logs -n ente deploy/ente-museum-api -c migration-gate --tail=200
+kubectl logs -n ente deploy/ente-museum-api -c museum --tail=200
+```
+
+### 9. Web pod fails with a permission error
+
+Keep the chart-provided web-content, nginx-cache, nginx-run, and tmp emptyDirs.
+Do not override the non-root web startup command without reproducing the
+upstream placeholder replacement.
+
+### 10. NetworkPolicy blocks an external service
+
+Add external PostgreSQL, private S3, SMTP, or egress-gateway rules to
+`networkPolicy.egress.museumExtraRules`. Check the CNI's dual-stack behavior.
+
+### 11. ServiceMonitor or PrometheusRule is rejected
+
+Install Prometheus Operator CRDs before enabling those resources, or leave them
+disabled and scrape the metrics Service another way.
+
+### 12. Backup dump fails
+
+Inspect the `dump` init container. Verify PostgreSQL credentials, SSL mode,
+network policy, and client/server version compatibility.
+
+```bash
+kubectl logs -n ente job/ente-backup-test -c dump
+```
+
+### 13. Backup upload fails
+
+Inspect the `upload` container and verify backup-specific S3 credentials,
+endpoint, bucket, prefix, and NetworkPolicy.
+
+```bash
+kubectl logs -n ente job/ente-backup-test -c upload
+```
+
+### 14. Upgrade appears to rotate Museum keys
+
+Stop the rollout and restore the previous Museum Secret. Ensure the Secret was
+not manually deleted and that release name and namespace did not change.
+
+### 15. Public albums open the wrong domain
+
+Align `web.apps.albums.externalUrl`, its Ingress or HTTPRoute host, TLS
+certificate, and S3 CORS origins.
+
+### 16. S3 delete operations fail
+
+Check whether the file-data bucket has object lock or versioning enabled. Ente
+does not support those semantics for these buckets.
+
+## 19. Version history
+
+### Chart 1.0.0
+
+- Initial stable HelmForge release
+- Official immutable Museum and web images
+- HelmForge PostgreSQL and external PostgreSQL
+- External S3 contract
+- Safe HA worker topology
+- Ingress, Gateway API, ESO, NetworkPolicy, PDB, and HPA
+- Metrics and backup automation
+- Hardened non-root runtime
+
+Upstream Museum and web use commit-based image tags rather than semantic server
+releases. HelmForge tracks the official production Museum commit and published
+web commit.
+
+## 20. Additional resources
+
+- [Ente](https://ente.io)
+- [Ente source](https://github.com/ente/ente)
+- [Ente self-hosting](https://help.ente.io/self-hosting)
+- [Ente object storage](https://help.ente.io/self-hosting/administration/object-storage)
+- [Ente backup](https://help.ente.io/self-hosting/administration/backup)
+- [HelmForge chart source](https://github.com/helmforgedev/charts/tree/main/charts/ente)
+- [HelmForge PostgreSQL](/docs/charts/postgresql)
+
+## 21. Related charts
+
+- [PostgreSQL](/docs/charts/postgresql) for a directly managed database
+- [Immich](/docs/charts/immich) for a different self-hosted photo platform
+- [External Secrets Operator documentation](https://external-secrets.io) for
+  provider-backed Secret synchronization
+
+Ente is the appropriate choice when client-side end-to-end encryption is the
+primary photo-storage requirement. Immich uses a different server-side media
+management architecture and operational model.

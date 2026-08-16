@@ -600,6 +600,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Ente',
+    slug: 'ente',
+    description: 'End-to-end encrypted photos with Museum, PostgreSQL, external S3, safe HA, and backups.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'Jenkins',
     slug: 'jenkins',
     description:

@@ -110,6 +110,30 @@ test.describe('Playground', () => {
     );
   });
 
+  test('ente scenarios emit safe HA and managed-service values', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="ente"]').click();
+
+    await expect(page.locator('#playground-chart-title')).toContainText('Ente');
+    await expect(page.locator('input[data-field-key="museum.api.replicaCount"]')).toHaveValue('1');
+    await expect(page.locator('input[data-field-key="storage.s3.existingSecret"]')).toHaveValue('ente-s3');
+    await expect(page.locator('#playground-code')).not.toContainText('storage.s3.existingSecret');
+
+    await page.locator('.playground-scenario-btn:has-text("Application HA")').click();
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('museum.api.replicaCount=3');
+    await expect(code).toContainText('museum.api.skipBackgroundJobs=true');
+    await expect(code).toContainText('museum.worker.enabled=true');
+    await expect(code).toContainText('pdb.museum.enabled=true');
+
+    await page.locator('.playground-scenario-btn:has-text("Managed Services")').click();
+    await expect(code).toContainText('database.mode=external');
+    await expect(code).toContainText('postgresql.enabled=false');
+    await expect(code).toContainText('externalSecrets.enabled=true');
+    await expect(code).toContainText('gateway.enabled=true');
+    await expect(code).toContainText('backup.enabled=true');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();

@@ -64,6 +64,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Castopod', href: '/docs/charts/castopod', maturity: 'stable' },
       { label: 'Listmonk', href: '/docs/charts/listmonk', maturity: 'stable' },
       { label: 'Immich', href: '/docs/charts/immich', maturity: 'stable' },
+      { label: 'Ente', href: '/docs/charts/ente', maturity: 'stable' },
       { label: 'OpenCut', href: '/docs/charts/opencut', maturity: 'stable' },
       { label: 'OpenReel Video', href: '/docs/charts/openreel-video', maturity: 'stable' },
     ],
