@@ -10,7 +10,7 @@ Deploy [NoteDiscovery](https://github.com/gamosoft/NoteDiscovery) on Kubernetes 
 
 ## Overview
 
-The HelmForge NoteDiscovery chart uses the official `ghcr.io/gamosoft/notediscovery:0.28.4` image and deploys a single-writer web application.
+The HelmForge NoteDiscovery chart uses the official `ghcr.io/gamosoft/notediscovery:0.31.1` image and deploys a single-writer web application.
 NoteDiscovery listens on port `8000`, stores durable notes under `/app/data`, and reads its runtime configuration from `/app/config.yaml`.
 
 The default topology is one persistent Deployment replica with a chart-managed PVC and generated unauthenticated config. When authentication is enabled, the generated config file is stored in a Secret. Production installs should normally use `auth.existingSecret` with a complete `config.yaml`.
@@ -221,10 +221,10 @@ Back up the PVC in every production deployment. The default `/app/data` director
 
 ## Upgrade Notes
 
-NoteDiscovery `0.28.4` adds a configurable default theme and fixes Markdown
-links to sibling notes. Set `notediscovery.defaultTheme` to a built-in or
-operator-mounted theme ID. A theme already saved in the browser takes
-precedence, and the application safely falls back to `light` for invalid IDs.
+NoteDiscovery `0.31.1` includes search and plugin maintenance fixes while
+retaining interactive task checkboxes and cache-safe asset behavior. Review the
+[upstream v0.31.1 release](https://github.com/gamosoft/NoteDiscovery/releases/tag/v0.31.1)
+before upgrading.
 
 Generated configuration now keeps plugin state under the writable data volume
 and bootstraps the official bundled plugins there. Existing Secrets should use
@@ -239,7 +239,7 @@ chart defaults while preserving explicit overrides:
 ```bash
 helm repo update helmforge
 helm upgrade notediscovery helmforge/notediscovery \
-  --version 1.1.0 \
+  --version 1.1.3 \
   --namespace notediscovery \
   --reset-then-reuse-values
 ```

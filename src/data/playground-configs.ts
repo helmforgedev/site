@@ -336,7 +336,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.4.28',
+          default: 'v0.4.31',
           description: 'Pinned Certimate image tag',
         },
         {
@@ -442,7 +442,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Server Tag',
           key: 'server.image.tag',
           type: 'text',
-          default: '0.75.0',
+          default: '0.77.0',
           description: 'Pinned NetBird server image tag',
         },
         {
@@ -468,7 +468,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Dashboard Tag',
           key: 'dashboard.image.tag',
           type: 'text',
-          default: 'v2.90.3',
+          default: 'v2.90.10',
           description: 'Pinned NetBird dashboard image tag',
         },
         {
@@ -5119,7 +5119,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.32.5',
+          default: '2.35.3',
           description: 'Pinned n8n image tag',
         },
         {
@@ -9868,7 +9868,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.45.0',
+          default: '6.65.3',
           description: 'Pinned Poznote image tag',
         },
         {
@@ -10116,7 +10116,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.28.4',
+          default: '0.31.1',
           description: 'Pinned NoteDiscovery image tag',
         },
         {
@@ -11796,7 +11796,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.62.4',
+          default: 'v0.63.13',
           description: 'Pinned Metabase image tag',
         },
         {
