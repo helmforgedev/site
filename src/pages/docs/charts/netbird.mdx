@@ -185,14 +185,13 @@ signal, relay, and proxy components on the same version. Review the
 [upstream 0.77.0 release](https://github.com/netbirdio/netbird/releases/tag/v0.77.0)
 before upgrading.
 
-No chart value migration is required when upgrading from `0.74.7`. Back up the
+No chart value migration is introduced by the image update from `0.76.3`. Back up the
 configured database and `/var/lib/netbird`, then apply the new chart defaults
 while preserving your explicit overrides:
 
 ```bash
 helm repo update helmforge
 helm upgrade netbird helmforge/netbird \
-  --version 1.0.6 \
   --namespace netbird \
   --reset-then-reuse-values
 ```
@@ -201,7 +200,18 @@ Using `--reuse-values` alone retains the previous image tag and does not deploy
 NetBird `0.77.0`.
 
 This v1 hardening release changes the default store from sqlite to PostgreSQL
-subchart mode. Existing sqlite installs that want to keep sqlite should set:
+subchart mode. Existing sqlite installs that want to keep sqlite must preserve
+that choice explicitly during the upgrade:
+
+```bash
+helm upgrade netbird helmforge/netbird \
+  --namespace netbird \
+  --reset-then-reuse-values \
+  --set database.mode=sqlite \
+  --set postgresql.enabled=false
+```
+
+The equivalent values are:
 
 ```yaml
 database:

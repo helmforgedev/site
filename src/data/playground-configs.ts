@@ -2527,6 +2527,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'false',
           description: 'Apply the API rate limit preset',
         },
+        {
+          label: 'External Redis Host',
+          key: 'rateLimiting.externalRedis.host',
+          type: 'text',
+          default: '',
+          description: 'Required when rate limiting uses an external Redis backend',
+        },
+        {
+          label: 'External Redis Port',
+          key: 'rateLimiting.externalRedis.port',
+          type: 'number',
+          default: '6379',
+          description: 'External Redis service port',
+        },
       ],
     },
     {
