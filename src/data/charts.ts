@@ -564,6 +564,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Envoy Gateway CRDs',
+    slug: 'envoy-gateway-crds',
+    description: 'Standalone, forward-only lifecycle for Envoy Gateway and Gateway API CRDs.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Elasticsearch',
     slug: 'elasticsearch',
     description: 'Multi-role cluster with automated backups, ILM policies, data tiers, and security by default.',
