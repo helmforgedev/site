@@ -18,9 +18,9 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
   CRDs, or replace the safe-upgrade policy.
 
 1. Upgrade Kubernetes first when it is outside the supported 1.33-1.36 range.
-2. Upgrade Envoy Gateway to 2.0.0 with `crds.enabled=true` so Helm records the
+2. Capture all CRD, custom-resource, policy, and binding UIDs.
+3. Upgrade Envoy Gateway to 2.0.0 with `crds.enabled=true` so Helm records the
    keep policy.
-3. Capture all CRD, custom-resource, policy, and binding UIDs.
 4. Install `envoy-gateway-crds` 1.0.0 with policy management disabled and
    server-side apply its locked bundle.
 5. Upgrade Envoy Gateway 2.0.0 with `crds.enabled=false`.
@@ -112,11 +112,11 @@ before changing production releases.
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
 helm upgrade --install envoy-gateway-crds helmforge/envoy-gateway-crds \
-  --version CRD_CHART_VERSION \
+  --version 1.0.0 \
   --namespace envoy-gateway \
   --create-namespace
 helm show crds helmforge/envoy-gateway-crds \
-  --version CRD_CHART_VERSION > envoy-gateway-crds-installed.yaml
+  --version 1.0.0 > envoy-gateway-crds-installed.yaml
 kubectl wait --for=condition=Established --timeout=120s \
   -f envoy-gateway-crds-installed.yaml
 helm upgrade --install envoy-gateway helmforge/envoy-gateway \
@@ -129,11 +129,11 @@ helm upgrade --install envoy-gateway helmforge/envoy-gateway \
 ```bash
 helm upgrade --install envoy-gateway-crds \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
-  --version CRD_CHART_VERSION \
+  --version 1.0.0 \
   --namespace envoy-gateway \
   --create-namespace
 helm show crds oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
-  --version CRD_CHART_VERSION > envoy-gateway-crds-installed.yaml
+  --version 1.0.0 > envoy-gateway-crds-installed.yaml
 kubectl wait --for=condition=Established --timeout=120s \
   -f envoy-gateway-crds-installed.yaml
 helm upgrade --install envoy-gateway \
@@ -162,6 +162,16 @@ first, wait for discovery, then install this application with
 as a migration bridge for existing chart 1.10.1 releases.
 
 ```bash
+helm install envoy-gateway-crds helmforge/envoy-gateway-crds \
+  --version 1.0.0 \
+  --namespace envoy-gateway \
+  --create-namespace
+helm show crds helmforge/envoy-gateway-crds \
+  --version 1.0.0 > envoy-gateway-crds-installed.yaml
+kubectl wait --for=condition=Established --timeout=120s \
+  -f envoy-gateway-crds-installed.yaml
+kubectl api-resources --api-group=gateway.networking.k8s.io
+kubectl api-resources --api-group=gateway.envoyproxy.io
 helm install envoy-gateway helmforge/envoy-gateway \
   --namespace envoy-gateway \
   --set crds.enabled=false
@@ -1508,6 +1518,8 @@ Record all CRD and custom-resource names, UIDs, and counts before changing
 ownership:
 
 ```bash
+set -euo pipefail
+
 REQUIRED_CRDS='backendtlspolicies.gateway.networking.k8s.io
 gatewayclasses.gateway.networking.k8s.io
 gateways.gateway.networking.k8s.io
@@ -1543,7 +1555,10 @@ done > envoy-api-before.json
 
 kubectl get validatingadmissionpolicy,validatingadmissionpolicybinding \
   safe-upgrades.gateway.networking.k8s.io \
-  -o yaml > policy-before.yaml
+  -o json > policy-before.json
+
+jq -r '.items[] | [.kind, .metadata.name, .metadata.uid] | @tsv' \
+  policy-before.json | sort > policy-uids-before.tsv
 ```
 
 Generate sorted name/UID inventories with `jq` and retain them with the change
@@ -1582,7 +1597,7 @@ from the previous release manifest; patching only the live object is not enough.
 ```bash
 helm template envoy-gateway-crds \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
-  --version CRD_CHART_VERSION \
+  --version 1.0.0 \
   --include-crds \
   --set safeUpgradePolicy.management=disabled \
   > envoy-gateway-crds.yaml
@@ -1598,9 +1613,9 @@ kubectl apply \
   --field-manager=helmforge-envoy-gateway-crds \
   -f envoy-gateway-crds.yaml
 
-kubectl wait --for=condition=Established \
-  --timeout=120s \
-  -f envoy-gateway-crds.yaml
+for crd in $REQUIRED_CRDS; do
+  kubectl wait --for=condition=Established --timeout=120s "crd/$crd"
+done
 ```
 
 Do not add `--force-conflicts` without auditing the reported field managers and
@@ -1611,7 +1626,7 @@ paths.
 ```bash
 helm upgrade --install envoy-gateway-crds \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
-  --version CRD_CHART_VERSION \
+  --version 1.0.0 \
   --namespace envoy-gateway \
   --skip-crds \
   --set safeUpgradePolicy.management=disabled
@@ -1642,7 +1657,7 @@ Helm 3.17 or later:
 ```bash
 helm upgrade envoy-gateway-crds \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
-  --version CRD_CHART_VERSION \
+  --version 1.0.0 \
   --namespace envoy-gateway \
   --skip-crds \
   --take-ownership \
@@ -1656,11 +1671,23 @@ Never edit Helm release Secrets and never use a hook to transfer ownership.
 
 #### 7. Verify preservation and runtime
 
-Compare the post-migration inventory with the files captured in step 1. All 18
-CRD UIDs, all custom-resource UIDs/counts, and the policy UID must remain
-unchanged. Confirm that only the standalone release owns the policy, the
-controller is Available, Gateways remain `Programmed`, and existing traffic
-still succeeds.
+Compare the post-migration inventory with the files captured in step 1. Capture
+the policy objects again and require their UID diff to be empty:
+
+```bash
+set -euo pipefail
+kubectl get validatingadmissionpolicy,validatingadmissionpolicybinding \
+  safe-upgrades.gateway.networking.k8s.io \
+  -o json > policy-after.json
+jq -r '.items[] | [.kind, .metadata.name, .metadata.uid] | @tsv' \
+  policy-after.json | sort > policy-uids-after.tsv
+diff -u policy-uids-before.tsv policy-uids-after.tsv
+```
+
+All 18 CRD UIDs, all custom-resource UIDs/counts, and both policy-resource UIDs
+must remain unchanged. Confirm that only the standalone release owns the
+policy, the controller is Available, Gateways remain `Programmed`, and existing
+traffic still succeeds.
 
 After ownership transfer, do not roll back to an application revision from
 before the bridge. Such a revision attempts to add the policy and binding back
