@@ -15,12 +15,12 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
   - Production HA profile (DaemonSet, anti-affinity)
 
 - **Gateway API Native**: First-class Gateway API support
-  - Envoy Gateway and Gateway API experimental v1.5.1 CRDs installed by default
+  - Envoy Gateway v1.9.0 and supported Gateway API v1.6.1 CRDs installed by default
   - `crds.enabled=false` support for platform-managed CRDs
   - Working Gateway and HTTPRoute examples
   - Global `gatewayAPI.enabled` gate for helper resources
   - Automated GatewayClass creation
-  - Support for all Gateway API v1.2.1 resources
+  - Support for the Gateway API v1.6.1 resources consumed by Envoy Gateway
   - Default `Gateway` resource (when `gateway.create: true`)
 
 - **Certgen Job**: Automatic internal TLS cert generation (pre-install hook)
@@ -77,7 +77,7 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 ### Prerequisites
 
-- Kubernetes 1.24+ (Gateway API v1 support)
+- Kubernetes 1.26+ (Gateway API v1 support)
 - Helm 3.8+
 
 ### HTTPS Repository (Recommended)
@@ -91,7 +91,7 @@ helm install envoy-gateway helmforge/envoy-gateway
 ### OCI Registry
 
 ```bash
-helm install envoy-gateway oci://ghcr.io/helmforgedev/helm/envoy-gateway --version 1.7.4
+helm install envoy-gateway oci://ghcr.io/helmforgedev/helm/envoy-gateway
 ```
 
 ### Verify Installation
@@ -108,13 +108,16 @@ kubectl get gateway,httproute -A
 
 ### 1. Install Envoy Gateway
 
-The chart installs the Envoy Gateway and Gateway API experimental v1.5.1 CRDs
-by default. Use `--set crds.enabled=false` only when all required CRDs are
-managed externally.
+The chart installs Envoy Gateway v1.9.0 and its supported Gateway API v1.6.1
+CRDs by default. This includes `ListenerSet`, `TCPRoute`, `TLSRoute`, and
+`UDPRoute`, which are also present in the v1.6.1 Standard bundle. The bundled
+definitions retain the upstream experimental-channel schema used by Envoy
+Gateway v1.9.0. The separate `gateway.networking.x-k8s.io` experimental APIs
+are excluded because their schema requires Kubernetes 1.32. Use
+`--set crds.enabled=false` only when all required CRDs are managed externally.
 
 ```bash
-helm install envoy-gateway helmforge/envoy-gateway \
-  --set crds.enabled=false
+helm install envoy-gateway helmforge/envoy-gateway
 ```
 
 ### 2. Choose a Profile
@@ -1200,7 +1203,7 @@ clientTrafficPolicy:
 | ------------------------ | -------------------------------------------------------------------------- | -------- |
 | `profile`                | Profile preset (dev/production-ha/custom)                                  | `custom` |
 | `namespaceOverride`      | Namespace for chart-managed resources; target namespace must already exist | `""`     |
-| `crds.enabled`           | Install bundled Envoy Gateway and Gateway API experimental CRDs            | `true`   |
+| `crds.enabled`           | Install bundled Envoy Gateway and its supported Gateway API v1.6.1 CRDs    | `true`   |
 | `nameOverride`           | Override chart name                                                        | `""`     |
 | `fullnameOverride`       | Override full name                                                         | `""`     |
 | `imagePullSecrets`       | Image pull secrets                                                         | `[]`     |
@@ -1213,7 +1216,7 @@ clientTrafficPolicy:
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.8.3`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.9.0`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -1231,9 +1234,9 @@ clientTrafficPolicy:
 | `proxy.kind`                             | EG proxy kind: Deployment or DaemonSet (managed by EG operator) | `Deployment`                   |
 | `proxy.replicaCount`                     | Number of proxy replicas (Deployment only)                      | `1`                            |
 | `proxy.image.repository`                 | Proxy image                                                     | `docker.io/envoyproxy/envoy`   |
-| `proxy.image.tag`                        | Proxy image tag                                                 | `distroless-v1.38.0`           |
+| `proxy.image.tag`                        | Proxy image tag                                                 | `distroless-v1.39.0`           |
 | `proxy.shutdownManager.image.repository` | Shutdown manager sidecar image                                  | `docker.io/envoyproxy/gateway` |
-| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.8.3`                       |
+| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.9.0`                       |
 | `proxy.resources.requests.cpu`           | CPU request                                                     | `100m`                         |
 | `proxy.resources.requests.memory`        | Memory request                                                  | `128Mi`                        |
 | `proxy.resources.limits.cpu`             | CPU limit                                                       | `1000m`                        |
@@ -1265,8 +1268,8 @@ gateway:
 
 The namespace policy also supports `None`, `All`, and `Selector`. When using
 `Selector`, `gateway.allowedListeners.namespaces.selector` is required and must
-contain a Kubernetes label selector. The chart bundles Gateway API v1.5.1
-experimental-channel CRDs and requires the ListenerSet CRD, or an equivalent
+contain a Kubernetes label selector. The chart bundles the supported Gateway
+API v1.6.1 CRDs and requires the ListenerSet CRD, or an equivalent
 platform-managed installation.
 
 | Parameter                               | Description                                  | Default               |
@@ -1282,7 +1285,7 @@ platform-managed installation.
 
 | Parameter           | Description       | Default  |
 | ------------------- | ----------------- | -------- |
-| `certgen.image.tag` | Certgen image tag | `v1.8.3` |
+| `certgen.image.tag` | Certgen image tag | `v1.9.0` |
 
 ### SecurityPolicy
 
@@ -1313,7 +1316,7 @@ platform-managed installation.
 | -------------------------------------------- | ------------------------------------------------ | -------------------------------- |
 | `rateLimiting.enabled`                       | Enable rate limiting                             | `false`                          |
 | `rateLimiting.service.image.repository`      | Rate limit service image repository              | `docker.io/envoyproxy/ratelimit` |
-| `rateLimiting.service.image.tag`             | Rate limit service image tag                     | `1e50889b`                       |
+| `rateLimiting.service.image.tag`             | Rate limit service image tag                     | `17b1956c`                       |
 | `rateLimiting.externalRedis.host`            | External Redis host (when `redis.enabled=false`) | `""`                             |
 | `rateLimiting.externalRedis.port`            | External Redis port                              | `6379`                           |
 | `rateLimiting.externalRedis.auth.enabled`    | Read external Redis password from a Secret       | `false`                          |
@@ -1404,12 +1407,12 @@ cleanup.
 
 ## Upgrade Notes
 
-`docker.io/envoyproxy/gateway:v1.8.3` is the upstream patch update from
-`v1.8.2`. The upstream image tag is published with the `v` prefix. This chart
-keeps the managed Envoy proxy image pinned to
-`docker.io/envoyproxy/envoy:distroless-v1.38.0`, which remains aligned with the
-upstream v1.8 compatibility matrix. The rate limit deployment now uses the
-upstream v1.8.3 default `docker.io/envoyproxy/ratelimit:1e50889b` and honors the
+`docker.io/envoyproxy/gateway:v1.9.0` is the upstream minor update from
+`v1.8.3`. The upstream image tag is published with the `v` prefix. This chart
+pins the managed Envoy proxy image to
+`docker.io/envoyproxy/envoy:distroless-v1.39.0`, aligned with the upstream v1.9
+compatibility matrix. The rate limit deployment uses the upstream v1.9.0
+default `docker.io/envoyproxy/ratelimit:17b1956c` and honors the
 `rateLimiting.service.image` override through the EnvoyGateway configuration.
 When rate limiting is enabled, the chart also uses the upstream-required
 `envoy-gateway` names for the controller Deployment and ServiceAccount. For an
@@ -1420,17 +1423,25 @@ uses its `-redis-client` endpoint, and Redis authentication is injected into the
 managed rate-limit Deployment through `REDIS_AUTH` from either the bundled or
 external Secret.
 
-Envoy Gateway v1.8.3 updates its distroless base and fixes backend TLS 1.3
-defaults, mismatched or malformed listener certificates, IPv6 literal OIDC
-endpoints, translator status races, and Wasm fetch retries. It also moves
-EnvoyExtensionPolicy Lua source from per-route overrides to listener-level
-filters. This changes generated xDS Lua filter names and layout; update any
-EnvoyPatchPolicy or extension server that matches the previous
-`envoy.filters.http.lua/` keys. Review the
-[upstream v1.8.3 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.8.3)
-before upgrading, verify Gateway API and Envoy Gateway CRDs in staging, and test
-existing Gateway, HTTPRoute, EnvoyProxy, `BackendTrafficPolicy`,
-`SecurityPolicy`, EnvoyExtensionPolicy, and EnvoyPatchPolicy resources.
+Envoy Gateway v1.9.0 requires Gateway API v1.6 CRDs and adds stricter CEL
+validation for client IP detection, API key extraction, and policy merge
+targets. Lua extensions are disabled by default, tracing client sampling now
+defaults to zero, and EndpointSlice indexing can increase controller memory use
+on large clusters. Remove `sessionPersistence.idleTimeout` before applying the
+new Gateway API CRDs, because Gateway API v1.6 removed that field. Review the
+[upstream v1.9.0 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.9.0/)
+before upgrading. Apply the bundled supported Gateway API v1.6.1 and Envoy
+Gateway CRDs server-side before the controller upgrade, correct resources
+rejected by the new validations, and test existing Gateway, route, EnvoyProxy,
+`BackendTrafficPolicy`, `SecurityPolicy`, EnvoyExtensionPolicy, and
+EnvoyPatchPolicy resources in staging.
+
+For platform-managed Gateway API CRDs, prefer `crds.enabled=false`; this
+disables the entire CRD subchart, including its safe-upgrade admission policy.
+Helm's `--skip-crds` flag skips files in the subchart's `crds/` directory but
+still renders templates. When using `--skip-crds` and the platform also manages
+the safe-upgrade policy, add
+`--set crds.gatewayAPI.safeUpgradePolicy.enabled=false`.
 
 ---
 
@@ -2189,7 +2200,13 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
 
 ## Version History
 
-### Version 1.8.1 (Current)
+### Version 1.10.0 (Current)
+
+Updates Envoy Gateway to v1.9.0, Envoy to distroless-v1.39.0, the rate-limit
+service to `17b1956c`, and the supported Gateway API CRDs to v1.6.1. See the
+upgrade notes for the CRD migration and changed upstream defaults.
+
+### Version 1.8.1
 
 Functional validation release with k3d-verified fixes for xDS connectivity, health probes, certgen, and RBAC.
 
@@ -2327,9 +2344,9 @@ First stable release with complete P1 (MVP) and P2 (Production) features.
 
 | Field                  | Value      |
 | ---------------------- | ---------- |
-| **Chart Version**      | 1.8.1      |
-| **App Version**        | v1.8.3     |
-| **Kubernetes Version** | >= 1.24    |
+| **Chart Version**      | 1.10.0     |
+| **App Version**        | v1.9.0     |
+| **Kubernetes Version** | >= 1.26    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |
 

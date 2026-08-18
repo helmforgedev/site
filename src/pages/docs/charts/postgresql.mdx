@@ -375,7 +375,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | Parameter          | Type   | Default                      | Description                                         |
 | ------------------ | ------ | ---------------------------- | --------------------------------------------------- |
 | `image.repository` | string | `docker.io/library/postgres` | PostgreSQL runtime image repository.                |
-| `image.tag`        | string | `"18.4-trixie"`              | PostgreSQL runtime image tag.                       |
+| `image.tag`        | string | `"18.6-trixie"`              | PostgreSQL runtime image tag.                       |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy for PostgreSQL containers.        |
 | `imagePullSecrets` | array  | `[]`                         | Optional image pull secrets for private registries. |
 
@@ -526,7 +526,7 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | `backup.images.uploader.tag`           | string  | `"1.0.0"`                                  | Uploader image tag.                                       |
 | `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`                             | Pull policy for the uploader image.                       |
 | `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres`               | PostgreSQL client image used for backup jobs.             |
-| `backup.images.postgresql.tag`         | string  | `"18.4-trixie"`                            | PostgreSQL client image tag used for backup jobs.         |
+| `backup.images.postgresql.tag`         | string  | `"18.6-trixie"`                            | PostgreSQL client image tag used for backup jobs.         |
 | `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`                             | Pull policy for the PostgreSQL backup image.              |
 | `backup.s3.endpoint`                   | string  | `""`                                       | S3-compatible endpoint URL.                               |
 | `backup.s3.bucket`                     | string  | `""`                                       | Target bucket name.                                       |
@@ -633,6 +633,14 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage the backup S3 credential Secret through ESO. |
 
 ## Upgrade Notes
+
+PostgreSQL 18.6 is the August 2026 security and bug-fix release; upstream did
+not publish 18.5 because of a post-wrap regression. Back up the cluster and
+review the
+[official PostgreSQL 18.6 release notes](https://www.postgresql.org/docs/release/18.6/)
+before upgrading. A dump and restore is not required from an earlier PostgreSQL
+18 release, but test extensions, authentication, replication, and application
+queries in staging.
 
 <Callout type="warning" title="Upgrading from 0.x to 1.x">
   If upgrading across major versions, check the
