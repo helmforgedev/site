@@ -15,8 +15,8 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
   - Production HA profile (DaemonSet, anti-affinity)
 
 - **Gateway API Native**: First-class Gateway API support
-  - Envoy Gateway v1.9.0 and supported Gateway API v1.6.1 CRDs installed by default
-  - `crds.enabled=false` support for platform-managed CRDs
+  - Standalone Envoy Gateway v1.9.0 and Gateway API v1.6.1 Experimental CRD lifecycle
+  - Fail-fast validation of all 18 required GVKs when `crds.enabled=false`
   - Working Gateway and HTTPRoute examples
   - Global `gatewayAPI.enabled` gate for helper resources
   - Automated GatewayClass creation
@@ -61,15 +61,15 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 ## Production-Ready Capabilities
 
-- ✅ High availability with leader election and anti-affinity
-- ✅ Horizontal Pod Autoscaler for proxy scaling
-- ✅ PodDisruptionBudgets for maintenance safety
-- ✅ Resource limits and requests tuning per profile
-- ✅ Health checks (liveness and readiness probes)
-- ✅ Security contexts (runAsNonRoot, drop ALL capabilities)
-- ✅ Support for Deployment and DaemonSet proxy kinds (operator-managed)
-- ✅ Comprehensive RBAC for Gateway API and Envoy Gateway CRDs
-- ✅ Namespace override for chart-managed namespaced resources
+- High availability with leader election and anti-affinity
+- Horizontal Pod Autoscaler for proxy scaling
+- PodDisruptionBudgets for maintenance safety
+- Resource limits and requests tuning per profile
+- Health checks (liveness and readiness probes)
+- Security contexts (`runAsNonRoot`, drop all capabilities)
+- Support for Deployment and DaemonSet proxy kinds (operator-managed)
+- Comprehensive RBAC for Gateway API and Envoy Gateway CRDs
+- Namespace override for chart-managed namespaced resources
 
 ---
 
@@ -77,21 +77,43 @@ Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gatew
 
 ### Prerequisites
 
-- Kubernetes 1.26+ (Gateway API v1 support)
-- Helm 3.8+
+- Kubernetes 1.33 through 1.36
+- Helm 3.17+ recommended for ownership migration
 
 ### HTTPS Repository (Recommended)
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install envoy-gateway helmforge/envoy-gateway
+helm upgrade --install envoy-gateway-crds helmforge/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --create-namespace
+helm show crds helmforge/envoy-gateway-crds \
+  --version CRD_CHART_VERSION > envoy-gateway-crds-installed.yaml
+kubectl wait --for=condition=Established --timeout=120s \
+  -f envoy-gateway-crds-installed.yaml
+helm upgrade --install envoy-gateway helmforge/envoy-gateway \
+  --namespace envoy-gateway \
+  --set crds.enabled=false
 ```
 
 ### OCI Registry
 
 ```bash
-helm install envoy-gateway oci://ghcr.io/helmforgedev/helm/envoy-gateway
+helm upgrade --install envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --create-namespace
+helm show crds oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION > envoy-gateway-crds-installed.yaml
+kubectl wait --for=condition=Established --timeout=120s \
+  -f envoy-gateway-crds-installed.yaml
+helm upgrade --install envoy-gateway \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --namespace envoy-gateway \
+  --set crds.enabled=false
 ```
 
 ### Verify Installation
@@ -108,16 +130,15 @@ kubectl get gateway,httproute -A
 
 ### 1. Install Envoy Gateway
 
-The chart installs Envoy Gateway v1.9.0 and its supported Gateway API v1.6.1
-CRDs by default. This includes `ListenerSet`, `TCPRoute`, `TLSRoute`, and
-`UDPRoute`, which are also present in the v1.6.1 Standard bundle. The bundled
-definitions retain the upstream experimental-channel schema used by Envoy
-Gateway v1.9.0. The separate `gateway.networking.x-k8s.io` experimental APIs
-are excluded because their schema requires Kubernetes 1.32. Use
-`--set crds.enabled=false` only when all required CRDs are managed externally.
+New installations use the [Envoy Gateway CRDs chart](/docs/charts/envoy-gateway-crds)
+first, wait for discovery, then install this application with
+`crds.enabled=false`. The local CRD dependency remains enabled by default only
+as a migration bridge for existing chart 1.10.1 releases.
 
 ```bash
-helm install envoy-gateway helmforge/envoy-gateway
+helm install envoy-gateway helmforge/envoy-gateway \
+  --namespace envoy-gateway \
+  --set crds.enabled=false
 ```
 
 ### 2. Choose a Profile
@@ -128,6 +149,7 @@ Perfect for local testing on k3d, kind, or minikube:
 
 ```bash
 helm install envoy-gateway helmforge/envoy-gateway \
+  --set crds.enabled=false \
   --set profile=dev
 ```
 
@@ -145,6 +167,7 @@ For production deployments with high availability:
 
 ```bash
 helm install envoy-gateway helmforge/envoy-gateway \
+  --set crds.enabled=false \
   --set profile=production-ha
 ```
 
@@ -1203,7 +1226,7 @@ clientTrafficPolicy:
 | ------------------------ | -------------------------------------------------------------------------- | -------- |
 | `profile`                | Profile preset (dev/production-ha/custom)                                  | `custom` |
 | `namespaceOverride`      | Namespace for chart-managed resources; target namespace must already exist | `""`     |
-| `crds.enabled`           | Install bundled Envoy Gateway and its supported Gateway API v1.6.1 CRDs    | `true`   |
+| `crds.enabled`           | Migration bridge; disable after the standalone CRD release is established  | `true`   |
 | `nameOverride`           | Override chart name                                                        | `""`     |
 | `fullnameOverride`       | Override full name                                                         | `""`     |
 | `imagePullSecrets`       | Image pull secrets                                                         | `[]`     |
@@ -1423,25 +1446,201 @@ uses its `-redis-client` endpoint, and Redis authentication is injected into the
 managed rate-limit Deployment through `REDIS_AUTH` from either the bundled or
 external Secret.
 
-Envoy Gateway v1.9.0 requires Gateway API v1.6 CRDs and adds stricter CEL
+Envoy Gateway v1.9.0 requires Gateway API v1.6.1 Experimental CRDs and adds stricter CEL
 validation for client IP detection, API key extraction, and policy merge
 targets. Lua extensions are disabled by default, tracing client sampling now
 defaults to zero, and EndpointSlice indexing can increase controller memory use
 on large clusters. Remove `sessionPersistence.idleTimeout` before applying the
 new Gateway API CRDs, because Gateway API v1.6 removed that field. Review the
 [upstream v1.9.0 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.9.0/)
-before upgrading. Apply the bundled supported Gateway API v1.6.1 and Envoy
-Gateway CRDs server-side before the controller upgrade, correct resources
+before upgrading. Apply the standalone Gateway API v1.6.1 and Envoy Gateway
+CRDs server-side before the controller upgrade, correct resources
 rejected by the new validations, and test existing Gateway, route, EnvoyProxy,
 `BackendTrafficPolicy`, `SecurityPolicy`, EnvoyExtensionPolicy, and
 EnvoyPatchPolicy resources in staging.
 
-For platform-managed Gateway API CRDs, prefer `crds.enabled=false`; this
-disables the entire CRD subchart, including its safe-upgrade admission policy.
-Helm's `--skip-crds` flag skips files in the subchart's `crds/` directory but
-still renders templates. When using `--skip-crds` and the platform also manages
-the safe-upgrade policy, add
-`--set crds.gatewayAPI.safeUpgradePolicy.enabled=false`.
+This release also corrects the declared Kubernetes support range to the
+upstream v1.9 matrix: Kubernetes 1.33 through 1.36. Upgrade Kubernetes before
+the chart when the cluster is outside that range.
+
+### CRD Migration From Chart 1.10.1
+
+Chart 1.10.1 installed 18 CRDs through Helm's special `crds/` directory and
+owned the Gateway API safe-upgrade policy as a normal application template.
+The CRDs themselves were never part of the Helm release manifest, but the
+policy and binding were. Moving ownership therefore requires a bridge revision.
+
+Do not upgrade directly from 1.10.1 with `crds.enabled=false`. Do not install
+the standalone policy over the policy owned by the application release.
+
+#### 1. Capture the existing objects
+
+Record all CRD and custom-resource names, UIDs, and counts before changing
+ownership:
+
+```bash
+REQUIRED_CRDS='backendtlspolicies.gateway.networking.k8s.io
+gatewayclasses.gateway.networking.k8s.io
+gateways.gateway.networking.k8s.io
+grpcroutes.gateway.networking.k8s.io
+httproutes.gateway.networking.k8s.io
+listenersets.gateway.networking.k8s.io
+referencegrants.gateway.networking.k8s.io
+tcproutes.gateway.networking.k8s.io
+tlsroutes.gateway.networking.k8s.io
+udproutes.gateway.networking.k8s.io
+backends.gateway.envoyproxy.io
+backendtrafficpolicies.gateway.envoyproxy.io
+clienttrafficpolicies.gateway.envoyproxy.io
+envoyextensionpolicies.gateway.envoyproxy.io
+envoypatchpolicies.gateway.envoyproxy.io
+envoyproxies.gateway.envoyproxy.io
+httproutefilters.gateway.envoyproxy.io
+securitypolicies.gateway.envoyproxy.io'
+
+for crd in $REQUIRED_CRDS; do
+  kubectl get crd "$crd" -o json
+done | jq -s '{apiVersion: "v1", kind: "List", items: .}' > crds-before.json
+
+for resource in $(kubectl api-resources \
+  --api-group=gateway.networking.k8s.io --verbs=list -o name); do
+  kubectl get "$resource" -A -o json
+done > gateway-api-before.json
+
+for resource in $(kubectl api-resources \
+  --api-group=gateway.envoyproxy.io --verbs=list -o name); do
+  kubectl get "$resource" -A -o json
+done > envoy-api-before.json
+
+kubectl get validatingadmissionpolicy,validatingadmissionpolicybinding \
+  safe-upgrades.gateway.networking.k8s.io \
+  -o yaml > policy-before.yaml
+```
+
+Generate sorted name/UID inventories with `jq` and retain them with the change
+record. The same loops must succeed after migration; a missing API type is a
+preflight failure, not something to ignore.
+
+#### 2. Upgrade to the bridge with the dependency enabled
+
+```bash
+helm upgrade envoy-gateway \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version BRIDGE_CHART_VERSION \
+  --namespace envoy-gateway \
+  --reuse-values \
+  --set crds.enabled=true \
+  --wait \
+  --timeout 10m
+```
+
+Verify that both resources print `keep`:
+
+```bash
+kubectl get validatingadmissionpolicy \
+  safe-upgrades.gateway.networking.k8s.io \
+  -o jsonpath='{.metadata.annotations.helm\.sh/resource-policy}{"\n"}'
+kubectl get validatingadmissionpolicybinding \
+  safe-upgrades.gateway.networking.k8s.io \
+  -o jsonpath='{.metadata.annotations.helm\.sh/resource-policy}{"\n"}'
+```
+
+This step must happen before disabling the dependency. Helm evaluates deletion
+from the previous release manifest; patching only the live object is not enough.
+
+#### 3. Apply the standalone bundle server-side
+
+```bash
+helm template envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --include-crds \
+  --set safeUpgradePolicy.management=disabled \
+  > envoy-gateway-crds.yaml
+
+kubectl apply \
+  --server-side \
+  --dry-run=server \
+  --field-manager=helmforge-envoy-gateway-crds \
+  -f envoy-gateway-crds.yaml
+
+kubectl apply \
+  --server-side \
+  --field-manager=helmforge-envoy-gateway-crds \
+  -f envoy-gateway-crds.yaml
+
+kubectl wait --for=condition=Established \
+  --timeout=120s \
+  -f envoy-gateway-crds.yaml
+```
+
+Do not add `--force-conflicts` without auditing the reported field managers and
+paths.
+
+#### 4. Create the standalone release without policy ownership
+
+```bash
+helm upgrade --install envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --skip-crds \
+  --set safeUpgradePolicy.management=disabled
+```
+
+#### 5. Disable the old dependency
+
+```bash
+helm upgrade envoy-gateway \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version BRIDGE_CHART_VERSION \
+  --namespace envoy-gateway \
+  --reuse-values \
+  --set crds.enabled=false \
+  --wait \
+  --timeout 10m
+```
+
+Rendering now checks all 18 required GVKs. A server-connected operation also
+checks Gateway API bundle `v1.6.1`/`experimental` and Envoy Gateway bundle
+`v1.9.0` annotations. Do not bypass failures with `--disable-validation`.
+
+#### 6. Transfer policy ownership
+
+After verifying that the live and standalone policy specifications match, use
+Helm 3.17 or later:
+
+```bash
+helm upgrade envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --skip-crds \
+  --take-ownership \
+  --set safeUpgradePolicy.management=managed
+```
+
+Older Helm clients can patch only
+`app.kubernetes.io/managed-by=Helm`, `meta.helm.sh/release-name`, and
+`meta.helm.sh/release-namespace` on the policy and binding after the same audit.
+Never edit Helm release Secrets and never use a hook to transfer ownership.
+
+#### 7. Verify preservation and runtime
+
+Compare the post-migration inventory with the files captured in step 1. All 18
+CRD UIDs, all custom-resource UIDs/counts, and the policy UID must remain
+unchanged. Confirm that only the standalone release owns the policy, the
+controller is Available, Gateways remain `Programmed`, and existing traffic
+still succeeds.
+
+After ownership transfer, do not roll back to an application revision from
+before the bridge. Such a revision attempts to add the policy and binding back
+to the old release. Deploy the required compatible application chart with
+`crds.enabled=false` instead.
+
+See the [standalone CRD lifecycle documentation](/docs/charts/envoy-gateway-crds)
+for provider-managed Gateway API, uninstall behavior, Helmfile ordering, and
+forward-only CRD upgrades.
 
 ---
 
@@ -2200,7 +2399,14 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
 
 ## Version History
 
-### Version 1.10.0 (Current)
+### CRD Lifecycle Bridge (Current)
+
+Adds the ownership-preserving migration to `envoy-gateway-crds`, validates all
+required external APIs, and corrects Kubernetes support to versions 1.33 through
+1.36. Existing 1.10.1 users must complete the bridge procedure above before
+setting `crds.enabled=false`.
+
+### Version 1.10.1
 
 Updates Envoy Gateway to v1.9.0, Envoy to distroless-v1.39.0, the rate-limit
 service to `17b1956c`, and the supported Gateway API CRDs to v1.6.1. See the
