@@ -18,7 +18,7 @@ production hardening controls that can be enabled without changing the developme
 ## Key Features
 
 - **Standalone and source-replica** - Single instance or source with read replicas.
-- **Official MySQL image** - Uses `docker.io/library/mysql:26.7.0` by default.
+- **Official MySQL image** - Uses `docker.io/library/mysql:9.7.2` by default.
 - **Deterministic credentials** - Inline values for development or existing Secrets/External Secrets for production.
 - **TLS** - Server TLS, optional secure transport requirement, internal client TLS, and private-key permission normalization.
 - **NetworkPolicy** - Optional ingress rules plus explicit egress for DNS, same-namespace MySQL, HTTPS, and custom targets.
@@ -335,7 +335,7 @@ platform integration inside the pod needs Kubernetes API credentials.
 | ------------------ | ------ | ------------------------- | ---------------------------------------------------------- |
 | `architecture`     | string | `standalone`              | Deployment architecture: `standalone` or `replication`.    |
 | `image.repository` | string | `docker.io/library/mysql` | MySQL runtime image repository.                            |
-| `image.tag`        | string | `"26.7.0"`                | MySQL runtime image tag.                                   |
+| `image.tag`        | string | `"9.7.2"`                 | MySQL runtime image tag.                                   |
 | `clusterDomain`    | string | `cluster.local`           | Kubernetes cluster DNS domain.                             |
 | `commonLabels`     | object | `{}`                      | Extra labels added to all resources.                       |
 | `extraManifests`   | array  | `[]`                      | Extra Kubernetes manifests rendered after chart resources. |
@@ -369,7 +369,6 @@ platform integration inside the pod needs Kubernetes API credentials.
 | `backup.schedule`                           | string  | `"0 3 * * *"`    | Backup schedule.                                 |
 | `backup.s3.existingSecret`                  | string  | `""`             | Existing Secret with S3 access and secret keys.  |
 | `backup.database.mysqldumpArgs`             | string  | See chart values | Extra arguments passed before `--all-databases`. |
-| `backup.images.mysql.tag`                   | string  | `"26.7.0"`       | MySQL client image tag used for backup jobs.     |
 
 ### TLS, Services, Metrics, and Policies
 
@@ -417,19 +416,6 @@ Use `PreferDualStack` for mixed environments. `RequireDualStack` should be reser
 IPv6 are guaranteed.
 
 ## Upgrade Notes
-
-MySQL 26.7.0 introduces Oracle's calendar-based version numbering after the 9.7
-series and includes server, InnoDB, replication, Group Replication, and client
-fixes. Back up all databases and run MySQL Shell's upgrade checker before
-upgrading a persistent production instance. Review the
-[official MySQL 26.7.0 release notes](https://dev.mysql.com/doc/relnotes/mysql/26.7/en/news-26-7-0.html)
-for removed or changed options, then validate authentication plugins,
-replication state, and application queries in staging.
-
-This remains an Innovation-to-Innovation upgrade, but direct downgrade from
-26.7 to 9.7 is unsupported. Treat rollback as a restore operation: take and
-verify a full pre-upgrade backup, then restore that backup into a 9.7 deployment
-instead of reusing a data directory initialized or upgraded by 26.7.
 
 <Callout type="warning" title="Password persistence">
   MySQL stores credentials during initial setup. On upgrade, ensure the provided Secret values match the existing data
