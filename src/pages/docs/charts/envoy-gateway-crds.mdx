@@ -10,6 +10,9 @@ description: Standalone Helm lifecycle for Envoy Gateway v1.9.0 and Gateway API 
 v1.9.0. It installs the 8 Envoy Gateway extension CRDs, the 10 Gateway API
 v1.6.1 Experimental CRDs, and an optional Gateway API safe-upgrade policy.
 
+The initial lifecycle chart release is 1.0.0. It must be published before the
+Envoy Gateway application chart 2.0.0 migration release.
+
 Install this chart before the [Envoy Gateway application chart](/docs/charts/envoy-gateway).
 The release boundary lets Kubernetes discovery register every API before Helm
 or `helm-diff` validates application custom resources.
@@ -90,14 +93,18 @@ this is an exhaustive readiness check rather than a two-object spot check.
 Diff and install the application:
 
 ```shell
+export APPLICATION_CHART_VERSION=2.0.0
+
 helm diff upgrade envoy-gateway \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version "${APPLICATION_CHART_VERSION}" \
   --namespace envoy-gateway \
   --allow-unreleased \
   --set crds.enabled=false
 
 helm upgrade --install envoy-gateway \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version "${APPLICATION_CHART_VERSION}" \
   --namespace envoy-gateway \
   --set crds.enabled=false
 ```
