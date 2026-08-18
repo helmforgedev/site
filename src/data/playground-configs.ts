@@ -2426,6 +2426,40 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  'envoy-gateway-crds': [
+    {
+      name: 'CRD Bundles',
+      fields: [
+        {
+          label: 'Gateway API Bundle',
+          key: 'crds.gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Install the Gateway API v1.6.1 Experimental CRDs',
+        },
+        {
+          label: 'Envoy Gateway Bundle',
+          key: 'crds.envoyGateway.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Install the Envoy Gateway v1.9.0 extension CRDs',
+        },
+      ],
+    },
+    {
+      name: 'Safe-Upgrade Policy',
+      fields: [
+        {
+          label: 'Management',
+          key: 'safeUpgradePolicy.management',
+          type: 'select',
+          default: 'managed',
+          options: ['managed', 'external', 'disabled'],
+          description: 'Select the owner of the Gateway API safe-upgrade policy and binding',
+        },
+      ],
+    },
+  ],
   'envoy-gateway': [
     {
       name: 'Controller',

@@ -85,6 +85,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
       { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'stable' },
+      { label: 'Envoy Gateway CRDs', href: '/docs/charts/envoy-gateway-crds', maturity: 'stable' },
       { label: 'NetBird', href: '/docs/charts/netbird', maturity: 'stable' },
       { label: 'NetBox', href: '/docs/charts/netbox', maturity: 'beta' },
       { label: 'Certimate', href: '/docs/charts/certimate', maturity: 'stable' },

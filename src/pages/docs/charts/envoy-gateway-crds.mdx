@@ -1,0 +1,333 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Envoy Gateway CRDs Chart
+description: Standalone Helm lifecycle for Envoy Gateway v1.9.0 and Gateway API v1.6.1 Experimental CRDs, with safe migration and validated helm-diff ordering.
+---
+
+# Envoy Gateway CRDs Chart
+
+`envoy-gateway-crds` is the cluster API lifecycle release for Envoy Gateway
+v1.9.0. It installs the 8 Envoy Gateway extension CRDs, the 10 Gateway API
+v1.6.1 Experimental CRDs, and an optional Gateway API safe-upgrade policy.
+
+The initial lifecycle chart release is 1.0.0. It must be published before the
+Envoy Gateway application chart 2.0.0 migration release.
+
+Install this chart before the [Envoy Gateway application chart](/docs/charts/envoy-gateway).
+The release boundary lets Kubernetes discovery register every API before Helm
+or `helm-diff` validates application custom resources.
+
+## Compatibility
+
+| Component           | Supported version |
+| ------------------- | ----------------- |
+| Envoy Gateway       | v1.9.0            |
+| Envoy Gateway CRDs  | v1.9.0            |
+| Gateway API         | v1.6.1            |
+| Gateway API channel | Experimental      |
+| Kubernetes          | 1.33 through 1.36 |
+
+Envoy Gateway v1.9 does not use Gateway API v1.5.1. Kubernetes versions outside
+1.33 through 1.36 are rejected by chart metadata rather than treated as
+untested-but-supported.
+
+## Why The CRDs Are A Separate Release
+
+Helm installs files from `crds/` before normal templates, but deliberately does
+not track them in the release manifest and does not upgrade or delete them.
+Client-side dry-run also cannot add APIs to Kubernetes discovery.
+
+Keeping CRDs as an application dependency would leave CRDs and custom resources
+inside the same Helm operation. A first `helm diff` could still fail with
+`no matches for kind` because the APIs do not exist yet.
+
+The supported order is:
+
+1. Install or update `envoy-gateway-crds`.
+2. Wait for all selected CRDs to become `Established`.
+3. Run application diff with normal Kubernetes validation.
+4. Install or upgrade Envoy Gateway with `crds.enabled=false`.
+
+## Fresh Installation
+
+### HTTPS repository
+
+```shell
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+
+helm upgrade --install envoy-gateway-crds \
+  helmforge/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --create-namespace
+```
+
+### OCI registry
+
+```shell
+helm upgrade --install envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --create-namespace
+```
+
+Wait for discovery:
+
+```shell
+helm show crds oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION > envoy-gateway-crds-installed.yaml
+
+kubectl wait --for=condition=Established \
+  --timeout=120s \
+  -f envoy-gateway-crds-installed.yaml
+
+kubectl api-resources --api-group=gateway.networking.k8s.io
+kubectl api-resources --api-group=gateway.envoyproxy.io
+```
+
+The rendered file contains all 18 CRDs from the pinned default chart bundle, so
+this is an exhaustive readiness check rather than a two-object spot check.
+
+Diff and install the application:
+
+```shell
+export APPLICATION_CHART_VERSION=2.0.0
+
+helm diff upgrade envoy-gateway \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version "${APPLICATION_CHART_VERSION}" \
+  --namespace envoy-gateway \
+  --allow-unreleased \
+  --set crds.enabled=false
+
+helm upgrade --install envoy-gateway \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway \
+  --version "${APPLICATION_CHART_VERSION}" \
+  --namespace envoy-gateway \
+  --set crds.enabled=false
+```
+
+Do not add `--disable-validation`. A missing or incompatible bundle should stop
+the application operation before normal manifests are applied.
+
+## Installed Resources
+
+The default release installs:
+
+- 10 `gateway.networking.k8s.io` v1.6.1 Experimental CRDs.
+- 8 `gateway.envoyproxy.io` v1.9.0 CRDs.
+- `ValidatingAdmissionPolicy/safe-upgrades.gateway.networking.k8s.io`.
+- `ValidatingAdmissionPolicyBinding/safe-upgrades.gateway.networking.k8s.io`.
+
+The chart creates no Pod, Deployment, Service, credential, or network listener.
+
+## Configuration
+
+| Value                          | Default   | Purpose                                                      |
+| ------------------------------ | --------- | ------------------------------------------------------------ |
+| `crds.gatewayAPI.enabled`      | `true`    | Select the Gateway API v1.6.1 Experimental bundle            |
+| `crds.envoyGateway.enabled`    | `true`    | Select the Envoy Gateway v1.9.0 extension bundle             |
+| `safeUpgradePolicy.management` | `managed` | Set policy ownership to `managed`, `external`, or `disabled` |
+| `commonLabels`                 | `{}`      | Add labels to Helm-managed policy resources                  |
+
+At least one CRD bundle must remain enabled. `managed` policy mode requires the
+Gateway API bundle because the policy protects those CRDs.
+
+## CRD Ownership And Release Size
+
+CRDs remain in Helm's special `crds/` directory. They are intentionally absent
+from `helm get manifest` and are not given misleading Helm release ownership
+annotations.
+
+This design keeps the release Secret well below Kubernetes' 1 MiB object limit.
+Lifecycle ownership is expressed by:
+
+- The standalone release and compatibility matrix.
+- Gateway API version/channel annotations.
+- Envoy Gateway bundle version and source digest annotations.
+- Server-side apply field manager `helmforge-envoy-gateway-crds`.
+- Real Helm ownership of the policy and binding.
+
+## Upgrading CRDs
+
+`helm upgrade` alone does not update objects from `crds/`. Render CRDs only,
+run server-side dry-run, apply, wait for `Established`, then update the release
+record with `--skip-crds`:
+
+```shell
+helm template envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --include-crds \
+  --set safeUpgradePolicy.management=disabled \
+  > envoy-gateway-crds.yaml
+
+kubectl apply \
+  --server-side \
+  --dry-run=server \
+  --field-manager=helmforge-envoy-gateway-crds \
+  -f envoy-gateway-crds.yaml
+
+kubectl apply \
+  --server-side \
+  --field-manager=helmforge-envoy-gateway-crds \
+  -f envoy-gateway-crds.yaml
+
+kubectl wait --for=condition=Established \
+  --timeout=120s \
+  -f envoy-gateway-crds.yaml
+
+helm upgrade envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --skip-crds
+```
+
+Never use `--force-conflicts` as a routine flag. Inspect `managedFields`, the
+installed bundle annotations, and each conflicting path before making an
+explicit ownership decision.
+
+CRD upgrades are forward-only. A Helm rollback does not and must not apply an
+older schema over stored custom resources.
+
+## Existing Envoy Gateway 1.10.1 Users
+
+Do not install the standalone policy over an application release that already
+owns `safe-upgrades.gateway.networking.k8s.io`. Do not disable the old CRD
+dependency directly from chart 1.10.1.
+
+Wait until the matching Envoy Gateway bridge release is available, then use
+this mandatory sequence:
+
+1. Upgrade the application to the bridge with `crds.enabled=true`.
+2. Verify `helm.sh/resource-policy=keep` on the policy and binding.
+3. Capture all CRD and custom-resource names, UIDs, and counts.
+4. Apply the identical standalone bundle with server-side apply.
+5. Install this release with `--skip-crds` and policy mode `disabled`.
+6. Upgrade the application bridge with `crds.enabled=false`.
+7. Verify every CRD and custom-resource UID is unchanged.
+8. Adopt the policy and binding into this release.
+9. Revalidate controller readiness, Gateway status, and traffic.
+
+The bridge is required because Helm decides deletions from the previous release
+manifest. Patching only the live policy does not place `keep` into that manifest.
+
+With Helm 3.17 or later, ownership adoption uses:
+
+```shell
+helm upgrade envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --namespace envoy-gateway \
+  --skip-crds \
+  --take-ownership \
+  --set safeUpgradePolicy.management=managed
+```
+
+Older Helm clients can patch only the standard Helm ownership label and
+annotations after comparing the live and target policy specifications. Never
+edit Helm release Secrets and never use a hook to transfer ownership.
+
+After adoption, do not roll the application back to a revision from before the
+bridge. That revision attempts to add the policy back to the old release. Apply
+the required compatible application version with `crds.enabled=false` instead.
+
+The full command-by-command procedure is also published in the Envoy Gateway
+application documentation.
+
+## Provider-Managed Gateway API
+
+A Kubernetes provider or platform release can own Gateway API while HelmForge
+owns only the Envoy extension CRDs. Verify that the provider exposes the full
+v1.6.1 Experimental API set and annotations:
+
+```shell
+kubectl get crd gateways.gateway.networking.k8s.io \
+  -o go-template='version={{ index .metadata.annotations "gateway.networking.k8s.io/bundle-version" }} channel={{ index .metadata.annotations "gateway.networking.k8s.io/channel" }}{{ "\n" }}'
+```
+
+Then install Envoy CRDs only:
+
+```shell
+helm upgrade --install envoy-gateway-crds \
+  oci://ghcr.io/helmforgedev/helm/envoy-gateway-crds \
+  --version CRD_CHART_VERSION \
+  --namespace envoy-gateway \
+  --create-namespace \
+  --set crds.gatewayAPI.enabled=false \
+  --set crds.envoyGateway.enabled=true \
+  --set safeUpgradePolicy.management=external
+```
+
+The official Gateway API Experimental bundle also installs its own safe-upgrade
+policy and `gateway.networking.x-k8s.io` resources. Leaving policy management in
+`external` mode avoids duplicate ownership. A Standard bundle is not equivalent
+to the required Experimental contract.
+
+## Helmfile And GitOps
+
+Initial bootstrap is always two-phase. A Helmfile `needs` relationship documents
+ordering, but a global client-side diff cannot discover APIs that have not yet
+been applied.
+
+Apply the CRD release selector first, wait for discovery, and only then diff or
+sync the application selector. For later upgrades, apply CRD schemas before the
+controller release.
+
+## Uninstall
+
+Uninstalling this release preserves:
+
+- All selected CRDs.
+- All custom resources stored through those CRDs.
+- The managed safe-upgrade policy.
+- The managed policy binding.
+
+This behavior prevents cluster-wide data loss. Manual CRD deletion is outside
+the chart lifecycle because deleting a CRD deletes every custom resource of
+that kind.
+
+## Troubleshooting
+
+### Application diff reports unknown kinds
+
+Wait for every required CRD to become `Established`, verify both API groups with
+`kubectl api-resources`, and retry without `--disable-validation`.
+
+### External bundle is rejected
+
+Check all 18 served GVKs. Gateway API CRDs must report bundle `v1.6.1` and
+channel `experimental`; Envoy CRDs must report bundle `v1.9.0`.
+
+### Helm reports policy ownership conflict
+
+An existing application or platform release owns the policy. Existing
+HelmForge users must complete the bridge migration. Provider-managed users must
+select `safeUpgradePolicy.management=external`.
+
+### CRDs did not change after helm upgrade
+
+This is expected for objects under `crds/`. Use the documented server-side
+apply flow before upgrading the controller.
+
+### Uninstall left cluster-scoped objects
+
+This is the documented safety contract. Verify that no controller or custom
+resource uses the APIs before considering a manual deletion.
+
+## Security Scan
+
+Kubescape is not applicable because the chart renders no Pod or workload
+controller. The deterministic inventory contains only
+`CustomResourceDefinition`, `ValidatingAdmissionPolicy`, and
+`ValidatingAdmissionPolicyBinding`.
+
+## Resources
+
+- [Envoy Gateway application chart](/docs/charts/envoy-gateway)
+- [Envoy Gateway v1.9 documentation](https://gateway.envoyproxy.io/v1.9/)
+- [Gateway API CRD management](https://gateway-api.sigs.k8s.io/guides/crd-management/)
+- [Gateway API implementation guidance](https://gateway-api.sigs.k8s.io/guides/implementers-guide/)
+- [Helm CRD lifecycle](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/)
