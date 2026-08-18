@@ -4,9 +4,35 @@ title: Envoy Gateway Chart
 description: Envoy Gateway Helm chart for Kubernetes with Gateway API, JWT/OIDC/CORS SecurityPolicy, BackendTrafficPolicy, observability, and production defaults.
 ---
 
+import Callout from '../../../components/Callout.astro';
+
 # Envoy Gateway Chart
 
 Modern Kubernetes Gateway API implementation powered by Envoy Proxy. Envoy Gateway provides a high-performance, extensible gateway for managing ingress traffic with native support for HTTP, HTTPS, gRPC, TCP, and UDP protocols.
+
+<Callout
+  type="danger"
+  title="Upgrading from Envoy Gateway chart 1.x to 2.0.0 requires a staged CRD migration"
+>
+  Do not upgrade directly with `crds.enabled=false`, uninstall the bundled
+  CRDs, or replace the safe-upgrade policy.
+
+1. Upgrade Kubernetes first when it is outside the supported 1.33-1.36 range.
+2. Upgrade Envoy Gateway to 2.0.0 with `crds.enabled=true` so Helm records the
+   keep policy.
+3. Capture all CRD, custom-resource, policy, and binding UIDs.
+4. Install `envoy-gateway-crds` 1.0.0 with policy management disabled and
+   server-side apply its locked bundle.
+5. Upgrade Envoy Gateway 2.0.0 with `crds.enabled=false`.
+6. Transfer the policy and binding to the standalone release, then verify all
+   captured UIDs and Gateway traffic.
+
+CRD schema upgrades are forward-only. Do not use Helm rollback to downgrade
+the bundle or return the application to a pre-2.0.0 revision. Complete the
+detailed **CRD Migration From Chart 1.10.1 to 2.0.0** procedure on this page
+before changing production releases.
+
+</Callout>
 
 ## Key Features
 
@@ -1463,12 +1489,15 @@ This release also corrects the declared Kubernetes support range to the
 upstream v1.9 matrix: Kubernetes 1.33 through 1.36. Upgrade Kubernetes before
 the chart when the cluster is outside that range.
 
-### CRD Migration From Chart 1.10.1
+### CRD Migration From Chart 1.10.1 to 2.0.0
 
 Chart 1.10.1 installed 18 CRDs through Helm's special `crds/` directory and
 owned the Gateway API safe-upgrade policy as a normal application template.
 The CRDs themselves were never part of the Helm release manifest, but the
 policy and binding were. Moving ownership therefore requires a bridge revision.
+
+Chart 2.0.0 is intentionally a major release because it raises the Kubernetes
+minimum from 1.26 to 1.33 and changes the CRD lifecycle and ownership contract.
 
 Do not upgrade directly from 1.10.1 with `crds.enabled=false`. Do not install
 the standalone policy over the policy owned by the application release.
@@ -1526,7 +1555,7 @@ preflight failure, not something to ignore.
 ```bash
 helm upgrade envoy-gateway \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway \
-  --version BRIDGE_CHART_VERSION \
+  --version 2.0.0 \
   --namespace envoy-gateway \
   --reuse-values \
   --set crds.enabled=true \
@@ -1593,7 +1622,7 @@ helm upgrade --install envoy-gateway-crds \
 ```bash
 helm upgrade envoy-gateway \
   oci://ghcr.io/helmforgedev/helm/envoy-gateway \
-  --version BRIDGE_CHART_VERSION \
+  --version 2.0.0 \
   --namespace envoy-gateway \
   --reuse-values \
   --set crds.enabled=false \
@@ -2399,12 +2428,12 @@ helm upgrade envoy-gateway helmforge/envoy-gateway \
 
 ## Version History
 
-### CRD Lifecycle Bridge (Current)
+### Version 2.0.0
 
-Adds the ownership-preserving migration to `envoy-gateway-crds`, validates all
-required external APIs, and corrects Kubernetes support to versions 1.33 through
-1.36. Existing 1.10.1 users must complete the bridge procedure above before
-setting `crds.enabled=false`.
+This breaking release adds the ownership-preserving migration to
+`envoy-gateway-crds`, validates all required external APIs, and corrects
+Kubernetes support to versions 1.33 through 1.36. Existing 1.10.1 users must
+complete the bridge procedure above before setting `crds.enabled=false`.
 
 ### Version 1.10.1
 
