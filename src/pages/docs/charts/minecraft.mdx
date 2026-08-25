@@ -29,7 +29,7 @@ cross-play, mod and plugin management, Aikar-optimized JVM flags, and RCON-backe
 - **Mod/plugin management** — Modrinth, CurseForge, Spiget, and direct URL downloads
 - **Resource packs** — configure server-side resource packs with SHA-1 verification
 - **Prometheus metrics** — mc-monitor sidecar with optional ServiceMonitor
-- **Pinned upstream image** — defaults to `2026.8.0`, with Java-specific tags available when needed
+- **Pinned upstream image** — defaults to `2026.8.2`, with Java-specific tags available when needed
 
 ## Installation
 
@@ -49,12 +49,12 @@ helm install minecraft oci://ghcr.io/helmforgedev/helm/minecraft --set server.eu
 
 | Minecraft Version | Required Java | Example `image.tag` |
 | ----------------- | ------------- | ------------------- |
-| 1.21.5+           | Java 25       | `2026.8.0`          |
-| 1.20.x - 1.21.4   | Java 21       | `2026.8.0-java21`   |
-| 1.17.x - 1.19.x   | Java 17       | `2026.8.0-java17`   |
+| 1.21.5+           | Java 25       | `2026.8.2`          |
+| 1.20.x - 1.21.4   | Java 21       | `2026.8.2-java21`   |
+| 1.17.x - 1.19.x   | Java 17       | `2026.8.2-java17`   |
 
-The chart defaults to the dated upstream image tag `2026.8.0`. Pin `image.tag`
-to a Java-specific variant, such as `2026.8.0-java21`, when running older
+The chart defaults to the dated upstream image tag `2026.8.2`. Pin `image.tag`
+to a Java-specific variant, such as `2026.8.2-java21`, when running older
 Minecraft versions or modpacks that require a specific Java runtime.
 
 ## Server Type Reference
@@ -300,7 +300,7 @@ service:
 | Parameter          | Type   | Default                           | Description                                                         |
 | ------------------ | ------ | --------------------------------- | ------------------------------------------------------------------- |
 | `image.repository` | string | `docker.io/itzg/minecraft-server` | Minecraft server container image.                                   |
-| `image.tag`        | string | `"2026.8.0"`                      | Image tag. Use Java-specific variants for older Minecraft versions. |
+| `image.tag`        | string | `"2026.8.2"`                      | Image tag. Use Java-specific variants for older Minecraft versions. |
 | `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                                                  |
 | `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries.                                |
 
@@ -446,7 +446,7 @@ upload — ensuring the world is in a consistent state before the backup is take
 | `backup.backoffLimit`                  | integer | `1`                                        | Job retry limit.                                             |
 | `backup.archivePrefix`                 | string  | `minecraft`                                | Prefix for backup archive filenames.                         |
 | `backup.excludes`                      | string  | `"*.jar cache logs"`                       | Space-separated patterns excluded from the archive.          |
-| `backup.images.worker`                 | string  | `docker.io/itzg/minecraft-server:2026.8.0` | Image for RCON and tar operations.                           |
+| `backup.images.worker`                 | string  | `docker.io/itzg/minecraft-server:2026.8.2` | Image for RCON and tar operations.                           |
 | `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`             | Image for S3 upload.                                         |
 | `backup.resources`                     | object  | `{}`                                       | Resources for backup containers.                             |
 | `backup.s3.endpoint`                   | string  | `""`                                       | S3-compatible endpoint URL.                                  |
@@ -515,7 +515,8 @@ upload — ensuring the world is in a consistent state before the backup is take
 
 ## Upgrade Notes
 
-`docker.io/itzg/minecraft-server:2026.8.0` adds GTNH daily builds and Java 25 fixes while retaining native IPv6 preference and a
+`docker.io/itzg/minecraft-server:2026.8.2` fixes Modrinth packs that require server-side mods and corrects
+`STOP_SERVER_DELAY_COMMAND` while retaining native IPv6 preference and a
 custom server-runner command, moves Vanilla installation to `mc-image-helper`,
 adds OCI generic-pack references, and includes GTNH, CurseForge HTTP, Java 17
 compatibility, and dependency fixes. Set `server.preferIPv6=true` to prefer the

@@ -9114,7 +9114,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2026.8.0',
+          default: '2026.8.2',
           description: 'Minecraft server image tag',
         },
         {
