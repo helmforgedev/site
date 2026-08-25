@@ -11844,7 +11844,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.63.13',
+          default: 'v0.63.14',
           description: 'Pinned Metabase image tag',
         },
         {
