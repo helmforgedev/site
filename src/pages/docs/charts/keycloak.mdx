@@ -12,20 +12,26 @@ import KeycloakDiagram from '../../../components/diagrams/KeycloakDiagram.astro'
 # Keycloak
 
 Deploy [Keycloak](https://www.keycloak.org/) on Kubernetes for identity and access management, SSO, OAuth 2.0,
-OpenID Connect, and SAML. The chart supports explicit `dev` and `production` modes, Keycloak `26.7.1`, bundled or
+OpenID Connect, and SAML. The chart supports explicit `dev` and `production` modes, Keycloak `26.7.2`, bundled or
 external PostgreSQL/MySQL-compatible databases, optional Gateway API routes, External Secrets Operator integration,
 Prometheus metrics, S3-compatible database backup, and dual-stack Service fields.
 
 ## Key Features
 
 - **Explicit runtime mode** — `mode: dev` for local testing and `mode: production` for hostname/database-backed deployments.
-- **Keycloak 26.7.x alignment** — image tag and app version use `quay.io/keycloak/keycloak:26.7.1`.
+- **Keycloak 26.7.x alignment** — image tag and app version use `quay.io/keycloak/keycloak:26.7.2`.
 - **Database choices** — embedded H2 for dev only, bundled PostgreSQL/MySQL subcharts, or external PostgreSQL/MySQL/MariaDB.
 - **HA-ready controls** — JDBC_PING cache stack, multi-replica scheduling defaults, PDB, rollout strategy, and capacity profiles.
 - **Routing options** — separate public/admin Ingress resources plus optional Gateway API `HTTPRoute` resources.
 - **Security integration** — non-root defaults, configurable ServiceAccount token mount, truststore controls, NetworkPolicy ingress and egress, and External Secrets Operator opt-in.
 - **Observability** — health probes, management service, metrics endpoint, ServiceMonitor, telemetry, tracing, and structured logging controls.
 - **Backup** — database-only PostgreSQL/MySQL dump CronJob uploaded to S3-compatible storage.
+
+<Callout type="warning" title="Keycloak 26.7.2 security update">
+  This patch includes fixes for account takeover, fine-grained admin permission bypasses, rotated client-secret
+  disclosure, and vulnerable dependencies. Review the official upgrade guide and validate authentication flows before
+  production rollout.
+</Callout>
 
 ## Architecture
 
@@ -309,7 +315,7 @@ externalSecrets:
 | `commonLabels`     | object | `{}`                        | Labels added to all resources.       |
 | `clusterDomain`    | string | `cluster.local`             | Kubernetes cluster DNS domain.       |
 | `image.repository` | string | `quay.io/keycloak/keycloak` | Keycloak image repository.           |
-| `image.tag`        | string | `"26.7.1"`                  | Keycloak image tag.                  |
+| `image.tag`        | string | `"26.7.2"`                  | Keycloak image tag.                  |
 | `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                        | Pull secrets for private registries. |
 
