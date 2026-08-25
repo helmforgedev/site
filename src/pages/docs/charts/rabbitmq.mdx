@@ -21,7 +21,7 @@ TLS listeners.
 
 ## Key Features
 
-- **Official Alpine image** — default `docker.io/library/rabbitmq:4.3.4-alpine` with chart-managed plugins
+- **Official Alpine image** — default `docker.io/library/rabbitmq:4.3.5-alpine` with chart-managed plugins
 - **Hardened Management UI** — CSP excludes `unsafe-eval` and `unsafe-inline`, with a configurable Referrer-Policy
 - **Two architectures** — `single-node` (one StatefulSet replica) or `cluster` (StatefulSet with peer discovery)
 - **Quorum queues by default** — `queueDefaults.type: quorum` for durable, replicated HA queues
@@ -63,7 +63,8 @@ RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +sbwt none +sbwtdcpu none +sbwtdio none
 This lowers idle CPU in containerized RabbitMQ deployments. Startup, liveness, and readiness probes use TCP checks
 against the active AMQP listener instead of repeatedly starting `rabbitmq-diagnostics`.
 
-RabbitMQ 4.3.4 also hardens the Management UI Content Security Policy by removing `unsafe-eval` and `unsafe-inline`.
+RabbitMQ 4.3.5 fixes quorum queue recovery, AMQP 1.0 validation, rolling-upgrade queries, direct reply-to duplicates,
+and protocol frame limits.
 The chart renders `management.headers.referrer_policy = no-referrer` by default. Set
 `management.referrerPolicy: ""` only when you intentionally want the browser's default policy.
 
@@ -332,7 +333,7 @@ management:
 | Parameter          | Type   | Default                      | Description                          |
 | ------------------ | ------ | ---------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/rabbitmq` | Official RabbitMQ image repository.  |
-| `image.tag`        | string | `"4.3.4-alpine"`             | Official Alpine RabbitMQ image tag.  |
+| `image.tag`        | string | `"4.3.5-alpine"`             | Official Alpine RabbitMQ image tag.  |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                         | Pull secrets for private registries. |
 
