@@ -4608,7 +4608,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '8.10.0',
+          default: '8.10.1',
           description: 'Pinned Redis image tag',
         },
         {
