@@ -8,6 +8,223 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  booklore: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v2.3.1',
+          description: 'Pinned official BookLore image tag',
+        },
+        {
+          label: 'HTTP Port',
+          key: 'app.port',
+          type: 'number',
+          default: '6060',
+          description: 'BookLore application and Service port',
+        },
+        {
+          label: 'Allowed Origins',
+          key: 'app.allowedOrigins',
+          type: 'text',
+          default: '*',
+          description: 'CORS origin contract; restrict this for public deployments',
+        },
+      ],
+    },
+    {
+      name: 'Storage',
+      fields: [
+        {
+          label: 'Data Volume',
+          key: 'persistence.data.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Application metadata and configuration capacity',
+        },
+        {
+          label: 'Books Volume',
+          key: 'persistence.books.size',
+          type: 'text',
+          default: '50Gi',
+          description: 'Persistent book library capacity',
+        },
+        {
+          label: 'BookDrop',
+          key: 'persistence.bookdrop.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create the optional import-drop volume',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      collapsible: true,
+      fields: [
+        {
+          label: 'MariaDB Subchart',
+          key: 'mariadb.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the bundled HelmForge MariaDB dependency',
+        },
+        {
+          label: 'External Host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External MariaDB host when the subchart is disabled',
+        },
+        {
+          label: 'External Secret',
+          key: 'database.external.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing the external database password',
+        },
+      ],
+    },
+    {
+      name: 'Ingress and isolation',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose BookLore through Kubernetes Ingress',
+        },
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'booklore.example.com',
+          description: 'Public BookLore hostname',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict inbound traffic to the application pod',
+        },
+      ],
+    },
+  ],
+  medikeep: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v0.69.0',
+          description: 'Pinned official MediKeep image tag',
+        },
+        {
+          label: 'Timezone',
+          key: 'app.timezone',
+          type: 'text',
+          default: 'UTC',
+          description: 'Timezone used for medical records and reminders',
+        },
+        {
+          label: 'API Documentation',
+          key: 'app.enableApiDocs',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose FastAPI documentation only on protected networks',
+        },
+      ],
+    },
+    {
+      name: 'Sensitive values',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Existing Secret',
+          key: 'secrets.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing the application key and admin password',
+        },
+        {
+          label: 'SSO',
+          key: 'medikeep.sso.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable the configured identity provider',
+        },
+        {
+          label: 'SSO Provider',
+          key: 'medikeep.sso.providerType',
+          type: 'select',
+          default: 'oidc',
+          options: ['oidc', 'github', 'google'],
+          description: 'MediKeep identity-provider type',
+        },
+      ],
+    },
+    {
+      name: 'Storage and database',
+      fields: [
+        {
+          label: 'Uploads Volume',
+          key: 'persistence.uploads.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Uploaded medical records and attachments capacity',
+        },
+        {
+          label: 'Backups Volume',
+          key: 'persistence.backups.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Application-generated backup capacity',
+        },
+        {
+          label: 'PostgreSQL Subchart',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the bundled HelmForge PostgreSQL dependency',
+        },
+      ],
+    },
+    {
+      name: 'Ingress and isolation',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose MediKeep through Kubernetes Ingress',
+        },
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'medikeep.example.com',
+          description: 'Public MediKeep hostname',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict inbound traffic to the application pod',
+        },
+      ],
+    },
+  ],
   ente: [
     {
       name: 'Museum',
@@ -9916,7 +10133,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.68.1',
+          default: '6.68.3',
           description: 'Pinned Poznote image tag',
         },
         {
@@ -10164,7 +10381,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.31.3',
+          default: '0.31.4',
           description: 'Pinned NoteDiscovery image tag',
         },
         {
