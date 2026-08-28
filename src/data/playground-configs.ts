@@ -155,6 +155,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Secret containing the application key and admin password',
         },
         {
+          label: 'Initial Admin Password',
+          key: 'secrets.adminDefaultPassword',
+          type: 'text',
+          default: '',
+          description: 'Required when exposing MediKeep without an existing Secret',
+        },
+        {
           label: 'SSO',
           key: 'medikeep.sso.enabled',
           type: 'toggle',
