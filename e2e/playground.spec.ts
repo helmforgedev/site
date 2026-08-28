@@ -42,6 +42,33 @@ test.describe('Playground', () => {
     await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
   });
 
+  test('mongodb arbiter output stays within supported topology combinations', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="mongodb"]').click();
+
+    const architecture = page.locator('select[data-field-key="architecture"]');
+    const members = page.locator('input[data-field-key="replicaSet.members"]');
+    const arbiter = page.locator('button[data-field-key="arbiter.enabled"]');
+    const code = page.locator('#playground-code');
+
+    await arbiter.click();
+    await expect(architecture).toHaveValue('replicaset');
+    await expect(members).toHaveValue('2');
+    await expect(code).toContainText('architecture=replicaset');
+    await expect(code).toContainText('replicaSet.members=2');
+    await expect(code).toContainText('arbiter.enabled=true');
+
+    await members.fill('3');
+    await expect(code).not.toContainText('arbiter.enabled');
+
+    await arbiter.click();
+    await architecture.selectOption('standalone');
+    await expect(code).not.toContainText('arbiter.enabled');
+
+    await page.goto('/playground?chart=mongodb&architecture=replicaset&replicaSet.members=3&arbiter.enabled=true');
+    await expect(page.locator('#playground-code')).not.toContainText('arbiter.enabled');
+  });
+
   test('ntfy defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="ntfy"]').click();

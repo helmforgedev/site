@@ -4932,7 +4932,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Arbiter',
           key: 'arbiter.enabled',
           type: 'toggle',
-          default: false,
+          default: 'false',
           description: 'Add one voting arbiter; requires 2, 4, or 6 data-bearing members',
         },
         {
