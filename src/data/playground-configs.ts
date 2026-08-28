@@ -4929,6 +4929,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Data-bearing members in replica set mode',
         },
         {
+          label: 'Arbiter',
+          key: 'arbiter.enabled',
+          type: 'toggle',
+          default: false,
+          description: 'Add one voting arbiter; requires 2, 4, or 6 data-bearing members',
+        },
+        {
           label: 'Storage Size',
           key: 'persistence.size',
           type: 'text',

@@ -168,7 +168,10 @@ persistence:
 
 <Callout type="info" title="When to use an arbiter">
   An arbiter participates in elections but holds no data. Use it when you have an even number of data-bearing members to
-  ensure a majority for elections. With 3 data members, an arbiter is not needed.
+  ensure a majority for elections. MongoDB recommends three data-bearing members when capacity permits because an
+  arbiter does not add data redundancy and can affect majority write availability. The chart supports one arbiter with
+  2, 4, or 6 data-bearing members. See the [official arbiter
+  considerations](https://www.mongodb.com/docs/manual/core/replica-set-arbiter/).
 </Callout>
 
 </div>
@@ -241,12 +244,13 @@ config:
 
 ### Architecture
 
-| Parameter            | Type    | Default      | Description                                              |
-| -------------------- | ------- | ------------ | -------------------------------------------------------- |
-| `architecture`       | string  | `standalone` | `standalone`, `replicaset`, or `sharded`.                |
-| `replicaSet.name`    | string  | `rs0`        | Replica set name.                                        |
-| `replicaSet.members` | integer | `3`          | Number of data-bearing replica set members.              |
-| `arbiter.enabled`    | boolean | `false`      | Add an arbiter pod (votes in elections, stores no data). |
+| Parameter            | Type    | Default      | Description                                                      |
+| -------------------- | ------- | ------------ | ---------------------------------------------------------------- |
+| `architecture`       | string  | `standalone` | `standalone`, `replicaset`, or `sharded`.                        |
+| `replicaSet.name`    | string  | `rs0`        | Replica set name.                                                |
+| `replicaSet.members` | integer | `3`          | Number of data-bearing replica set members.                      |
+| `arbiter.enabled`    | boolean | `false`      | Add one non-data-bearing voting member in replica set mode.      |
+| `arbiter.resources`  | object  | `{}`         | CPU and memory requests/limits for the arbiter mongod container. |
 
 ### Sharded Cluster
 
@@ -340,8 +344,14 @@ MongoDB administrative commands instead of changing chart values.
   2. Deploy the chart in `replicaset` mode.
   3. Restore data with `mongorestore`.
 
-Changing `replicaSet.members` on an existing replica set triggers a reconfiguration.
-Scaling down removes members — ensure no data is exclusively on the removed members.
+Enabling or disabling `arbiter.enabled` reconciles the arbiter through the post-upgrade hook. Increasing
+`replicaSet.members` adds missing members. Reducing it does not remove data-bearing members from MongoDB; follow MongoDB's
+member-removal procedure before scaling down the StatefulSet.
+
+When arbiter reconciliation would change MongoDB's implicit default write concern, the hook preserves the currently
+effective value (`w: 1` or `majority`) by promoting it to a global default. Existing operator-managed global defaults are
+left unchanged. MongoDB 5.0 and newer do not allow a global default write concern to be unset after it is established. See
+the official [`setDefaultRWConcern` documentation](https://www.mongodb.com/docs/manual/reference/command/setDefaultRWConcern/).
 
 </Callout>
 
