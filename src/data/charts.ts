@@ -60,7 +60,7 @@ export const charts: Chart[] = [
     slug: 'clickhouse',
     description:
       'Standalone ClickHouse OLAP database with official images, persistent storage, metrics, ESO, and safety guards.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -118,7 +118,7 @@ export const charts: Chart[] = [
     name: 'Matomo',
     slug: 'matomo',
     description: 'Privacy-first analytics with official Matomo image, MySQL, archiver CronJob, Gateway API, and ESO.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -126,7 +126,7 @@ export const charts: Chart[] = [
     slug: 'netbox',
     description:
       'Infrastructure source of truth for DCIM and IPAM with separate web, RQ worker, housekeeping, PostgreSQL, Redis, Gateway API, and ESO.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -141,7 +141,7 @@ export const charts: Chart[] = [
     slug: 'pimcore',
     description:
       'PIM, MDM, DAM, and DXP platform with PHP-FPM, Messenger workers, MariaDB, RabbitMQ, Mercure, and ESO.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -516,7 +516,7 @@ export const charts: Chart[] = [
     name: 'NoteDiscovery',
     slug: 'notediscovery',
     description: 'Self-hosted Markdown knowledge base with graph view, search, sharing, and MCP integration.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -524,7 +524,7 @@ export const charts: Chart[] = [
     slug: 'medikeep',
     description:
       'Self-hosted personal medical records manager with PostgreSQL, uploads, backups, and privacy controls.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {
@@ -532,7 +532,7 @@ export const charts: Chart[] = [
     slug: 'poznote',
     description:
       'Self-hosted note-taking and documentation platform with SQLite persistence, OIDC authentication, and Markdown support.',
-    maturity: 'beta',
+    maturity: 'stable',
     backup: false,
   },
   {

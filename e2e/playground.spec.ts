@@ -38,7 +38,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="notediscovery"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.3');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.4');
     await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
   });
 
@@ -58,7 +58,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.68.1');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.68.3');
     await expect(page.locator('input[data-field-key="persistence.data.size"]')).toHaveValue('5Gi');
     await expect(page.locator('#playground-code')).not.toContainText('poznote.sharing.hideRestrictUsers');
     await page.locator('button[data-field-key="poznote.sharing.hideRestrictUsers"]').click();
