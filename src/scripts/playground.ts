@@ -81,6 +81,7 @@ const coupledRuleKeysBySlug: Record<string, string[][]> = {
 };
 
 const giteaPostgresqlPassword = 'change-me-gitea-postgresql';
+const mongodbArbiterMemberCounts = new Set(['2', '4', '6']);
 
 function getGroups(slug: string): GroupConfig[] {
   return configs[slug] ?? configs['_default'] ?? [];
@@ -232,7 +233,7 @@ function autoEnableField(key: string) {
 function setControlValue(key: string, value: string) {
   currentValues[key] = value;
   const control = controlsEl?.querySelector<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
-    `[data-field-key="${key}"]`,
+    `input[data-field-key="${key}"], select[data-field-key="${key}"], button[data-field-key="${key}"]`,
   );
 
   if (!control) return;
@@ -259,6 +260,22 @@ function clearGiteaExternalDatabaseDetectionFields() {
 }
 
 function applyFieldSideEffects(key: string, value: string) {
+  if (selectedSlug === 'mongodb') {
+    if (key === 'arbiter.enabled' && value === 'true') {
+      setControlValue('architecture', 'replicaset');
+      if (!mongodbArbiterMemberCounts.has(currentValues['replicaSet.members'])) {
+        setControlValue('replicaSet.members', '2');
+      }
+    } else if (
+      currentValues['arbiter.enabled'] === 'true' &&
+      ((key === 'architecture' && value !== 'replicaset') ||
+        (key === 'replicaSet.members' && !mongodbArbiterMemberCounts.has(value)))
+    ) {
+      updateToggleField('arbiter.enabled', false);
+    }
+    return;
+  }
+
   if (selectedSlug !== 'gitea') return;
 
   if (key === 'database.mode' && value === 'postgresql') {
@@ -607,6 +624,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.addEventListener('input', () => {
       setFieldValue(field.key, input.value);
       if (field.enables) autoEnableField(field.enables);
+      applyFieldSideEffects(field.key, input.value);
       updateOutput();
     });
     controlDiv.appendChild(input);
@@ -997,6 +1015,14 @@ function setTreeValue(tree: Record<string, any>, key: string, value: boolean | n
 
 function updateOutput() {
   if (!codeEl || !selectedSlug) return;
+  if (
+    selectedSlug === 'mongodb' &&
+    currentValues['arbiter.enabled'] === 'true' &&
+    (currentValues['architecture'] !== 'replicaset' ||
+      !mongodbArbiterMemberCounts.has(currentValues['replicaSet.members']))
+  ) {
+    updateToggleField('arbiter.enabled', false);
+  }
   if (copyBtn) copyBtn.disabled = false;
   if (shareBtn) shareBtn.disabled = false;
 
