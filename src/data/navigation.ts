@@ -112,7 +112,10 @@ export const chartCategories: ChartCategory[] = [
   },
   {
     label: 'Home Automation',
-    charts: [{ label: 'openHAB', href: '/docs/charts/openhab', maturity: 'stable' }],
+    charts: [
+      { label: 'openHAB', href: '/docs/charts/openhab', maturity: 'stable' },
+      { label: 'Matterbridge', href: '/docs/charts/matterbridge', maturity: 'stable' },
+    ],
   },
   {
     label: 'Monitoring & Ops',

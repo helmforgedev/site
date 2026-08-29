@@ -585,6 +585,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Matterbridge',
+    slug: 'matterbridge',
+    description: 'Matter plugin manager with durable fabric identity, hardened runtime, and LAN-aware networking.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Hoppscotch',
     slug: 'hoppscotch',
     description: 'Open-source API development platform with REST, GraphQL, and WebSocket support.',
