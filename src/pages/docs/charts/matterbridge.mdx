@@ -1,0 +1,757 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Matterbridge Chart
+description: Production-ready Matterbridge Helm chart with persistent Matter fabric identity, hardened non-root runtime, practical host-network LAN mode, Gateway API, Ingress, dual-stack Services, and External Secrets.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
+# Matterbridge
+
+Deploy [Matterbridge](https://matterbridge.io) on Kubernetes with its official
+container image. Matterbridge is a plugin manager that exposes existing smart
+home platforms and devices to Apple Home, Google Home, Alexa, SmartThings and
+other Matter controllers.
+
+The HelmForge chart preserves plugins, certificates and Matter fabric identity
+on one retained volume. It also makes the most important Kubernetes trade-off
+explicit: the portable default uses pod networking, while reliable discovery
+on a physical home or building LAN usually requires host networking.
+
+<Callout type="warning" title="The UI working does not prove Matter discovery works">
+  Matter commissioning needs mDNS multicast, routable IPv6 and direct TCP/UDP ports. Most Kubernetes CNIs do not carry
+  those protocols between a pod and the physical LAN. Use the production LAN configuration below unless your CNI
+  explicitly supports this topology.
+</Callout>
+
+## Highlights
+
+- Official `docker.io/luligu/matterbridge:3.10.7` image, pinned and multi-arch
+- Stable HelmForge chart version `1.0.0`
+- Single StatefulSet that protects the one Matter identity
+- One PVC for plugins, fabrics, certificates and configuration
+- Non-root UID/GID 1000 with a read-only root filesystem
+- All Linux capabilities dropped and RuntimeDefault seccomp
+- No Kubernetes API token mounted into the pod
+- Official `/health` startup, readiness and liveness probes
+- Portable Pod Security baseline-compatible default
+- Opt-in host networking for real LAN mDNS and IPv6
+- Optional Matter TCP/UDP range Service for capable CNIs
+- Ingress and Gateway API support for the frontend
+- External Secrets Operator resources for plugin or TLS Secrets
+- Dual-stack Services and optional NetworkPolicy
+- Explicit singleton, storage and port validation
+
+## Installation
+
+<DocsTabs
+  tabs={[
+    { id: 'https', label: 'HTTPS Repository' },
+    { id: 'oci', label: 'OCI Registry' },
+  ]}
+>
+
+<div data-tab-panel="https">
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install matterbridge helmforge/matterbridge
+```
+
+</div>
+
+<div data-tab-panel="oci">
+
+```bash
+helm install matterbridge oci://ghcr.io/helmforgedev/helm/matterbridge
+```
+
+</div>
+
+</DocsTabs>
+
+The default Service is private. Access the setup UI without exposing it:
+
+```bash
+kubectl port-forward svc/matterbridge 8283:8283
+```
+
+Open `http://localhost:8283` and install the plugins for your source platform.
+
+## Choose the network topology
+
+### Portable default
+
+The default values use the pod network:
+
+```yaml
+network:
+  hostNetwork: false
+```
+
+This installs in namespaces enforcing Kubernetes Pod Security baseline. It is a
+good evaluation mode and works fully in CNIs that transport multicast and IPv6
+between the LAN and pod network.
+
+The frontend and health endpoint can be healthy even if controllers cannot find
+the Matter bridge. That usually indicates a network topology issue rather than
+an application failure.
+
+### Production LAN mode
+
+Label exactly one trusted node connected to the controller LAN:
+
+```bash
+kubectl label node home-node-1 matterbridge.helmforge.dev/lan-node=true
+```
+
+Create `values.yaml`:
+
+```yaml
+network:
+  hostNetwork: true
+
+nodeSelector:
+  matterbridge.helmforge.dev/lan-node: 'true'
+
+persistence:
+  size: 5Gi
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: '2'
+    memory: 2Gi
+```
+
+Install or upgrade:
+
+```bash
+helm upgrade --install matterbridge helmforge/matterbridge -f values.yaml
+```
+
+The chart automatically uses `ClusterFirstWithHostNet` DNS. Matterbridge sees
+the node LAN interfaces directly, including link-local IPv6 and mDNS.
+
+<Callout type="warning" title="Host networking is a deliberate security exception">
+  Kubernetes Pod Security baseline forbids host namespaces. Run the pod only on a trusted node, restrict who can change
+  the release, and keep the frontend private or behind an authenticated proxy.
+</Callout>
+
+### Multicast-aware CNI mode
+
+Advanced clusters may keep pod networking and publish the Matter port range:
+
+```yaml
+network:
+  hostNetwork: false
+
+matterService:
+  enabled: true
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - IPv6
+    - IPv4
+```
+
+The Service creates TCP and UDP ports beginning at 5540. It does not relay UDP
+5353 multicast. Confirm mDNS, IPv6 routing, source addresses and firewall rules
+independently before selecting this topology.
+
+## Ports
+
+| Surface      | Protocol      |   Default | Purpose                                   |
+| ------------ | ------------- | --------: | ----------------------------------------- |
+| Frontend     | TCP           |      8283 | Setup, plugins, status and administration |
+| Matter base  | TCP and UDP   |      5540 | First Matter bridge/node                  |
+| Matter range | TCP and UDP   | 5540–5559 | Child bridges and additional nodes        |
+| mDNS         | UDP multicast |      5353 | Discovery and commissioning on the LAN    |
+
+Change the reserved range when a node already uses these ports:
+
+```yaml
+matterbridge:
+  matterPort: 5560
+  matterPortRangeSize: 20
+```
+
+The chart rejects overlap with the frontend, invalid range sizes and ranges that
+exceed port 65535.
+
+On a multi-homed node, select the LAN interface:
+
+```yaml
+matterbridge:
+  mdnsInterface: eth1
+```
+
+## Commissioning
+
+1. Wait for `matterbridge-0` to become Ready.
+2. Open the frontend.
+3. Install and configure the plugin for the source platform.
+4. Start the plugin and confirm its devices appear.
+5. Use the QR or manual pairing code generated by Matterbridge.
+6. Pair from a Matter controller on the reachable LAN.
+
+Check startup and commissioning status:
+
+```bash
+kubectl logs matterbridge-0 --tail=150
+```
+
+<Callout type="warning" title="Pairing codes are credentials">
+  Redact QR URLs, manual pairing codes, fabric data and private keys from tickets, screenshots and public log systems.
+</Callout>
+
+## Runtime modes
+
+The default `bridge` mode exposes one Matter bridge containing plugin devices:
+
+```yaml
+matterbridge:
+  mode: bridge
+```
+
+Use `childbridge` when plugins should expose separate Matter bridges:
+
+```yaml
+matterbridge:
+  mode: childbridge
+  profile: upstairs
+```
+
+The optional profile isolates independent Matterbridge installations. Each
+profile still needs its own persistent state, identity and non-conflicting
+network ports.
+
+## Persistence
+
+Persistence is enabled by default:
+
+```yaml
+persistence:
+  enabled: true
+  size: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  retain: true
+```
+
+The one `/data` volume contains all coupled state:
+
+| Path                  | Content                                        |
+| --------------------- | ---------------------------------------------- |
+| `/data/Matterbridge`  | Installed plugins and plugin assets            |
+| `/data/.matterbridge` | Configuration, logs and Matter storage         |
+| `/data/.mattercert`   | Fabric certificates and commissioning identity |
+| `/data/.npm-global`   | Writable private npm prefix                    |
+| `/data/.npm-cache`    | Plugin package cache                           |
+
+Using one PVC gives backups and restores one consistency boundary. The chart
+keeps a created PVC after uninstall unless `persistence.retain=false`.
+
+### Existing PVC
+
+```yaml
+persistence:
+  enabled: true
+  existingClaim: existing-matterbridge-data
+```
+
+The claim must be in the release namespace and writable by UID/GID 1000. The
+chart never creates or deletes an existing claim.
+
+### Consistent backup
+
+Matterbridge has no stable chart-manageable live backup API. Stop the singleton
+for a filesystem copy or non-atomic snapshot:
+
+```bash
+MATTERBRIDGE_NAMESPACE=matterbridge
+MATTERBRIDGE_STATEFULSET=$(kubectl get statefulset \
+  -n "$MATTERBRIDGE_NAMESPACE" \
+  -l app.kubernetes.io/name=matterbridge \
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl scale -n "$MATTERBRIDGE_NAMESPACE" \
+  statefulset/"$MATTERBRIDGE_STATEFULSET" --replicas=0
+kubectl wait -n "$MATTERBRIDGE_NAMESPACE" \
+  --for=delete pod -l app.kubernetes.io/name=matterbridge --timeout=120s
+# Take and verify the PVC snapshot or backup.
+kubectl scale -n "$MATTERBRIDGE_NAMESPACE" \
+  statefulset/"$MATTERBRIDGE_STATEFULSET" --replicas=1
+kubectl rollout status -n "$MATTERBRIDGE_NAMESPACE" \
+  statefulset/"$MATTERBRIDGE_STATEFULSET" --timeout=300s
+```
+
+CSI atomic snapshots may reduce downtime, subject to the storage provider's
+application-consistency guidance. Test restoration in an isolated namespace.
+
+Restore the entire `/data` tree together. A partial restore can break fabric
+identity and require recommissioning every controller and device.
+
+## Why only one replica
+
+Matterbridge does not provide active-active clustering or leader election. Its
+fabric identity, filesystem locks, mDNS advertisements and fixed Matter ports
+belong to one process.
+
+The chart always renders one StatefulSet replica and rejects other values:
+
+```yaml
+replicaCount: 1
+```
+
+There is no HPA. A PodDisruptionBudget is also omitted because it cannot create
+availability from a singleton and can block planned node maintenance.
+
+Recovery relies on a restorable PVC, deterministic scheduling and a tested
+upgrade procedure rather than simultaneous replicas.
+
+## Frontend exposure
+
+Matterbridge does not expose a stable chart-managed authentication contract.
+Keep the default ClusterIP private or enforce authentication and TLS at a
+trusted reverse proxy.
+
+### Ingress
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: matterbridge.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: matterbridge-ingress-tls
+      hosts:
+        - matterbridge.example.com
+```
+
+### Gateway API
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: frontend
+      parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - matterbridge.example.com
+```
+
+Ingress and HTTPRoute expose only the management frontend. Neither carries
+Matter traffic or mDNS multicast.
+
+### Native frontend TLS
+
+To let Matterbridge itself serve HTTPS, provide an existing Secret with
+`cert.pem` and `key.pem`; `ca.pem` is optional:
+
+```yaml
+frontend:
+  tls:
+    enabled: true
+    existingSecret: matterbridge-frontend-tls
+```
+
+The Secret is mounted read-only at `/data/.matterbridge/certs` and probes switch
+to HTTPS. Prefer proxy termination when certificates are already managed by an
+Ingress or Gateway.
+
+## Plugin credentials with External Secrets
+
+The chart renders the canonical `external-secrets.io/v1` contract. It does not
+invent environment names for plugins because each plugin defines its own
+configuration interface.
+
+```yaml
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - name: plugin
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: matterbridge-plugin
+        data:
+          - secretKey: PLUGIN_TOKEN
+            remoteRef:
+              key: matterbridge/plugin
+              property: token
+
+extraEnvFrom:
+  - secretRef:
+      name: matterbridge-plugin
+```
+
+ExternalSecret names, labels, annotations, target templates, `data`, `dataFrom`
+and item-level store references are supported. The chart fails rendering when
+ESO is enabled without a usable store reference.
+
+## NetworkPolicy
+
+NetworkPolicy is opt-in and valid only with pod networking:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+  egress:
+    enabled: true
+    allowDNS: true
+    extraEgress:
+      - to:
+          - ipBlock:
+              cidr: 192.0.2.10/32
+        ports:
+          - protocol: TCP
+            port: 1883
+```
+
+The chart cannot guess the LAN devices, MQTT brokers and cloud endpoints used by
+installed plugins. Define every required destination before enabling restrictive
+egress. Combining NetworkPolicy with host networking is rejected because CNI
+enforcement is inconsistent.
+
+## Security posture
+
+Default controls include:
+
+- `runAsNonRoot: true` with UID and GID 1000
+- `allowPrivilegeEscalation: false`
+- `readOnlyRootFilesystem: true`
+- all capabilities dropped
+- `RuntimeDefault` seccomp
+- no mounted service-account token
+- explicit CPU and memory requests and limits
+- writable state limited to `/data` and `/tmp`
+
+The official image's normal entrypoint expects root-oriented paths. HelmForge
+starts the included `matterbridge` binary directly and uses `--homedir /data`,
+so the official image runs without root or a writable image filesystem.
+
+The local MITRE, NSA and SOC2 Kubescape score for the default manifest is
+`93.93939%`. The remaining medium controls concern optional NetworkPolicy.
+
+## Resources
+
+Defaults suit a small plugin/device fleet:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 1Gi
+```
+
+Increase memory for many plugins or devices. Watch actual usage before lowering
+limits, especially during plugin installation and first startup.
+
+## Health and lifecycle
+
+All probes use the official `/health` endpoint. Startup permits up to five
+minutes for first boot, plugin restoration and Matter storage initialization.
+Liveness uses the conservative upstream interval.
+
+The termination grace period is 60 seconds, matching the upstream container
+guidance and allowing Matter sessions, storage and mDNS advertisements to close.
+
+Useful commands:
+
+```bash
+kubectl get statefulset,pod,pvc,service
+kubectl get events --sort-by=.lastTimestamp
+kubectl logs matterbridge-0 --follow
+kubectl rollout restart statefulset/matterbridge
+```
+
+Matterbridge has no native Prometheus endpoint. Use Kubernetes resource,
+readiness and restart metrics rather than scraping the frontend as Prometheus.
+
+## Configuration reference
+
+### Naming and image
+
+| Value              | Default                         | Description                                    |
+| ------------------ | ------------------------------- | ---------------------------------------------- |
+| `nameOverride`     | `""`                            | Override the chart name used in resources      |
+| `fullnameOverride` | `""`                            | Override the complete release resource name    |
+| `commonLabels`     | `{}`                            | Labels added to every rendered resource        |
+| `replicaCount`     | `1`                             | Singleton count; every other value is rejected |
+| `image.repository` | `docker.io/luligu/matterbridge` | Official image repository                      |
+| `image.tag`        | `3.10.7`                        | Pinned stable application version              |
+| `image.pullPolicy` | `IfNotPresent`                  | Kubernetes pull policy                         |
+| `imagePullSecrets` | `[]`                            | Registry pull Secrets                          |
+
+### Matterbridge runtime
+
+| Value                                | Default  | Description                                    |
+| ------------------------------------ | -------- | ---------------------------------------------- |
+| `matterbridge.mode`                  | `bridge` | `bridge` or `childbridge` runtime mode         |
+| `matterbridge.profile`               | `""`     | Optional isolated instance profile             |
+| `matterbridge.matterPort`            | `5540`   | Matter TCP/UDP base port                       |
+| `matterbridge.matterPortRangeSize`   | `20`     | Consecutive Matter ports reserved              |
+| `matterbridge.mdnsInterface`         | `""`     | Optional interface used for mDNS               |
+| `matterbridge.ipv4Address`           | `""`     | Optional explicit IPv4 listener                |
+| `matterbridge.ipv6Address`           | `""`     | Optional explicit IPv6 listener                |
+| `matterbridge.logger`                | `info`   | Application log level                          |
+| `matterbridge.matterLogger`          | `info`   | Matter protocol log level                      |
+| `matterbridge.noAnsi`                | `true`   | Remove ANSI sequences from Kubernetes logs     |
+| `matterbridge.fileLogger`            | `false`  | Persist application logs under `/data`         |
+| `matterbridge.matterFileLogger`      | `false`  | Persist Matter protocol logs under `/data`     |
+| `matterbridge.disableVirtualDevices` | `false`  | Disable restart/update/reboot virtual devices  |
+| `matterbridge.resetSessions`         | `false`  | Reset Matter sessions during graceful shutdown |
+| `matterbridge.extraArgs`             | `[]`     | Additional upstream CLI arguments              |
+
+### Frontend and network
+
+| Value                         | Default | Description                                         |
+| ----------------------------- | ------- | --------------------------------------------------- |
+| `frontend.port`               | `8283`  | Frontend HTTP/HTTPS port                            |
+| `frontend.bindAddress`        | `""`    | Optional explicit frontend bind address             |
+| `frontend.tls.enabled`        | `false` | Enable native Matterbridge HTTPS                    |
+| `frontend.tls.existingSecret` | `""`    | Secret containing `cert.pem` and `key.pem`          |
+| `network.hostNetwork`         | `false` | Use node network interfaces for Matter LAN traffic  |
+| `network.dnsPolicy`           | `""`    | Explicit DNS policy or automatic mode-aware default |
+
+### Frontend Service
+
+| Value                    | Default     | Description                 |
+| ------------------------ | ----------- | --------------------------- |
+| `service.type`           | `ClusterIP` | Frontend Service type       |
+| `service.port`           | `8283`      | Frontend Service port       |
+| `service.annotations`    | `{}`        | Service annotations         |
+| `service.ipFamilyPolicy` | omitted     | Kubernetes IP family policy |
+| `service.ipFamilies`     | `[]`        | Ordered Service IP families |
+
+### Matter Service
+
+| Value                                 | Default        | Description                               |
+| ------------------------------------- | -------------- | ----------------------------------------- |
+| `matterService.enabled`               | `false`        | Publish the Matter TCP/UDP port range     |
+| `matterService.type`                  | `LoadBalancer` | Matter Service type                       |
+| `matterService.protocols`             | `[UDP, TCP]`   | Protocols created for every reserved port |
+| `matterService.externalTrafficPolicy` | `Local`        | Preserve source addresses where supported |
+| `matterService.annotations`           | `{}`           | Matter Service annotations                |
+| `matterService.ipFamilyPolicy`        | omitted        | Matter Service IP family policy           |
+| `matterService.ipFamilies`            | `[]`           | Ordered Matter Service IP families        |
+
+### Persistence
+
+| Value                       | Default           | Description                                      |
+| --------------------------- | ----------------- | ------------------------------------------------ |
+| `persistence.enabled`       | `true`            | Persist all coupled Matterbridge state           |
+| `persistence.existingClaim` | `""`              | Reuse a PVC from the release namespace           |
+| `persistence.storageClass`  | `""`              | Storage class; empty selects the cluster default |
+| `persistence.accessModes`   | `[ReadWriteOnce]` | PVC access modes                                 |
+| `persistence.size`          | `2Gi`             | Requested capacity                               |
+| `persistence.retain`        | `true`            | Keep a chart-created claim after uninstall       |
+| `persistence.annotations`   | `{}`              | Storage, snapshot or backup annotations          |
+
+### Service account and pod security
+
+| Value                                         | Default          | Description                                   |
+| --------------------------------------------- | ---------------- | --------------------------------------------- |
+| `serviceAccount.create`                       | `true`           | Create a dedicated ServiceAccount             |
+| `serviceAccount.name`                         | `""`             | ServiceAccount name override                  |
+| `serviceAccount.annotations`                  | `{}`             | ServiceAccount annotations                    |
+| `serviceAccount.automountServiceAccountToken` | `false`          | Mount Kubernetes API credentials              |
+| `podSecurityContext.runAsNonRoot`             | `true`           | Require a non-root runtime user               |
+| `podSecurityContext.runAsUser`                | `1000`           | Runtime UID                                   |
+| `podSecurityContext.runAsGroup`               | `1000`           | Runtime primary GID                           |
+| `podSecurityContext.fsGroup`                  | `1000`           | Persistent volume group                       |
+| `podSecurityContext.fsGroupChangePolicy`      | `OnRootMismatch` | Avoid unnecessary recursive ownership changes |
+| `podSecurityContext.seccompProfile.type`      | `RuntimeDefault` | Pod seccomp profile                           |
+| `securityContext.allowPrivilegeEscalation`    | `false`          | Prevent privilege escalation                  |
+| `securityContext.readOnlyRootFilesystem`      | `true`           | Keep the image filesystem immutable           |
+| `securityContext.capabilities.drop`           | `[ALL]`          | Drop Linux capabilities                       |
+
+### Probes
+
+Every probe targets `/health`. The following fields exist independently below
+`startupProbe`, `readinessProbe` and `livenessProbe`:
+
+| Value suffix          | Startup | Readiness | Liveness | Description             |
+| --------------------- | ------: | --------: | -------: | ----------------------- |
+| `enabled`             |  `true` |    `true` |   `true` | Render the probe        |
+| `initialDelaySeconds` |     `5` |       `0` |      `0` | Delay before checks     |
+| `periodSeconds`       |     `5` |      `10` |     `60` | Interval between checks |
+| `timeoutSeconds`      |     `5` |       `5` |     `10` | Timeout per check       |
+| `failureThreshold`    |    `60` |       `3` |      `5` | Failures before action  |
+| `successThreshold`    |     `1` |       `1` |      `1` | Successes required      |
+
+### Ingress and Gateway API
+
+| Value                      | Default | Description                                             |
+| -------------------------- | ------- | ------------------------------------------------------- |
+| `ingress.enabled`          | `false` | Render a frontend Ingress                               |
+| `ingress.ingressClassName` | `""`    | Ingress controller class                                |
+| `ingress.annotations`      | `{}`    | Ingress annotations                                     |
+| `ingress.hosts`            | `[]`    | Host, path and path-type rules                          |
+| `ingress.tls`              | `[]`    | Ingress TLS definitions                                 |
+| `gatewayAPI.enabled`       | `false` | Render frontend HTTPRoutes                              |
+| `gatewayAPI.httpRoutes`    | `[]`    | Named routes with parent refs, hosts, rules and filters |
+
+Each HTTPRoute gets the chart frontend as its backend unless a rule supplies
+`backendRefs` or sets `omitDefaultBackend`. Multiple routes must render unique
+names.
+
+### External Secrets
+
+| Value                             | Default | Description                               |
+| --------------------------------- | ------- | ----------------------------------------- |
+| `externalSecrets.enabled`         | `false` | Render `external-secrets.io/v1` resources |
+| `externalSecrets.refreshInterval` | `1h`    | Default interval injected into items      |
+| `externalSecrets.items`           | `[]`    | Complete ExternalSecret definitions       |
+
+Items accept `name`, `fullnameOverride`, labels, annotations and a complete
+`spec`. A target name is generated when omitted. Each item must identify a
+SecretStore, ClusterSecretStore or generator through the standard ESO fields.
+
+### NetworkPolicy
+
+| Value                              | Default | Description                                           |
+| ---------------------------------- | ------- | ----------------------------------------------------- |
+| `networkPolicy.enabled`            | `false` | Render the policy in pod-network mode                 |
+| `networkPolicy.ingressFrom`        | `[]`    | Peers allowed to reach the frontend and Matter ports  |
+| `networkPolicy.egress.enabled`     | `false` | Begin enforcing egress rules                          |
+| `networkPolicy.egress.allowDNS`    | `true`  | Permit UDP and TCP DNS on port 53                     |
+| `networkPolicy.egress.extraTo`     | `[]`    | Additional destination peers without port restriction |
+| `networkPolicy.egress.extraEgress` | `[]`    | Complete additional egress rules                      |
+
+### Scheduling and extensibility
+
+| Value                           | Default | Description                                |
+| ------------------------------- | ------- | ------------------------------------------ |
+| `resources.requests.cpu`        | `100m`  | CPU request                                |
+| `resources.requests.memory`     | `256Mi` | Memory request                             |
+| `resources.limits.cpu`          | `1`     | CPU limit                                  |
+| `resources.limits.memory`       | `1Gi`   | Memory limit                               |
+| `terminationGracePeriodSeconds` | `60`    | Graceful shutdown budget                   |
+| `revisionHistoryLimit`          | `3`     | StatefulSet revision history               |
+| `podAnnotations`                | `{}`    | Pod annotations                            |
+| `podLabels`                     | `{}`    | Non-selector pod labels                    |
+| `priorityClassName`             | `""`    | Pod priority class                         |
+| `nodeSelector`                  | `{}`    | Node selection, especially for LAN mode    |
+| `affinity`                      | `{}`    | Pod affinity and anti-affinity             |
+| `tolerations`                   | `[]`    | Pod tolerations                            |
+| `topologySpreadConstraints`     | `[]`    | Topology spread rules                      |
+| `extraEnv`                      | `[]`    | Additional container environment variables |
+| `extraEnvFrom`                  | `[]`    | Secret or ConfigMap environment sources    |
+| `extraVolumes`                  | `[]`    | Additional pod volumes                     |
+| `extraVolumeMounts`             | `[]`    | Additional Matterbridge mounts             |
+| `extraInitContainers`           | `[]`    | Additional init containers                 |
+| `extraContainers`               | `[]`    | Additional sidecars                        |
+| `extraManifests`                | `[]`    | Additional templated Kubernetes objects    |
+
+Selector labels cannot be overridden through `podLabels`. Additional containers
+must define their own security contexts and resource policy; the chart does not
+silently mutate user-provided container specifications.
+
+## Upgrades
+
+Before upgrading:
+
+1. Read the Matterbridge release notes.
+2. Verify a restorable backup of the whole PVC.
+3. Check compatibility for every installed plugin.
+4. Keep the pod on the same trusted LAN topology.
+
+Upgrade:
+
+```bash
+helm repo update
+helm upgrade matterbridge helmforge/matterbridge -f values.yaml
+kubectl rollout status statefulset/matterbridge
+```
+
+Afterward, inspect logs, open the frontend and test a representative bridged
+device. For an incompatible migration, keep the StatefulSet stopped, roll back
+the Helm release, restore the complete `/data` contents from the verified
+pre-upgrade PVC snapshot or backup, and only then start the rolled-back release.
+
+## Troubleshooting
+
+### Controller cannot discover the bridge
+
+1. Confirm the controller and Kubernetes node share routable IPv6/LAN access.
+2. Enable `network.hostNetwork=true`.
+3. Pin the pod to the correct LAN-connected node.
+4. Check firewalls for UDP 5353 and the Matter TCP/UDP range.
+5. Set `matterbridge.mdnsInterface` on multi-homed nodes.
+6. Look for mDNS advertisement lines in the pod logs.
+
+### Frontend is reachable but no devices appear
+
+Confirm that the plugin is installed, started and connected to its source
+platform. Check plugin-specific credentials and network destinations. This is
+independent from Matter controller discovery.
+
+### Pod cannot write state
+
+The PVC must be writable by UID/GID 1000. Inspect volume ownership and storage
+driver `fsGroup` behavior. Avoid disabling the non-root security context as a
+first response.
+
+### Pod remains unready during first boot
+
+```bash
+kubectl describe pod matterbridge-0
+kubectl logs matterbridge-0 --tail=200
+kubectl get events --sort-by=.lastTimestamp
+```
+
+Plugin restoration may take time. The startup probe allows 60 failures at
+five-second intervals. Investigate storage, memory and plugin errors before
+increasing that budget.
+
+### Ports collide in host-network mode
+
+Move the Matter base and range away from other host processes:
+
+```yaml
+matterbridge:
+  matterPort: 5560
+  matterPortRangeSize: 20
+```
+
+Only one Matterbridge pod can bind a given frontend and Matter range on a node.
+
+## Uninstall
+
+```bash
+helm uninstall matterbridge
+```
+
+The chart-created PVC is retained by default. Delete it only after verifying a
+backup and accepting that losing Matter identity may require recommissioning.
+
+## Related resources
+
+- [Matterbridge website](https://matterbridge.io)
+- [Matterbridge source and documentation](https://github.com/Luligu/matterbridge)
+- [Official container image](https://hub.docker.com/r/luligu/matterbridge)
+- [HelmForge chart source](https://github.com/helmforgedev/charts/tree/main/charts/matterbridge)
+- [HelmForge values playground](/playground)

@@ -12802,6 +12802,150 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  matterbridge: [
+    {
+      name: 'Runtime',
+      fields: [
+        {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '3.10.7',
+          description: 'Pinned official Matterbridge image tag',
+        },
+        {
+          label: 'Runtime Mode',
+          key: 'matterbridge.mode',
+          type: 'select',
+          default: 'bridge',
+          options: ['bridge', 'childbridge'],
+          description: 'One aggregate bridge or separate child bridges',
+        },
+        {
+          label: 'Log Level',
+          key: 'matterbridge.logger',
+          type: 'select',
+          default: 'info',
+          options: ['error', 'warn', 'notice', 'info', 'debug'],
+          description: 'Matterbridge application log verbosity',
+        },
+      ],
+    },
+    {
+      name: 'Matter LAN',
+      fields: [
+        {
+          label: 'Host Network',
+          key: 'network.hostNetwork',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable for normal LAN mDNS, IPv6, and Matter commissioning',
+        },
+        {
+          label: 'mDNS Interface',
+          key: 'matterbridge.mdnsInterface',
+          type: 'text',
+          default: '',
+          description: 'Optional node LAN interface for multi-homed hosts',
+        },
+        {
+          label: 'Matter Base Port',
+          key: 'matterbridge.matterPort',
+          type: 'number',
+          default: '5540',
+          description: 'First TCP and UDP port reserved for Matter nodes',
+        },
+        {
+          label: 'Matter Port Range',
+          key: 'matterbridge.matterPortRangeSize',
+          type: 'number',
+          default: '20',
+          description: 'Number of consecutive Matter ports to reserve',
+        },
+      ],
+    },
+    {
+      name: 'Storage',
+      fields: [
+        {
+          label: 'Persistence',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Persist plugins, fabric identity, certificates, and configuration',
+        },
+        {
+          label: 'Volume Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '2Gi',
+          description: 'Capacity for Matterbridge state and installed plugins',
+        },
+        {
+          label: 'Storage Class',
+          key: 'persistence.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Empty selects the cluster default storage class',
+        },
+      ],
+    },
+    {
+      name: 'Frontend',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose the administrative frontend through Ingress',
+        },
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'matterbridge.example.com',
+          description: 'Private authenticated frontend hostname',
+        },
+        {
+          label: 'Ingress Class',
+          key: 'ingress.ingressClassName',
+          type: 'select',
+          default: 'nginx',
+          options: ['nginx', 'traefik'],
+          description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '100m',
+          description: 'Guaranteed CPU for Matterbridge and plugins',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '256Mi',
+          description: 'Guaranteed memory for a small plugin fleet',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '1Gi',
+          description: 'Increase for large device and plugin fleets',
+        },
+      ],
+    },
+  ],
   hoppscotch: [
     {
       name: 'General',
