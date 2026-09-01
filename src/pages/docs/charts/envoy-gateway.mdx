@@ -921,7 +921,7 @@ When `security.networkPolicies=true`, the chart creates NetworkPolicies for:
 **Controller Policy**:
 
 - **Ingress**: Allow from proxy pods only
-- **Egress**: Allow to Kubernetes API (443, 6443), DNS (53), and optional complete custom rules from `security.networkPolicy.extraEgress`
+- **Egress**: Allow to Kubernetes API CIDRs on TCP 443/6443, DNS (53), and optional complete custom rules from `security.networkPolicy.extraEgress`
 
 **Proxy Policy**:
 
@@ -947,6 +947,9 @@ collector:
 security:
   networkPolicies: true
   networkPolicy:
+    # Narrow these defaults to the API endpoint CIDRs used by your cluster.
+    apiServerCIDRs:
+      - 10.43.0.1/32
     extraEgress:
       - to:
           - namespaceSelector:
@@ -1275,7 +1278,7 @@ clientTrafficPolicy:
 | -------------------------------------- | ----------------------------- | ------------------------------ |
 | `controller.replicaCount`              | Number of controller replicas | `1`                            |
 | `controller.image.repository`          | Controller image              | `docker.io/envoyproxy/gateway` |
-| `controller.image.tag`                 | Controller image tag          | `v1.9.0`                       |
+| `controller.image.tag`                 | Controller image tag          | `v1.9.1`                       |
 | `controller.image.pullPolicy`          | Image pull policy             | `IfNotPresent`                 |
 | `controller.resources.requests.cpu`    | CPU request                   | `100m`                         |
 | `controller.resources.requests.memory` | Memory request                | `128Mi`                        |
@@ -1295,7 +1298,7 @@ clientTrafficPolicy:
 | `proxy.image.repository`                 | Proxy image                                                     | `docker.io/envoyproxy/envoy`   |
 | `proxy.image.tag`                        | Proxy image tag                                                 | `distroless-v1.39.0`           |
 | `proxy.shutdownManager.image.repository` | Shutdown manager sidecar image                                  | `docker.io/envoyproxy/gateway` |
-| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.9.0`                       |
+| `proxy.shutdownManager.image.tag`        | Shutdown manager sidecar image tag                              | `v1.9.1`                       |
 | `proxy.resources.requests.cpu`           | CPU request                                                     | `100m`                         |
 | `proxy.resources.requests.memory`        | Memory request                                                  | `128Mi`                        |
 | `proxy.resources.limits.cpu`             | CPU limit                                                       | `1000m`                        |
@@ -1344,7 +1347,7 @@ platform-managed installation.
 
 | Parameter           | Description       | Default  |
 | ------------------- | ----------------- | -------- |
-| `certgen.image.tag` | Certgen image tag | `v1.9.0` |
+| `certgen.image.tag` | Certgen image tag | `v1.9.1` |
 
 ### SecurityPolicy
 
@@ -1411,13 +1414,14 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### Security
 
-| Parameter                              | Description                                                      | Default                  |
-| -------------------------------------- | ---------------------------------------------------------------- | ------------------------ |
-| `security.networkPolicies`             | Enable NetworkPolicies                                           | `false`                  |
-| `security.networkPolicy.dns.namespace` | Namespace containing cluster DNS pods allowed by NetworkPolicies | `kube-system`            |
-| `security.networkPolicy.dns.podLabels` | Labels selecting cluster DNS pods allowed by NetworkPolicies     | `{"k8s-app":"kube-dns"}` |
-| `security.networkPolicy.extraEgress`   | Additional complete egress rules for the controller policy       | `[]`                     |
-| `security.podSecurityStandards`        | Enable PodSecurityStandards                                      | `true`                   |
+| Parameter                               | Description                                                                          | Default                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------ |
+| `security.networkPolicies`              | Enable NetworkPolicies                                                               | `false`                  |
+| `security.networkPolicy.apiServerCIDRs` | CIDRs that may contain API endpoints; access is restricted to TCP ports 443 and 6443 | `["0.0.0.0/0","::/0"]`   |
+| `security.networkPolicy.dns.namespace`  | Namespace containing cluster DNS pods allowed by NetworkPolicies                     | `kube-system`            |
+| `security.networkPolicy.dns.podLabels`  | Labels selecting cluster DNS pods allowed by NetworkPolicies                         | `{"k8s-app":"kube-dns"}` |
+| `security.networkPolicy.extraEgress`    | Additional complete egress rules for the controller policy                           | `[]`                     |
+| `security.podSecurityStandards`         | Enable PodSecurityStandards                                                          | `true`                   |
 
 ### High Availability
 
@@ -1466,9 +1470,8 @@ cleanup.
 
 ## Upgrade Notes
 
-`docker.io/envoyproxy/gateway:v1.9.0` is the upstream minor update from
-`v1.8.3`. The upstream image tag is published with the `v` prefix. This chart
-pins the managed Envoy proxy image to
+`docker.io/envoyproxy/gateway:v1.9.1` is the canonical upstream patch image for
+the v1.9 release line. This chart pins the managed Envoy proxy image to
 `docker.io/envoyproxy/envoy:distroless-v1.39.0`, aligned with the upstream v1.9
 compatibility matrix. The rate limit deployment uses the upstream v1.9.0
 default `docker.io/envoyproxy/ratelimit:17b1956c` and honors the
@@ -1482,17 +1485,15 @@ uses its `-redis-client` endpoint, and Redis authentication is injected into the
 managed rate-limit Deployment through `REDIS_AUTH` from either the bundled or
 external Secret.
 
-Envoy Gateway v1.9.0 requires Gateway API v1.6.1 Experimental CRDs and adds stricter CEL
-validation for client IP detection, API key extraction, and policy merge
-targets. Lua extensions are disabled by default, tracing client sampling now
-defaults to zero, and EndpointSlice indexing can increase controller memory use
-on large clusters. Remove `sessionPersistence.idleTimeout` before applying the
-new Gateway API CRDs, because Gateway API v1.6 removed that field. Review the
-[upstream v1.9.0 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.9.0/)
-before upgrading. Apply the standalone Gateway API v1.6.1 and Envoy Gateway
-CRDs server-side before the controller upgrade, correct resources
-rejected by the new validations, and test existing Gateway, route, EnvoyProxy,
-`BackendTrafficPolicy`, `SecurityPolicy`, EnvoyExtensionPolicy, and
+Envoy Gateway v1.9.1 fixes a tenant `SecurityContext` path that could replace
+the hardened default and escape Pod Security Admission expectations. It also
+contains control-plane availability, OIDC URL validation, and TCPRoute fixes.
+Review the
+[upstream v1.9.1 release notes](https://gateway.envoyproxy.io/news/releases/notes/v1.9.1/)
+before upgrading. The supported CRD set remains Gateway API v1.6.1 Experimental
+with the Envoy Gateway v1.9.0 CRD bundle annotations. Apply the standalone CRDs
+server-side before the controller upgrade and test existing Gateway, route,
+EnvoyProxy, `BackendTrafficPolicy`, `SecurityPolicy`, EnvoyExtensionPolicy, and
 EnvoyPatchPolicy resources in staging.
 
 This release also corrects the declared Kubernetes support range to the
@@ -2607,7 +2608,7 @@ First stable release with complete P1 (MVP) and P2 (Production) features.
 | Field                  | Value      |
 | ---------------------- | ---------- |
 | **Chart Version**      | 1.10.0     |
-| **App Version**        | v1.9.0     |
+| **App Version**        | v1.9.1     |
 | **Kubernetes Version** | >= 1.26    |
 | **Helm Version**       | >= 3.8     |
 | **License**            | Apache 2.0 |

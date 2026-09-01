@@ -250,7 +250,7 @@ ingress:
 | Parameter          | Type   | Default                    | Description |
 | ------------------ | ------ | -------------------------- | ----------- |
 | `image.repository` | string | `docker.io/ckan/ckan-base` | CKAN image. |
-| `image.tag`        | string | `"2.11.5"`                 | Image tag.  |
+| `image.tag`        | string | `"2.12.0"`                 | Image tag.  |
 
 ### CKAN Application
 
@@ -292,16 +292,18 @@ ingress:
 
 ### Database
 
-| Parameter                                 | Type    | Default        | Description                              |
-| ----------------------------------------- | ------- | -------------- | ---------------------------------------- |
-| `database.mode`                           | string  | `subchart`     | Mode: `subchart` or `external`.          |
-| `database.external.host`                  | string  | `""`           | External PostgreSQL hostname.            |
-| `database.external.ckanDatabase`          | string  | `ckan`         | CKAN main database name.                 |
-| `database.external.datastoreDatabase`     | string  | `datastore`    | DataStore extension database name.       |
-| `database.external.datastoreReadUsername` | string  | `datastore_ro` | Read-only user for the DataStore API.    |
-| `database.external.existingSecret`        | string  | `""`           | Existing secret with database passwords. |
-| `postgresql.enabled`                      | boolean | `true`         | Deploy the bundled PostgreSQL subchart.  |
-| `postgresql.auth.password`                | string  | `""`           | Password. Auto-generated if empty.       |
+| Parameter                                       | Type    | Default        | Description                                                                        |
+| ----------------------------------------------- | ------- | -------------- | ---------------------------------------------------------------------------------- |
+| `database.mode`                                 | string  | `subchart`     | Mode: `subchart` or `external`.                                                    |
+| `database.external.host`                        | string  | `""`           | External PostgreSQL hostname.                                                      |
+| `database.external.ckanDatabase`                | string  | `ckan`         | CKAN main database name.                                                           |
+| `database.external.datastoreDatabase`           | string  | `datastore`    | DataStore extension database name.                                                 |
+| `database.external.datastoreReadUsername`       | string  | `datastore_ro` | Read-only user for the DataStore API.                                              |
+| `database.external.existingSecret`              | string  | `""`           | Existing secret with database passwords.                                           |
+| `postgresql.enabled`                            | boolean | `true`         | Deploy the bundled PostgreSQL subchart.                                            |
+| `postgresql.startupProbe.initialDelaySeconds`   | integer | `30`           | Delay startup checks until PostgreSQL completes its temporary init server cycle.   |
+| `postgresql.readinessProbe.initialDelaySeconds` | integer | `30`           | Delay readiness checks until PostgreSQL completes its temporary init server cycle. |
+| `postgresql.auth.password`                      | string  | `""`           | Password. Auto-generated if empty.                                                 |
 
 ### Redis
 
@@ -338,6 +340,14 @@ ingress:
 | `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
 | `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
 | `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
+
+## Upgrade Notes
+
+CKAN 2.12.0 is a minor application upgrade. Back up the CKAN database and
+persistent storage, review the
+[upstream 2.12.0 release](https://github.com/ckan/ckan/releases/tag/ckan-2.12.0),
+and test extensions against CKAN 2.12 before production rollout. Keep Solr,
+PostgreSQL, and Redis available while CKAN performs its upgrade steps.
 
 ## More Information
 

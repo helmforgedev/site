@@ -51,10 +51,12 @@ helm install ntfy oci://ghcr.io/helmforgedev/helm/ntfy
 
 ### Upgrade guidance
 
-The current chart defaults to ntfy 2.27.0, with hardened message templates, verified-email login, and stable PostgreSQL
-support. Existing values and the opt-in abuse ban-feed remain compatible. The
+The current chart defaults to ntfy 2.28.0. This release limits titles to 1 KiB,
+combined tags to 512 bytes, and cache replay to 10 MiB. Cache replay counts
+toward daily visitor bandwidth and may return HTTP 429; clients should handle
+`X-Messages-Truncated` on capped replay responses. Existing values remain compatible. The
 `--reset-then-reuse-values` flag retains an explicit `image.tag` from the current release; remove or update that override
-if you want to adopt the chart's `v2.27.0` default:
+if you want to adopt the chart's `v2.28.0` default:
 
 ```bash
 helm upgrade ntfy helmforge/ntfy \
@@ -304,7 +306,7 @@ gateway:
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/binwiederhier/ntfy` | ntfy container image.                |
-| `image.tag`        | string | `"v2.27.0"`                    | Image tag.                           |
+| `image.tag`        | string | `"v2.28.0"`                    | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
