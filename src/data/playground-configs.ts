@@ -560,7 +560,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.4.31',
+          default: 'v0.4.32',
           description: 'Pinned Certimate image tag',
         },
         {
@@ -2699,7 +2699,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Controller Tag',
           key: 'controller.image.tag',
           type: 'text',
-          default: 'v1.9.0',
+          default: 'v1.9.1',
           description: 'Envoy Gateway controller image tag',
         },
       ],
@@ -2761,7 +2761,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Shutdown Tag',
           key: 'proxy.shutdownManager.image.tag',
           type: 'text',
-          default: 'v1.9.0',
+          default: 'v1.9.1',
           description: 'Shutdown manager sidecar image tag',
         },
       ],
@@ -5291,7 +5291,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '26.7.2',
+          default: '26.7.3',
           description: 'Pinned Keycloak image tag',
         },
         {
@@ -5539,7 +5539,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v2.27.0',
+          default: 'v2.28.0',
           description: 'Pinned ntfy image tag',
         },
         {
@@ -6454,7 +6454,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.11.4',
+          default: '1.11.5',
           description: 'Pinned Langflow image tag',
         },
         {
@@ -10147,7 +10147,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.68.3',
+          default: '6.68.7',
           description: 'Pinned Poznote image tag',
         },
         {
@@ -12075,7 +12075,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.63.14',
+          default: 'v0.63.15',
           description: 'Pinned Metabase image tag',
         },
         {

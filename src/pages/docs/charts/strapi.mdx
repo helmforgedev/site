@@ -56,11 +56,11 @@ helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 
 The chart uses **HelmForge's production-ready Strapi base image** instead of the generic Strapi image. This provides significant advantages for Kubernetes deployments:
 
-**Image:** `docker.io/helmforge/strapi-base:5.52.0`
+**Image:** `docker.io/helmforge/strapi-base:5.52.2`
 
 ### Key Features
 
-- **Strapi 5.52.0** — Stable HelmForge base image with security patches
+- **Strapi 5.52.2** — Stable HelmForge base image with security patches
 - **All official plugins included** — Upload providers, email, database plugins pre-installed
 - **Database support** — PostgreSQL for production-ready defaults and SQLite for development use
 - **Health check endpoint** — HTTP `/_health` endpoint returns HTTP 200 with JSON body containing status, uptime, database connectivity, and version
@@ -76,7 +76,7 @@ The chart uses **HelmForge's production-ready Strapi base image** instead of the
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
 ```
 
 This provides a working Strapi instance with default configuration, perfect for:
@@ -92,7 +92,7 @@ For production deployments with custom content types and configurations:
 
 ```dockerfile
 # Dockerfile
-FROM docker.io/helmforge/strapi-base:5.52.0
+FROM docker.io/helmforge/strapi-base:5.52.2
 
 # Copy your Strapi project
 COPY --chown=strapi:strapi . /opt/app
@@ -118,8 +118,8 @@ image:
 | ------------------ | --------------------------- |
 | **Registry**       | docker.io                   |
 | **Repository**     | helmforge/strapi-base       |
-| **Current Tag**    | 5.52.0                      |
-| **Strapi Version** | 5.52.0                      |
+| **Current Tag**    | 5.52.2                      |
+| **Strapi Version** | 5.52.2                      |
 | **Base Image**     | node:22-alpine              |
 | **User**           | strapi (UID 1000, GID 1000) |
 | **Working Dir**    | /opt/app                    |
@@ -178,7 +178,7 @@ Default deployment for development or testing:
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
 
 postgresql:
   enabled: true
@@ -208,7 +208,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
 
 # S3 uploads enable multi-replica scaling
 strapi:
@@ -739,7 +739,7 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 | -------------------------- | ----------------------- | ----------------------------------------------------- |
 | `replicaCount`             | `1`                     | Number of replicas (requires S3/Cloudinary if > 1)    |
 | `image.repository`         | `helmforge/strapi-base` | Strapi application image (HelmForge production-ready) |
-| `image.tag`                | `5.52.0`                | HelmForge Strapi base image tag                       |
+| `image.tag`                | `5.52.2`                | HelmForge Strapi base image tag                       |
 | `strapi.url`               | `""`                    | Public URL (auto-detected from ingress)               |
 | `strapi.nodeEnv`           | `production`            | Node environment                                      |
 | `strapi.telemetryDisabled` | `true`                  | Disable Strapi telemetry                              |
@@ -813,7 +813,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
   pullPolicy: IfNotPresent
 
 database:
@@ -851,7 +851,7 @@ replicaCount: 2
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
 
 database:
   mode: external
@@ -896,7 +896,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.0'
+  tag: '5.52.2'
 
 postgresql:
   enabled: true
@@ -1040,11 +1040,12 @@ affinity:
 
 ## Upgrade Notes
 
-Strapi `5.52.0` adds MCP action audit logging, Corsican locale codes, and Koa
-proxy configuration. It fixes nested populate, relation editing, data-transfer
-restore, and upload behavior, and updates `ws` to `8.21.2`, which includes the
-fix for CVE-2026-48779. Back up the database and uploads PVC before upgrading
-production workloads.
+Strapi `5.52.2` includes maintenance and security fixes plus an opt-in beta
+media library. Existing deployments keep their current SVG upload behavior;
+new upstream projects block SVG uploads by default. The HelmForge base image
+preserves the existing runtime and database contract. Back up the database
+before upgrading production workloads. If `strapi.upload.provider` is `local`,
+also back up the uploads PVC.
 
 ## Migration Guide
 

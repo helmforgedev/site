@@ -22,7 +22,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="certimate"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v0.4.31');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v0.4.32');
     await expect(page.locator('input[data-field-key="persistence.size"]')).toHaveValue('10Gi');
   });
 
@@ -73,7 +73,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="ntfy"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v2.27.0');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('v2.28.0');
     await page.locator('[data-section-toggle="Abuse Ban-Feed"]').click();
     await expect(page.locator('input[data-field-key="ntfy.banFeed.file"]')).toHaveValue('/var/cache/ntfy/ban.log');
     await expect(page.locator('input[data-field-key="ntfy.banFeed.threshold"]')).toHaveValue('100');
@@ -85,7 +85,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.68.3');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.68.7');
     await expect(page.locator('input[data-field-key="persistence.data.size"]')).toHaveValue('5Gi');
     await expect(page.locator('#playground-code')).not.toContainText('poznote.sharing.hideRestrictUsers');
     await page.locator('button[data-field-key="poznote.sharing.hideRestrictUsers"]').click();
