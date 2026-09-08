@@ -2813,6 +2813,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Enable metrics and access log configuration',
         },
         {
+          label: 'ServiceMonitor',
+          key: 'monitoring.prometheus.serviceMonitor',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create the controller ServiceMonitor when monitoring is enabled',
+        },
+        {
+          label: 'ServiceMonitor Release Label',
+          key: 'monitoring.prometheus.serviceMonitorLabels.release',
+          type: 'text',
+          default: '',
+          description: 'Match the release label required by your Prometheus selector, for example monitoring',
+        },
+        {
           label: 'Access Logs',
           key: 'monitoring.accessLogs.format',
           type: 'select',
