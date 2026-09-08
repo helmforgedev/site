@@ -784,6 +784,25 @@ helm install envoy-gateway helmforge/envoy-gateway \
 
 #### Prometheus Integration
 
+To let Prometheus discover the controller ServiceMonitor through a label selector,
+set `monitoring.prometheus.serviceMonitorLabels` to match your Prometheus
+`spec.serviceMonitorSelector.matchLabels`:
+
+```yaml
+monitoring:
+  enabled: true
+  prometheus:
+    serviceMonitor: true
+    serviceMonitorLabels:
+      release: monitoring
+```
+
+The map defaults to `{}` and accepts string values. Built-in chart labels take
+precedence when keys overlap. These labels apply only to ServiceMonitor metadata;
+the selector used to find controller Services remains unchanged. Prometheus
+`spec.serviceMonitorNamespaceSelector` must also allow the release namespace
+(or the chart's `namespaceOverride`).
+
 **ServiceMonitors** scrape metrics from:
 
 - **Controller** (port 8081):
@@ -1403,14 +1422,15 @@ All `redis.*` values are forwarded to the redis chart — refer to its documenta
 
 ### Monitoring
 
-| Parameter                              | Description                   | Default |
-| -------------------------------------- | ----------------------------- | ------- |
-| `monitoring.enabled`                   | Enable monitoring             | `false` |
-| `monitoring.prometheus.serviceMonitor` | Create ServiceMonitors        | `true`  |
-| `monitoring.prometheus.prometheusRule` | Create PrometheusRule         | `false` |
-| `monitoring.grafana.dashboards`        | Create Grafana dashboards     | `false` |
-| `monitoring.accessLogs.enabled`        | Enable access logs            | `true`  |
-| `monitoring.accessLogs.format`         | Access log format (json/text) | `json`  |
+| Parameter                                    | Description                                                                                          | Default |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------- |
+| `monitoring.enabled`                         | Enable monitoring                                                                                    | `false` |
+| `monitoring.prometheus.serviceMonitor`       | Create ServiceMonitors                                                                               | `true`  |
+| `monitoring.prometheus.serviceMonitorLabels` | Extra ServiceMonitor metadata labels for Prometheus selection; built-in chart labels take precedence | `{}`    |
+| `monitoring.prometheus.prometheusRule`       | Create PrometheusRule                                                                                | `false` |
+| `monitoring.grafana.dashboards`              | Create Grafana dashboards                                                                            | `false` |
+| `monitoring.accessLogs.enabled`              | Enable access logs                                                                                   | `true`  |
+| `monitoring.accessLogs.format`               | Access log format (json/text)                                                                        | `json`  |
 
 ### Security
 
