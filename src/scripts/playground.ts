@@ -260,6 +260,21 @@ function clearGiteaExternalDatabaseDetectionFields() {
 }
 
 function applyFieldSideEffects(key: string, value: string) {
+  if (selectedSlug === 'moodle') {
+    const engines = ['postgresql', 'mysql', 'mariadb'];
+    const selectedToggle = engines.find((engine) => key === `${engine}.enabled`);
+    const isBundled = engines.some((engine) => currentValues[`${engine}.enabled`] === 'true');
+    if ((key === 'database.type' && isBundled) || (selectedToggle && value === 'true')) {
+      const selectedEngine = selectedToggle ?? value;
+      setControlValue('database.type', selectedEngine);
+      for (const engine of engines) {
+        setControlValue(`${engine}.enabled`, String(engine === selectedEngine));
+      }
+    }
+    // An external connection stays external when its engine changes.
+    return;
+  }
+
   if (selectedSlug === 'mongodb') {
     if (key === 'arbiter.enabled' && value === 'true') {
       setControlValue('architecture', 'replicaset');
