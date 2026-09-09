@@ -260,6 +260,22 @@ function clearGiteaExternalDatabaseDetectionFields() {
 }
 
 function applyFieldSideEffects(key: string, value: string) {
+  if (selectedSlug === 'n8n') {
+    if (key === 'queue.enabled' && value === 'true') {
+      setControlValue('postgresql.enabled', 'true');
+      setControlValue('redis.enabled', 'true');
+      if (!currentValues['postgresql.auth.password']) {
+        setControlValue('postgresql.auth.password', 'change-me-n8n-postgresql');
+      }
+      if (!currentValues['redis.auth.password']) {
+        setControlValue('redis.auth.password', 'change-me-n8n-redis');
+      }
+    }
+    if ((key === 'postgresql.enabled' || key === 'redis.enabled') && value === 'false') {
+      setControlValue('queue.enabled', 'false');
+    }
+    return;
+  }
   if (selectedSlug === 'moodle') {
     const engines = ['postgresql', 'mysql', 'mariadb'];
     const selectedToggle = engines.find((engine) => key === `${engine}.enabled`);

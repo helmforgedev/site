@@ -1,6 +1,38 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="n8n"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.38.4');
+    await page.locator('[data-section-toggle="Queue"]').click();
+    const queue = page.locator('button[data-field-key="queue.enabled"]');
+    await queue.click();
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('queue.enabled=true');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await expect(code).toContainText('redis.enabled=true');
+    await expect(code).toContainText('postgresql.auth.password=change-me-n8n-postgresql');
+    await expect(code).not.toContainText('mysql.enabled');
+    const password = page.locator('input[data-field-key="postgresql.auth.password"]');
+    await password.fill('custom-fixture-password');
+    await queue.click();
+    await queue.click();
+    await expect(password).toHaveValue('custom-fixture-password');
+    await page.locator('button[data-field-key="redis.enabled"]').click();
+    await expect(code).not.toContainText('queue.enabled=true');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await page
+      .locator('.playground-scenario-btn')
+      .filter({ hasText: /^Production$/ })
+      .click();
+    await expect(code).toContainText('ingress.hosts[0].host=n8n.example.com');
+    await expect(code).toContainText('ingress.hosts[0].paths[0].pathType=Prefix');
+    await expect(code).toContainText('ingress.tls[0].secretName=n8n-tls');
+    await expect(code).toContainText('ingress.tls[0].hosts[0]=n8n.example.com');
+    await expect(code).not.toContainText('ingress.hostname=');
+    await expect(code).not.toContainText('ingress.tls=true');
+  });
   test('renders chart list and config panel', async ({ page }) => {
     await page.goto('/playground');
     await expect(page).toHaveTitle(/Playground/i);
