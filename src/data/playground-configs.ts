@@ -10,6 +10,27 @@
 export const chartConfigs: Record<string, ChartConfig> = {
   moodle: [
     {
+      name: 'Application metrics',
+      collapsible: true,
+      gateField: 'metrics.enabled',
+      fields: [
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Discover authenticated metrics with an existing Prometheus Operator',
+        },
+        {
+          label: 'Metrics Secret',
+          key: 'metrics.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with a token key; empty generates a retained token',
+        },
+      ],
+    },
+    {
       name: 'Learning site',
       fields: [
         {
