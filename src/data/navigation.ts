@@ -54,6 +54,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Strapi', href: '/docs/charts/strapi', maturity: 'stable' },
       { label: 'Pimcore', href: '/docs/charts/pimcore', maturity: 'stable' },
       { label: 'Drupal', href: '/docs/charts/drupal', maturity: 'stable' },
+      { label: 'Moodle', href: '/docs/charts/moodle', maturity: 'stable' },
       { label: 'Docmost', href: '/docs/charts/docmost', maturity: 'stable' },
       { label: 'Ghost', href: '/docs/charts/ghost', maturity: 'stable' },
       { label: 'Memos', href: '/docs/charts/memos', maturity: 'stable' },

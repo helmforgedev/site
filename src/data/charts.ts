@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Moodle',
+    slug: 'moodle',
+    description:
+      'Learning platform with immutable upstream code, PostgreSQL, cron, Redis sessions and explicit maintenance.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Generic',
     slug: 'generic',
     description: 'Multi-purpose chart for Deployments, StatefulSets, Jobs, and CronJobs.',

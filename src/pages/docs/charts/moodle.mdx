@@ -1,0 +1,1540 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Moodle Chart
+description: Moodle LMS with official pinned artifacts, PostgreSQL, immutable code, cron, Redis sessions, safe scaling and explicit maintenance.
+---
+
+# Moodle
+
+Production-oriented [Moodle](https://moodle.org) LMS deployment with official
+upstream artifacts, PostgreSQL, protected bootstrap, read-only application code,
+scheduled task processing and explicit maintenance operations.
+
+The chart targets Moodle **5.2.2** and PHP **8.4.25** through a digest-pinned
+MoodleHQ PHP/Apache image. The application archive is independently SHA-256
+verified before extraction. MoodleHQ's image supplies the runtime, not the LMS.
+
+## Features
+
+- Read-only Moodle code, non-root Apache on port 8080, dropped capabilities.
+- PostgreSQL subchart or external PostgreSQL with verified TLS support.
+- Serialized first installation using upstream CLI and PostgreSQL advisory locks.
+- Explicit maintenance Job; normal startup refuses automatic schema migrations.
+- Independent cron and optional ad-hoc task containers sharing code and data.
+- Redis sessions with optional TLS; documented separation from MUC cache mapping.
+- Persistent Moodledata and fail-fast shared-storage requirements for scaling.
+- Ingress, Gateway API, dual-stack Services, NetworkPolicy, HPA and PDB.
+- Existing Secrets, canonical External Secrets integration and SMTP configuration.
+- Authenticated Moodle metrics, isolated listener, ServiceMonitor and alert rules.
+- Complete backup/restore, upgrade, immutable plugin and Bitnami migration guides.
+
+## Install
+
+OCI installation:
+
+```bash
+helm install moodle oci://ghcr.io/helmforgedev/helm/moodle \
+  --namespace learning --create-namespace
+```
+
+HTTPS repository installation:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update helmforge
+helm install moodle helmforge/moodle --namespace learning --create-namespace
+```
+
+During development before the first release, install the local chart directory.
+The CI release pipeline owns the published chart version.
+
+## Quick start
+
+```bash
+kubectl -n learning rollout status deployment/moodle --timeout=5m
+kubectl -n learning port-forward service/moodle 8080:80
+```
+
+Open [http://localhost:8080](http://localhost:8080). The upstream installer already initialized the
+database. Retrieve the generated administrator password in a private terminal:
+
+```bash
+kubectl -n learning get secret moodle-admin \
+  -o jsonpath='{.data.admin-password}' | base64 --decode
+```
+
+The username defaults to admin. Use an existing Secret for production and
+configure the real public HTTPS URL before directing students to the site.
+Changing a bootstrap password does not reset an existing Moodle account.
+
+## Prerequisites
+
+- Kubernetes 1.26 or newer and Helm with OCI support.
+- Dynamic PVC provisioning or an existing data claim writable by UID/GID 33.
+- Outbound HTTPS for archive mode, or a compatible immutable application image.
+- PostgreSQL 16 or newer; the enabled subchart supplies PostgreSQL 18.6.
+- A real RWX backend and Redis sessions before enabling multiple web replicas.
+- Gateway API or External Secrets controllers only when those integrations are enabled.
+
+## Production example
+
+```yaml
+moodle:
+  wwwroot: https://learn.example.com
+  sslProxy: true
+  existingSecret: learning-admin
+  adminEmail: learning-admin@example.com
+persistence:
+  size: 50Gi
+sessions:
+  enabled: true
+redis:
+  enabled: true
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: learn.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: learning-tls
+      hosts: [learn.example.com]
+```
+
+Create the referenced admin/TLS Secrets beforehand. This example provides one
+web replica; it does not claim HA for standalone PostgreSQL or Redis.
+
+## Deployment scenarios
+
+Use the examples directory for disposable development, staging, production,
+External Secrets and shared-storage deployments. Each scenario is explicit:
+the chart does not silently select database/storage capacity from a preset.
+Keep production database and Redis failover under your infrastructure's tested
+operating procedures.
+
+## Security Scan: moodle
+
+| Framework          | Score          |
+| ------------------ | -------------- |
+| MITRE + NSA + SOC2 | **94.242424%** |
+
+Security posture acceptable. Local Kubescape 4.0.9 scan of the default render
+on 2026-09-09, using the same frameworks as CI. Remaining findings concern
+opt-in NetworkPolicy and the bundled database's writable filesystem. This is
+a Kubernetes configuration assessment, not an image vulnerability scan.
+
+## Moodle operations
+
+### Runtime contract
+
+This chart deploys Moodle 5.2.2 using MoodleHQ's PHP 8.4 Apache runtime.
+MoodleHQ publishes a development-oriented PHP environment, not a packaged LMS.
+The chart supplies the production configuration and the separately verified
+Moodle application. It does not use the development Compose configuration.
+
+The default runtime manifest and application archive are pinned independently.
+Changing only a PHP tag does not change a digest-pinned runtime. Changing a
+Moodle application version requires updating the archive URL and checksum
+together, then following the database upgrade workflow.
+
+Every pod prepares its own application code into an emptyDir. The archive is
+downloaded over HTTPS, checked against the configured SHA-256, and extracted
+before execution. Application containers mount this directory read-only.
+Restarts never replace code with the latest upstream branch.
+
+The first start requires outbound HTTPS and enough temporary space for the
+archive and extracted application. Subsequent pod replacements repeat the
+verified preparation. Mirror the exact archive bytes for restricted networks,
+or use an immutable custom image as described below.
+
+### Filesystem layout
+
+| Path                     | Ownership                                      | Durability               |
+| ------------------------ | ---------------------------------------------- | ------------------------ |
+| /var/www/html            | Prepared upstream code, read-only to workloads | Recreated per pod        |
+| /var/www/html/config.php | Chart configuration, outside public root       | Recreated from ConfigMap |
+| /var/www/html/public     | Apache document root                           | Read-only                |
+| /var/moodledata          | Uploaded files and shared application state    | PVC by default           |
+| /var/moodledata/cache    | Shared Moodle cache                            | Same data PVC            |
+| /var/moodledata/temp     | Shared temporary operations                    | Same data PVC            |
+| /tmp/moodle-localcache   | Node-local cache                               | Per-container emptyDir   |
+| /tmp/moodle-requests     | Per-request temporary files                    | Per-container emptyDir   |
+| /opt/helmforge           | Runtime configuration and scripts              | Read-only ConfigMap      |
+
+Moodle CLI scripts remain under `/var/www/html/admin/cli`. Moving the web root
+to `public/` does not move these scripts. Moodle data is never under the HTTP
+document root.
+
+### Installation
+
+Default installation creates a PostgreSQL database and an administrator Secret.
+The installer waits for an authenticated database connection, rather than
+assuming an open TCP port means database initialization has finished.
+
+A PostgreSQL advisory lock serializes installation across replicas. The lock is
+held while the upstream `install_database.php` runs. It is released when the
+connection closes, including abnormal termination.
+
+`database.connectTimeout` bounds the combined wait for database connectivity and
+the installer lock. Size it for the complete first installation when starting
+multiple replicas together. The HA example uses 600 seconds; allow a longer
+Helm timeout, such as `--timeout 15m`, for downloads and schema creation.
+
+Installation creates schema only when the Moodle configuration table is absent.
+It never drops existing tables. A partial installation fails for administrator
+inspection rather than trying to erase and recreate a database.
+
+The installer compares the database version to `public/version.php` on every
+startup. A mismatch blocks normal startup with an explicit maintenance message.
+Moodle upgrades and downgrades do not run implicitly in web pods.
+
+The chart uses the upstream GPL license agreement option for unattended
+installation. Deploying the application accepts its upstream license; the chart
+itself remains Apache-2.0.
+
+### Administrator credentials
+
+Use a Kubernetes Secret in production:
+
+```bash
+kubectl -n learning create secret generic moodle-admin \
+  --from-file=admin-password=./admin-password.txt
+```
+
+Reference it with:
+
+```yaml
+moodle:
+  existingSecret: moodle-admin
+  existingSecretPasswordKey: admin-password
+```
+
+The bootstrap password is injected only into the installer container. Changing
+it later does not reset an installed administrator account. Reset passwords
+through Moodle's administrative interface or upstream CLI.
+
+For disposable installations, leaving `adminPassword` empty generates a strong
+password. The generated Secret is retained on uninstall and reused by Helm
+lookup. Preserve it together with database credentials and the data volume.
+
+Render-only GitOps workflows cannot use live lookup. Supply `existingSecret`
+for deterministic reconciliation instead of relying on generated credentials.
+
+### Cron and ad-hoc work
+
+The default cron sidecar invokes upstream `admin/cli/cron.php --keep-alive=0`
+at least once per minute when the preceding invocation finishes within a minute.
+Long-running tasks finish before another invocation starts in the same pod.
+Moodle's database locks coordinate task execution across web replicas.
+
+Cron has its own resource requests and limits. Sharing the pod makes the
+default RWO data volume safe: web and scheduled tasks run on the same node and
+read the exact same code and configuration.
+
+```bash
+kubectl -n learning logs deployment/moodle -c cron --tail=100
+```
+
+Successful cycles update `/tmp/moodle-task-last-success` inside the cron
+container. This is a local troubleshooting marker, not a durable audit log or
+a claim that every scheduled task succeeded.
+
+For task-heavy sites, enable an additional ad-hoc worker:
+
+```yaml
+adhoc:
+  enabled: true
+  keepAlive: 55
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '2'
+      memory: 2Gi
+```
+
+The worker uses upstream concurrency controls. It does not pass `--ignorelimits`.
+Inspect failed tasks in Moodle's task administration pages and application logs.
+
+The shell supervisor forwards termination signals. Kubernetes may interrupt an
+in-flight task when a pod is replaced. Before maintenance or upgrades, drain
+tasks through the upstream cron controls rather than assuming the pod grace
+period guarantees every task can finish.
+
+### Controlled upgrade
+
+Read the target Moodle release's upgrade prerequisites first. The chart does
+not make an unsupported multi-major upgrade safe. Moodle 5.2 requires an
+upgrade source supported by its release notes.
+
+1. Verify that a restore-tested database and moodledata backup exists.
+2. Record the current chart values, code digest, archive checksum and plugins.
+3. Stop new cron work and wait for running tasks to finish.
+4. Enable Moodle maintenance and drain external traffic.
+5. Set `maintenance.enabled=true`, a unique run ID and `action=upgrade` with
+   the target code. Web/task replicas become zero; the maintenance Job uses
+   the same application configuration and data PVC.
+6. Inspect the Job result and logs. A failed operation leaves maintenance on.
+7. Run a separate `action=disable` Job with a new run ID after verification.
+8. Set `maintenance.enabled=false`, restore desired replicas and enable cron.
+9. Verify login, a representative course, file downloads and scheduled tasks.
+
+Drain tasks while the current deployment is still running:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/cron.php --disable-wait=600
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/maintenance.php --enable
+```
+
+Commit the intended target version to your deployment values. A maintenance
+override can then contain:
+
+```yaml
+maintenance:
+  enabled: true
+  action: upgrade
+  runId: upgrade-522
+  activeDeadlineSeconds: 1800
+```
+
+Use Helm's job wait explicitly:
+
+```bash
+helm upgrade moodle oci://ghcr.io/helmforgedev/helm/moodle \
+  -n learning -f production-values.yaml -f maintenance-values.yaml \
+  --wait --wait-for-jobs --timeout 30m
+kubectl -n learning logs job/moodle-maint-upgrade-522 -c maintenance
+```
+
+The Job has zero retries. Inspect a failed migration before changing its run ID.
+Reusing a run ID with changed pod content is rejected by Kubernetes because
+Jobs are immutable. Use a new ID for every deliberate operation.
+
+After a successful upgrade, run `action=disable` with another run ID. The upgrade
+Job intentionally does not disable maintenance automatically. Re-enable cron:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/cron.php --enable
+```
+
+The database remains on the new schema after a Helm rollback. To revert an
+incompatible upgrade, restore database and moodledata together and deploy the
+matching old code/configuration. Never use Helm rollback as a database restore.
+
+### Health and observability
+
+The chart distinguishes three checks:
+
+- `/healthz.php` proves Apache executes PHP; liveness avoids restarting all
+  web pods during a temporary database outage.
+- `/readyz.php` checks installed database version against deployed code and
+  the CLI maintenance marker.
+- `admin/cli/checks.php` reports Moodle operational checks, including task
+  freshness. Its warnings are not suitable for restarting containers.
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/checks.php
+```
+
+Apache access logs and PHP errors go to stdout/stderr. Collect cron and worker
+logs independently. Monitor database availability, PVC utilization, PHP process
+memory, request latency, queue age and scheduled-task failures.
+
+Enable `metrics.enabled` for authenticated application metrics through the
+pinned `tool_monitoring` plugin. See [Authenticated application metrics](#authenticated-application-metrics)
+for its private listener, ServiceMonitor and optional PrometheusRule. Continue
+using Kubernetes and PostgreSQL monitoring for infrastructure signals.
+
+The bundled behavioral smoke checks health bodies, a rendered login form,
+private-path protection and filesystem permissions:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /opt/helmforge/smoke.php moodle 80
+```
+
+### Immutable plugins and offline code
+
+Browser-based code deployment is disabled by default. Build reviewed plugins,
+themes and matching language packs into an immutable application image. Preserve
+upstream licenses and include the complete Moodle 5.2 code tree at `/opt/moodle`.
+
+Use the same image for web, initialization, cron and maintenance. The chart
+automatically shares its image settings across those components.
+
+```yaml
+source:
+  mode: image
+  imagePath: /opt/moodle
+```
+
+Set `image.repository`, `image.tag` and `image.digest` to the verified custom
+image. The image must retain the official runtime's Apache, PHP extensions,
+curl and tar. Supply an exact digest; the chart does not build or publish it.
+
+Code is copied to the per-pod code volume and mounted read-only by consumers.
+No Composer or plugin installation occurs during production requests.
+Plugin database migrations are also part of the explicit upgrade workflow.
+
+For archive mode behind an internal mirror, change `source.url` while retaining
+the original checksum. A mismatch fails before the package is extracted.
+Never fetch the expected checksum from a mutable endpoint during pod startup.
+
+## Moodle production topology
+
+### Capacity planning
+
+The default topology is one web pod, a cron sidecar and persistent PostgreSQL.
+It is suitable for evaluating the complete application and as a starting point
+for a small site. Production sizing depends on concurrent students, course
+content, quizzes, scheduled reports, plugins and backup tasks.
+
+Apache defaults to eight prefork workers. PHP defaults to 256 MiB per process;
+the web container has a 2 GiB limit. These limits are ceilings, not reserved
+capacity. Load test peak quizzes and uploads before accepting an SLO.
+
+Increase `apache.maxRequestWorkers` only with enough memory and database
+connections. The cron/worker containers have independent memory limits. Large
+course backups often need more memory and disk than ordinary web requests.
+
+### Public URL and TLS
+
+Configure one canonical root URL without a trailing slash. DNS and certificates
+are managed by your infrastructure. Route requests to the chart Service on port
+80; Apache runs on unprivileged port 8080 inside the pod.
+
+```yaml
+moodle:
+  wwwroot: https://learn.example.com
+  sslProxy: true
+  reverseProxy: false
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
+  hosts:
+    - host: learn.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: learning-tls
+      hosts: [learn.example.com]
+```
+
+`sslProxy` tells Moodle that TLS terminates at a trusted proxy. Secure cookies
+follow the HTTPS public URL. `reverseProxy` remains false for ordinary Ingress
+controllers that preserve the public Host header. Enabling it blindly can
+trigger Moodle's reverse-proxy-abuse protection.
+
+Set ingress upload limits consistently with PHP POST and upload limits. Configure
+timeouts for long requests at your controller or gateway. Do not expose the
+backend directly to untrusted clients when relying on proxy TLS settings.
+
+This chart serves Moodle at the host root; use a dedicated hostname.
+
+### Gateway API
+
+Gateway API is optional and requires an existing Gateway controller and CRDs.
+HTTPRoutes attach to a Gateway; the chart does not create or operate that Gateway.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: learning
+      parentRefs:
+        - name: public-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames: [learn.example.com]
+```
+
+The default route backend is the Moodle Service and port. Explicit route rules
+can add matches, filters and backendRefs. Give every route a unique name when
+rendering more than one route. Ingress and HTTPRoute may coexist for migration.
+
+See [Gateway API](https://gateway-api.sigs.k8s.io/) for namespace attachment,
+TLS listener configuration and controller support.
+
+### External PostgreSQL
+
+The chart supports PostgreSQL 16 or newer. Its optional PostgreSQL dependency
+is the HelmForge chart, not a vendor-specific database container wrapper.
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  host: postgres.learning.svc.cluster.local
+  port: 5432
+  name: moodle
+  username: moodle
+  existingSecret: learning-db
+  existingSecretPasswordKey: password
+  sslMode: verify-full
+  tlsSecret: learning-db-ca
+  tlsCAKey: ca.crt
+```
+
+Provision an empty UTF-8 database and a user that owns the Moodle schema.
+The schema owner needs DDL permissions for installation and upgrades. Use a
+dedicated database; the upstream installer refuses unrelated existing tables.
+
+Verified TLS uses the mounted CA and libpq's hostname verification. Do not use
+an IP address if the server certificate is issued only for a DNS hostname.
+The chart does not provision an external database or rotate its passwords.
+
+Bundled PostgreSQL accepts the full subchart contract, including its persistence,
+resources and replication settings. For production, prefer a managed database
+or a database topology whose failover and backups you operate and test.
+
+### Redis sessions and MUC
+
+Enable explicit session storage with either bundled Redis:
+
+```yaml
+sessions:
+  enabled: true
+redis:
+  enabled: true
+```
+
+Or an external service:
+
+```yaml
+sessions:
+  enabled: true
+  host: redis.learning.svc.cluster.local
+  port: 6379
+  existingSecret: learning-redis
+  existingSecretPasswordKey: redis-password
+  database: 0
+  prefix: school_a_session_
+```
+
+Use a dedicated prefix and an appropriate Redis eviction policy. Losing session
+keys signs users out. Redis availability is part of the login availability
+budget; a standalone Redis deployment is not an HA service.
+
+For Redis TLS, set `sessions.tlsSecret` and `tlsCAKey`. Certificate validation
+remains enabled. Use a stable service endpoint supplied by your Redis platform.
+The bundled topology supported by this chart is standalone Redis.
+
+Redis sessions do not configure Moodle Universal Cache mappings. Configure and
+test MUC stores in Moodle's cache administration or through reviewed application
+configuration. The chart deliberately does not claim that enabling sessions
+automatically moves every Moodle cache into Redis.
+
+### Safe horizontal scaling
+
+Multiple web pods and HPA require both:
+
+1. `persistence.enabled=true` with real `ReadWriteMany` storage.
+2. `sessions.enabled=true` with a reachable Redis endpoint.
+
+The chart fails rendering when these prerequisites are absent. `existingClaim`
+does not prove that a volume supports concurrent writers: its declared access
+modes must describe the actual provisioned storage.
+
+Moodledata, shared cache, temporary and backup temporary directories remain on
+the shared volume. Only local cache/request directories use per-container
+emptyDir. Redis or an object-storage plugin does not remove this filesystem
+requirement.
+
+Moodle uses PostgreSQL task locks. The chart does not configure a nonexistent
+core Redis lock factory. Shared sessions, task locks and identical read-only code
+allow requests and cron execution across replicas.
+
+Use node anti-affinity/topology spread with enough cluster capacity. Enable PDB
+only with multiple replicas. Ensure the minimum HPA replica count can satisfy
+your PDB during node maintenance.
+
+The local lab tests concurrent web replicas against a shared volume on one node.
+That proves application concurrency and shared writes, not cross-node CSI
+failover. Test the chosen production RWX storage and database/Redis failover in
+your own multi-node environment.
+
+### NetworkPolicy
+
+NetworkPolicy is opt-in. Its default policy permits web ingress to port 8080,
+DNS egress, the bundled PostgreSQL/Redis endpoints and HTTPS egress in archive
+mode. Configure `ingressFrom` to restrict traffic to your gateway/controller.
+
+Add explicit `extraEgress` rules for external databases, Redis, SMTP, identity
+providers, object stores and other application integrations. Kubernetes network
+policies do not provide portable FQDN filtering; unrestricted port 443 egress in
+archive mode is a documented compromise. Use an immutable image and explicit
+egress destinations where tighter policy is required.
+
+### SMTP and email safety
+
+```yaml
+smtp:
+  hosts: smtp.example.com:587
+  security: tls
+  username: moodle
+  existingSecret: learning-smtp
+  existingSecretPasswordKey: smtp-password
+  noReplyAddress: noreply@example.com
+```
+
+SMTP passwords stay in Secret references. Send a test message through Moodle,
+then exercise a cron-driven notification. Check sender authorization, SPF, DKIM
+and your provider's quotas outside the chart.
+
+Set `moodle.noEmailEver=true` on staging and restored test sites to prevent
+accidental notifications to real students. Explicitly reverse that setting only
+when the intended environment should send mail.
+
+### External Secrets
+
+The chart uses `externalSecrets.enabled`, `refreshInterval` and `items[]`.
+Each item carries a complete ExternalSecret spec. The operator must already be
+installed; the chart renders the stable `external-secrets.io/v1` API.
+
+```yaml
+moodle:
+  existingSecret: learning-admin
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: learning-admin
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: learning-admin
+        data:
+          - secretKey: admin-password
+            remoteRef:
+              key: learning/moodle
+              property: bootstrapPassword
+```
+
+Wait for `Ready=True` and `SecretSynced`, then verify the workload consumes the
+target. Database/Redis/SMTP secrets may be synchronized by additional items.
+Secret rotation does not itself change existing database or Moodle passwords.
+Coordinate credential changes with the corresponding service and restart
+consuming pods after environment-based secrets change.
+
+### Dual-stack networking
+
+The Service inherits cluster defaults when IP family fields are omitted.
+Set `service.ipFamilyPolicy=PreferDualStack` for portable dual-stack preference.
+Explicit `ipFamilies` values require a cluster advertising those families.
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
+
+See [Kubernetes dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/).
+Upstream gateways, DNS and external databases must also support the selected
+families; a dual-stack Service alone does not make all integrations dual-stack.
+
+## Moodle backup and recovery
+
+### Consistency boundary
+
+A recoverable Moodle site consists of the database, moodledata, exact application
+code/plugins and deployment configuration. A course backup is not a full-site
+backup. A PVC snapshot without a database recovery point is also insufficient.
+
+This chart does not enable an automatic site-backup CronJob. The PostgreSQL
+subchart may perform database backups, but those do not include Moodledata.
+Use your backup platform or the coordinated maintenance procedure below for
+complete recovery points. The site catalog therefore does not advertise this
+chart as having built-in automated backups.
+
+Backups contain student records, submissions and credentials/configuration.
+Apply your organization's encryption, access, retention and restore-testing
+requirements to every artifact. Keep backup copies outside the source cluster.
+
+### Prepare a recovery point
+
+Record the exact deployed chart version and values:
+
+```bash
+mkdir -p moodle-recovery
+chmod 700 moodle-recovery
+helm get values moodle -n learning -o yaml > moodle-recovery/values.yaml
+helm get metadata moodle -n learning -o yaml > moodle-recovery/release.yaml
+```
+
+These commands can capture sensitive inline values. Prefer existing Secret
+references and keep the recovery directory private. Preserve the required
+secret versions in your secret-management system.
+
+Record `image.repository`, `image.tag`, `image.digest`, `source.url`,
+`source.sha256`, custom plugins and configuration alongside the recovery point.
+An upstream download being available today is not an archival guarantee; retain
+your own verified code artifact or immutable image.
+
+### Quiesce writes
+
+Stop scheduling and drain tasks before interrupting pods:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/cron.php --disable-wait=600
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/maintenance.php --enable
+```
+
+Verify no active ad-hoc or scheduled tasks remain. Drain user traffic at the
+gateway and wait for in-flight PHP requests, integrations and uploads to finish.
+For HA, this applies to all web replicas. Maintenance mode alone is not proof
+that a request which started earlier has stopped writing.
+
+Take the database backup and the filesystem copy while writes remain quiesced.
+Do not resume between these two steps.
+
+### PostgreSQL backup
+
+Use `pg_dump --format=custom` from a PostgreSQL client version compatible with
+the server. With a managed database, use its documented consistent backup
+mechanism and record the recovery point identifier.
+
+Example with client connection settings supplied through a protected libpq
+service/password file:
+
+```bash
+PGSERVICE=moodle-backup pg_dump --format=custom \
+  --file=moodle-recovery/database.dump
+pg_restore --list moodle-recovery/database.dump \
+  > moodle-recovery/database-contents.txt
+```
+
+Use the schema owner or a dedicated appropriately privileged backup account.
+Do not put database passwords into shell history. A database backup that cannot
+be listed and restored is not accepted recovery evidence.
+
+### Moodledata backup
+
+Stream an archive from a quiesced application pod using a shell that preserves
+binary stdout, such as Bash:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  tar -C /var/moodledata -czf - . > moodle-recovery/moodledata.tgz
+tar -tzf moodle-recovery/moodledata.tgz \
+  > moodle-recovery/moodledata-contents.txt
+sha256sum moodle-recovery/database.dump moodle-recovery/moodledata.tgz \
+  > moodle-recovery/SHA256SUMS
+```
+
+The archive includes shared data and configuration generated under moodledata.
+For large sites, a storage snapshot or backup agent with incremental transfers
+is preferable to streaming a full archive through the Kubernetes API.
+
+If using a storage/object-file-system plugin, identify which objects are outside
+the PVC. Back them up at the same logical recovery point. The default chart
+does not configure an object-storage plugin or include external objects in a
+PVC archive.
+
+### Resume after successful backup
+
+Verify both artifacts and record their common maintenance window. Only then
+resume application traffic and tasks:
+
+```bash
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/maintenance.php --disable
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/cron.php --enable
+```
+
+If a backup step fails, keep the site quiesced while deciding whether to retry
+or deliberately resume without a new recovery point. Do not describe partial
+artifacts as a complete site backup.
+
+### Restore drill
+
+Restore first into an isolated namespace with separate database, data PVC,
+Redis prefix and hostname. Disable email and external integrations.
+
+1. Verify archive checksums and list database/archive contents.
+2. Provision a new empty database with the required owner and extensions.
+3. Restore the custom-format dump with `pg_restore --exit-on-error`.
+4. Restore moodledata into an empty PVC with UID/GID 33 and group-writable
+   directories, preserving file names and contents.
+5. Deploy the exact matching code and configuration with
+   `moodle.autoInstall=false` and `moodle.noEmailEver=true`.
+6. Set a restore-specific public URL, then disable maintenance after inspection.
+7. Purge local caches, verify a real administrator login and open representative
+   courses, submissions and uploaded files.
+8. Run scheduled-task checks and a controlled cron cycle.
+9. Record elapsed recovery time and any excluded external data.
+
+Use a unique Redis prefix or an isolated Redis database; restored sessions must
+not overlap production sessions. Keep the restored site blocked from production
+SMTP and webhooks until deliberately configured.
+
+Never test restoration over the live database or reuse the production PVC.
+Retained PVCs and Secrets are a deletion safeguard, not a disaster-recovery copy.
+
+### Migration from Bitnami
+
+Bitnami's environment variables and entrypoint are not an upstream Moodle API.
+Map the public URL, proxy settings, SMTP, administrator bootstrap and Secret
+references to this chart's explicit values.
+
+Bitnami commonly uses MariaDB. This chart's supported database backend is
+PostgreSQL. A MariaDB dump cannot be loaded into PostgreSQL with `pg_restore`.
+Perform an upstream-supported Moodle database transfer and verify it in an
+isolated environment before cutover, or retain the original deployment until
+a tested migration path is available. This chart does not automate cross-engine
+conversion.
+
+Do not mount a Bitnami application directory as moodledata. Separate the code
+tree from the actual data directory, preserve plugins/themes and use matching
+Moodle versions for the initial recovery test. Database engine conversion,
+container migration and a major Moodle upgrade should have separately tested
+recovery checkpoints.
+
+Upstream references:
+
+- [Site backup](https://docs.moodle.org/en/Site_backup)
+- [Site restore](https://docs.moodle.org/en/Site_restore)
+- [Upgrading](https://docs.moodle.org/502/en/Upgrading)
+
+## Moodle troubleshooting
+
+### Source download does not finish
+
+Inspect `prepare-code` logs, DNS, HTTPS egress, proxy policy and available disk.
+The default archive is downloaded once per pod creation, not on every request.
+Use a verified internal HTTPS mirror or an immutable image for offline clusters.
+
+```bash
+kubectl -n learning logs deployment/moodle -c prepare-code
+kubectl -n learning get events --sort-by=.lastTimestamp
+```
+
+### Checksum mismatch
+
+Do not disable checksum verification. Check whether the URL points to a weekly
+or mutable package rather than the intended stable release. Compare the bytes
+against the official release checksum and investigate the mirror/cache.
+
+### Database initialization wait
+
+Inspect PostgreSQL readiness and its initialization logs. Verify the selected
+Secret/key and database/user values. A TCP connection alone does not prove the
+application user and schema have been created.
+
+For external databases, check NetworkPolicy, TLS CA and certificate hostname.
+The wait is bounded by `database.connectTimeout`.
+
+### Installer reports existing tables
+
+The database may contain a partial installation or unrelated schema. Inspect it
+before doing anything destructive. Use a dedicated empty database for a new
+site, or restore a complete existing Moodle database and set `autoInstall=false`.
+
+### Database and code version mismatch
+
+Normal pods do not run upgrades automatically. Confirm that code and database
+belong together, restore the matching code if needed, or use the explicit
+maintenance Job after a backup. Never force a downgrade by editing a database
+version value.
+
+### Browser gets PHP source
+
+This is a failed deployment, regardless of HTTP 200. The Apache PHP handler must
+be active. Restore the chart-managed Apache configuration and run
+`/opt/helmforge/smoke.php`; health bodies must be exactly `ok` and `ready`, and
+the login response must be HTML. Do not expose a server serving PHP source.
+
+### Redirect goes to localhost
+
+The default URL is for local port forwarding. Set `moodle.wwwroot` to the actual
+public root URL, without a trailing slash, and configure the matching Ingress
+or HTTPRoute hostname.
+
+### Reverse proxy abuse or redirect loop
+
+For a host-preserving controller, use `reverseProxy=false`. Set `sslProxy=true`
+when TLS terminates at a trusted proxy and keep `wwwroot` HTTPS. Verify that
+backend access and forwarded headers cannot be spoofed by untrusted clients.
+
+### Uploads fail with HTTP 413
+
+Align gateway/Ingress body size, `php.uploadMaxFilesize` and `php.postMaxSize`.
+Check Moodle's own course/site upload restrictions. PHP settings cannot override
+a smaller limit enforced by the gateway.
+
+### Moodledata is not writable
+
+Check the PVC's ownership, storage-driver fsGroup support and volume capacity.
+The workload uses UID/GID 33 and fsGroup 33. Imported NFS data may need an
+administrator to set ownership/permissions before installation.
+
+Do not solve permission failures by making application code writable or running
+all workloads as root. Keep the distinction between code and mutable data.
+
+### Cron is stale
+
+Inspect the `cron` container, task administration pages and `checks.php`.
+Verify cron has not been disabled for maintenance. Long-running tasks, SMTP
+timeouts and unreachable integrations can delay later work.
+
+```bash
+kubectl -n learning logs deployment/moodle -c cron --tail=100
+kubectl -n learning exec deployment/moodle -c moodle -- \
+  php /var/www/html/admin/cli/checks.php
+```
+
+### Users lose sessions after scaling
+
+Verify Redis credentials, key prefix, TLS, availability and eviction policy.
+Use dedicated session storage and make sure all replicas use the same settings.
+Do not confuse Redis sessions with MUC cache mappings.
+
+### New replicas remain Pending
+
+Check capacity, anti-affinity, topology spread and storage access modes. Multiple
+nodes require actual RWX storage. The chart blocks obvious incompatible values;
+it cannot turn a storage backend into a multi-writer filesystem.
+
+### Maintenance Job cannot be updated
+
+Kubernetes Jobs have immutable pod templates. Give each deliberate operation a
+new `maintenance.runId`. Inspect previous logs before retrying a failed upgrade.
+An operation with the same ID is not a new execution.
+
+### Maintenance Job fails or times out
+
+Inspect its `prepare-code` and `maintenance` logs and the namespace events.
+Check task drain, database connectivity, PVC mounts and the intended source
+version. Maintenance remains enabled after an upgrade by design.
+
+Do not disable maintenance until migration and application checks are complete.
+Use the documented restore procedure if the database cannot safely advance.
+
+### ExternalSecret does not become Ready
+
+Inspect the ExternalSecret conditions, SecretStore and remote property names.
+Confirm the generated target name matches the workload's `existingSecret`.
+The operator must serve `external-secrets.io/v1`.
+
+### A changed password does not take effect
+
+Administrator bootstrap settings only apply to first installation. Existing
+database and Redis passwords must be changed in their services as well as their
+Secrets. Restart PHP pods after updating environment-based connection secrets.
+
+### HTTP checks pass but a course feature fails
+
+Health probes do not exercise every plugin, external identity provider or course
+format. Validate representative learning workflows, submissions and downloads
+with the actual production plugins and integration configuration.
+
+## Moodle observability
+
+### Authenticated application metrics
+
+Enable `metrics.enabled` to install the upstream
+[tool_monitoring plugin](https://github.com/daniil-berg/moodle-tool_monitoring)
+1.1.0 and its Prometheus exporter. The archive is pinned to commit
+`23c45f66b6c3ed409b0749017b3387c1744016cc` and verified with SHA-256 before
+extraction. Set `metrics.plugin.mode: image` when both plugins are already
+included in your immutable application image.
+
+The exporter exposes course counts, user account counts, online users,
+in-progress quizzes and overdue scheduled/ad-hoc tasks. Configure the enabled
+families through `metrics.enabledMetrics`. The chart reconciles these five
+built-in families during startup; additional custom metrics remain operator-managed.
+
+```yaml
+metrics:
+  enabled: true
+  existingSecret: moodle-monitoring
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+```
+
+Create the existing Secret in the release namespace with a nonempty `token` key.
+Alternatively, omit `existingSecret` to generate a retained token Secret. An
+existing Secret can be populated by your secret manager. Tokens are mounted as
+files, never embedded in ConfigMaps or values. Secret projections and Prometheus
+configuration reloads are eventually consistent; allow propagation after rotation.
+
+Prometheus Operator and its CRDs must already exist. Configure its ServiceMonitor
+and PrometheusRule selectors to match the labels above and include the Moodle
+namespace. The chart does not install Prometheus itself.
+
+The dedicated ClusterIP Service listens on port 9090. Only
+`/r.php/monitoringexporter_prometheus/metrics` is allowed on that listener, with
+Bearer authentication. Missing and invalid tokens return 403. The application
+listener rejects the monitoring route, including requests with valid tokens.
+Public Ingress and HTTPRoute resources do not expose the metrics Service.
+
+When `networkPolicy.enabled` is true, restrict `metrics.ingressFrom` to the
+actual Prometheus namespace and pod labels. An empty list permits internal
+clients to reach the authenticated listener. The default scrape interval is
+60 seconds; these metrics query Moodle's database, so measure database impact
+before shortening it.
+
+### Lifecycle on existing installations
+
+A fresh installation registers both plugins automatically. Adding or updating
+the plugin on an existing database requires the documented maintenance upgrade
+workflow: drain cron and workers, enable maintenance, run the upgrade Job with
+`metrics.enabled: true`, then disable maintenance and resume the application.
+Normal startup refuses a missing or mismatched plugin database version.
+
+Keep metrics enabled throughout those maintenance operations. Disabling the
+ServiceMonitor only stops discovery. Setting `metrics.enabled: false` does not
+uninstall registered Moodle plugins: properly uninstall both plugins through
+Moodle's supported administration workflow before removing their chart code.
+
+### Queries and alerts
+
+Every replica reports the same global database counts. Deduplicate replicas
+before summing dimensions; for example, total courses for one release:
+
+```promql
+sum(max by (visible) (tool_monitoring_courses{namespace="learning",service="moodle-metrics"}))
+```
+
+The optional rules report an unavailable metrics target after five minutes and
+overdue tasks persisting for fifteen minutes. The overdue-task rule is omitted
+when its metric family is disabled. These rules describe exporter availability
+and task backlog; they do not replace HTTP probes or infrastructure alerts.
+
+PostgreSQL and Redis retain their own independent HelmForge exporter settings
+(`postgresql.metrics` and `redis.metrics`). Enable their ServiceMonitors separately
+when database and cache infrastructure metrics are also required.
+
+### Runtime evidence
+
+The metrics CI scenario creates a temporary Prometheus instance through the
+Operator. The application smoke hook checks rejected credentials, authenticated
+exposition, public/private listener isolation, ServiceMonitor discovery and
+healthy rule evaluation. It creates a real temporary course, waits for its
+count to appear in Prometheus, removes it and verifies the original count.
+
+For a fresh disposable lab, install the official Prometheus Operator bundle
+before running the full chart gate. This is a lab prerequisite, not a chart
+dependency. Use only the designated local Kubernetes context:
+
+```bash
+kubectl --context k3d-helmforge-tests-wsl apply --server-side -f \
+  https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.0/bundle.yaml
+kubectl --context k3d-helmforge-tests-wsl -n default rollout status \
+  deployment/prometheus-operator --timeout=180s
+make validate-chart CHART=moodle TIMEOUT=900
+```
+
+If an Operator is already installed, verify it watches the validation namespace
+instead of installing another controller. The validated lab used Operator
+0.94.0 and the fixture pins Prometheus 3.14.0 by image digest.
+
+## Complete values reference
+
+Bundled PostgreSQL and Redis also accept their full HelmForge subchart values.
+Their schemas validate additional subchart settings; the tables below document
+every value explicitly set or exposed by the Moodle parent chart.
+
+### nameOverride
+
+Override the chart name.
+
+| Parameter      | Default | Meaning                  |
+| -------------- | ------- | ------------------------ |
+| `nameOverride` | `""`    | Override the chart name. |
+
+### fullnameOverride
+
+Override resource names.
+
+| Parameter          | Default | Meaning                  |
+| ------------------ | ------- | ------------------------ |
+| `fullnameOverride` | `""`    | Override resource names. |
+
+### commonLabels
+
+Additional resource labels; selector labels are reserved.
+
+| Parameter      | Default | Meaning                                                   |
+| -------------- | ------- | --------------------------------------------------------- |
+| `commonLabels` | `{}`    | Additional resource labels; selector labels are reserved. |
+
+### replicaCount
+
+Number of web pods; multiple replicas require RWX and Redis sessions.
+
+| Parameter      | Default | Meaning                                                               |
+| -------------- | ------- | --------------------------------------------------------------------- |
+| `replicaCount` | `1`     | Number of web pods; multiple replicas require RWX and Redis sessions. |
+
+### image
+
+Official PHP/Apache runtime, separately pinned from the Moodle code.
+
+| Parameter          | Default                                                                   | Meaning                                                                 |
+| ------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `image.repository` | `docker.io/moodlehq/moodle-php-apache`                                    | Image repository; custom images must contain the same PHP/Apache tools. |
+| `image.tag`        | `8.4-bookworm`                                                            | Human-readable PHP variant; digest pins the actual bytes.               |
+| `image.digest`     | `sha256:922af51668352004b4255cdc1f726a63f0cee7c1354eaf66dd8d5f2c7cc379b5` | Multi-architecture manifest digest.                                     |
+| `image.pullPolicy` | `IfNotPresent`                                                            | Container image pull policy.                                            |
+
+### imagePullSecrets
+
+Registry credentials.
+
+| Parameter          | Default | Meaning               |
+| ------------------ | ------- | --------------------- |
+| `imagePullSecrets` | `[]`    | Registry credentials. |
+
+### source
+
+Immutable Moodle code distribution, prepared once per pod.
+
+| Parameter                | Default                                                                      | Meaning                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `source.mode`            | `archive`                                                                    | archive downloads a verified release; image copies code baked into image.path. |
+| `source.url`             | `https://download.moodle.org/download.php/direct/stable502/moodle-5.2.2.tgz` | Official release archive or an HTTPS mirror of identical bytes.                |
+| `source.sha256`          | `72be209e7c0f5341b87de0bc993b2430087fda2769d8c3cc2f32736d1513e88c`           | SHA-256 of the archive; verified before extraction.                            |
+| `source.imagePath`       | `/opt/moodle`                                                                | Source directory in a custom image when mode=image.                            |
+| `source.downloadTimeout` | `180`                                                                        | Maximum HTTPS download time per attempt in seconds.                            |
+
+### moodle
+
+Moodle application settings.
+
+| Parameter                          | Default                    | Meaning                                                                           |
+| ---------------------------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `moodle.wwwroot`                   | `http://localhost:8080`    | Public URL without trailing slash. Set the real HTTPS URL in production.          |
+| `moodle.siteName`                  | `Moodle Learning Platform` | Full site name used only on first installation.                                   |
+| `moodle.shortName`                 | `Moodle`                   | Short site name used only on first installation.                                  |
+| `moodle.language`                  | `en`                       | Installation language. Non-English language packs require upstream egress.        |
+| `moodle.adminUser`                 | `admin`                    | Administrative account name used only on first installation.                      |
+| `moodle.adminEmail`                | `admin@example.com`        | Administrative contact email.                                                     |
+| `moodle.adminPassword`             | `""`                       | Inline bootstrap password; generated and preserved when empty.                    |
+| `moodle.existingSecret`            | `""`                       | Existing bootstrap secret. Password changes do not reset an installed account.    |
+| `moodle.existingSecretPasswordKey` | `admin-password`           | Bootstrap secret password key.                                                    |
+| `moodle.autoInstall`               | `true`                     | Enable automated first installation into an empty PostgreSQL database.            |
+| `moodle.sslProxy`                  | `false`                    | Allow TLS termination at a trusted proxy; pair with HTTPS wwwroot.                |
+| `moodle.reverseProxy`              | `false`                    | Enable only when proxy rewrites Host; ordinary Ingress preserves Host.            |
+| `moodle.disableUpdateAutodeploy`   | `true`                     | Disable browser-based plugin installation and code updates.                       |
+| `moodle.noEmailEver`               | `false`                    | Disable outgoing email, useful in restored or staging environments.               |
+| `moodle.timezone`                  | `UTC`                      | Site timezone, configured consistently for PHP and Moodle.                        |
+| `moodle.extraConfig`               | `""`                       | Additional config.php statements before Moodle setup; trusted administrator code. |
+| `moodle.extraEnv`                  | `[]`                       | Extra environment variables for PHP workloads, including cron.                    |
+| `moodle.extraEnvFrom`              | `[]`                       | Extra environment sources for PHP workloads.                                      |
+
+### database
+
+PostgreSQL connection; disable postgresql.enabled to use an external server.
+
+| Parameter                            | Default    | Meaning                                                                      |
+| ------------------------------------ | ---------- | ---------------------------------------------------------------------------- |
+| `database.host`                      | `""`       | External PostgreSQL hostname; ignored with bundled PostgreSQL.               |
+| `database.port`                      | `5432`     | External PostgreSQL port.                                                    |
+| `database.name`                      | `moodle`   | External database name.                                                      |
+| `database.username`                  | `moodle`   | External database user.                                                      |
+| `database.existingSecret`            | `""`       | External database password Secret, required for external PostgreSQL.         |
+| `database.existingSecretPasswordKey` | `password` | Password key in the external Secret.                                         |
+| `database.prefix`                    | `mdl_`     | Moodle table prefix; at most ten alphanumeric/underscore characters.         |
+| `database.sslMode`                   | `prefer`   | libpq SSL mode; use verify-full with a CA for production external databases. |
+| `database.tlsSecret`                 | `""`       | Optional Secret containing PostgreSQL CA certificate.                        |
+| `database.tlsCAKey`                  | `ca.crt`   | CA certificate key in database.tlsSecret.                                    |
+| `database.connectTimeout`            | `180`      | Maximum wait for authenticated DB connectivity and installer lock.           |
+
+### postgresql
+
+Bundled HelmForge PostgreSQL; full subchart values may be overridden.
+
+| Parameter                                       | Default         | Meaning                                                                     |
+| ----------------------------------------------- | --------------- | --------------------------------------------------------------------------- |
+| `postgresql.enabled`                            | `true`          | Deploy PostgreSQL.                                                          |
+| `postgresql.architecture`                       | `standalone`    | Standalone or replication; external database is recommended for managed HA. |
+| `postgresql.auth.database`                      | `moodle`        | Initial database name.                                                      |
+| `postgresql.auth.username`                      | `moodle`        | Initial application user.                                                   |
+| `postgresql.auth.password`                      | `""`            | Application password; generated by the subchart when empty.                 |
+| `postgresql.auth.existingSecret`                | `""`            | Existing PostgreSQL credentials Secret.                                     |
+| `postgresql.auth.existingSecretUserPasswordKey` | `user-password` | Application password key.                                                   |
+
+### sessions
+
+Redis session options; independent of Moodle MUC cache mappings.
+
+| Parameter                            | Default           | Meaning                                                                       |
+| ------------------------------------ | ----------------- | ----------------------------------------------------------------------------- |
+| `sessions.enabled`                   | `false`           | Use Redis sessions; requires bundled Redis or an external Redis endpoint.     |
+| `sessions.host`                      | `""`              | External Redis hostname.                                                      |
+| `sessions.port`                      | `6379`            | External Redis port.                                                          |
+| `sessions.database`                  | `0`               | Redis logical database dedicated to Moodle sessions.                          |
+| `sessions.prefix`                    | `moodle_session_` | Key prefix; isolate each Moodle installation.                                 |
+| `sessions.existingSecret`            | `""`              | External Redis password Secret; empty permits unauthenticated external Redis. |
+| `sessions.existingSecretPasswordKey` | `redis-password`  | Redis password key.                                                           |
+| `sessions.tlsSecret`                 | `""`              | Optional Secret containing CA for Redis TLS.                                  |
+| `sessions.tlsCAKey`                  | `ca.crt`          | Redis CA certificate key.                                                     |
+| `sessions.acquireLockTimeout`        | `120`             | Maximum time to acquire a session lock in seconds.                            |
+| `sessions.lockExpire`                | `7200`            | Session lock expiration in seconds.                                           |
+
+### redis
+
+Optional HelmForge Redis subchart for sessions.
+
+| Parameter                              | Default          | Meaning                                       |
+| -------------------------------------- | ---------------- | --------------------------------------------- |
+| `redis.enabled`                        | `false`          | Deploy Redis; also set sessions.enabled=true. |
+| `redis.architecture`                   | `standalone`     | Supported bundled topology: standalone.       |
+| `redis.auth.enabled`                   | `true`           | Require Redis authentication.                 |
+| `redis.auth.password`                  | `""`             | Inline Redis password, generated when empty.  |
+| `redis.auth.existingSecret`            | `""`             | Existing Redis credentials Secret.            |
+| `redis.auth.existingSecretPasswordKey` | `redis-password` | Password key.                                 |
+
+### persistence
+
+Persistent Moodle data, always outside the web root.
+
+| Parameter                   | Default             | Meaning                                                                          |
+| --------------------------- | ------------------- | -------------------------------------------------------------------------------- |
+| `persistence.enabled`       | `true`              | Enable persistent moodledata. Disable only for disposable tests.                 |
+| `persistence.existingClaim` | `""`                | Existing data claim; accessModes must describe its real capabilities.            |
+| `persistence.storageClass`  | `""`                | Storage class; empty uses cluster default, '-' disables dynamic class selection. |
+| `persistence.accessModes`   | `["ReadWriteOnce"]` | Use ReadWriteMany for multiple web replicas.                                     |
+| `persistence.size`          | `10Gi`              | Requested data capacity.                                                         |
+| `persistence.retain`        | `true`              | Retain chart-created data PVC when uninstalling.                                 |
+| `persistence.annotations`   | `{}`                | Additional PVC annotations.                                                      |
+
+### php
+
+PHP runtime configuration.
+
+| Parameter               | Default | Meaning                                                                  |
+| ----------------------- | ------- | ------------------------------------------------------------------------ |
+| `php.memoryLimit`       | `256M`  | Memory limit for each PHP process; align with pod concurrency/resources. |
+| `php.uploadMaxFilesize` | `64M`   | Maximum uploaded file size.                                              |
+| `php.postMaxSize`       | `64M`   | Maximum POST size, at least uploadMaxFilesize.                           |
+| `php.maxInputVars`      | `5000`  | Moodle requires at least 5000 form input variables.                      |
+| `php.maxExecutionTime`  | `300`   | HTTP execution time limit; CLI tasks are not constrained by this value.  |
+| `php.extraIni`          | `""`    | Additional PHP INI directives.                                           |
+
+### apache
+
+Apache prefork concurrency; each child may consume php.memoryLimit.
+
+| Parameter                  | Default | Meaning                                      |
+| -------------------------- | ------- | -------------------------------------------- |
+| `apache.maxRequestWorkers` | `8`     | Maximum concurrent PHP requests per web pod. |
+
+### cron
+
+Cron sidecar shares code and data with its web pod, including RWO storage.
+
+| Parameter                        | Default | Meaning                                                                           |
+| -------------------------------- | ------- | --------------------------------------------------------------------------------- |
+| `cron.enabled`                   | `true`  | Run scheduled Moodle tasks; Moodle database locks coordinate multiple pods.       |
+| `cron.interval`                  | `60`    | Interval between invocations; a running task is never overlapped in the same pod. |
+| `cron.resources.requests.cpu`    | `100m`  | Kubernetes configuration; validated against the resource schema.                  |
+| `cron.resources.requests.memory` | `256Mi` | Kubernetes configuration; validated against the resource schema.                  |
+| `cron.resources.limits.cpu`      | `1`     | Kubernetes configuration; validated against the resource schema.                  |
+| `cron.resources.limits.memory`   | `1Gi`   | Kubernetes configuration; validated against the resource schema.                  |
+
+### adhoc
+
+Additional ad-hoc task processing in a separate sidecar.
+
+| Parameter                         | Default | Meaning                                                                     |
+| --------------------------------- | ------- | --------------------------------------------------------------------------- |
+| `adhoc.enabled`                   | `false` | Enable a dedicated ad-hoc worker; normal cron already handles ad-hoc tasks. |
+| `adhoc.keepAlive`                 | `55`    | Upstream keep-alive duration in seconds.                                    |
+| `adhoc.resources.requests.cpu`    | `100m`  | Kubernetes configuration; validated against the resource schema.            |
+| `adhoc.resources.requests.memory` | `256Mi` | Kubernetes configuration; validated against the resource schema.            |
+| `adhoc.resources.limits.cpu`      | `1`     | Kubernetes configuration; validated against the resource schema.            |
+| `adhoc.resources.limits.memory`   | `1Gi`   | Kubernetes configuration; validated against the resource schema.            |
+
+### maintenance
+
+Explicit maintenance window; stops web/task pods before running an operator-requested job.
+
+| Parameter                           | Default    | Meaning                                                                     |
+| ----------------------------------- | ---------- | --------------------------------------------------------------------------- |
+| `maintenance.enabled`               | `false`    | Scale web pods to zero and run the selected maintenance action.             |
+| `maintenance.runId`                 | `manual-1` | Unique operation identifier. Change for each operation to create a new Job. |
+| `maintenance.action`                | `checks`   | Upstream CLI operation: upgrade, checks, purge-caches, enable, or disable.  |
+| `maintenance.activeDeadlineSeconds` | `1800`     | Maximum execution time; unsuccessful upgrades stay in maintenance.          |
+
+### metrics
+
+Optional authenticated Moodle application metrics through tool_monitoring.
+
+| Parameter                                  | Default                                                                                                          | Meaning                                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `metrics.enabled`                          | `false`                                                                                                          | Install/configure the plugin and expose a private metrics listener.                           |
+| `metrics.existingSecret`                   | `""`                                                                                                             | Existing Secret containing the bearer token; empty generates a retained Secret.               |
+| `metrics.existingSecretTokenKey`           | `token`                                                                                                          | Key containing a nonempty token in the metrics Secret.                                        |
+| `metrics.plugin.mode`                      | `archive`                                                                                                        | archive downloads pinned source; image requires the plugin in the application image.          |
+| `metrics.plugin.url`                       | `https://codeload.github.com/daniil-berg/moodle-tool_monitoring/tar.gz/23c45f66b6c3ed409b0749017b3387c1744016cc` | Immutable upstream tool_monitoring 1.1.0 archive.                                             |
+| `metrics.plugin.sha256`                    | `dc7a5256e93e10b0514fcb752767e2554b7aa0cd24e8c8d74e54c33b358028e1`                                               | SHA-256 checked before extracting plugin code.                                                |
+| `metrics.enabledMetrics`                   | `["courses","overdue_tasks","quiz_attempts_in_progress","user_accounts","users_online"]`                         | Built-in metrics managed by Helm; custom plugin metrics remain administrator-managed.         |
+| `metrics.serviceMonitor.enabled`           | `false`                                                                                                          | Create an authenticated ServiceMonitor for the private metrics Service.                       |
+| `metrics.serviceMonitor.labels`            | `{}`                                                                                                             | Labels matching the Prometheus serviceMonitorSelector.                                        |
+| `metrics.serviceMonitor.annotations`       | `{}`                                                                                                             | Extra ServiceMonitor annotations.                                                             |
+| `metrics.serviceMonitor.interval`          | `60s`                                                                                                            | Scrape interval; metrics query Moodle's database.                                             |
+| `metrics.serviceMonitor.scrapeTimeout`     | `20s`                                                                                                            | Per-scrape timeout, lower than interval.                                                      |
+| `metrics.serviceMonitor.relabelings`       | `[]`                                                                                                             | Target relabeling rules.                                                                      |
+| `metrics.serviceMonitor.metricRelabelings` | `[]`                                                                                                             | Metric relabeling rules; avoid summing global Moodle counts across web replicas.              |
+| `metrics.ingressFrom`                      | `[]`                                                                                                             | Allowed metrics clients when NetworkPolicy is enabled; empty permits any client on port 9090. |
+| `metrics.prometheusRule.enabled`           | `false`                                                                                                          | Create scrape availability and persistent overdue-task alerts; requires ServiceMonitor.       |
+| `metrics.prometheusRule.labels`            | `{}`                                                                                                             | Labels matching the Prometheus ruleSelector.                                                  |
+| `metrics.prometheusRule.unavailableFor`    | `5m`                                                                                                             | How long all scrape targets must be missing or down before alerting.                          |
+| `metrics.prometheusRule.overdueTasksFor`   | `15m`                                                                                                            | How long overdue tasks must remain present before alerting.                                   |
+
+### smtp
+
+Outbound SMTP settings.
+
+| Parameter                        | Default               | Meaning                                                                    |
+| -------------------------------- | --------------------- | -------------------------------------------------------------------------- |
+| `smtp.hosts`                     | `""`                  | SMTP server hostname with optional port, for example smtp.example.com:587. |
+| `smtp.security`                  | `tls`                 | Transport security: empty, tls, or ssl.                                    |
+| `smtp.username`                  | `""`                  | SMTP user.                                                                 |
+| `smtp.existingSecret`            | `""`                  | Secret containing SMTP password.                                           |
+| `smtp.existingSecretPasswordKey` | `smtp-password`       | SMTP password key.                                                         |
+| `smtp.noReplyAddress`            | `noreply@example.com` | Sender address for automated notifications.                                |
+
+### resources
+
+Web container resources.
+
+| Parameter                   | Default | Meaning                                                          |
+| --------------------------- | ------- | ---------------------------------------------------------------- |
+| `resources.requests.cpu`    | `250m`  | Kubernetes configuration; validated against the resource schema. |
+| `resources.requests.memory` | `512Mi` | Kubernetes configuration; validated against the resource schema. |
+| `resources.limits.cpu`      | `2`     | Kubernetes configuration; validated against the resource schema. |
+| `resources.limits.memory`   | `2Gi`   | Kubernetes configuration; validated against the resource schema. |
+
+### initResources
+
+Source preparation and installation resources.
+
+| Parameter                       | Default | Meaning                                                          |
+| ------------------------------- | ------- | ---------------------------------------------------------------- |
+| `initResources.requests.cpu`    | `250m`  | Kubernetes configuration; validated against the resource schema. |
+| `initResources.requests.memory` | `256Mi` | Kubernetes configuration; validated against the resource schema. |
+| `initResources.limits.cpu`      | `2`     | Kubernetes configuration; validated against the resource schema. |
+| `initResources.limits.memory`   | `1Gi`   | Kubernetes configuration; validated against the resource schema. |
+
+### podSecurityContext
+
+Pod filesystem ownership and seccomp.
+
+| Parameter                                | Default          | Meaning                                                          |
+| ---------------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| `podSecurityContext.runAsUser`           | `33`             | Kubernetes configuration; validated against the resource schema. |
+| `podSecurityContext.runAsGroup`          | `33`             | Kubernetes configuration; validated against the resource schema. |
+| `podSecurityContext.runAsNonRoot`        | `true`           | Kubernetes configuration; validated against the resource schema. |
+| `podSecurityContext.fsGroup`             | `33`             | Kubernetes configuration; validated against the resource schema. |
+| `podSecurityContext.fsGroupChangePolicy` | `OnRootMismatch` | Kubernetes configuration; validated against the resource schema. |
+| `podSecurityContext.seccompProfile.type` | `RuntimeDefault` | Kubernetes configuration; validated against the resource schema. |
+
+### securityContext
+
+Container hardening applied to web, init, cron and worker.
+
+| Parameter                                  | Default   | Meaning                                                          |
+| ------------------------------------------ | --------- | ---------------------------------------------------------------- |
+| `securityContext.allowPrivilegeEscalation` | `false`   | Kubernetes configuration; validated against the resource schema. |
+| `securityContext.readOnlyRootFilesystem`   | `true`    | Kubernetes configuration; validated against the resource schema. |
+| `securityContext.capabilities.drop`        | `["ALL"]` | Kubernetes configuration; validated against the resource schema. |
+
+### terminationGracePeriodSeconds
+
+Grace period for Apache and in-flight tasks before Kubernetes terminates pods.
+
+| Parameter                       | Default | Meaning                                                                        |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `terminationGracePeriodSeconds` | `120`   | Grace period for Apache and in-flight tasks before Kubernetes terminates pods. |
+
+### podLabels
+
+Pod labels; selector labels are reserved.
+
+| Parameter   | Default | Meaning                                   |
+| ----------- | ------- | ----------------------------------------- |
+| `podLabels` | `{}`    | Pod labels; selector labels are reserved. |
+
+### podAnnotations
+
+Pod annotations.
+
+| Parameter        | Default | Meaning          |
+| ---------------- | ------- | ---------------- |
+| `podAnnotations` | `{}`    | Pod annotations. |
+
+### nodeSelector
+
+Node placement.
+
+| Parameter      | Default | Meaning         |
+| -------------- | ------- | --------------- |
+| `nodeSelector` | `{}`    | Node placement. |
+
+### tolerations
+
+Node taint tolerations.
+
+| Parameter     | Default | Meaning                 |
+| ------------- | ------- | ----------------------- |
+| `tolerations` | `[]`    | Node taint tolerations. |
+
+### affinity
+
+Pod affinity and anti-affinity.
+
+| Parameter  | Default | Meaning                         |
+| ---------- | ------- | ------------------------------- |
+| `affinity` | `{}`    | Pod affinity and anti-affinity. |
+
+### topologySpreadConstraints
+
+Topology spread constraints.
+
+| Parameter                   | Default | Meaning                      |
+| --------------------------- | ------- | ---------------------------- |
+| `topologySpreadConstraints` | `[]`    | Topology spread constraints. |
+
+### priorityClassName
+
+Scheduling priority class.
+
+| Parameter           | Default | Meaning                    |
+| ------------------- | ------- | -------------------------- |
+| `priorityClassName` | `""`    | Scheduling priority class. |
+
+### extraVolumes
+
+Extra volumes for CA certificates or trusted extensions.
+
+| Parameter      | Default | Meaning                                                  |
+| -------------- | ------- | -------------------------------------------------------- |
+| `extraVolumes` | `[]`    | Extra volumes for CA certificates or trusted extensions. |
+
+### extraVolumeMounts
+
+Extra mounts shared by PHP containers.
+
+| Parameter           | Default | Meaning                                |
+| ------------------- | ------- | -------------------------------------- |
+| `extraVolumeMounts` | `[]`    | Extra mounts shared by PHP containers. |
+
+### serviceAccount
+
+Dedicated service account configuration.
+
+| Parameter                    | Default | Meaning                |
+| ---------------------------- | ------- | ---------------------- |
+| `serviceAccount.create`      | `true`  | Create the account.    |
+| `serviceAccount.name`        | `""`    | Account name override. |
+| `serviceAccount.annotations` | `{}`    | Account annotations.   |
+
+### service
+
+Web service options.
+
+| Parameter             | Default     | Meaning                                            |
+| --------------------- | ----------- | -------------------------------------------------- |
+| `service.type`        | `ClusterIP` | Service type.                                      |
+| `service.port`        | `80`        | Service port; Apache listens on unprivileged 8080. |
+| `service.annotations` | `{}`        | Service annotations.                               |
+
+### ingress
+
+Ingress configuration; configure moodle.wwwroot consistently.
+
+| Parameter                  | Default | Meaning                                                   |
+| -------------------------- | ------- | --------------------------------------------------------- |
+| `ingress.enabled`          | `false` | Render an Ingress.                                        |
+| `ingress.ingressClassName` | `""`    | Ingress controller class.                                 |
+| `ingress.annotations`      | `{}`    | Controller-specific annotations, including upload limits. |
+| `ingress.hosts`            | `[]`    | Host/path definitions.                                    |
+| `ingress.tls`              | `[]`    | TLS certificate references.                               |
+
+### gatewayAPI
+
+Canonical Gateway API integration.
+
+| Parameter               | Default | Meaning                                                     |
+| ----------------------- | ------- | ----------------------------------------------------------- |
+| `gatewayAPI.enabled`    | `false` | Render HTTPRoutes.                                          |
+| `gatewayAPI.httpRoutes` | `[]`    | HTTPRoute definitions with parentRefs, hostnames and rules. |
+
+### externalSecrets
+
+Canonical External Secrets integration.
+
+| Parameter                         | Default | Meaning                                                     |
+| --------------------------------- | ------- | ----------------------------------------------------------- |
+| `externalSecrets.enabled`         | `false` | Render ExternalSecret objects; operator must already exist. |
+| `externalSecrets.refreshInterval` | `1h`    | Default refresh interval.                                   |
+| `externalSecrets.items`           | `[]`    | ExternalSecret definitions containing complete specs.       |
+
+### autoscaling
+
+Autoscaling requires shared data and Redis sessions.
+
+| Parameter                                    | Default | Meaning                            |
+| -------------------------------------------- | ------- | ---------------------------------- |
+| `autoscaling.enabled`                        | `false` | Enable HPA.                        |
+| `autoscaling.minReplicas`                    | `2`     | Minimum web replicas.              |
+| `autoscaling.maxReplicas`                    | `5`     | Maximum web replicas.              |
+| `autoscaling.targetCPUUtilizationPercentage` | `70`    | Target CPU utilization percentage. |
+
+### pdb
+
+Voluntary disruption protection.
+
+| Parameter          | Default | Meaning                                          |
+| ------------------ | ------- | ------------------------------------------------ |
+| `pdb.enabled`      | `false` | Render PDB; use only with multiple web replicas. |
+| `pdb.minAvailable` | `1`     | Minimum healthy web pods.                        |
+
+### networkPolicy
+
+Network isolation; additional external endpoints use explicit extraEgress rules.
+
+| Parameter                   | Default | Meaning                                                                  |
+| --------------------------- | ------- | ------------------------------------------------------------------------ |
+| `networkPolicy.enabled`     | `false` | Enable NetworkPolicy.                                                    |
+| `networkPolicy.ingressFrom` | `[]`    | Allowed ingress peers; empty permits all sources to the web port.        |
+| `networkPolicy.extraEgress` | `[]`    | Additional egress rules for external DB/Redis, SMTP, plugins or storage. |
+
+### Optional Service IP fields
+
+| Parameter                | Default | Meaning                                            |
+| ------------------------ | ------- | -------------------------------------------------- |
+| `service.ipFamilyPolicy` | omitted | SingleStack, PreferDualStack or RequireDualStack   |
+| `service.ipFamilies`     | omitted | Ordered IPv4/IPv6 list, at most two unique entries |
+
+## Version history
+
+Initial chart targets Moodle 5.2.2. Chart releases are managed by CI; application
+upgrades require the documented schema lifecycle.
+
+## Related charts
+
+- [PostgreSQL](/docs/charts/postgresql)
+- [Redis](/docs/charts/redis)
+- [External Secrets](https://external-secrets.io/latest/)
