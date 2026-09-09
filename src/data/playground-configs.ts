@@ -10355,7 +10355,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.68.7',
+          default: '6.80.0',
           description: 'Pinned Poznote image tag',
         },
         {
