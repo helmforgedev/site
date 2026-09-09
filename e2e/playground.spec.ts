@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('minecraft uses its verified image tag', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="minecraft"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.9.0');
+    await expect(page.locator('#playground-code')).not.toContainText('2026.8.3');
+  });
   test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="n8n"]').click();

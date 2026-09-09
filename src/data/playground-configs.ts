@@ -9609,7 +9609,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2026.8.3',
+          default: '2026.9.0',
           description: 'Minecraft server image tag',
         },
         {
