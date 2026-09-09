@@ -323,7 +323,7 @@ ingress:
 | Parameter          | Type   | Default                       | Description     |
 | ------------------ | ------ | ----------------------------- | --------------- |
 | `image.repository` | string | `docker.io/authelia/authelia` | Authelia image. |
-| `image.tag`        | string | `"4.39.20"`                   | Image tag.      |
+| `image.tag`        | string | `"4.39.22"`                   | Image tag.      |
 
 ### Secrets
 
@@ -413,6 +413,23 @@ The output hash goes in `usersDatabase.users.<user>.password`.
 | `backup.s3.bucket`         | string  | `""`          | Target bucket name.                  |
 | `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials. |
 | `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.          |
+
+## Upgrading to 4.39.22
+
+Authelia 4.39.21 changes storage encryption to use HKDF and authenticated additional data;
+4.39.22 fixes the access-token JWT session migration. Back up the database and retain
+the storage encryption key before upgrading. Allow startup migrations to complete
+before serving traffic. A rollback may require restoring the matching database
+backup and key.
+
+Generated credentials are retained through Helm cluster lookup. Use an existing
+Secret for GitOps or offline rendering, where lookup cannot retrieve the installed
+key. Do not rotate the storage key during this update. After rollout, run
+`authelia storage encryption check --config /config/configuration.yml` inside the
+Authelia container and verify application health and MFA enrollment.
+
+See the [4.39.21 release notes](https://github.com/authelia/authelia/releases/tag/v4.39.21)
+and [4.39.22 migration fix](https://github.com/authelia/authelia/releases/tag/v4.39.22).
 
 ## More Information
 
