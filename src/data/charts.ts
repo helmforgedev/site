@@ -17,7 +17,7 @@ export const charts: Chart[] = [
     name: 'Moodle',
     slug: 'moodle',
     description:
-      'Learning platform with immutable upstream code, PostgreSQL, cron, Redis sessions and explicit maintenance.',
+      'Learning platform with immutable upstream code, PostgreSQL/MySQL/MariaDB, cron, Redis sessions and explicit maintenance.',
     maturity: 'stable',
     backup: false,
   },
