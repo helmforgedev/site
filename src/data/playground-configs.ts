@@ -8,6 +8,100 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  moodle: [
+    {
+      name: 'Learning site',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'moodle.wwwroot',
+          type: 'text',
+          default: 'http://localhost:8080',
+          description: 'Canonical root URL without a trailing slash',
+        },
+        {
+          label: 'Site name',
+          key: 'moodle.siteName',
+          type: 'text',
+          default: 'Moodle Learning Platform',
+          description: 'Full name used during initial installation',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'moodle.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret containing admin-password; recommended for production',
+        },
+        {
+          label: 'Proxy TLS',
+          key: 'moodle.sslProxy',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable with an HTTPS public URL when TLS terminates at the gateway',
+        },
+      ],
+    },
+    {
+      name: 'Data and tasks',
+      fields: [
+        {
+          label: 'Data capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Persistent Moodledata capacity',
+        },
+        {
+          label: 'Scheduled tasks',
+          key: 'cron.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Run upstream Moodle cron in a dedicated container',
+        },
+        {
+          label: 'Ad-hoc worker',
+          key: 'adhoc.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Additional processing for queued ad-hoc tasks',
+        },
+        {
+          label: 'Disable email',
+          key: 'moodle.noEmailEver',
+          type: 'toggle',
+          default: 'false',
+          description: 'Prevent outgoing Moodle mail in staging or restore drills',
+        },
+      ],
+    },
+    {
+      name: 'PHP capacity',
+      fields: [
+        {
+          label: 'PHP memory',
+          key: 'php.memoryLimit',
+          type: 'text',
+          default: '256M',
+          description: 'Per-process PHP memory ceiling; size pod memory for request concurrency',
+        },
+        {
+          label: 'Upload limit',
+          key: 'php.uploadMaxFilesize',
+          type: 'text',
+          default: '64M',
+          description: 'Match PHP POST, Moodle and gateway upload limits',
+        },
+        {
+          label: 'POST limit',
+          key: 'php.postMaxSize',
+          type: 'text',
+          default: '64M',
+          description: 'Maximum HTTP POST size, at least the upload limit',
+        },
+      ],
+    },
+  ],
   booklore: [
     {
       name: 'Application',
