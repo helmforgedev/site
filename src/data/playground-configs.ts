@@ -6718,8 +6718,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.11.5',
+          default: '1.12.0',
           description: 'Pinned Langflow image tag',
+        },
+        {
+          label: 'Automatic Login',
+          key: 'auth.autoLogin',
+          type: 'toggle',
+          default: 'false',
+          description: 'Development only: enable automatic login without credentials',
         },
         {
           label: 'HTTP Port',
