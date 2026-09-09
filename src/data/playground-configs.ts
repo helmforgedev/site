@@ -3410,14 +3410,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '9.1.1',
+          default: '9.1.2',
           description: 'Pinned Valkey image tag',
         },
         {
           label: 'Helm Test Image Tag',
           key: 'tests.image.tag',
           type: 'text',
-          default: '9.1.1',
+          default: '9.1.2',
           description: 'Pinned Valkey image tag for helm test',
         },
         {
