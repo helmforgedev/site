@@ -1,6 +1,38 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  for (const [slug, key] of [
+    ['stirling-pdf', 'metrics.enabled'],
+    ['bytestash', 'backup.enabled'],
+    ['minecraft', 'server.preferIPv6'],
+  ]) {
+    test(`${slug} renders its boolean option as a working toggle`, async ({ page }) => {
+      await page.goto('/playground');
+      await page.locator(`.playground-chart-btn[data-slug="${slug}"]`).click();
+      const toggle = page.locator(`button[data-field-key="${key}"]`);
+      await expect(toggle).toBeVisible();
+      await toggle.click();
+      await expect(page.locator('#playground-code')).toContainText(`${key}=true`);
+      await toggle.click();
+      await expect(page.locator('#playground-code')).not.toContainText(`${key}=true`);
+    });
+  }
+  test('memos keeps database driver and bundled databases consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="memos"]').click();
+    const driver = page.locator('select[data-field-key="database.driver"]');
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(driver).toHaveValue('postgres');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await page.locator('button[data-field-key="mysql.enabled"]').click();
+    await expect(driver).toHaveValue('mysql');
+    await expect(code).toContainText('mysql.enabled=true');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+    await driver.selectOption('sqlite');
+    await expect(code).not.toContainText('mysql.enabled=true');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+  });
   test('langflow keeps automatic login opt-in', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="langflow"]').click();

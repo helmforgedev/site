@@ -1,0 +1,510 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Ryot Chart
+description:
+  Private personal tracking with protected local authentication, HelmForge PostgreSQL, verified recovery and explicit
+  integration boundaries.
+---
+
+# Ryot Helm Chart
+
+Deploy [Ryot](https://github.com/IgnisDa/ryot) for private personal tracking with the official
+`ghcr.io/ignisda/ryot:v10.5.0` image and HelmForge PostgreSQL.
+
+## Production contract
+
+- One application replica with Recreate upgrades and one active native scheduler.
+- Protected native administrator creation before the public process starts; existing users are preserved.
+- Closed registration, local password authentication, retained administrator override and initial-password Secrets.
+- Non-root UID 1001, read-only root filesystem, dropped capabilities and no Kubernetes API token.
+- Native frontend, Rust backend and Caddy retained together; dedicated temporary directories preserve frontend assets.
+- HelmForge PostgreSQL with restricted credentials, required extensions, persistent data and network isolation.
+- External PostgreSQL components with Secret-backed passwords and verified TLS by default.
+- Ingress, Gateway API, dual-stack Service, External Secrets Operator and placement controls.
+- Native session and private-collection persistence checks, plus logical database recovery verification.
+
+**This version supports local authentication only. OIDC and S3 are deliberately unavailable in the chart.** The native
+OIDC login accepts a stored subject without proving a provider exchange; this was reproduced only with an owned
+disposable account. The chart refuses to start with OIDC-linked database accounts. Source inspection also found S3
+signing and deletion operations without user authorization or ownership checks. Merely putting credentials in a Secret
+does not repair those upstream behaviors. See [security and integrations](#security).
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm install ryot helmforge/ryot -f values.yaml
+kubectl port-forward svc/ryot-ryot 8000:8000
+```
+
+The initial account is `admin`; customize `bootstrap.username` before installation. Helm NOTES identifies the initial
+password Secret. Prefer `bootstrap.existingSecret` and `auth.existingSecret` for GitOps. Updating an initial-password
+Secret never resets an existing account. The administrator override must contain at least 32 characters and remain
+stable through upgrades and recovery.
+
+For remote use, set `server.publicUrl` to the exact HTTPS origin, configure Ingress or Gateway routing and allow the
+controller through `networkPolicy.ingressFrom`. Default ingress permits same-namespace pods only. The proxy health
+endpoint also probes the native backend. Resource limits must accommodate both the frontend and backend.
+
+## Database choices
+
+Bundled PostgreSQL is enabled by default. Its native first-boot scripts prepare `uuid-ossp` and `pg_trgm` as the
+database administrator; the Ryot process uses the separate application user. Keep these scripts and the writable
+PostgreSQL temporary/socket mounts when overriding dependency values. Scripts do not rerun on an existing database
+volume.
+
+For external PostgreSQL, disable `postgresql.enabled` and set `database.host`, `database.name`, `database.username` and
+`database.passwordSecret`. A DBA must prepare both extensions and schema privileges before deployment. The chart builds
+the URI in a private memory volume with correctly encoded credentials. External connections default to `verify-full`;
+use `database.caSecret` for a private CA and permit the database destination through NetworkPolicy. PostgreSQL is the
+only supported database engine.
+
+The read-only admission check waits for an authenticated database connection, rejects OIDC-linked accounts and decides
+whether first-administrator setup is needed. Native migrations fail closed before readiness. Disabling bootstrap does
+not disable database admission or the nonempty administrator-override requirement.
+
+## Durability and availability
+
+User accounts, native sessions and tracking records live in PostgreSQL. Application temporary files, import staging and
+logs are ephemeral; archive relevant logs through the platform. A single scheduler avoids duplicate native background
+processing, so horizontal autoscaling and single-replica disruption budgets are not exposed as availability features.
+Recreate upgrades include downtime.
+
+Back up PostgreSQL and retain authentication Secrets before upgrades. Native migrations are not reversed by Helm
+rollback. The recovery profile quiesces the application, creates a native custom-format dump, restores into a separate
+empty database and verifies the original session and private collection before cleanup. It does not claim multi-node
+database failover. See [database operations and recovery](#recovery).
+
+## Integrations and monitoring
+
+Default egress allows DNS and the selected bundled database. Explicitly allow external databases and trusted provider
+APIs using `networkPolicy.extraEgress` or `networkPolicy.webEgress`. Provider credentials may use Secret references in
+`extraEnv`; managed identity, database and unsafe storage settings cannot be overridden there.
+
+No native Prometheus endpoint is claimed for this release. Monitor application health, workload resources, native logs
+and the PostgreSQL dependency with your platform tooling. PostgreSQL exposes its own documented exporter and
+ServiceMonitor options. SMTP delivery is not part of this chart's verified integration contract; its native test can
+return success despite a failed send.
+
+## Security Scan: `ryot`
+
+| Framework | Score      |
+| --------- | ---------- |
+| Overall   | **99.39%** |
+| MITRE     | **98.82%** |
+| NSA       | **99.00%** |
+| SOC2      | **96.00%** |
+
+Kubescape 4.0.13, default manifests including PostgreSQL, 2026-09-10. C-0012 flags the bootstrap script's
+password-handling code inside a ConfigMap; actual credential values come from Secrets and are not embedded in that
+script. The finding remains visible without suppression. This configuration scan does not establish upstream application
+security or image vulnerability status; the OIDC and S3 restrictions above remain mandatory regardless of this score.
+
+## Security
+
+Use the pinned release only with local accounts under this chart's production contract. Keep registration disabled and
+retain a strong administrator override. Existing Secret values are checked before any application listener starts. The
+bootstrap password is mounted only in the private initialization container.
+
+### OIDC
+
+Ryot v10.5.0's native login resolver accepts a stored OIDC subject without verifying a provider exchange. Disabling the
+provider configuration alone does not protect an existing linked account. The chart therefore rejects SERVER_OIDC
+overrides and refuses databases containing linked accounts before public startup. An isolated regression used only a new
+disposable ordinary account, confirmed its session identity, then deleted the account through the native API.
+
+Do not create OIDC-linked accounts through administrative APIs or import such accounts into a running deployment.
+Perform any identity remediation separately under controlled access; this chart does not rewrite account identities.
+Enable OIDC only after an upstream correction and a new authorization regression, not by removing the admission check.
+
+### S3
+
+Native S3 presigning and object deletion use application credentials without user or object ownership checks in this
+release. FILE_STORAGE overrides are rejected and native storage credentials remain empty. A private bucket alone does
+not supply missing application authorization. The default gate checks that storage stays disabled and signing/delete
+requests cannot perform useful operations.
+
+### Provider APIs and SMTP
+
+Supply unrelated provider credentials through `extraEnv` Secret key references and allow only their required network
+destinations. Do not place tokens directly in values or expose the administrator override in a browser URL.
+
+SMTP uses implicit TLS on port 465 with the pinned Rust library's compiled public trust roots. A mounted Node/private CA
+bundle does not establish trust for that transport. The native notification test can return true even when delivery
+fails; verify a received message before relying on notifications. No SMTP delivery fixture is asserted by this chart.
+
+Source evidence:
+[authentication service](https://github.com/IgnisDa/ryot/blob/v10.5.0/crates/services/user/src/authentication_operations.rs),
+[storage resolver](https://github.com/IgnisDa/ryot/blob/v10.5.0/crates/resolvers/file-storage/src/lib.rs).
+
+## Recovery
+
+Back up PostgreSQL with its native tools and retain the administrator override and initial-password Secrets separately.
+The initial password is not an account reset mechanism; actual password hashes and sessions live in the database.
+
+### Before upgrading
+
+1. Record the application and PostgreSQL versions, database endpoint, extension versions and retained Secret names.
+2. Stop the Ryot writer for a consistent recovery checkpoint when migrations or queued operations are involved.
+3. Create a custom-format pg_dump using the database's supported client version and protect the resulting archive.
+4. Verify restoration into a separate empty database before applying irreversible application migrations.
+5. Upgrade with the same credentials, inspect admission/migration logs and authenticate before reopening ingress.
+
+The chart's PostgreSQL first-boot scripts prepare uuid-ossp and pg_trgm only on a new data volume. For external
+databases, have the DBA prepare these extensions and grant application schema privileges. Do not make the application
+role a superuser to bypass migration setup.
+
+### Restore validation
+
+Restore the native dump into an empty database with the intended application owner and extensions. Point the chart at
+that database using the same retained authentication Secret and a verified TLS connection when external. The admission
+check must pass without modifying existing users. Verify an existing native session, local password login and private
+tracking data before directing user traffic to the recovered deployment.
+
+The automated profile uses an independent empty database on its disposable PostgreSQL server, preserves the original
+database, then checks the original session and a Unicode collection. It proves logical database recovery, not multi-node
+failover. Production backup storage, retention and recovery-point objectives remain deployment responsibilities.
+
+Application temporary import files and in-memory background jobs are not part of the PostgreSQL recovery boundary. Helm
+rollback does not reverse data migrations. Do not restore an OIDC-linked database into this local-only chart.
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://track.example.com
+auth:
+  existingSecret: ryot-administrator-token
+bootstrap:
+  username: administrator
+  existingSecret: ryot-initial-password
+postgresql:
+  standalone:
+    persistence:
+      size: 20Gi
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: track.example.com
+      paths:
+        - { path: /, pathType: Prefix }
+  tls:
+    - secretName: track-tls
+      hosts: [track.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels: { kubernetes.io/metadata.name: kube-system }
+      podSelector:
+        matchLabels: { app.kubernetes.io/name: traefik }
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Name Override.
+nameOverride: ''
+# -- Fullname Override.
+fullnameOverride: ''
+# -- Common Labels.
+commonLabels: {}
+# -- One scheduler and writer; multiple replicas are not supported by this chart.
+replicaCount: 1
+# -- Image.
+image:
+  # -- Repository.
+  repository: ghcr.io/ignisda/ryot
+  # -- Tag.
+  tag: v10.5.0
+  # -- Pull Policy.
+  pullPolicy: IfNotPresent
+# -- Image Pull Secrets.
+imagePullSecrets: []
+# -- Auth.
+auth:
+  # -- Administrator override, generated and retained when empty. Use at least 32 characters or an existing Secret.
+  adminAccessToken: ''
+  # -- Existing Secret.
+  existingSecret: ''
+  # -- Admin Access Token Key.
+  adminAccessTokenKey: admin-access-token
+# -- Server.
+server:
+  # -- Port.
+  port: 8000
+  # -- Public Url.
+  publicUrl: http://localhost:8000
+# -- Extra Env.
+extraEnv: []
+# -- Database.
+database:
+  # -- Host.
+  host: ''
+  # -- Port.
+  port: 5432
+  # -- Name.
+  name: ryot
+  # -- Username.
+  username: ryot
+  # -- Password Secret.
+  passwordSecret: ''
+  # -- Password Key.
+  passwordKey: password
+  # -- Empty selects disable for bundled PostgreSQL and verify-full for external PostgreSQL.
+  sslMode: ''
+  # -- Ca Secret.
+  caSecret: ''
+  # -- Ca Key.
+  caKey: ca.crt
+  # -- Connection Timeout.
+  connectionTimeout: 180
+  # -- Client Image.
+  clientImage:
+    # -- Repository.
+    repository: docker.io/library/postgres
+    # -- Tag.
+    tag: 18.6-trixie
+    # -- Pull Policy.
+    pullPolicy: IfNotPresent
+# -- Service Account.
+serviceAccount:
+  # -- Create.
+  create: true
+  # -- Name.
+  name: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Automount Service Account Token.
+  automountServiceAccountToken: false
+# -- Service.
+service:
+  # -- Type.
+  type: ClusterIP
+  # -- Port.
+  port: 8000
+  # -- Annotations.
+  annotations: {}
+  # -- Ip Family Policy.
+  ipFamilyPolicy: ''
+  # -- Ip Families.
+  ipFamilies: []
+# -- Ingress.
+ingress:
+  # -- Enabled.
+  enabled: false
+  # -- Ingress Class Name.
+  ingressClassName: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Hosts.
+  hosts: []
+  # -- Tls.
+  tls: []
+# -- Gateway.
+gateway:
+  # -- Enabled.
+  enabled: false
+  # -- Annotations.
+  annotations: {}
+  # -- Parent Refs.
+  parentRefs: []
+  # -- Hostnames.
+  hostnames: []
+  # -- Path.
+  path: /
+  # -- Path Type.
+  pathType: PathPrefix
+# -- External Secrets.
+externalSecrets:
+  # -- Enabled.
+  enabled: false
+  # -- Refresh Interval.
+  refreshInterval: 1h
+  # -- Items.
+  items: []
+# -- Network Policy.
+networkPolicy:
+  # -- Enabled.
+  enabled: true
+  # -- Ingress From.
+  ingressFrom: []
+  # -- Egress Isolation.
+  egressIsolation: true
+  # -- DNS peers; adapt selectors for clusters with different DNS labels.
+  dnsEgress:
+    - namespaceSelector:
+        matchLabels: { kubernetes.io/metadata.name: kube-system }
+      podSelector:
+        matchLabels: { k8s-app: kube-dns }
+  # -- Web Egress.
+  webEgress: []
+  # -- Web Ports.
+  webPorts:
+    - 443
+  # -- Extra Egress.
+  extraEgress: []
+# -- Probes.
+probes:
+  # -- Startup.
+  startup:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /health
+    # -- Failure Threshold.
+    failureThreshold: 60
+    # -- Period Seconds.
+    periodSeconds: 5
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+  # -- Readiness.
+  readiness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /health
+    # -- Failure Threshold.
+    failureThreshold: 3
+    # -- Period Seconds.
+    periodSeconds: 10
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+  # -- Liveness.
+  liveness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /health
+    # -- Failure Threshold.
+    failureThreshold: 3
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+# -- Resources.
+resources:
+  # -- Requests.
+  requests:
+    # -- Cpu.
+    cpu: 250m
+    # -- Memory.
+    memory: 512Mi
+  # -- Limits.
+  limits:
+    # -- Cpu.
+    cpu: '2'
+    # -- Memory.
+    memory: 2Gi
+# -- Pod Security Context.
+podSecurityContext:
+  # -- Run As Non Root.
+  runAsNonRoot: true
+  # -- Run As User.
+  runAsUser: 1001
+  # -- Run As Group.
+  runAsGroup: 1001
+  # -- Fs Group.
+  fsGroup: 1001
+  # -- Fs Group Change Policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Seccomp Profile.
+  seccompProfile:
+    # -- Type.
+    type: RuntimeDefault
+# -- Security Context.
+securityContext:
+  # -- Allow Privilege Escalation.
+  allowPrivilegeEscalation: false
+  # -- Read Only Root Filesystem.
+  readOnlyRootFilesystem: true
+  # -- Capabilities.
+  capabilities:
+    # -- Drop.
+    drop:
+      - ALL
+# -- Pod Labels.
+podLabels: {}
+# -- Pod Annotations.
+podAnnotations: {}
+# -- Node Selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity.
+affinity: {}
+# -- Topology Spread Constraints.
+topologySpreadConstraints: []
+# -- Priority Class Name.
+priorityClassName: ''
+# -- Termination Grace Period Seconds.
+terminationGracePeriodSeconds: 30
+# -- Bootstrap.
+bootstrap:
+  # -- Enabled.
+  enabled: true
+  # -- Username.
+  username: admin
+  # -- Password.
+  password: ''
+  # -- Existing Secret.
+  existingSecret: ''
+  # -- Password Key.
+  passwordKey: password
+# -- Runtime.
+runtime:
+  # -- Temporary Size.
+  temporarySize: 1Gi
+  # -- Home Size.
+  homeSize: 256Mi
+# -- Postgresql.
+postgresql:
+  # -- Keep the bundled database immutable outside explicit runtime/data mounts.
+  securityContext:
+    readOnlyRootFilesystem: true
+  # -- Writable temporary and Unix socket directories for the official PostgreSQL image.
+  extraVolumes:
+    - { name: postgres-tmp, emptyDir: { sizeLimit: 1Gi } }
+    - { name: postgres-socket, emptyDir: { medium: Memory, sizeLimit: 16Mi } }
+  # -- Preserve these mounts when overriding extraVolumeMounts.
+  extraVolumeMounts:
+    - { name: postgres-tmp, mountPath: /tmp }
+    - { name: postgres-socket, mountPath: /var/run/postgresql }
+  # -- Isolate the bundled database; same-namespace clients still need native credentials.
+  networkPolicy:
+    enabled: true
+    egress:
+      enabled: true
+      allowDNS: true
+      allowSameNamespacePostgreSQL: false
+      allowHTTPS: false
+  # -- Install required extensions as the database administrator on first initialization, before application migrations.
+  initdb:
+    # -- Preserve this script when customizing first-boot SQL. External databases need equivalent DBA preparation.
+    scripts:
+      # -- Uses the subchart's actual application database and administrator connection.
+      20-ryot-extensions.sh: |
+        #!/bin/bash
+        set -euo pipefail
+        export PGPASSWORD="${POSTGRES_PASSWORD}"
+        psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${APP_DATABASE}" <<'SQL'
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+        SQL
+  # -- Enabled.
+  enabled: true
+  # -- Architecture.
+  architecture: standalone
+  # -- Auth.
+  auth:
+    # -- Database.
+    database: ryot
+    # -- Username.
+    username: ryot
+    # -- Existing Secret.
+    existingSecret: ''
+    # -- Existing Secret User Password Key.
+    existingSecretUserPasswordKey: user-password
+```

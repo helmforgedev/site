@@ -14,6 +14,21 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Ryot',
+    slug: 'ryot',
+    description:
+      'Private personal tracking with protected local accounts, HelmForge PostgreSQL and verified database recovery.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Papra',
+    slug: 'papra',
+    description: 'Private document archive with protected bootstrap, encrypted originals, libSQL and S3 storage.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Stirling PDF',
     slug: 'stirling-pdf',
     description: 'Authenticated PDF, OCR and office conversion with durable state and private native Prometheus.',
@@ -552,7 +567,8 @@ export const charts: Chart[] = [
   {
     name: 'Memos',
     slug: 'memos',
-    description: 'Self-hosted notes with SQLite, external database support, backups, and secure defaults.',
+    description:
+      'Private notes with protected bootstrap, SQLite or HelmForge SQL, OAuth, MCP, S3 and verified recovery.',
     maturity: 'stable',
     backup: false,
   },

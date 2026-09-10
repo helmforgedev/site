@@ -1,0 +1,613 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Papra Chart
+description:
+  Private document management with protected administrator setup, encrypted local or S3 originals, libSQL and verified
+  recovery.
+---
+
+# Papra Helm Chart
+
+Deploy [Papra](https://github.com/papra-hq/papra), a private document archive with extraction, full-text search and
+organization-based access control. The chart uses the official `ghcr.io/papra-hq/papra:26.6.2-rootless` image.
+
+## Production defaults
+
+- A single writer with Recreate upgrades, a retained 5 GiB PVC and explicit resource limits.
+- Non-root UID/GID 1000, read-only root filesystem, dropped capabilities and no Kubernetes API token.
+- Protected first-administrator creation on loopback before the public server starts; existing users are preserved.
+- Retained session-signing and initial-password Secrets, with existing Secret and External Secrets Operator support.
+- Closed email/password registration, native health probes and default network isolation.
+- Local SQLite or authenticated external libSQL; local originals or S3-compatible storage.
+- Optional native database encryption and versioned document encryption keys, supplied through Secrets.
+- A separate persistent local libSQL task queue, preserving pending extraction work across pod replacement.
+- Ingress, Gateway API, dual-stack Services, placement controls and trusted private CA bundles.
+
+Papra does not use PostgreSQL, MySQL or Redis. Its local database and libSQL client share the application's native
+migrations. The chart keeps one application replica across all storage combinations.
+
+## Installation and access
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm install papra helmforge/papra -f values.yaml
+kubectl port-forward svc/papra-papra 1221:1221
+```
+
+Set `bootstrap.email` and `bootstrap.name` before installation; the default account is `admin@example.test`. The initial
+password is generated once and retained in the Secret reported by Helm NOTES. Prefer `bootstrap.existingSecret` and
+`auth.existingSecret` for GitOps. The password is available only to the init container; the public process never
+receives the bootstrap password mount.
+
+Bootstrap runs strict native migrations, checks the existing user count and initializes only an empty instance through
+Papra's own authentication API. It verifies administrator permissions before stopping its loopback listener. Changing
+the bootstrap Secret later does not reset an existing account. Keep the separate `auth` Secret stable to retain
+sessions.
+
+For remote access, configure a dedicated HTTPS hostname through `server.publicUrl`, an Ingress or Gateway route, and the
+matching `networkPolicy.ingressFrom` peers. Configure edge upload limits and timeouts for your document sizes. See
+[production examples](https://github.com/helmforgedev/charts/blob/main/charts/papra/examples/production.yaml).
+
+## Database and document storage
+
+The default PVC contains the local database under `db/` and original documents under `documents/`. The native server
+performs extraction and indexing; database records contain metadata and extracted text.
+
+For remote libSQL, set `database.remoteUrl` and `database.authTokenSecret`. Production endpoints should use HTTPS. For a
+private CA, mount its bundle with `server.trustedCaSecret`; this extends Node trust without disabling certificate
+verification. The chart does not provision a remote database or manage its tokens. Local document storage still requires
+the PVC. Remote libSQL cannot use the client's local `database.encryptionSecret` option.
+
+For S3, set `storage.driver: s3`, endpoint, region, bucket and `storage.s3.existingSecret`. The bucket must already
+exist. `storage.s3.forcePathStyle` supports compatible endpoints. Allow the destination through NetworkPolicy. The
+default SQLite database still needs durable storage when documents are placed in S3. Changing the storage driver does
+not automatically migrate existing originals; use the upstream migration procedure with a backup and verified rollback
+plan.
+
+See [storage and recovery](#recovery) and
+[external storage examples](https://github.com/helmforgedev/charts/blob/main/charts/papra/examples/external-storage.yaml).
+
+## Encryption and key retention
+
+`database.encryptionSecret` enables native encryption of a newly created local database. Preserve its exact value in
+every upgrade and restore. Enabling, disabling or rotating this key on an existing database is not an automatic
+migration. The chart does not recreate a database when a key is missing or incorrect.
+
+`storage.encryptionSecret` enables native envelope encryption of original documents. Its selected key contains a single
+64-hex-character key or a versioned ring such as `001:<64-hex-key>,002:<64-hex-key>`. Each key represents 32 bytes.
+Papra orders version labels lexically; use stable, zero-padded labels and keep every version still referenced by
+originals. Adding a new version changes encryption of new documents; it does not rewrap all existing documents.
+
+Document encryption protects original files. Extracted text and metadata remain in the database, so protect the database
+separately. Database backups, original objects and the complete key ring must be recovered together. For plaintext
+documents created before encryption was enabled, use the separate upstream maintenance procedure; startup does not
+silently rewrite historical storage.
+
+## Authentication and integrations
+
+The default public process disables first-user privilege grants, email/password signup, unconfigured password reset and
+Better Auth telemetry. Existing instances can use their native account-management flows after authentication.
+
+`envFrom` provides an advanced Secret-backed integration path, while chart-managed explicit environment values retain
+precedence. Do not put credentials in plain `extraEnv` values. Native custom OAuth providers have a different enrollment
+contract from email/password signup: Papra's global registration flag does not restrict custom-provider provisioning.
+Restrict access at the identity provider before configuring those providers; do not infer a closed enrollment policy
+from `auth.allowRegistration: false`. This chart's validated default authentication is the native password flow.
+
+## Monitoring and operations
+
+Pending extraction tasks live in `db/tasks.sqlite` on the data volume. `tasks.workerEnabled=false` pauses consumption
+while leaving the web API available; reenabling it processes retained pending jobs. Include this separate queue and its
+WAL files in consistent backups. Its metadata is not encrypted by `database.encryptionSecret`; treat it as private data.
+
+The pinned native queue has no lease/reaper for jobs interrupted in `processing`, extraction retries default to zero,
+and completed jobs are retained. Persistent pending work does not guarantee automatic recovery of an interrupted
+extraction or a crash between document creation and enqueue. Monitor failed/stuck jobs and queue growth; see
+[task lifecycle](#tasks). The chart does not silently rewrite task state.
+
+Startup/readiness use `/api/health`, including native database health, and liveness uses `/api/ping`. There is no
+verified native Prometheus endpoint in this release; the chart does not create a misleading ServiceMonitor. Monitor
+workload availability, memory, PVC capacity, application logs and authenticated edge traffic using your existing
+platform monitoring.
+
+NetworkPolicy permits same-namespace HTTP ingress and DNS by default. Allow ingress-controller peers and explicit
+S3/libSQL/mail/identity-provider destinations. A compatible CNI is required for enforcement. See
+[operations](#operations).
+
+## Upgrade and recovery
+
+Take a consistent database and original-document backup before upgrades. Native migrations run before readiness; Helm
+rollback does not reverse data migrations. For local state, stop the writer, archive the database directory including
+WAL files and the complete document directory, and retain all Secrets separately. Restore into a fresh PVC with
+`persistence.existingClaim`, then authenticate and verify original checksums and search results before reopening access.
+
+PVC retention protects generated claims from ordinary release uninstall. Namespace deletion and external storage
+policies can still remove data. Existing claims are managed by their owner. Recreate upgrades deliberately include
+downtime.
+
+## Validation
+
+Runtime profiles exercise native bootstrap, administrator permissions, closed registration, organization/document
+creation, exact original SHA-256, extraction/search, private-download denial and persistence across pod replacement.
+Additional profiles verify encrypted database integrity and wrong-key rejection, encrypted fresh-PVC recovery, signed S3
+object reads and unsigned denial, authenticated remote libSQL, and both integrations over trusted HTTPS. The queue
+profile pauses the worker, proves the same pending job survives replacement, resumes the native worker and verifies
+completion and searchable content without another upload.
+
+Run the repository gate from `helmforge-ops`:
+
+```bash
+make validate-chart CHART=papra
+```
+
+The complete gate, security scan and release evidence must be green before publication.
+
+## Security Scan: `papra`
+
+| Framework | Score      |
+| --------- | ---------- |
+| Overall   | **98.48%** |
+| MITRE     | **97.06%** |
+| NSA       | **97.50%** |
+| SOC2      | **90.00%** |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-10. The sole finding is C-0012 matching the literal boolean
+`AUTH_IS_PASSWORD_RESET_ENABLED=false` in the main and bootstrap environments. This is a policy flag, not a password;
+actual authentication and encryption credentials use Secrets. The finding remains visible without suppression. This
+configuration scan does not replace image vulnerability management or application security review.
+
+## Operations
+
+### First installation
+
+Set the administrator email, a dedicated public HTTPS URL and durable storage before installation. Supply existing
+Secrets through your secret manager, or securely retrieve generated credentials using the names reported by Helm NOTES.
+The session secret and initial password have separate roles. Changing the latter never resets an existing user.
+
+Monitor the bootstrap init container for migration and setup failures. A failed native database query is an error, not
+permission to recreate users. Avoid exposing a fresh deployment with bootstrap disabled until its onboarding is
+protected.
+
+### Network and resources
+
+Ingress and Gateway API are optional. Add controller peers to the default NetworkPolicy, plus explicit external-service
+egress. Same-namespace traffic is the default HTTP allowance. DNS defaults can be narrowed to your cluster DNS labels.
+Do not infer enforcement from a rendered policy; the cluster CNI must implement it.
+
+The image runs as UID/GID 1000 with a read-only root. The data PVC, temporary volume and home volume provide the
+required writable paths. Ensure the storage driver honors fsGroup or pre-provision appropriate ownership. Size requests
+and limits for native extraction and document sizes; configure edge upload limits and request timeouts independently.
+
+Readiness `/api/health` includes database health; `/api/ping` supports process liveness. Use platform monitoring for
+workload health, disk capacity and edge errors. No native Prometheus exporter is claimed by this chart.
+
+### External Secrets
+
+`externalSecrets.items` accepts a full native ExternalSecret spec, optional metadata and explicit target names. Install
+the operator and CRDs first. Set `auth.existingSecret`, `bootstrap.existingSecret` and encryption/storage Secret
+references to the materialized target names. Secret refresh does not itself restart environment-based consumers;
+coordinate application rollouts and upstream credential rotation. Keep historical document-encryption key versions
+available.
+
+### Adoption and upgrade
+
+The bootstrap init container checks existing users after native migrations. It skips setup for an existing instance and
+does not compare or reset the administrator password. Preserve the native session secret and all encryption keys when
+adopting an existing PVC. Keep the same application storage paths and verify version-specific migrations on a restored
+copy.
+
+Recreate updates include downtime and retain one writer. A Helm rollback restores Kubernetes configuration, not previous
+database or file formats. Follow the recovery procedure when a data migration must be reversed.
+
+## Recovery
+
+### Recovery set
+
+Keep a consistent recovery set containing the database, original document objects, session-signing Secret, database
+encryption key if enabled, and every document-encryption key version still in use. Include operator-managed
+configuration and integration Secrets. A database backup alone does not contain filesystem/S3 originals, and document
+objects alone cannot reconstruct organization metadata, permissions or wrapped file keys.
+
+For local state, scale the application Deployment to zero and wait for its pod to terminate. Archive `db/`, `documents/`
+and any additional configuration stored on the PVC. Preserve SQLite WAL files rather than copying only a live database.
+Use storage snapshots only with a consistency guarantee appropriate to the whole recovery set.
+
+For remote libSQL or S3, use the provider's backup/versioning procedures and coordinate the application's writes so the
+database and originals represent a compatible recovery point. The chart does not automatically migrate historical
+objects when `storage.driver` changes.
+
+### Restore procedure
+
+1. Provision a fresh PVC with the required size and ownership; keep the original volume intact.
+2. Restore the complete local recovery set while the application remains stopped.
+3. Restore remote database/object state if used, and materialize the original Secrets.
+4. Set `persistence.existingClaim` to the recovered PVC and preserve native database/storage configuration.
+5. Start one writer; confirm strict migrations and native readiness succeed.
+6. Authenticate, verify organization access, download original documents and compare SHA-256, and verify search results.
+7. Reopen traffic only after the checks pass.
+
+The chart runtime gate follows this procedure for encrypted local database and documents, verifies account/session
+retention and exact original bytes on the fresh volume, and confirms the database rejects missing or wrong encryption
+keys. The restore helper archives explicit state directories, avoiding ownership changes to the storage-provider-managed
+PVC root.
+
+### Key changes
+
+Choose a local database encryption key before first database creation. Changing or removing that key is not an online
+migration; retain the exact original key for recovery. Remote libSQL encryption belongs to its server/provider and
+cannot use the local client's `DATABASE_ENCRYPTION_KEY` option.
+
+Document key-ring labels are compared lexically. Use zero-padded versions and retain old keys until no original refers
+to them. Adding a new key version only affects new encryption. The native plaintext-encryption maintenance command does
+not rewrap documents that are already encrypted. Never delete an older key merely because a newer version is configured.
+
+Document envelope encryption protects originals. Extracted text and metadata reside in the database and require their
+own encryption and access policy.
+
+## Tasks
+
+The chart selects the native libSQL task driver with `file:/app/app-data/db/tasks.sqlite` and a one-second poll
+interval. This database is separate from the application database, including when the application uses remote libSQL.
+The singleton's data volume therefore remains part of the deployment's durable state in every database mode.
+
+`tasks.workerEnabled=true` runs the native web API and worker together. Setting it false selects native web-only mode;
+uploads remain available but extraction and scheduled maintenance pause. Reenable it after maintenance. The verified
+queue profile uploads in web-only mode, reads the pending task without modifying SQL, replaces the pod, verifies the
+same pending task ID, then resumes the worker and checks that task completes and its document becomes searchable.
+
+### Recovery boundaries
+
+The pinned Cadence driver marks a claimed task `processing` and only consumes `pending` tasks. It has no processing
+lease, heartbeat or stale-job reaper. A process killed during extraction can leave a processing task stuck. Native
+extraction sets no retries; failures remain failed. No stable Papra HTTP/CLI requeue operation was found for this
+release. Do not reset all processing rows automatically or infer that a restart retries interrupted work.
+
+Document insertion and enqueue are separate operations, so a crash between them can leave an original without its
+extraction task. Keep original files recoverable and inspect task status, document content and native worker logs when
+search results lag. A successful upload or a healthy HTTP endpoint does not prove extraction completed.
+
+Completed tasks remain in this release's queue. Monitor queue database growth and establish an operator-reviewed
+retention procedure appropriate to the installed upstream version. The chart does not delete task history behind the
+application's back.
+
+### Confidentiality and backup
+
+The task driver exposes no encryption-key setting. Application database encryption does not encrypt tasks.sqlite.
+Extraction payloads contain document/organization identifiers and OCR languages rather than original bytes or extracted
+text, but generic task results and error details may still be private. Protect the PVC and backup destination; use
+storage-level encryption when all local metadata must be encrypted at rest.
+
+Stop the writer and include all of `db/`, its WAL/SHM files and `documents/` in a consistent local recovery archive.
+Restore application data, queue state and key material together. A restored pending task can run; a restored processing
+task retains the native limitation described above.
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://documents.example.com
+bootstrap:
+  email: administrator@example.com
+  existingSecret: papra-initial-admin
+auth:
+  existingSecret: papra-session
+persistence:
+  size: 50Gi
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: documents.example.com
+      paths:
+        - { path: /, pathType: Prefix }
+  tls:
+    - secretName: documents-tls
+      hosts: [documents.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels: { kubernetes.io/metadata.name: kube-system }
+      podSelector:
+        matchLabels: { app.kubernetes.io/name: traefik }
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Name Override.
+nameOverride: ''
+# -- Fullname Override.
+fullnameOverride: ''
+# -- Common Labels.
+commonLabels: {}
+# -- Single writer; only one replica is supported for native jobs and document state.
+replicaCount: 1
+# -- Image.
+image:
+  # -- Repository.
+  repository: ghcr.io/papra-hq/papra
+  # -- Tag.
+  tag: 26.6.2-rootless
+  # -- Pull Policy.
+  pullPolicy: IfNotPresent
+# -- Image Pull Secrets.
+imagePullSecrets: []
+# -- Auth.
+auth:
+  # -- Session signing secret; empty generates and retains a strong value. Prefer an existing Secret for GitOps.
+  secret: ''
+  # -- Existing Secret containing the stable session signing key; takes precedence over generated state.
+  existingSecret: ''
+  # -- Secret Key.
+  secretKey: auth-secret
+  # -- Allow native password signup for ordinary users; closed by default. Does not restrict custom OAuth providers.
+  allowRegistration: false
+# -- Server.
+server:
+  # -- Port.
+  port: 1221
+  # -- Browser-facing origin used by native authentication. Use the exact HTTPS origin in production.
+  publicUrl: http://localhost:1221
+  # -- Existing Secret with a CA bundle extending Node trust for HTTPS integrations.
+  trustedCaSecret: ''
+  # -- CA bundle key; TLS verification remains enabled.
+  trustedCaKey: ca.crt
+# -- Additional unmanaged environment variables; authentication, storage and database settings are chart-owned.
+extraEnv: []
+# -- Advanced environment imports for both migrations/bootstrap and the application. Explicit managed variables take precedence.
+envFrom: []
+# -- Persistent native background queue, stored separately from the application database on the data volume.
+tasks:
+  # -- Run the native worker alongside the web API. False pauses consumption while preserving pending work.
+  workerEnabled: true
+  # -- Local persistent libSQL polling interval. Completed jobs are retained; in-flight jobs have no native crash reaper.
+  pollIntervalMs: 1000
+# -- Native database connection. Papra supports SQLite and libSQL, not PostgreSQL or MySQL.
+database:
+  # -- Empty uses the persistent local SQLite database; remote URLs must use libsql:// or https://.
+  remoteUrl: ''
+  # -- Existing Secret containing a remote libSQL authentication token.
+  authTokenSecret: ''
+  # -- Remote authentication token key.
+  authTokenKey: auth-token
+  # -- Existing Secret with the local database encryption key, selected before first database creation.
+  encryptionSecret: ''
+  # -- Local database encryption key. Preserve the exact key for recovery; remote URLs cannot use it.
+  encryptionKey: database-encryption-key
+# -- Native original-document storage and optional envelope encryption.
+storage:
+  # -- filesystem or s3. SQLite and configuration still require persistent storage with S3.
+  driver: filesystem
+  # -- Existing Secret containing the native document encryption key ring.
+  encryptionSecret: ''
+  # -- Secret key containing one 64-hex key or versioned keys such as 001:hex,002:hex.
+  encryptionKey: document-encryption-keys
+  s3:
+    # -- Use path-style bucket addressing for compatible endpoints.
+    forcePathStyle: true
+    # -- S3 API endpoint.
+    endpoint: ''
+    # -- S3 region.
+    region: ''
+    # -- Existing bucket; the chart does not create buckets.
+    bucket: ''
+    # -- Existing Secret containing native static S3 credentials.
+    existingSecret: ''
+    # -- Access key identifier key.
+    accessKeyIdKey: access-key-id
+    # -- Secret access key key.
+    secretAccessKeyKey: secret-access-key
+# -- Service Account.
+serviceAccount:
+  # -- Create.
+  create: true
+  # -- Name.
+  name: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Automount Service Account Token.
+  automountServiceAccountToken: false
+# -- Service.
+service:
+  # -- Type.
+  type: ClusterIP
+  # -- Port.
+  port: 1221
+  # -- Annotations.
+  annotations: {}
+  # -- Ip Family Policy.
+  ipFamilyPolicy: ''
+  # -- Ip Families.
+  ipFamilies: []
+# -- Ingress.
+ingress:
+  # -- Enabled.
+  enabled: false
+  # -- Ingress Class Name.
+  ingressClassName: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Hosts.
+  hosts: []
+  # -- Tls.
+  tls: []
+# -- Gateway.
+gateway:
+  # -- Enabled.
+  enabled: false
+  # -- Annotations.
+  annotations: {}
+  # -- Parent Refs.
+  parentRefs: []
+  # -- Hostnames.
+  hostnames: []
+  # -- Path.
+  path: /
+  # -- Path Type.
+  pathType: PathPrefix
+# -- External Secrets.
+externalSecrets:
+  # -- Enabled.
+  enabled: false
+  # -- Refresh Interval.
+  refreshInterval: 1h
+  # -- Items.
+  items: []
+# -- Network Policy.
+networkPolicy:
+  # -- Enabled.
+  enabled: true
+  # -- HTTP client peers; empty permits same-namespace pods. Add ingress-controller selectors when publishing the service.
+  ingressFrom: []
+  # -- Deny unlisted egress; explicitly allow S3, libSQL, mail and identity provider destinations.
+  egressIsolation: true
+  # -- DNS peers; adapt these selectors when the cluster uses different DNS labels.
+  dnsEgress:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  # -- Web Egress.
+  webEgress: []
+  # -- Web Ports.
+  webPorts:
+    - 443
+  # -- Extra Egress.
+  extraEgress: []
+# -- Probes.
+probes:
+  # -- Startup.
+  startup:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/health
+    # -- Failure Threshold.
+    failureThreshold: 60
+    # -- Period Seconds.
+    periodSeconds: 5
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+  # -- Readiness.
+  readiness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/health
+    # -- Failure Threshold.
+    failureThreshold: 3
+    # -- Period Seconds.
+    periodSeconds: 10
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+  # -- Liveness.
+  liveness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/ping
+    # -- Failure Threshold.
+    failureThreshold: 3
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+# -- Resources.
+resources:
+  # -- Requests.
+  requests:
+    # -- Cpu.
+    cpu: 250m
+    # -- Memory.
+    memory: 512Mi
+  # -- Limits.
+  limits:
+    # -- Cpu.
+    cpu: '1'
+    # -- Memory.
+    memory: 1Gi
+# -- Pod Security Context.
+podSecurityContext:
+  # -- Run As Non Root.
+  runAsNonRoot: true
+  # -- Run As User.
+  runAsUser: 1000
+  # -- Run As Group.
+  runAsGroup: 1000
+  # -- Fs Group.
+  fsGroup: 1000
+  # -- Fs Group Change Policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Seccomp Profile.
+  seccompProfile:
+    # -- Type.
+    type: RuntimeDefault
+# -- Security Context.
+securityContext:
+  # -- Allow Privilege Escalation.
+  allowPrivilegeEscalation: false
+  # -- Read Only Root Filesystem.
+  readOnlyRootFilesystem: true
+  # -- Capabilities.
+  capabilities:
+    # -- Drop.
+    drop:
+      - ALL
+# -- Pod Labels.
+podLabels: {}
+# -- Pod Annotations.
+podAnnotations: {}
+# -- Node Selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity.
+affinity: {}
+# -- Topology Spread Constraints.
+topologySpreadConstraints: []
+# -- Priority Class Name.
+priorityClassName: ''
+# -- Termination Grace Period Seconds.
+terminationGracePeriodSeconds: 30
+# -- Persistence.
+persistence:
+  # -- Enabled.
+  enabled: true
+  # -- Existing Claim.
+  existingClaim: ''
+  # -- Storage Class.
+  storageClass: ''
+  # -- Size.
+  size: 5Gi
+  # -- Access Modes.
+  accessModes:
+    - ReadWriteOnce
+  # -- Retain.
+  retain: true
+  # -- Annotations.
+  annotations: {}
+# -- Bootstrap.
+bootstrap:
+  # -- Enabled.
+  enabled: true
+  # -- Email.
+  email: admin@example.test
+  # -- Name.
+  name: Administrator
+  # -- Password.
+  password: ''
+  # -- Existing Secret.
+  existingSecret: ''
+  # -- Password Key.
+  passwordKey: password
+# -- Runtime.
+runtime:
+  # -- Temporary Size.
+  temporarySize: 1Gi
+  # -- Home Size.
+  homeSize: 256Mi
+```
