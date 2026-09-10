@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: changedetection.io Chart
-description: changedetection.io Helm chart for Kubernetes website monitoring with persistent SQLite storage, notifications, External Secrets, Ingress, Gateway API, and optional Playwright rendering.
+description: changedetection.io Helm chart for Kubernetes website monitoring with persistent JSON datastore, notifications, External Secrets, Ingress, Gateway API, and optional Playwright rendering.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,23 +11,23 @@ import Callout from '../../../components/Callout.astro';
 
 changedetection.io watches URLs for content changes, stores snapshots and diff history, and sends notifications through
 Apprise-backed channels such as email, webhooks, Slack, Telegram, Discord, Gotify, and many others. The HelmForge chart
-packages the official `ghcr.io/dgtlmoon/changedetection.io:0.55.8` image with persistent `/datastore` storage and an
+packages the official `ghcr.io/dgtlmoon/changedetection.io:0.60.3` image with persistent `/datastore` storage and an
 optional Playwright browser sidecar for JavaScript-rendered pages.
 
 ## Architecture
 
-The chart deploys a single `Deployment` with the `Recreate` strategy. The application stores its SQLite database,
+The chart deploys a single `Deployment` with the `Recreate` strategy. The application stores its JSON settings and watch files,
 watch configuration, rendered snapshots, and optional Python user packages under `/datastore`, which is backed by a PVC
 by default.
 
-| Component                   | Purpose                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| `changedetection` container | Runs the changedetection.io web UI, scheduler, diff engine, and notification flow.          |
-| Optional `browser` sidecar  | Runs Browserless Chromium on localhost for Playwright-backed JavaScript rendering.          |
-| PVC                         | Stores SQLite data, snapshots, watch history, and Python user package installs.             |
-| Service                     | Exposes the HTTP application port inside the cluster.                                       |
-| Ingress or HTTPRoute        | Optional external routing, disabled by default.                                             |
-| ExternalSecret              | Optional environment Secret materialization for notification credentials or runtime tuning. |
+| Component                   | Purpose                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `changedetection` container | Runs the changedetection.io web UI, scheduler, diff engine, and notification flow.               |
+| Optional `browser` sidecar  | Runs Browserless Chromium on localhost for Playwright-backed JavaScript rendering.               |
+| PVC                         | Stores JSON settings and watch data, snapshots, watch history, and Python user package installs. |
+| Service                     | Exposes the HTTP application port inside the cluster.                                            |
+| Ingress or HTTPRoute        | Optional external routing, disabled by default.                                                  |
+| ExternalSecret              | Optional environment Secret materialization for notification credentials or runtime tuning.      |
 
 <Callout type="warning" title="Plan the browser mode before production">
   The most important sizing decision is whether `browser.enabled` is required. Static pages and APIs work without the
@@ -192,9 +192,33 @@ gateway:
 
 </DocsTabs>
 
+## Upgrade Notes
+
+Version 0.60.3 includes the intervening watch/tag loading, XML parsing,
+CSRF/XSS protections, browser and UTF-8 backup fixes since 0.55.8.
+Back up the complete `/datastore` before upgrading: `changedetection.json`,
+watch/tag directories and snapshots belong together. Restore that backup with
+its matching old image for rollback; reverting only the tag does not reverse
+storage migrations.
+
+Upstream consistently blocks private, loopback and other restricted target
+addresses by default. Existing internal-site monitors may need an explicit opt-in:
+
+```yaml
+changedetection:
+  extraEnv:
+    - name: ALLOW_IANA_RESTRICTED_ADDRESSES
+      value: 'true'
+```
+
+Use that setting only when internal monitoring is intended and application access
+is controlled. The chart keeps the upstream restriction enabled by default.
+`PLAYWRIGHT_BYPASS_CSP` defaults to `true` upstream; set it to `false` through
+`changedetection.extraEnv` when the remote browser does not support CSP bypass.
+
 ## Operational Guidance
 
-Keep `persistence.enabled=true` for any environment where watches or history matter. changedetection.io uses SQLite,
+Keep `persistence.enabled=true` for any environment where watches or history matter. changedetection.io uses JSON settings and watch files,
 so the chart intentionally runs a single replica and does not expose horizontal scaling knobs. Increase `persistence.size`
 for frequent checks, long retention, rendered screenshots, and many watches.
 
@@ -260,7 +284,7 @@ service:
 | Parameter                                   | Default                               | Description                                                             |
 | ------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | `image.repository`                          | `ghcr.io/dgtlmoon/changedetection.io` | Official changedetection.io image.                                      |
-| `image.tag`                                 | `0.55.8`                              | Pinned upstream image tag.                                              |
+| `image.tag`                                 | `0.60.3`                              | Pinned upstream image tag.                                              |
 | `image.pullPolicy`                          | `IfNotPresent`                        | Kubernetes image pull policy.                                           |
 | `changedetection.port`                      | `5000`                                | Container HTTP port.                                                    |
 | `changedetection.baseUrl`                   | `""`                                  | Public URL used in notification links.                                  |
