@@ -14,6 +14,35 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'ByteStash',
+    slug: 'bytestash',
+    description: 'Private snippets with protected bootstrap, native MCP, optional OIDC and verified SQLite snapshots.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'SiYuan',
+    slug: 'siyuan',
+    description:
+      'Private knowledge workspace with retained authentication, strict OIDC admission and verified full-workspace recovery.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'BentoPDF',
+    slug: 'bentopdf',
+    description: 'Browser-local PDF tools with isolated NGINX, runtime controls and optional Prometheus monitoring.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Glance',
+    slug: 'glance',
+    description: 'Private dashboard with retained login credentials, secret-backed widgets and restricted networking.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Moodle',
     slug: 'moodle',
     description:

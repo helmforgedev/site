@@ -1,0 +1,442 @@
+---
+# @AI-METADATA: chart documentation synchronized with the production values contract
+layout: ../../../layouts/DocsLayout.astro
+title: BentoPDF Chart
+description: Browser-local PDF processing with isolated NGINX, runtime tool controls, stateless scaling and genuine Prometheus monitoring.
+---
+
+# BentoPDF
+
+[Official upstream repository](https://github.com/alam00000/bentopdf).
+
+BentoPDF provides PDF tools that run in the user's browser. The official image contains a static application and NGINX. This chart deploys a restricted, stateless service with native runtime tool controls and optional NGINX monitoring.
+
+## Features
+
+- Non-root UID/GID 101, read-only root, RuntimeDefault seccomp, no capabilities or Kubernetes API token.
+- Tagged upstream routes, MIME types, compression and browser isolation headers preserved.
+- Public runtime configuration with rollout checksums.
+- Rolling updates, topology spreading, optional disruption budget and CPU autoscaling.
+- Ingress, Gateway API HTTPRoute, dual-stack Services and default-deny pod egress.
+- Official NGINX exporter, metrics Service, ServiceMonitor and PrometheusRule as opt-in features.
+- Real browser validation merges distinct PDFs and parses the downloaded document.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install bentopdf helmforge/bentopdf --namespace bentopdf --create-namespace
+kubectl -n bentopdf port-forward service/bentopdf-bentopdf 8080:8080
+```
+
+Open http://localhost:8080. Use a dedicated HTTPS hostname in production. SharedArrayBuffer needs a secure context; localhost is an exception for testing.
+
+## Deployment contract
+
+The official image is `ghcr.io/alam00000/bentopdf:2.8.8`, verified for Linux amd64 and arm64. Deploy at the domain root. BASE_URL, branding and CSP build arguments cannot be changed through runtime environment variables.
+
+NGINX starts directly with configuration derived from the tagged upstream nginx.conf. Image-owned security-header includes and assets remain immutable. Only `/etc/nginx/tmp` and `/tmp` are writable. ConfigMap changes trigger a rollout because individual files use subPath mounts.
+
+No database, Secret, ExternalSecret or PVC is required. There is no native login. Protect private installations through edge authentication. Disabling tools is presentation control, not an authorization boundary.
+
+## Privacy and network boundary
+
+PDF operations execute on client devices. The browser test checks for document POST/PUT/PATCH requests to the application server during the tested merge workflow. It does not audit every upstream tool or browser extension.
+
+Access logs contain HTTP metadata such as paths and client addresses. Treat logs accordingly. There is no server-side document backup dataset.
+
+Some tools download WASM, OCR or font assets from CDNs in the browser. Denying pod egress does not block those requests. The default image is not an offline guarantee. Air-gapped use requires hosting relevant assets and building an image with matching URLs and CSP.
+
+## Runtime configuration
+
+```yaml
+config:
+  disabledTools:
+    - compress-pdf
+  editorDisabledCategories:
+    - annotation-shape
+    - redaction
+```
+
+Use exact upstream tool/category identifiers. Disabling a parent category disables its children. Unknown identifiers may have no effect upstream. These controls do not enforce permissions.
+
+## Availability
+
+```yaml
+replicaCount: 2
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+```
+
+PDF processing does not occupy pod CPU. Replicas serve static content; spread them across failure domains. PDBs cover voluntary disruption, not node failures. The chart rejects singleton PDBs to avoid blocking maintenance.
+
+Optional HPA targets the bentopdf container CPU, requires metrics-server and CPU requests, and defaults to two minimum replicas. HPA owns replica count when enabled. Scale-down stabilization is 300 seconds. Browser workload may not increase serving CPU.
+
+## Networking
+
+The default Service is ClusterIP on 8080. Ingress and HTTPRoute reference existing controllers/Gateways. Terminate TLS at the edge and preserve CSP, Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy. Replacing these headers may break workers and office conversions.
+
+NetworkPolicy allows HTTP from the release namespace and denies outbound pod traffic by default. Configure `networkPolicy.ingressFrom` for the edge namespace. `metrics.ingressFrom` separately grants exporter access. `extraEgress` allows explicit rules. Enforcement requires a NetworkPolicy-capable CNI.
+
+Service `ipFamilyPolicy`/`ipFamilies` support dual stack. PreferDualStack can fall back; RequireDualStack needs cluster support. `server.ipv6` independently controls the NGINX listener.
+
+## Observability
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+  prometheusRule:
+    enabled: true
+    labels:
+      release: prometheus
+```
+
+Install Prometheus Operator CRDs and match monitor/rule labels to Prometheus selectors. The official exporter scrapes loopback-only stub_status on 8081. The public application port does not expose that endpoint. Metrics default to port 9113.
+
+`nginx_up` reports exporter-to-NGINX connectivity. `nginx_http_requests_total` and connection gauges describe static serving, not PDF operations or 5xx counts. The built-in alert detects nginx_up zero for five minutes. Configure target-down alerts for missing exporters; use browser/blackbox checks for broader coverage.
+
+## Upgrade and restore
+
+```bash
+helm upgrade bentopdf helmforge/bentopdf -n bentopdf -f production.yaml
+kubectl -n bentopdf rollout status deployment/bentopdf-bentopdf
+helm rollback bentopdf -n bentopdf
+```
+
+Review release notes and browser-cache compatibility. Existing tabs may need reloading after upgrades. Rolling updates use maxUnavailable zero and maxSurge one; reserve extra pod capacity.
+
+Keep values, edge configuration and image pins in version control. Reinstall the same chart/image/configuration to recover server state. Client documents require client backups; Kubernetes snapshots cannot recover them.
+
+## Validation
+
+Install dependencies with `npm ci --prefix charts/bentopdf/scripts` and Chromium with `npx --prefix charts/bentopdf/scripts playwright install chromium`. Run `make validate-chart CHART=bentopdf` from helmforge-ops. The real browser test is not skipped when Chromium is unavailable.
+
+## Security Scan
+
+### Security Scan: `bentopdf`
+
+| Framework          | Score    |
+| ------------------ | -------- |
+| MITRE + NSA + SOC2 | **100%** |
+
+> Security posture acceptable.
+
+Measured with Kubescape 4.0.13 against default manifests. This is a configuration assessment, not an application security guarantee.
+
+## Parameters
+
+See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.yaml) and [values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.schema.json) for the complete contract.
+
+## Operations guide
+
+Use a dedicated HTTPS origin and preserve upstream CSP/COOP/COEP. Localhost is a secure-context exception; plain remote HTTP is not. Check browser console and network output for WASM failures before changing pod network policies.
+
+CDN requests originate from the browser. Corporate proxies, content filters, TLS interception and extensions may block them. Offline operation requires an audited image with suitable build-time asset URLs and CSP, followed by validation of each required workflow.
+
+Tool controls use exact upstream IDs such as compress-pdf or annotation-shape. They affect presentation and do not enforce permissions. Save downloads to managed client storage; server logs do not contain recovery copies.
+
+Use two replicas and spread them across nodes. PDBs cover voluntary disruptions. Rolling updates need surge capacity. HPA requires metrics-server and measures serving CPU, not client processing.
+
+Match ServiceMonitor labels to Prometheus selectors and permit its namespace through metrics.ingressFrom. Confirm nginx_up is one and nginx_http_requests_total increases. Configure target-down alerts separately. stub_status does not expose per-status HTTP counters.
+
+Restore server state by reinstalling pinned images and values. Back up edge identity configuration and client documents separately.
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Override the short chart resource name.
+nameOverride: ''
+# -- Override the full release resource name.
+fullnameOverride: ''
+# -- Extra resource labels; selector labels are reserved.
+commonLabels: {}
+# -- Stateless replicas; PDF processing occurs in the browser.
+replicaCount: 1
+# -- Image.
+image:
+  # -- Repository.
+  repository: ghcr.io/alam00000/bentopdf
+  # -- Verified stable image tag.
+  tag: 2.8.8
+  # -- Kubernetes pull policy.
+  pullPolicy: IfNotPresent
+# -- Registry credentials for a private mirror.
+imagePullSecrets: []
+# -- NGINX listener; deploy the official image at the domain root.
+server:
+  # -- Service HTTP port.
+  port: 8080
+  # -- Enable the NGINX IPv6 listener; Service IP families are configured separately.
+  ipv6: true
+# -- Public runtime tool controls; these are not an authorization boundary.
+config:
+  # -- Disabled Tools.
+  disabledTools: []
+  # -- Native editor category IDs, for example annotation-shape or redaction.
+  editorDisabledCategories: []
+# -- Service Account.
+serviceAccount:
+  # -- Create a dedicated ServiceAccount with no API permissions.
+  create: true
+  # -- Existing or overridden ServiceAccount name.
+  name: ''
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- Automount Service Account Token.
+  automountServiceAccountToken: false
+# -- Service.
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- Service HTTP port.
+  port: 8080
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- Service IP family policy; empty uses cluster default.
+  ipFamilyPolicy: ''
+  # -- Requested address families; RequireDualStack needs a dual-stack cluster.
+  ipFamilies: []
+# -- Ingress.
+ingress:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: false
+  # -- Ingress controller class; empty omits the field.
+  ingressClassName: ''
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- Host/path rules; at least one explicit host is required when enabled.
+  hosts: []
+  # -- TLS host/Secret entries.
+  tls: []
+# -- Gateway.
+gateway:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: false
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- Existing Gateway parent references, including namespace when appropriate.
+  parentRefs: []
+  # -- Public DNS hostnames.
+  hostnames: []
+  # -- Path.
+  path: /
+  # -- Gateway path match type.
+  pathType: PathPrefix
+# -- Pod network isolation does not restrict browser CDN requests.
+networkPolicy:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: true
+  # -- Allowed ingress peers; empty allows pods in this namespace only.
+  ingressFrom: []
+  # -- Isolate outbound pod traffic; browser CDN requests are unaffected.
+  egressIsolation: true
+  # -- Explicit extra egress rules; default empty denies all pod egress.
+  extraEgress: []
+# -- Probes.
+probes:
+  # -- Startup.
+  startup:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /
+    # -- Period Seconds.
+    periodSeconds: 5
+    # -- Timeout Seconds.
+    timeoutSeconds: 2
+    # -- Failure Threshold.
+    failureThreshold: 30
+  # -- Liveness.
+  liveness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 3
+    # -- Failure Threshold.
+    failureThreshold: 3
+  # -- Readiness checks the initialized HTTP server.
+  readiness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /
+    # -- Period Seconds.
+    periodSeconds: 10
+    # -- Timeout Seconds.
+    timeoutSeconds: 3
+    # -- Failure Threshold.
+    failureThreshold: 3
+# -- Resources.
+resources:
+  # -- Requests.
+  requests:
+    # -- Cpu.
+    cpu: 50m
+    # -- Memory.
+    memory: 64Mi
+  # -- Limits.
+  limits:
+    # -- Cpu.
+    cpu: 500m
+    # -- Memory.
+    memory: 256Mi
+# -- Non-root pod identity with RuntimeDefault seccomp.
+podSecurityContext:
+  # -- Run As Non Root.
+  runAsNonRoot: true
+  # -- Run As User.
+  runAsUser: 101
+  # -- Run As Group.
+  runAsGroup: 101
+  # -- Fs Group.
+  fsGroup: 101
+  # -- Seccomp Profile.
+  seccompProfile:
+    # -- Type.
+    type: RuntimeDefault
+# -- Restricted container privileges; all configuration and assets are read-only.
+securityContext:
+  # -- Allow Privilege Escalation.
+  allowPrivilegeEscalation: false
+  # -- Read Only Root Filesystem.
+  readOnlyRootFilesystem: true
+  # -- Capabilities.
+  capabilities:
+    # -- Drop.
+    drop:
+      - ALL
+# -- Pod Disruption Budget.
+podDisruptionBudget:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: false
+  # -- Maximum unavailable pods during voluntary disruption.
+  maxUnavailable: 1
+# -- Pod labels; immutable selector labels cannot be overridden.
+podLabels: {}
+# -- Pod annotations, e.g. for an external Secret reloader.
+podAnnotations: {}
+# -- Node selection constraints.
+nodeSelector: {}
+# -- Scheduling tolerations.
+tolerations: []
+# -- Pod affinity or anti-affinity.
+affinity: {}
+# -- Topology spreading across nodes or zones.
+topologySpreadConstraints: []
+# -- Scheduling priority class.
+priorityClassName: ''
+# -- Grace period for HTTP shutdown.
+terminationGracePeriodSeconds: 30
+# -- CPU scaling applies to static file serving, not browser PDF processing.
+autoscaling:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: false
+  # -- Minimum stateless replicas; use at least two with a disruption budget.
+  minReplicas: 2
+  # -- Maximum replicas allowed by the HPA.
+  maxReplicas: 5
+  # -- Target utilization of the bentopdf container CPU request, excluding exporter CPU.
+  targetCPUUtilizationPercentage: 70
+# -- Optional official NGINX exporter; measures serving traffic, not PDF content or operations.
+metrics:
+  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+  enabled: false
+  # -- Image.
+  image:
+    # -- Repository.
+    repository: docker.io/nginx/nginx-prometheus-exporter
+    # -- Tag.
+    tag: 1.5.3
+    # -- Pull Policy.
+    pullPolicy: IfNotPresent
+  # -- Service HTTP port.
+  port: 9113
+  # -- Resources.
+  resources:
+    # -- Requests.
+    requests:
+      # -- Cpu.
+      cpu: 10m
+      # -- Memory.
+      memory: 32Mi
+    # -- Limits.
+    limits:
+      # -- Cpu.
+      cpu: 100m
+      # -- Memory.
+      memory: 64Mi
+  # -- Service Monitor.
+  serviceMonitor:
+    # -- Enabled.
+    enabled: false
+    # -- Labels.
+    labels: {}
+    # -- Prometheus scrape interval.
+    interval: 30s
+    # -- Prometheus scrape timeout; keep no longer than interval.
+    scrapeTimeout: 10s
+  # -- Prometheus Rule.
+  prometheusRule:
+    # -- Enabled.
+    enabled: false
+    # -- Labels.
+    labels: {}
+    # -- Additional native Prometheus alerting or recording rules.
+    additionalRules: []
+  # -- Allowed ingress peers; empty allows pods in this namespace only.
+  ingressFrom: []
+```
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+fullnameOverride: bentopdf
+replicaCount: 2
+podDisruptionBudget:
+  enabled: true
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: bentopdf
+```
+
+## Metrics example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+fullnameOverride: bentopdf
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+  prometheusRule:
+    enabled: true
+```
+
+## Runtime-config example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+fullnameOverride: bentopdf
+config:
+  disabledTools:
+    - compress-pdf
+  editorDisabledCategories:
+    - annotation-shape
+```

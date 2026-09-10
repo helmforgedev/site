@@ -1,0 +1,654 @@
+---
+# @AI-METADATA: production chart documentation synchronized with values and validated upstream behavior
+layout: ../../../layouts/DocsLayout.astro
+title: ByteStash Chart
+description:
+  Private snippets with protected administrator bootstrap, native MCP, optional OIDC and verified SQLite online snapshot
+  recovery.
+---
+
+# ByteStash
+
+[Official upstream repository](https://github.com/jordan-dalby/ByteStash).
+
+Private code snippets using the official `ghcr.io/jordan-dalby/bytestash:1.5.12` image. Linux amd64, arm64 and arm image
+manifests were verified. The chart preserves SQLite's single-writer contract and closes the upstream first-registration
+window with an administrative init container.
+
+## Features
+
+- Transactional initial administrator creation before HTTP starts; existing passwords are never reset on restart.
+- Separate retained JWT and bootstrap Secrets, native JWT file loading, existing Secrets and canonical ESO items.
+- Durable 5Gi SQLite claim, Recreate upgrades and optional verified online snapshots with retention and fresh-PVC
+  recovery.
+- Native OIDC with confidential client credentials and optional additional CA trust; provider admission requirements are
+  documented against the actual upstream behavior.
+- Native authenticated MCP endpoint with API-key revocation validation.
+- Non-root UID/GID 1000, read-only image filesystem, dropped capabilities, RuntimeDefault seccomp and no Kubernetes API
+  token; bounded resources and database-aware readiness.
+- Explicit NetworkPolicy, Ingress class, Gateway API, Service dual stack and native URL subpath support.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install bytestash helmforge/bytestash --namespace snippets --create-namespace
+kubectl -n snippets port-forward service/bytestash-bytestash 5000:5000
+```
+
+Open `http://localhost:5000`. Retrieve the initial administrator credential from the Secret named in Helm NOTES. For
+production, use a dedicated HTTPS hostname and existing Secrets managed by your credential system. The default
+administrator is `admin`; local registration is closed. Use the native application password flow for later password
+rotation. Changing the bootstrap Secret never resets an existing account.
+
+## Production values
+
+```yaml
+auth:
+  existingSecret: snippets-jwt
+bootstrap:
+  username: snippetsadmin
+  existingSecret: snippets-admin
+persistence:
+  size: 10Gi
+backup:
+  enabled: true
+  size: 80Gi
+  retention: 7
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: snippets.example.test
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: snippets-tls
+      hosts: [snippets.example.test]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+```
+
+Create `snippets-jwt` with a strong `jwt-secret` key and `snippets-admin` with a `password` key before installation. The
+main server only receives the JWT credential; the bootstrap password is mounted exclusively in its init container. Never
+run two releases against the same writable database claim. Resource defaults are 100m/128Mi requests and 1 CPU/512Mi
+limits; size them for your users and snippet volume.
+
+## Configuration contract
+
+| Values                            | Behavior                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `auth`                            | Retained JWT key, local account enrollment, token lifetime and administrator usernames |
+| `bootstrap`                       | Initial local administrator through native database and password APIs                  |
+| `oidc`                            | Native HTTPS issuer, client Secret, requested scopes and additional trusted CA         |
+| `server.basePath`                 | Safe URL prefix such as `/snippets`, without a trailing slash                          |
+| `persistence`                     | Complete SQLite data directory, existing claim, storage class and retention            |
+| `backup`                          | Verified online snapshots, UTC schedule, retention and separate destination PVC        |
+| `service`, `ingress`, `gateway`   | Native port 5000 behind configurable Service routing                                   |
+| `externalSecrets.items`           | External Secrets Operator v1 resources targeting existing Secret references            |
+| `networkPolicy`                   | Same-namespace ingress and DNS by default, explicit additional egress                  |
+| `probes`, `resources`             | Authentication-config readiness, HTTP liveness and bounded resources                   |
+| `extraEnv`, `envFrom`             | Additional upstream settings; chart-managed security variables are protected           |
+| `extraContainers`, `extraVolumes` | Explicit companion workloads and storage with reserved-name guards                     |
+
+See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/bytestash/values.yaml),
+[values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/bytestash/values.schema.json),
+[design](https://github.com/helmforgedev/charts/blob/main/charts/bytestash/DESIGN.md) and [operations](#operations) for
+the full contract and recovery procedure.
+
+## Authentication and networking limits
+
+OIDC enrollment must be restricted at the provider. Closing local registration does not close OIDC enrollment in the
+pinned upstream. Its browser token storage is not an HttpOnly-cookie session. The chart documents these limitations and
+keeps local administrator recovery available. The OIDC runtime fixture verifies S256 PKCE and trusted issuer TLS.
+
+The upstream process always trusts proxy headers. Configure the edge to overwrite forwarded headers, constrain accepted
+hostnames and limit pod ingress to that edge. The advertised upstream `ALLOWED_HOSTS` setting is not implemented in the
+tagged server, so the chart does not offer it as a security control. Enabling OIDC requires explicit HTTPS egress.
+
+There is no external SQL backend, native Prometheus endpoint, ServiceMonitor, HPA or PDB. Use Kubernetes
+workload/PVC/Job and ingress monitoring. The native MCP endpoint is `/mcp` under the chosen subpath and requires an
+application API key.
+
+## Backup and upgrade
+
+Backups use SQLite's online backup API, integrity verification and atomic publication on a separate PVC. A storage-check
+Job ensures the destination binds during Helm installation with delayed provisioning. The backup CronJob uses Forbid
+concurrency and colocates with the writer for RWO access. ReadWriteOncePod is rejected when online backup is enabled.
+
+A same-cluster PVC is not an off-cluster disaster-recovery copy. Budget destination space for retained full snapshots
+plus one temporary copy and export backups through your infrastructure backup system. Restore to a fresh claim and set
+`persistence.existingClaim`; preserve the JWT Secret if sessions must survive. Helm rollback does not reverse database
+migrations. The [operations guide](#operations) includes the exact recovery sequence.
+
+## Validation
+
+The chart includes Helm feature and rejection tests plus real Kubernetes application validation: protected bootstrap,
+anonymous denial, local registration policy, Unicode snippet creation, persistence after pod replacement, retained JWT
+sessions, native MCP key use and revocation, OIDC signature/state/TLS checks and online snapshot recovery. CI profiles
+cover default, ephemeral, subpath, existing credentials, ESO, OIDC, backup, dual stack, Ingress and Gateway API.
+
+## Security Scan
+
+### Security Scan: `bytestash`
+
+| Framework          | Score         |
+| ------------------ | ------------- |
+| MITRE + NSA + SOC2 | **98.48485%** |
+
+> Security posture acceptable.
+
+Measured using Kubescape 4.0.13 against default manifests. This assesses Kubernetes deployment configuration, not the
+absence of upstream application vulnerabilities.
+
+Control C-0012 flags the non-secret environment settings `TOKEN_EXPIRY=24h` and `ALLOW_PASSWORD_CHANGES=true` by name.
+These contain a duration and a boolean, not credentials. JWT and initial password material are mounted from Secrets. The
+unmodified scanner result is reported above; no control was suppressed.
+
+## Operations
+
+### Initial access and credential ownership
+
+The chart creates a local administrator in an init container before the application opens HTTP. It uses the pinned
+application's database schema, password validation and bcrypt implementation in an explicit transaction. A nonempty
+database is never reset. The configured administrator must already exist when reusing a populated database with
+bootstrap enabled; set the correct username or explicitly disable bootstrap when adopting an existing claim.
+
+The bootstrap password is an initial credential, not a password reconciler. Changing its Secret does not change the
+database password. Use the application's password-management flow for rotation and update your password manager. The
+main container cannot mount the bootstrap password Secret. The separately retained JWT key is passed through the
+upstream `JWT_SECRET_FILE` feature. Rotate that key deliberately: existing sessions will become invalid. Generated
+Secrets are retained across upgrades by Kubernetes lookup; GitOps rendering without live lookup should use existing
+Secrets or ESO.
+
+### SQLite snapshots and recovery
+
+Enable `backup.enabled` to create consistent online database snapshots through `better-sqlite3`'s backup API. Each
+completed copy passes SQLite `integrity_check` before atomic publication. Incomplete copies are not counted as valid
+snapshots. The retention policy deletes only chart-named completed snapshots, never unrelated destination files. Cron
+jobs cannot overlap.
+
+The backup pod is placed on the application node for ReadWriteOnce volume compatibility. ReadWriteOncePod is
+incompatible with a separate online backup pod and is rejected. A short Job binds and verifies the backup PVC during
+each Helm revision, including with WaitForFirstConsumer storage. This prevents `helm install --wait` from waiting until
+the scheduled backup. The storage check does not create a snapshot. Suspending the CronJob does not disable this
+installation check.
+
+```bash
+kubectl -n snippets create job bytestash-manual-backup --from=cronjob/bytestash-bytestash-backup
+kubectl -n snippets wait --for=condition=Complete job/bytestash-manual-backup --timeout=600s
+kubectl -n snippets logs job/bytestash-manual-backup
+```
+
+Size the destination for complete copies of the database plus one temporary snapshot. The default 10Gi is a starting
+point, not enough to guarantee seven copies of a full 5Gi source. Monitor free bytes, failed jobs and snapshot age.
+Snapshots contain accounts, password hashes and API keys. Protect them and copy them to a separate failure domain using
+your storage backup system. A second PVC in the same cluster is not disaster recovery by itself.
+
+To recover:
+
+1. Stop the application and wait until its pod has terminated.
+2. Provision a fresh claim accessible to UID/GID 1000. Copy a verified snapshot as `snippets.db` at the claim root.
+3. Preserve the corresponding JWT Secret if sessions must remain valid. Preserve the bootstrap username and current
+   database password in your password manager.
+4. Set `persistence.existingClaim` to the recovered claim and upgrade the release. Never attach the same writable SQLite
+   claim to two running applications.
+5. Log in, verify snippets and API access, and perform a new backup. Keep the old claim until recovery is accepted.
+
+The chart's runtime validation exercises three online snapshots, retention of two copies and recovery into a fresh PVC,
+including verification of Unicode snippet content and a previously issued JWT. Do not copy a live `snippets.db` file
+without the SQLite backup API; WAL content may not be present in the main file. Helm rollback does not reverse data
+migrations. Snapshot before upstream upgrades and restore data separately when required.
+
+### OIDC and reverse proxy
+
+Register a confidential client with callback `https://snippets.example.test/api/auth/oidc/callback`. Include the
+configured `server.basePath` before `/api` when serving under a subpath. Use an HTTPS issuer and client Secret. Optional
+`oidc.caConfigMap` adds a trusted PEM CA through native Node TLS verification; it does not disable certificate checks.
+
+Restrict assigned users at the identity provider. Upstream 1.5.12 does not apply `ALLOW_NEW_ACCOUNTS=false` as an OIDC
+allowlist once the database has users. Identities are keyed by subject and issuer, not automatically linked by email.
+Mapped username collisions receive a numeric suffix. Administrator access is based on the final username in
+`auth.adminUsernames`; verify that mapping and control provider enrollment. Local administrator login stays available.
+
+The runtime fixture verifies S256 PKCE against standard provider discovery metadata. Upstream stores its application
+token in the callback query and browser storage; the JavaScript-created cookie is not HttpOnly. Avoid callback query
+logging at the proxy and treat XSS protection as part of the application boundary. The chart does not advertise HttpOnly
+sessions that upstream does not implement.
+
+ByteStash always trusts reverse-proxy headers. Terminate HTTPS at an edge that overwrites forwarded headers and accepts
+only the configured hostname; restrict `networkPolicy.ingressFrom` to that edge. The upstream `ALLOWED_HOSTS` setting is
+not consumed by this tagged server and is intentionally absent from the chart. The process port is fixed at 5000.
+
+### MCP and observability
+
+The native Streamable HTTP MCP endpoint is `/mcp`, prefixed by `server.basePath`. Authenticate using an application API
+key in `x-api-key` or `Authorization: Bearer ...`; an application login JWT is not the MCP API key. Keys are scoped to
+their owner's snippets. Revoke unused keys in the application. The runtime gate verifies MCP tool discovery and denial
+after key revocation.
+
+There is no native Prometheus endpoint in the pinned application. Use Kubernetes workload, PVC and Job metrics plus
+ingress monitoring. No invented exporter, ServiceMonitor, database subchart, HPA or PDB is included. SQLite remains a
+single-writer deployment with intentional downtime during Recreate upgrades.
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Override the chart name used in resource names.
+nameOverride: ''
+# -- Override the complete resource name.
+fullnameOverride: ''
+# -- Extra resource labels; selector labels are reserved.
+commonLabels: {}
+# -- Replica Count.
+replicaCount: 1
+# -- Image.
+image:
+  # -- Repository.
+  repository: ghcr.io/jordan-dalby/bytestash
+  # -- Verified stable image tag.
+  tag: 1.5.12
+  # -- Kubernetes pull policy.
+  pullPolicy: IfNotPresent
+# -- Registry credentials for a private mirror.
+imagePullSecrets: []
+# -- Native local authentication and JWT session settings.
+auth:
+  # -- Existing Secret containing the JWT signing key; recommended for GitOps.
+  existingSecret: ''
+  # -- Inline JWT signing key, at least 32 characters. Empty generates and retains 64 random characters.
+  jwtSecret: ''
+  # -- Secret key containing the JWT signing material.
+  jwtSecretKey: jwt-secret
+  # -- Finite native JWT lifetime, for example 24h or 7d.
+  tokenExpiry: 24h
+  # -- Permit local registration after bootstrap. This does not restrict OIDC enrollment.
+  allowNewAccounts: false
+  # -- Allow native password changes; the bootstrap Secret is not a password reconciler.
+  allowPasswordChanges: true
+  # -- Additional exact native administrator usernames; the bootstrap username is included automatically.
+  adminUsernames: []
+# -- Server.
+oidc:
+  # -- Enable native OpenID Connect; restrict new identities at the provider.
+  enabled: false
+  # -- HTTPS discovery issuer.
+  issuerURL: ''
+  # -- Registered confidential client ID.
+  clientID: ''
+  # -- Inline client credential; prefer an existing Secret.
+  clientSecret: ''
+  # -- Existing Secret containing the client credential.
+  existingSecret: ''
+  # -- Key holding the client credential.
+  clientSecretKey: client-secret
+  # -- Provider name displayed on login.
+  displayName: Single sign-on
+  # -- Space-separated requested scopes, including openid.
+  scopes: 'openid profile email'
+  # -- Optional ConfigMap holding an additional trusted PEM CA bundle.
+  caConfigMap: ''
+  # -- ConfigMap key containing the CA bundle.
+  caKey: ca.crt
+# -- Extra sidecars; use pinned images and restricted security contexts.
+extraContainers: []
+# -- Additional volumes; names must not overlap chart-managed volumes.
+extraVolumes: []
+# -- Server URL routing.
+server:
+  # -- Native safe URL prefix, for example /snippets; empty serves at root. No trailing slash.
+  basePath: ''
+# -- Extra Env.
+extraEnv: []
+# -- Additional envFrom Secret/ConfigMap references.
+envFrom: []
+# -- Service Account.
+serviceAccount:
+  # -- Create a dedicated ServiceAccount with no API permissions.
+  create: true
+  # -- Existing or overridden ServiceAccount name.
+  name: ''
+  # -- ServiceAccount annotations.
+  annotations: {}
+  # -- Automount Service Account Token.
+  automountServiceAccountToken: false
+# -- Service.
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- Service port mapped to the fixed upstream container port 5000.
+  port: 5000
+  # -- Service annotations.
+  annotations: {}
+  # -- Service IP family policy; empty uses cluster default.
+  ipFamilyPolicy: ''
+  # -- Requested address families; RequireDualStack needs a dual-stack cluster.
+  ipFamilies: []
+# -- Ingress.
+ingress:
+  # -- Enable Ingress. TLS is configured through ingress.tls.
+  enabled: false
+  # -- Ingress controller class; empty omits the field.
+  ingressClassName: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Host/path rules; at least one explicit host is required when enabled.
+  hosts: []
+  # -- TLS host/Secret entries.
+  tls: []
+# -- Gateway.
+gateway:
+  # -- Enable a Gateway API v1 HTTPRoute. Install Gateway API CRDs and a controller first.
+  enabled: false
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- Existing Gateway parent references, including namespace when appropriate.
+  parentRefs: []
+  # -- Public DNS hostnames.
+  hostnames: []
+  # -- Path.
+  path: /
+  # -- Gateway path match type.
+  pathType: PathPrefix
+# -- External Secrets.
+externalSecrets:
+  # -- Enabled.
+  enabled: false
+  # -- Default operator refresh interval.
+  refreshInterval: 1h
+  # -- Items.
+  items: []
+# -- Network Policy.
+networkPolicy:
+  # -- Enabled.
+  enabled: true
+  # -- Allowed ingress peers. Empty permits pods in the same namespace only.
+  ingressFrom: []
+  # -- Enable outbound isolation, allowing DNS and configured web ports.
+  egressIsolation: true
+  # -- DNS peers; defaults to cluster pods in any namespace, restricted to DNS ports.
+  dnsEgress:
+    - namespaceSelector: {}
+  # -- Explicit HTTPS destinations for OIDC; empty denies web egress.
+  webEgress: []
+  # -- Web Ports.
+  webPorts:
+    - 443
+  # -- Additional egress rules, for example internal APIs on alternate ports.
+  extraEgress: []
+# -- Probes.
+probes:
+  # -- Startup.
+  startup:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/auth/config
+    # -- Period Seconds.
+    periodSeconds: 5
+    # -- Timeout Seconds.
+    timeoutSeconds: 2
+    # -- Failure Threshold.
+    failureThreshold: 60
+  # -- Liveness.
+  liveness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 3
+    # -- Failure Threshold.
+    failureThreshold: 3
+  # -- Readiness checks the initialized HTTP server.
+  readiness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/auth/config
+    # -- Period Seconds.
+    periodSeconds: 10
+    # -- Timeout Seconds.
+    timeoutSeconds: 3
+    # -- Failure Threshold.
+    failureThreshold: 3
+# -- Server resource requests and limits; increase with active users and snippet volume.
+resources:
+  # -- Requests.
+  requests:
+    # -- Cpu.
+    cpu: 100m
+    # -- Memory.
+    memory: 128Mi
+  # -- Limits.
+  limits:
+    # -- Cpu.
+    cpu: '1'
+    # -- Memory.
+    memory: 512Mi
+# -- Non-root pod identity with RuntimeDefault seccomp.
+podSecurityContext:
+  # -- Run As Non Root.
+  runAsNonRoot: true
+  # -- Run As User.
+  runAsUser: 1000
+  # -- Run As Group.
+  runAsGroup: 1000
+  # -- Fs Group.
+  fsGroup: 1000
+  # -- Fs Group Change Policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Seccomp Profile.
+  seccompProfile:
+    # -- Type.
+    type: RuntimeDefault
+# -- Restricted container privileges; all configuration and assets are read-only.
+securityContext:
+  # -- Allow Privilege Escalation.
+  allowPrivilegeEscalation: false
+  # -- Read Only Root Filesystem.
+  readOnlyRootFilesystem: true
+  # -- Capabilities.
+  capabilities:
+    # -- Drop.
+    drop:
+      - ALL
+# -- Pod labels; immutable selector labels cannot be overridden.
+podLabels: {}
+# -- Pod annotations, e.g. for an external Secret reloader.
+podAnnotations: {}
+# -- Node selection constraints.
+nodeSelector: {}
+# -- Scheduling tolerations.
+tolerations: []
+# -- Pod affinity or anti-affinity.
+affinity: {}
+# -- Topology spreading across nodes or zones.
+topologySpreadConstraints: []
+# -- Scheduling priority class.
+priorityClassName: ''
+# -- Grace period for HTTP shutdown.
+terminationGracePeriodSeconds: 30
+# -- Complete SQLite directory mounted at /data/snippets.
+persistence:
+  # -- Persist SQLite data; disable only for disposable environments.
+  enabled: true
+  # -- Existing Claim.
+  existingClaim: ''
+  # -- Storage Class.
+  storageClass: ''
+  # -- Size.
+  size: 5Gi
+  # -- One application writer regardless of access mode. RWOP cannot be used with online backup pods.
+  accessModes:
+    - ReadWriteOnce
+  # -- Keep generated data PVC on uninstall; namespace deletion is not prevented.
+  retain: true
+  # -- Annotations.
+  annotations: {}
+# -- Verified SQLite online snapshots on separate persistent storage.
+backup:
+  # -- Enable verified SQLite online snapshots to a separate PVC.
+  enabled: false
+  # -- Cron schedule evaluated in UTC.
+  schedule: '0 3 * * *'
+  # -- Number of completed snapshots to retain; excludes unrelated files.
+  retention: 7
+  # -- Suspend new scheduled backup jobs.
+  suspend: false
+  # -- Deadline in seconds for one snapshot job.
+  activeDeadlineSeconds: 600
+  # -- Existing destination claim; never managed by this release.
+  existingClaim: ''
+  # -- Destination storage class; dash disables dynamic provisioning.
+  storageClass: ''
+  # -- Destination capacity, sized for retained complete database copies.
+  size: 10Gi
+  # -- Keep generated backup claim on uninstall.
+  retain: true
+  # -- Backup pod resource requests and limits.
+  resources:
+    # -- Requested resources.
+    requests:
+      # -- Requested CPU.
+      cpu: 50m
+      # -- Requested memory.
+      memory: 128Mi
+    # -- Maximum resources.
+    limits:
+      # -- Maximum CPU.
+      cpu: '1'
+      # -- Maximum memory.
+      memory: 512Mi
+# -- Initial administrator created before the first HTTP listener starts.
+bootstrap:
+  # -- Create the initial administrator before HTTP opens. Disable only when adopting an existing populated claim.
+  enabled: true
+  # -- Initial local administrator username; preserve when reusing the database.
+  username: admin
+  # -- Initial password, minimum eight characters. Empty generates a retained 32-character credential.
+  password: ''
+  # -- Existing initial-password Secret, mounted only in the bootstrap init container.
+  existingSecret: ''
+  # -- Secret key holding the initial administrative password.
+  passwordKey: password
+  # -- Resources.
+  resources:
+    # -- Requests.
+    requests:
+      # -- Cpu.
+      cpu: 100m
+      # -- Memory.
+      memory: 128Mi
+    # -- Limits.
+    limits:
+      # -- Cpu.
+      cpu: '1'
+      # -- Memory.
+      memory: 256Mi
+```
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+auth:
+  existingSecret: snippets-jwt
+bootstrap:
+  username: snippetsadmin
+  existingSecret: snippets-admin
+persistence:
+  size: 10Gi
+backup:
+  enabled: true
+  size: 80Gi
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: snippets.example.test
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: snippets-tls
+      hosts:
+        - snippets.example.test
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+```
+
+## Oidc example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+oidc:
+  enabled: true
+  issuerURL: https://id.example.test
+  clientID: snippets
+  existingSecret: snippets-oidc
+networkPolicy:
+  webEgress:
+    - ipBlock:
+        cidr: 203.0.113.10/32
+```
+
+## Gateway-api example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+gateway:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames:
+    - snippets.example.test
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: gateway-system
+```
+
+## External-secrets example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+auth:
+  existingSecret: snippets-jwt
+bootstrap:
+  existingSecret: snippets-admin
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: snippets-jwt
+      spec:
+        secretStoreRef:
+          name: production-vault
+          kind: ClusterSecretStore
+        data:
+          - secretKey: jwt-secret
+            remoteRef:
+              key: applications/bytestash/jwt
+    - fullnameOverride: snippets-admin
+      spec:
+        secretStoreRef:
+          name: production-vault
+          kind: ClusterSecretStore
+        data:
+          - secretKey: password
+            remoteRef:
+              key: applications/bytestash/admin
+```

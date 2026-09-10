@@ -132,6 +132,10 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Heimdall', href: '/docs/charts/heimdall', maturity: 'stable' },
       { label: 'Homarr', href: '/docs/charts/homarr', maturity: 'stable' },
+      { label: 'BentoPDF', href: '/docs/charts/bentopdf', maturity: 'stable' },
+      { label: 'SiYuan', href: '/docs/charts/siyuan', maturity: 'stable' },
+      { label: 'ByteStash', href: '/docs/charts/bytestash', maturity: 'stable' },
+      { label: 'Glance', href: '/docs/charts/glance', maturity: 'stable' },
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
       { label: 'Discount Bandit', href: '/docs/charts/discount-bandit', maturity: 'stable' },
     ],

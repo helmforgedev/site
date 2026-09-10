@@ -8,6 +8,203 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  bytestash: [
+    {
+      name: 'Private snippets',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.5.12',
+          description: 'Pinned official application image',
+        },
+        {
+          label: 'Existing JWT Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Recommended for GitOps; contains jwt-secret',
+        },
+        {
+          label: 'Existing administrator Secret',
+          key: 'bootstrap.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Initial password key; changing it never resets an existing account',
+        },
+        {
+          label: 'Database capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'One SQLite writer per claim',
+        },
+        {
+          label: 'Online snapshots',
+          key: 'backup.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Verified SQLite snapshots on a separate PVC; no S3 transport',
+        },
+        {
+          label: 'Snapshot capacity',
+          key: 'backup.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Size for retained complete copies plus one temporary snapshot',
+        },
+      ],
+    },
+  ],
+  siyuan: [
+    {
+      name: 'Private workspace',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v3.8.3',
+          description: 'Pinned official SiYuan release',
+        },
+        {
+          label: 'Existing access-code Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Recommended for GitOps; contains access-code',
+        },
+        {
+          label: 'Workspace capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Complete workspace storage; one writer only',
+        },
+        {
+          label: 'Existing workspace claim',
+          key: 'persistence.existingClaim',
+          type: 'text',
+          default: '',
+          description: 'Reuse a retained or restored PVC',
+        },
+      ],
+    },
+  ],
+  bentopdf: [
+    {
+      name: 'Static PDF service',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2.8.8',
+          description: 'Pinned official BentoPDF image',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Static asset replicas; PDF processing runs in the browser',
+        },
+        {
+          label: 'NGINX metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Official exporter for static-serving traffic',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires metrics enabled and Prometheus Operator',
+        },
+      ],
+    },
+  ],
+  glance: [
+    {
+      name: 'Dashboard',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v0.8.6',
+          description: 'Pinned official Glance image',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Login rate limits and widget caches are per pod',
+        },
+        {
+          label: 'Native login',
+          key: 'auth.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Keep enabled for a private dashboard',
+        },
+        {
+          label: 'Username',
+          key: 'auth.username',
+          type: 'text',
+          default: 'admin',
+          description: 'Single shared dashboard account',
+        },
+        {
+          label: 'Existing auth Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Contains password and secret-key; recommended for GitOps',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'glance.example.com',
+          description: 'Public DNS hostname',
+        },
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: '',
+          description: 'Class of the installed ingress controller',
+        },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Use root unless proxy rewriting is configured',
+        },
+        {
+          label: 'Path type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact'],
+          description: 'Ingress path matching',
+        },
+      ],
+    },
+  ],
   moodle: [
     {
       name: 'Database',
