@@ -2,14 +2,17 @@
 # @AI-METADATA: chart documentation synchronized with the production values contract
 layout: ../../../layouts/DocsLayout.astro
 title: BentoPDF Chart
-description: Browser-local PDF processing with isolated NGINX, runtime tool controls, stateless scaling and genuine Prometheus monitoring.
+description:
+  Browser-local PDF processing with isolated NGINX, runtime tool controls, stateless scaling and genuine Prometheus
+  monitoring.
 ---
 
 # BentoPDF
 
 [Official upstream repository](https://github.com/alam00000/bentopdf).
 
-BentoPDF provides PDF tools that run in the user's browser. The official image contains a static application and NGINX. This chart deploys a restricted, stateless service with native runtime tool controls and optional NGINX monitoring.
+BentoPDF provides PDF tools that run in the user's browser. The official image contains a static application and NGINX.
+This chart deploys a restricted, stateless service with native runtime tool controls and optional NGINX monitoring.
 
 ## Features
 
@@ -30,23 +33,32 @@ helm install bentopdf helmforge/bentopdf --namespace bentopdf --create-namespace
 kubectl -n bentopdf port-forward service/bentopdf-bentopdf 8080:8080
 ```
 
-Open http://localhost:8080. Use a dedicated HTTPS hostname in production. SharedArrayBuffer needs a secure context; localhost is an exception for testing.
+Open http://localhost:8080. Use a dedicated HTTPS hostname in production. SharedArrayBuffer needs a secure context;
+localhost is an exception for testing.
 
 ## Deployment contract
 
-The official image is `ghcr.io/alam00000/bentopdf:2.8.8`, verified for Linux amd64 and arm64. Deploy at the domain root. BASE_URL, branding and CSP build arguments cannot be changed through runtime environment variables.
+The official image is `ghcr.io/alam00000/bentopdf:2.8.8`, verified for Linux amd64 and arm64. Deploy at the domain root.
+BASE_URL, branding and CSP build arguments cannot be changed through runtime environment variables.
 
-NGINX starts directly with configuration derived from the tagged upstream nginx.conf. Image-owned security-header includes and assets remain immutable. Only `/etc/nginx/tmp` and `/tmp` are writable. ConfigMap changes trigger a rollout because individual files use subPath mounts.
+NGINX starts directly with configuration derived from the tagged upstream nginx.conf. Image-owned security-header
+includes and assets remain immutable. Only `/etc/nginx/tmp` and `/tmp` are writable. ConfigMap changes trigger a rollout
+because individual files use subPath mounts.
 
-No database, Secret, ExternalSecret or PVC is required. There is no native login. Protect private installations through edge authentication. Disabling tools is presentation control, not an authorization boundary.
+No database, Secret, ExternalSecret or PVC is required. There is no native login. Protect private installations through
+edge authentication. Disabling tools is presentation control, not an authorization boundary.
 
 ## Privacy and network boundary
 
-PDF operations execute on client devices. The browser test checks for document POST/PUT/PATCH requests to the application server during the tested merge workflow. It does not audit every upstream tool or browser extension.
+PDF operations execute on client devices. The browser test checks for document POST/PUT/PATCH requests to the
+application server during the tested merge workflow. It does not audit every upstream tool or browser extension.
 
-Access logs contain HTTP metadata such as paths and client addresses. Treat logs accordingly. There is no server-side document backup dataset.
+Access logs contain HTTP metadata such as paths and client addresses. Treat logs accordingly. There is no server-side
+document backup dataset.
 
-Some tools download WASM, OCR or font assets from CDNs in the browser. Denying pod egress does not block those requests. The default image is not an offline guarantee. Air-gapped use requires hosting relevant assets and building an image with matching URLs and CSP.
+Some tools download WASM, OCR or font assets from CDNs in the browser. Denying pod egress does not block those requests.
+The default image is not an offline guarantee. Air-gapped use requires hosting relevant assets and building an image
+with matching URLs and CSP.
 
 ## Runtime configuration
 
@@ -59,7 +71,8 @@ config:
     - redaction
 ```
 
-Use exact upstream tool/category identifiers. Disabling a parent category disables its children. Unknown identifiers may have no effect upstream. These controls do not enforce permissions.
+Use exact upstream tool/category identifiers. Disabling a parent category disables its children. Unknown identifiers may
+have no effect upstream. These controls do not enforce permissions.
 
 ## Availability
 
@@ -70,17 +83,25 @@ podDisruptionBudget:
   maxUnavailable: 1
 ```
 
-PDF processing does not occupy pod CPU. Replicas serve static content; spread them across failure domains. PDBs cover voluntary disruption, not node failures. The chart rejects singleton PDBs to avoid blocking maintenance.
+PDF processing does not occupy pod CPU. Replicas serve static content; spread them across failure domains. PDBs cover
+voluntary disruption, not node failures. The chart rejects singleton PDBs to avoid blocking maintenance.
 
-Optional HPA targets the bentopdf container CPU, requires metrics-server and CPU requests, and defaults to two minimum replicas. HPA owns replica count when enabled. Scale-down stabilization is 300 seconds. Browser workload may not increase serving CPU.
+Optional HPA targets the bentopdf container CPU, requires metrics-server and CPU requests, and defaults to two minimum
+replicas. HPA owns replica count when enabled. Scale-down stabilization is 300 seconds. Browser workload may not
+increase serving CPU.
 
 ## Networking
 
-The default Service is ClusterIP on 8080. Ingress and HTTPRoute reference existing controllers/Gateways. Terminate TLS at the edge and preserve CSP, Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy. Replacing these headers may break workers and office conversions.
+The default Service is ClusterIP on 8080. Ingress and HTTPRoute reference existing controllers/Gateways. Terminate TLS
+at the edge and preserve CSP, Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy. Replacing these headers may
+break workers and office conversions.
 
-NetworkPolicy allows HTTP from the release namespace and denies outbound pod traffic by default. Configure `networkPolicy.ingressFrom` for the edge namespace. `metrics.ingressFrom` separately grants exporter access. `extraEgress` allows explicit rules. Enforcement requires a NetworkPolicy-capable CNI.
+NetworkPolicy allows HTTP from the release namespace and denies outbound pod traffic by default. Configure
+`networkPolicy.ingressFrom` for the edge namespace. `metrics.ingressFrom` separately grants exporter access.
+`extraEgress` allows explicit rules. Enforcement requires a NetworkPolicy-capable CNI.
 
-Service `ipFamilyPolicy`/`ipFamilies` support dual stack. PreferDualStack can fall back; RequireDualStack needs cluster support. `server.ipv6` independently controls the NGINX listener.
+Service `ipFamilyPolicy`/`ipFamilies` support dual stack. PreferDualStack can fall back; RequireDualStack needs cluster
+support. `server.ipv6` independently controls the NGINX listener.
 
 ## Observability
 
@@ -97,9 +118,13 @@ metrics:
       release: prometheus
 ```
 
-Install Prometheus Operator CRDs and match monitor/rule labels to Prometheus selectors. The official exporter scrapes loopback-only stub_status on 8081. The public application port does not expose that endpoint. Metrics default to port 9113.
+Install Prometheus Operator CRDs and match monitor/rule labels to Prometheus selectors. The official exporter scrapes
+loopback-only stub_status on 8081. The public application port does not expose that endpoint. Metrics default to
+port 9113.
 
-`nginx_up` reports exporter-to-NGINX connectivity. `nginx_http_requests_total` and connection gauges describe static serving, not PDF operations or 5xx counts. The built-in alert detects nginx_up zero for five minutes. Configure target-down alerts for missing exporters; use browser/blackbox checks for broader coverage.
+`nginx_up` reports exporter-to-NGINX connectivity. `nginx_http_requests_total` and connection gauges describe static
+serving, not PDF operations or 5xx counts. The built-in alert detects nginx_up zero for five minutes. Configure
+target-down alerts for missing exporters; use browser/blackbox checks for broader coverage.
 
 ## Upgrade and restore
 
@@ -109,13 +134,17 @@ kubectl -n bentopdf rollout status deployment/bentopdf-bentopdf
 helm rollback bentopdf -n bentopdf
 ```
 
-Review release notes and browser-cache compatibility. Existing tabs may need reloading after upgrades. Rolling updates use maxUnavailable zero and maxSurge one; reserve extra pod capacity.
+Review release notes and browser-cache compatibility. Existing tabs may need reloading after upgrades. Rolling updates
+use maxUnavailable zero and maxSurge one; reserve extra pod capacity.
 
-Keep values, edge configuration and image pins in version control. Reinstall the same chart/image/configuration to recover server state. Client documents require client backups; Kubernetes snapshots cannot recover them.
+Keep values, edge configuration and image pins in version control. Reinstall the same chart/image/configuration to
+recover server state. Client documents require client backups; Kubernetes snapshots cannot recover them.
 
 ## Validation
 
-Install dependencies with `npm ci --prefix charts/bentopdf/scripts` and Chromium with `npx --prefix charts/bentopdf/scripts playwright install chromium`. Run `make validate-chart CHART=bentopdf` from helmforge-ops. The real browser test is not skipped when Chromium is unavailable.
+Install dependencies with `npm ci --prefix charts/bentopdf/scripts` and Chromium with
+`npx --prefix charts/bentopdf/scripts playwright install chromium`. Run `make validate-chart CHART=bentopdf` from
+helmforge-ops. The real browser test is not skipped when Chromium is unavailable.
 
 ## Security Scan
 
@@ -127,25 +156,36 @@ Install dependencies with `npm ci --prefix charts/bentopdf/scripts` and Chromium
 
 > Security posture acceptable.
 
-Measured with Kubescape 4.0.13 against default manifests. This is a configuration assessment, not an application security guarantee.
+Measured with Kubescape 4.0.13 against default manifests. This is a configuration assessment, not an application
+security guarantee.
 
 ## Parameters
 
-See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.yaml) and [values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.schema.json) for the complete contract.
+See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.yaml) and
+[values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/bentopdf/values.schema.json) for the
+complete contract.
 
 ## Operations guide
 
-Use a dedicated HTTPS origin and preserve upstream CSP/COOP/COEP. Localhost is a secure-context exception; plain remote HTTP is not. Check browser console and network output for WASM failures before changing pod network policies.
+Use a dedicated HTTPS origin and preserve upstream CSP/COOP/COEP. Localhost is a secure-context exception; plain remote
+HTTP is not. Check browser console and network output for WASM failures before changing pod network policies.
 
-CDN requests originate from the browser. Corporate proxies, content filters, TLS interception and extensions may block them. Offline operation requires an audited image with suitable build-time asset URLs and CSP, followed by validation of each required workflow.
+CDN requests originate from the browser. Corporate proxies, content filters, TLS interception and extensions may block
+them. Offline operation requires an audited image with suitable build-time asset URLs and CSP, followed by validation of
+each required workflow.
 
-Tool controls use exact upstream IDs such as compress-pdf or annotation-shape. They affect presentation and do not enforce permissions. Save downloads to managed client storage; server logs do not contain recovery copies.
+Tool controls use exact upstream IDs such as compress-pdf or annotation-shape. They affect presentation and do not
+enforce permissions. Save downloads to managed client storage; server logs do not contain recovery copies.
 
-Use two replicas and spread them across nodes. PDBs cover voluntary disruptions. Rolling updates need surge capacity. HPA requires metrics-server and measures serving CPU, not client processing.
+Use two replicas and spread them across nodes. PDBs cover voluntary disruptions. Rolling updates need surge capacity.
+HPA requires metrics-server and measures serving CPU, not client processing.
 
-Match ServiceMonitor labels to Prometheus selectors and permit its namespace through metrics.ingressFrom. Confirm nginx_up is one and nginx_http_requests_total increases. Configure target-down alerts separately. stub_status does not expose per-status HTTP counters.
+Match ServiceMonitor labels to Prometheus selectors and permit its namespace through metrics.ingressFrom. Confirm
+nginx_up is one and nginx_http_requests_total increases. Configure target-down alerts separately. stub_status does not
+expose per-status HTTP counters.
 
-Restore server state by reinstalling pinned images and values. Back up edge identity configuration and client documents separately.
+Restore server state by reinstalling pinned images and values. Back up edge identity configuration and client documents
+separately.
 
 ## Complete values
 
@@ -216,19 +256,11 @@ ingress:
   # -- TLS host/Secret entries.
   tls: []
 # -- Gateway.
-gateway:
-  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
   enabled: false
-  # -- HTTPRoute annotations.
-  annotations: {}
-  # -- Existing Gateway parent references, including namespace when appropriate.
-  parentRefs: []
-  # -- Public DNS hostnames.
-  hostnames: []
-  # -- Path.
-  path: /
-  # -- Gateway path match type.
-  pathType: PathPrefix
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
 # -- Pod network isolation does not restrict browser CDN requests.
 networkPolicy:
   # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
@@ -440,3 +472,11 @@ config:
   editorDisabledCategories:
     - annotation-shape
 ```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

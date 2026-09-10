@@ -343,19 +343,11 @@ ingress:
   # -- TLS host/Secret entries.
   tls: []
 # -- Gateway.
-gateway:
-  # -- Enable a Gateway API v1 HTTPRoute. Install Gateway API CRDs and a controller first.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
   enabled: false
-  # -- HTTPRoute annotations.
-  annotations: {}
-  # -- Existing Gateway parent references, including namespace when appropriate.
-  parentRefs: []
-  # -- Public DNS hostnames.
-  hostnames: []
-  # -- Path.
-  path: /
-  # -- Gateway path match type.
-  pathType: PathPrefix
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
 # -- External Secrets.
 externalSecrets:
   # -- Enabled.
@@ -607,19 +599,19 @@ networkPolicy:
 ## Gateway-api example
 
 ```yaml
-# SPDX-License-Identifier: Apache-2.0
-gateway:
-  enabled: true
-  parentRefs:
-    - name: public
-      namespace: gateway-system
-  hostnames:
-    - snippets.example.test
 networkPolicy:
   ingressFrom:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: gateway-system
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: public
+          namespace: gateway-system
+      hostnames:
+        - snippets.example.test
 ```
 
 ## External-secrets example
@@ -652,3 +644,11 @@ externalSecrets:
             remoteRef:
               key: applications/bytestash/admin
 ```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

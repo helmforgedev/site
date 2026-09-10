@@ -2,7 +2,9 @@
 # @AI-METADATA: chart documentation synchronized with the production values contract
 layout: ../../../layouts/DocsLayout.astro
 title: SiYuan Chart
-description: Private knowledge workspace with retained native authentication, strict OIDC admission, restricted runtime and verified complete-workspace recovery.
+description:
+  Private knowledge workspace with retained native authentication, strict OIDC admission, restricted runtime and
+  verified complete-workspace recovery.
 ---
 
 # SiYuan
@@ -33,9 +35,9 @@ helm install siyuan helmforge/siyuan --namespace siyuan --create-namespace
 kubectl -n siyuan port-forward service/siyuan-siyuan 6806:6806
 ```
 
-Open [http://localhost:6806](http://localhost:6806) and use the access code described in Helm NOTES. For remote access, configure an HTTPS
-hostname and a WebSocket-capable ingress or Gateway. SiYuan is a personal administrative workspace; this is not a
-tenant-isolated collaboration server.
+Open [http://localhost:6806](http://localhost:6806) and use the access code described in Helm NOTES. For remote access,
+configure an HTTPS hostname and a WebSocket-capable ingress or Gateway. SiYuan is a personal administrative workspace;
+this is not a tenant-isolated collaboration server.
 
 ## Storage and availability
 
@@ -195,12 +197,14 @@ storage.
 
 > Security posture acceptable.
 
-Measured with Kubescape 4.0.13 against default manifests. This assesses deployment configuration, not every upstream feature or extension.
+Measured with Kubescape 4.0.13 against default manifests. This assesses deployment configuration, not every upstream
+feature or extension.
 
 ## Values
 
-See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/siyuan/values.yaml) and [values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/siyuan/values.schema.json) for the full contract, including scheduling
-and dual-stack settings.
+See [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/siyuan/values.yaml) and
+[values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/siyuan/values.schema.json) for the full
+contract, including scheduling and dual-stack settings.
 
 ## Workspace recovery
 
@@ -320,19 +324,11 @@ ingress:
   # -- TLS host/Secret entries.
   tls: []
 # -- Gateway.
-gateway:
-  # -- Enable a Gateway API v1 HTTPRoute. Install Gateway API CRDs and a controller first.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
   enabled: false
-  # -- HTTPRoute annotations.
-  annotations: {}
-  # -- Existing Gateway parent references, including namespace when appropriate.
-  parentRefs: []
-  # -- Public DNS hostnames.
-  hostnames: []
-  # -- Path.
-  path: /
-  # -- Gateway path match type.
-  pathType: PathPrefix
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
 # -- External Secrets.
 externalSecrets:
   # -- Enabled.
@@ -565,19 +561,19 @@ networkPolicy:
 ## Gateway-api example
 
 ```yaml
-# SPDX-License-Identifier: Apache-2.0
-gateway:
-  enabled: true
-  parentRefs:
-    - name: public
-      namespace: gateway-system
-  hostnames:
-    - notes.example.com
 networkPolicy:
   ingressFrom:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: gateway-system
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: public
+          namespace: gateway-system
+      hostnames:
+        - notes.example.com
 ```
 
 ## External-secrets example
@@ -599,3 +595,11 @@ externalSecrets:
             remoteRef:
               key: applications/siyuan/access-code
 ```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

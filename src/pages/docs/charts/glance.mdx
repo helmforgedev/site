@@ -2,15 +2,16 @@
 # @AI-METADATA: chart documentation synchronized with the production values contract
 layout: ../../../layouts/DocsLayout.astro
 title: Glance Chart
-description: Private Glance dashboards with retained authentication, secret-backed widgets, restricted networking, safe rolling updates and production operation guides.
+description:
+  Private Glance dashboards with retained authentication, secret-backed widgets, restricted networking, safe rolling
+  updates and production operation guides.
 ---
 
 # Glance
 
-Deploy the [official Glance dashboard](https://github.com/glanceapp/glance) with
-native login, declarative widgets and a restricted Kubernetes runtime.
-The chart pins docker.io/glanceapp/glance:v0.8.6 and serves HTTP on port 8080.
-It requires no database, cache server or persistent application volume.
+Deploy the [official Glance dashboard](https://github.com/glanceapp/glance) with native login, declarative widgets and a
+restricted Kubernetes runtime. The chart pins docker.io/glanceapp/glance:v0.8.6 and serves HTTP on port 8080. It
+requires no database, cache server or persistent application volume.
 
 ## Installation
 
@@ -34,10 +35,9 @@ kubectl -n glance rollout status deployment/glance-glance --timeout=120s
 kubectl -n glance port-forward svc/glance-glance 8080:8080
 ```
 
-Open http://localhost:8080 and use the admin account with the generated password
-from the Secret identified in the notes. Keep the password in a trusted terminal.
-For production, prepare the external auth Secret, TLS certificate and restricted
-ingress peers described below before directing users to the deployment.
+Open http://localhost:8080 and use the admin account with the generated password from the Secret identified in the
+notes. Keep the password in a trusted terminal. For production, prepare the external auth Secret, TLS certificate and
+restricted ingress peers described below before directing users to the deployment.
 
 ## Production capabilities
 
@@ -56,93 +56,79 @@ ingress peers described below before directing users to the deployment.
 
 ### Product boundary
 
-Glance is a Go dashboard that renders configured feeds, bookmarks and widgets.
-The upstream image has no database server, worker process, application storage
-volume or built-in Prometheus endpoint. This chart preserves that architecture.
-Configuration and credential sources are the durable deployment state.
-Browser-local Todo data is not stored in a Kubernetes PVC.
+Glance is a Go dashboard that renders configured feeds, bookmarks and widgets. The upstream image has no database
+server, worker process, application storage volume or built-in Prometheus endpoint. This chart preserves that
+architecture. Configuration and credential sources are the durable deployment state. Browser-local Todo data is not
+stored in a Kubernetes PVC.
 
 ### Authentication contract
 
-The chart enables native authentication and configures one dashboard account.
-All users of that account share the same view; it is not a multi-tenant portal.
-Generated passwords contain 32 random alphanumeric characters. Session keys
-encode 64 random bytes, matching the tagged upstream implementation exactly.
-Helm lookup reuses an existing Secret during upgrades. Inline values deliberately
-override retained material, while existingSecret transfers ownership to the user
-or External Secrets Operator. Offline helm template cannot look up the cluster;
-GitOps systems that continuously render offline should use an existing Secret.
+The chart enables native authentication and configures one dashboard account. All users of that account share the same
+view; it is not a multi-tenant portal. Generated passwords contain 32 random alphanumeric characters. Session keys
+encode 64 random bytes, matching the tagged upstream implementation exactly. Helm lookup reuses an existing Secret
+during upgrades. Inline values deliberately override retained material, while existingSecret transfers ownership to the
+user or External Secrets Operator. Offline helm template cannot look up the cluster; GitOps systems that continuously
+render offline should use an existing Secret.
 
-Neither password nor signing key appears in the ConfigMap. Glance resolves
-projected files through its native secret interpolation. Configuration is rendered
-with toYaml rather than tpl so custom-api widget Go templates remain literal.
-The chart owns auth and server sections and rejects attempts to override them
-through config.data. This keeps ports, health probes and credential mounts aligned.
+Neither password nor signing key appears in the ConfigMap. Glance resolves projected files through its native secret
+interpolation. Configuration is rendered with toYaml rather than tpl so custom-api widget Go templates remain literal.
+The chart owns auth and server sections and rejects attempts to override them through config.data. This keeps ports,
+health probes and credential mounts aligned.
 
 ### Restricted runtime
 
-The default pod runs as UID/GID 10001 with a read-only root filesystem, dropped
-capabilities, RuntimeDefault seccomp and no service account token. Configuration,
-assets and Secret projections are read-only. No Docker socket or hostPath is
-mounted. Docker-container widgets need a separately secured API integration;
-the chart does not expose the host Docker daemon to satisfy a dashboard widget.
+The default pod runs as UID/GID 10001 with a read-only root filesystem, dropped capabilities, RuntimeDefault seccomp and
+no service account token. Configuration, assets and Secret projections are read-only. No Docker socket or hostPath is
+mounted. Docker-container widgets need a separately secured API integration; the chart does not expose the host Docker
+daemon to satisfy a dashboard widget.
 
 ### Availability and scheduling
 
-RollingUpdate uses zero unavailable pods and a one-pod surge. Two replicas can
-share immutable configuration and signing material without a data volume.
-Widget caches and login rate limits remain process-local. A shared cookie can
-authenticate on either pod, but the chart does not claim distributed rate limiting.
-Sensitive public deployments should enforce limits at a trusted ingress edge.
-An optional PDB requires two or more replicas and cannot allow all replicas to be
-unavailable. Topology spreading is explicit; node capacity remains the operator's
-responsibility. A one-node lab proves process behavior, not zone failure recovery.
+RollingUpdate uses zero unavailable pods and a one-pod surge. Two replicas can share immutable configuration and signing
+material without a data volume. Widget caches and login rate limits remain process-local. A shared cookie can
+authenticate on either pod, but the chart does not claim distributed rate limiting. Sensitive public deployments should
+enforce limits at a trusted ingress edge. An optional PDB requires two or more replicas and cannot allow all replicas to
+be unavailable. Topology spreading is explicit; node capacity remains the operator's responsibility. A one-node lab
+proves process behavior, not zone failure recovery.
 
 ### Network and exposure
 
-Default ingress admits only pods in the deployment namespace. DNS plus outbound
-HTTP/HTTPS allows ordinary feeds. Operators can replace destination CIDRs or add
-explicit egress for intranet APIs. The policy requires an enforcing CNI.
-Trust of proxy headers is opt-in and must be coupled to restricted proxy access.
-Ingress and Gateway resources refer to existing controllers. Gateway listeners
-terminate TLS; subpath deployments require a prefix-stripping rule at the proxy.
+Default ingress admits only pods in the deployment namespace. DNS plus outbound HTTP/HTTPS allows ordinary feeds.
+Operators can replace destination CIDRs or add explicit egress for intranet APIs. The policy requires an enforcing CNI.
+Trust of proxy headers is opt-in and must be coupled to restricted proxy access. Ingress and Gateway resources refer to
+existing controllers. Gateway listeners terminate TLS; subpath deployments require a prefix-stripping rule at the proxy.
 
 ### Observability and recovery
 
-Native /api/healthz probes are independent of third-party feed availability.
-The functional gate additionally checks auth, dashboard content, cross-pod cookies,
-Secret retention during Helm upgrade and session reuse after pod replacement.
-ExternalSecrets is exercised against a real operator and validated with CRD schema.
-No artificial ServiceMonitor points at a nonexistent metrics endpoint.
-Backups comprise values/configuration, static assets and the credential source.
-There is no CronJob copying a nonexistent database, and no claim that server
-backups recover browser-local storage.
+Native /api/healthz probes are independent of third-party feed availability. The functional gate additionally checks
+auth, dashboard content, cross-pod cookies, Secret retention during Helm upgrade and session reuse after pod
+replacement. ExternalSecrets is exercised against a real operator and validated with CRD schema. No artificial
+ServiceMonitor points at a nonexistent metrics endpoint. Backups comprise values/configuration, static assets and the
+credential source. There is no CronJob copying a nonexistent database, and no claim that server backups recover
+browser-local storage.
 
 ### Upgrade and rotation
 
-A configuration checksum rolls pods after Helm-managed config changes. Explicit
-authentication values also participate in a checksum; generated random values do
-not cause incidental rollouts. Updating a referenced Secret requires a controlled
-rollout or an external reloader. Secret projection updates alone are not promised
-to reload already parsed authentication configuration. Rotating the signing key
-invalidates existing sessions; retaining it preserves sessions across restarts.
+A configuration checksum rolls pods after Helm-managed config changes. Explicit authentication values also participate
+in a checksum; generated random values do not cause incidental rollouts. Updating a referenced Secret requires a
+controlled rollout or an external reloader. Secret projection updates alone are not promised to reload already parsed
+authentication configuration. Rotating the signing key invalidates existing sessions; retaining it preserves sessions
+across restarts.
 
 ## Authentication and rotation
 
 ### Private bootstrap
 
-Native login is enabled by default. Obtain the generated password from the Secret
-named in helm get notes, using a trusted terminal. The account name defaults to
-admin. TLS termination should be configured before sharing access outside the lab.
-The default ClusterIP and same-namespace ingress policy limit initial exposure.
+Native login is enabled by default. Obtain the generated password from the Secret named in helm get notes, using a
+trusted terminal. The account name defaults to admin. TLS termination should be configured before sharing access outside
+the lab. The default ClusterIP and same-namespace ingress policy limit initial exposure.
 
 ### Existing credentials
 
-Set auth.existingSecret to a Secret in the release namespace containing password
-and secret-key. The latter must be a base64 string representing exactly 64 random
-bytes. It is itself a string inside the Kubernetes Secret; Secret data fields add
-the normal Kubernetes base64 layer. Prefer secret management tooling over putting
-credentials on shell command lines, in Git or in Helm values files.
+Set auth.existingSecret to a Secret in the release namespace containing password and secret-key. The latter must be a
+base64 string representing exactly 64 random bytes. It is itself a string inside the Kubernetes Secret; Secret data
+fields add the normal Kubernetes base64 layer. Prefer secret management tooling over putting credentials on shell
+command lines, in Git or in Helm values files.
 
 Generate a compatible signing value with the pinned upstream image:
 
@@ -150,57 +136,50 @@ Generate a compatible signing value with the pinned upstream image:
 docker run --rm docker.io/glanceapp/glance:v0.8.6 secret:make
 ```
 
-The command produces secret material. Store its output directly in your trusted
-secret manager and do not paste it into logs, issue bodies or shared documentation.
-Configure alternate keys with auth.passwordKey and auth.secretKeyKey.
+The command produces secret material. Store its output directly in your trusted secret manager and do not paste it into
+logs, issue bodies or shared documentation. Configure alternate keys with auth.passwordKey and auth.secretKeyKey.
 
 ### External Secrets
 
-The chart implements externalSecrets.enabled, refreshInterval and items[]. Each
-item carries its own complete operator spec. The target name must match the auth
-or widget Secret reference. Install ESO and provision the SecretStore first.
-examples/external-secrets.yaml uses a production store name, not the test provider.
-ci/external-secrets-values.yaml is a deterministic lab-only fixture.
+The chart implements externalSecrets.enabled, refreshInterval and items[]. Each item carries its own complete operator
+spec. The target name must match the auth or widget Secret reference. Install ESO and provision the SecretStore first.
+examples/external-secrets.yaml uses a production store name, not the test provider. ci/external-secrets-values.yaml is a
+deterministic lab-only fixture.
 
-Confirm the operator reports Ready=True and SecretSynced before troubleshooting
-Glance login. A missing projection prevents startup and is not an application
-password failure. Never use the fake store outside a disposable validation lab.
+Confirm the operator reports Ready=True and SecretSynced before troubleshooting Glance login. A missing projection
+prevents startup and is not an application password failure. Never use the fake store outside a disposable validation
+lab.
 
 ### Rotation
 
-An ordinary Helm upgrade retains generated credentials through lookup. GitOps
-renderers that cannot query the cluster should use an externally owned Secret.
-To change credentials in a chart-owned Secret, pass explicit auth values through a
-secure delivery mechanism. Changing password preserves existing signed sessions;
-rotate secret-key as well when all sessions must be invalidated.
-For referenced Secrets, update the source and then restart the Deployment after
-the operator has synchronized. A reloader may automate that rollout.
+An ordinary Helm upgrade retains generated credentials through lookup. GitOps renderers that cannot query the cluster
+should use an externally owned Secret. To change credentials in a chart-owned Secret, pass explicit auth values through
+a secure delivery mechanism. Changing password preserves existing signed sessions; rotate secret-key as well when all
+sessions must be invalidated. For referenced Secrets, update the source and then restart the Deployment after the
+operator has synchronized. A reloader may automate that rollout.
 
-The upstream login limiter is per process. Multiple replicas do not provide a
-shared failed-login counter. Enforce a suitable limit at the authenticated edge.
+The upstream login limiter is per process. Multiple replicas do not provide a shared failed-login counter. Enforce a
+suitable limit at the authenticated edge.
 
 ## Widgets and network configuration
 
 ### Declarative dashboard
 
-config.data accepts the native Glance pages, theme, branding and document settings.
-The auth and server sections are reserved so they cannot contradict chart ports
-or bypass native login accidentally. Arrays such as pages are replaced during
-values merging; supply a complete page list when overriding the default dashboard.
-Configuration is mounted as a directory, without subPath, and a Helm-managed
-ConfigMap change triggers a Deployment rollout through a checksum.
+config.data accepts the native Glance pages, theme, branding and document settings. The auth and server sections are
+reserved so they cannot contradict chart ports or bypass native login accidentally. Arrays such as pages are replaced
+during values merging; supply a complete page list when overriding the default dashboard. Configuration is mounted as a
+directory, without subPath, and a Helm-managed ConfigMap change triggers a Deployment rollout through a checksum.
 
 ### Literal widget templates
 
-Custom API widgets use Go templates that look like Helm template delimiters.
-This chart intentionally does not call tpl on config.data. An expression such as
-`{{ .JSON.String "value" }}` reaches Glance unchanged. The functional CI fixture
+Custom API widgets use Go templates that look like Helm template delimiters. This chart intentionally does not call tpl
+on config.data. An expression such as `{{ .JSON.String "value" }}` reaches Glance unchanged. The functional CI fixture
 renders a known JSON value through this path and verifies the output.
 
 ### Secret-backed feeds
 
-widgetSecrets.sources projects selected keys from existing Kubernetes Secrets into
-/run/secrets. Use the upstream secret-file interpolation in the configuration:
+widgetSecrets.sources projects selected keys from existing Kubernetes Secrets into /run/secrets. Use the upstream
+secret-file interpolation in the configuration:
 
 ```yaml
 widgetSecrets:
@@ -222,68 +201,59 @@ config:
                   - glanceapp/glance
 ```
 
-The auth-password and auth-signing-key filenames are reserved. Mount only the
-keys a widget needs. Do not put credentials into assets.existingConfigMap: assets
-are deliberately served as public static content and are not a secret store.
+The auth-password and auth-signing-key filenames are reserved. Mount only the keys a widget needs. Do not put
+credentials into assets.existingConfigMap: assets are deliberately served as public static content and are not a secret
+store.
 
 ### Egress
 
-The default NetworkPolicy allows DNS and TCP ports 80/443 for feed retrieval.
-Restrict webEgress CIDRs for an intranet-only dashboard. Add extraEgress for
-internal APIs using other ports and restrict the matching destination as well.
-Application egress rules do not control a user's browser fetching remote images.
-Do not infer offline operation from a deny-egress pod policy.
+The default NetworkPolicy allows DNS and TCP ports 80/443 for feed retrieval. Restrict webEgress CIDRs for an
+intranet-only dashboard. Add extraEgress for internal APIs using other ports and restrict the matching destination as
+well. Application egress rules do not control a user's browser fetching remote images. Do not infer offline operation
+from a deny-egress pod policy.
 
 ### Proxy trust and subpaths
 
-Enable server.proxied only when the Service is reachable through trusted peers.
-Restrict networkPolicy.ingressFrom to the actual ingress controller namespace and
-pod selector. The namespace field alone is not a guarantee that every pod there
-is trusted. For server.baseUrl=/glance, configure the proxy to remove /glance
-before forwarding. The chart does not silently install controller-specific rewrite
-annotations or claim that a PathPrefix match performs rewriting.
+Enable server.proxied only when the Service is reachable through trusted peers. Restrict networkPolicy.ingressFrom to
+the actual ingress controller namespace and pod selector. The namespace field alone is not a guarantee that every pod
+there is trusted. For server.baseUrl=/glance, configure the proxy to remove /glance before forwarding. The chart does
+not silently install controller-specific rewrite annotations or claim that a PathPrefix match performs rewriting.
 
 ### Docker widgets
 
-This chart never mounts /var/run/docker.sock. A dashboard does not require host
-daemon control. If Docker widgets are needed, provide a separately authenticated,
-restricted proxy that exposes only the necessary read operations, with appropriate
-network rules. Kubernetes API credentials are likewise not mounted by default.
+This chart never mounts /var/run/docker.sock. A dashboard does not require host daemon control. If Docker widgets are
+needed, provide a separately authenticated, restricted proxy that exposes only the necessary read operations, with
+appropriate network rules. Kubernetes API credentials are likewise not mounted by default.
 
 ## Operations and troubleshooting
 
 ### Health and monitoring
 
-Glance exposes GET /api/healthz. The endpoint stays public so kubelet probes can
-check a private dashboard without carrying a user password. A successful probe
-means the HTTP application initialized; it does not prove every external feed is
-available. Verify important widgets separately and inspect application logs.
-Use an existing blackbox exporter to monitor availability through the public TLS
-endpoint. No native Prometheus metrics endpoint was identified in v0.8.6, so this
-chart does not create a misleading ServiceMonitor.
+Glance exposes GET /api/healthz. The endpoint stays public so kubelet probes can check a private dashboard without
+carrying a user password. A successful probe means the HTTP application initialized; it does not prove every external
+feed is available. Verify important widgets separately and inspect application logs. Use an existing blackbox exporter
+to monitor availability through the public TLS endpoint. No native Prometheus metrics endpoint was identified in v0.8.6,
+so this chart does not create a misleading ServiceMonitor.
 
 ### Upgrades
 
-Review tagged upstream release notes before changing image.tag. Keep a copy of
-the previous image tag and values. For image changes use Helm's normal merged
-values or --reset-then-reuse-values; --reuse-values can preserve an old image tag.
-Confirm the effective Deployment image after rollout. Avoid deleting a generated
-authentication Secret during an upgrade because that invalidates retained sessions.
+Review tagged upstream release notes before changing image.tag. Keep a copy of the previous image tag and values. For
+image changes use Helm's normal merged values or --reset-then-reuse-values; --reuse-values can preserve an old image
+tag. Confirm the effective Deployment image after rollout. Avoid deleting a generated authentication Secret during an
+upgrade because that invalidates retained sessions.
 
 ### Recovery inventory
 
-Store the complete configuration/values in Git without secrets. Back up the
-external secret source or encrypted Kubernetes Secret backups, and preserve any
-public assets ConfigMap. Restore those resources before creating a replacement
-release. Keep the same username and signing key to preserve unexpired sessions.
-The chart has no database or filesystem content volume. Browser-local Todo data
-requires browser profile recovery and is not covered by Kubernetes backups.
+Store the complete configuration/values in Git without secrets. Back up the external secret source or encrypted
+Kubernetes Secret backups, and preserve any public assets ConfigMap. Restore those resources before creating a
+replacement release. Keep the same username and signing key to preserve unexpired sessions. The chart has no database or
+filesystem content volume. Browser-local Todo data requires browser profile recovery and is not covered by Kubernetes
+backups.
 
 ### Replica behavior
 
-Two replicas can serve the same configuration with the same signing material.
-Their widget caches and login rate-limit counters are independent. A PDB affects
-voluntary disruptions only. Spread replicas over real nodes for node-level
+Two replicas can serve the same configuration with the same signing material. Their widget caches and login rate-limit
+counters are independent. A PDB affects voluntary disruptions only. Spread replicas over real nodes for node-level
 resilience; a two-pod deployment on one node is not zone redundancy.
 
 ### Troubleshooting
@@ -307,15 +277,14 @@ resilience; a two-pod deployment on one node is not zone redundancy.
 
 ### Validation boundary
 
-The chart-owned runtime test checks native health, unauthorized access, a successful
-login, rendered widget content, session reuse across replicas, credential retention
-through Helm upgrade and pod replacement. It does not prove availability of all
-third-party feeds, provider SSO, distributed rate limiting or browser data recovery.
+The chart-owned runtime test checks native health, unauthorized access, a successful login, rendered widget content,
+session reuse across replicas, credential retention through Helm upgrade and pod replacement. It does not prove
+availability of all third-party feeds, provider SSO, distributed rate limiting or browser data recovery.
 
 ## Deployment scenarios
 
-The examples are complete values overlays. Resources referenced by name must exist
-in the release namespace, and routing controllers must already be installed.
+The examples are complete values overlays. Resources referenced by name must exist in the release namespace, and routing
+controllers must already be installed.
 
 ### Private minimal instance
 
@@ -381,20 +350,20 @@ topologySpreadConstraints:
 Install Gateway API CRDs and provide the referenced Gateway HTTPS listener.
 
 ```yaml
-# SPDX-License-Identifier: Apache-2.0
-gateway:
-  enabled: true
-  parentRefs:
-    - name: public
-      namespace: gateway-system
-      sectionName: https
-  hostnames:
-    - glance.example.com
 networkPolicy:
   ingressFrom:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: gateway-system
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: public
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - glance.example.com
 ```
 
 ### Authenticated release feeds
@@ -478,53 +447,32 @@ config:
 
 ## Complete values reference
 
-These are the chart defaults. Keep credentials in existing Secrets for GitOps
-renderers that cannot perform live cluster lookup. Comments describe the purpose
-and operational boundaries of each supported field.
+These are the chart defaults. Keep credentials in existing Secrets for GitOps renderers that cannot perform live cluster
+lookup. Comments describe the purpose and operational boundaries of each supported field.
 
 ```yaml
-# SPDX-License-Identifier: Apache-2.0
-# -- Override the chart name used in resource names.
 nameOverride: ''
-# -- Override the complete resource name.
 fullnameOverride: ''
-# -- Extra resource labels; selector labels are reserved.
 commonLabels: {}
-# -- Glance replicas. Authentication rate limiting and widget caches are per pod.
 replicaCount: 1
 image:
-  # -- Official upstream Glance image.
   repository: docker.io/glanceapp/glance
-  # -- Verified stable image tag.
   tag: v0.8.6
-  # -- Kubernetes pull policy.
   pullPolicy: IfNotPresent
-# -- Registry credentials for a private mirror.
 imagePullSecrets: []
 auth:
-  # -- Require native Glance login. Disable only behind a separately authenticated edge or for public dashboards.
   enabled: true
-  # -- Initial dashboard username; all authenticated users see the same dashboard.
   username: admin
-  # -- Password stored only in a Secret. Empty generates and retains a random password.
   password: ''
-  # -- Base64 encoding of exactly 64 random bytes for session signing. Empty generates and retains it.
   secretKey: ''
-  # -- Existing Secret containing password and secret-key; bypasses generated credentials.
   existingSecret: ''
-  # -- Password key in the existing Secret.
   passwordKey: password
-  # -- Signing key in the existing Secret.
   secretKeyKey: secret-key
 server:
-  # -- Container listen port; Service and probes follow this value.
   port: 8080
-  # -- Trust proxy headers. Enable only when network ingress is restricted to trusted proxies.
   proxied: false
-  # -- External subpath, such as /glance. The reverse proxy must strip this prefix before forwarding.
   baseUrl: ''
 config:
-  # -- Upstream Glance configuration. auth and server are chart-managed and forbidden here. Go widget templates remain literal; Helm tpl is not applied.
   data:
     pages:
       - name: Home
@@ -539,141 +487,106 @@ config:
                         url: https://helmforge.dev
               - type: calendar
 assets:
-  # -- Existing ConfigMap containing public static assets mounted at /app/assets. Never put credentials here.
   existingConfigMap: ''
 widgetSecrets:
-  # -- Additional Secret files mounted under /run/secrets; reference with ${secret:filename} in config.data.
   sources: []
-    # - name: glance-widget-tokens
-    #   items:
-    #     - key: github-token
-    #       path: github-token
-# -- Extra environment variables for Glance configuration substitutions.
 extraEnv: []
-# -- Additional envFrom Secret/ConfigMap references.
 envFrom: []
 serviceAccount:
-  # -- Create a dedicated ServiceAccount with no API permissions.
   create: true
-  # -- Existing or overridden ServiceAccount name.
   name: ''
-  # -- ServiceAccount annotations.
   annotations: {}
-  # -- Mount a Kubernetes API token. Glance does not need one.
   automountServiceAccountToken: false
 service:
-  # -- Kubernetes Service type.
   type: ClusterIP
-  # -- Service HTTP port.
   port: 8080
-  # -- Service annotations.
   annotations: {}
-  # -- Service IP family policy; empty uses cluster default.
   ipFamilyPolicy: ''
-  # -- Requested address families; RequireDualStack needs a dual-stack cluster.
   ipFamilies: []
 ingress:
-  # -- Enable Ingress. TLS is configured through ingress.tls.
   enabled: false
-  # -- Ingress controller class; empty omits the field.
   ingressClassName: ''
-  # -- Controller-specific annotations, including any required prefix stripping.
   annotations: {}
-  # -- Host/path rules; at least one explicit host is required when enabled.
   hosts: []
-  # -- TLS host/Secret entries.
   tls: []
-gateway:
-  # -- Enable a Gateway API v1 HTTPRoute. Install Gateway API CRDs and a controller first.
-  enabled: false
-  # -- HTTPRoute annotations.
-  annotations: {}
-  # -- Existing Gateway parent references, including namespace when appropriate.
-  parentRefs: []
-  # -- Public DNS hostnames.
-  hostnames: []
-  # -- Matched HTTP path. Subpaths require an external prefix-stripping rule.
-  path: /
-  # -- Gateway path match type.
-  pathType: PathPrefix
 externalSecrets:
-  # -- Render ExternalSecret objects for auth or widget credentials.
   enabled: false
-  # -- Default operator refresh interval.
   refreshInterval: 1h
-  # -- Full ExternalSecret specifications. auth.existingSecret must match the target Secret name.
   items: []
 networkPolicy:
-  # -- Isolate ingress and allow declared outgoing feeds. Requires a NetworkPolicy-capable CNI.
   enabled: true
-  # -- Allowed ingress peers. Empty permits pods in the same namespace only.
   ingressFrom: []
-  # -- Enable outbound isolation, allowing DNS and configured web ports.
   egressIsolation: true
-  # -- DNS peers; defaults to cluster pods in any namespace, restricted to DNS ports.
   dnsEgress:
     - namespaceSelector: {}
-  # -- Destinations for HTTP/HTTPS feeds. Replace broad CIDRs for a restricted intranet dashboard.
   webEgress:
     - ipBlock:
         cidr: 0.0.0.0/0
     - ipBlock:
-        cidr: ::/0
-  # -- Allowed feed ports; TCP only. Internal non-HTTP widgets need extraEgress.
-  webPorts: [80, 443]
-  # -- Additional egress rules, for example internal APIs on alternate ports.
+        cidr: '::/0'
+  webPorts:
+    - 80
+    - 443
   extraEgress: []
 probes:
-  # -- Startup health endpoint; native /api/healthz remains unauthenticated.
-  startup: { enabled: true, path: /api/healthz, periodSeconds: 5, timeoutSeconds: 2, failureThreshold: 30 }
-  # -- Liveness checks process health without depending on external feeds.
-  liveness: { enabled: true, path: /api/healthz, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3 }
-  # -- Readiness checks the initialized HTTP server.
-  readiness: { enabled: true, path: /api/healthz, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 3 }
-# -- Resource requests and limits for the Go dashboard; size for widget count and feed payloads.
+  startup:
+    enabled: true
+    path: /api/healthz
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /api/healthz
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /api/healthz
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
 resources:
-  requests: { cpu: 50m, memory: 64Mi }
-  limits: { cpu: 500m, memory: 256Mi }
-# -- Non-root pod identity with RuntimeDefault seccomp.
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
   runAsGroup: 10001
   fsGroup: 10001
-  seccompProfile: { type: RuntimeDefault }
-# -- Restricted container privileges; all configuration and assets are read-only.
+  seccompProfile:
+    type: RuntimeDefault
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
-  capabilities: { drop: [ALL] }
+  capabilities:
+    drop:
+      - ALL
 podDisruptionBudget:
-  # -- Protect voluntary disruptions. Requires at least two replicas; no singleton eviction deadlock.
   enabled: false
-  # -- Maximum unavailable pods during voluntary disruption.
   maxUnavailable: 1
-# -- Pod labels; immutable selector labels cannot be overridden.
 podLabels: {}
-# -- Pod annotations, e.g. for an external Secret reloader.
 podAnnotations: {}
-# -- Node selection constraints.
 nodeSelector: {}
-# -- Scheduling tolerations.
 tolerations: []
-# -- Pod affinity or anti-affinity.
 affinity: {}
-# -- Topology spreading across nodes or zones.
 topologySpreadConstraints: []
-# -- Scheduling priority class.
 priorityClassName: ''
-# -- Grace period for HTTP shutdown.
 terminationGracePeriodSeconds: 30
+gatewayAPI:
+  enabled: false
+  httpRoutes: []
 ```
 
 ## Parameter details
 
-Native widget options under config.data follow the pinned upstream configuration
-reference. The chart schema validates the structural page/column/widget contract
-while allowing product-specific widget settings.
+Native widget options under config.data follow the pinned upstream configuration reference. The chart schema validates
+the structural page/column/widget contract while allowing product-specific widget settings.
 
 ### nameOverride
 
@@ -785,7 +698,8 @@ Default: `""`.
 
 ### config.data
 
-Upstream Glance configuration. auth and server are chart-managed and forbidden here. Go widget templates remain literal; Helm tpl is not applied.
+Upstream Glance configuration. auth and server are chart-managed and forbidden here. Go widget templates remain literal;
+Helm tpl is not applied.
 
 Default: `object`.
 
@@ -896,42 +810,6 @@ Default: `[]`.
 TLS host/Secret entries.
 
 Default: `[]`.
-
-### gateway.enabled
-
-Enable a Gateway API v1 HTTPRoute. Install Gateway API CRDs and a controller first.
-
-Default: `false`.
-
-### gateway.annotations
-
-HTTPRoute annotations.
-
-Default: `{}`.
-
-### gateway.parentRefs
-
-Existing Gateway parent references, including namespace when appropriate.
-
-Default: `[]`.
-
-### gateway.hostnames
-
-Public DNS hostnames.
-
-Default: `[]`.
-
-### gateway.path
-
-Matched HTTP path. Subpaths require an external prefix-stripping rule.
-
-Default: `/`.
-
-### gateway.pathType
-
-Gateway path match type.
-
-Default: `PathPrefix`.
 
 ### externalSecrets.enabled
 
@@ -1091,32 +969,28 @@ Default: `30`.
 
 ## Migration and version history
 
-This is the first HelmForge chart for Glance. Existing Docker installations should
-move their dashboard configuration into config.data, separating auth and server
-settings into the chart's corresponding sections. Copy credential material into
-an existing Secret and public assets into a ConfigMap. Keep the same username and
-signing key if preserving current sessions matters. No database migration is needed.
+This is the first HelmForge chart for Glance. Existing Docker installations should move their dashboard configuration
+into config.data, separating auth and server settings into the chart's corresponding sections. Copy credential material
+into an existing Secret and public assets into a ConfigMap. Keep the same username and signing key if preserving current
+sessions matters. No database migration is needed.
 
-The first implementation targets Glance v0.8.6. The chart package version is owned
-by the HelmForge release pipeline. Future image changes require upstream release
-review and confirmation of the effective running image after rollout.
+The first implementation targets Glance v0.8.6. The chart package version is owned by the HelmForge release pipeline.
+Future image changes require upstream release review and confirmation of the effective running image after rollout.
 
 ## Validation coverage
 
-The runtime gate exercises native health, anonymous rejection, successful login,
-rendered widget content, session continuity across replicas, credential retention
-through Helm upgrade and a subsequent pod replacement. A custom-api fixture verifies
-literal Go templates and Secret interpolation. ESO is tested with a real operator;
-the fake SecretStore and deterministic CI credentials are for disposable labs only.
+The runtime gate exercises native health, anonymous rejection, successful login, rendered widget content, session
+continuity across replicas, credential retention through Helm upgrade and a subsequent pod replacement. A custom-api
+fixture verifies literal Go templates and Secret interpolation. ESO is tested with a real operator; the fake SecretStore
+and deterministic CI credentials are for disposable labs only.
 
-The tests do not establish availability of every external API, distributed login
-rate limiting, browser profile recovery or geographic redundancy.
+The tests do not establish availability of every external API, distributed login rate limiting, browser profile recovery
+or geographic redundancy.
 
 ## Security posture
 
-Kubescape 4.0.13 reported 100% compliance for the default rendered resources
-under MITRE, NSA and SOC2 frameworks. This is a Kubernetes configuration assessment,
-not an application audit. Actual posture also depends on ingress policy, TLS,
+Kubescape 4.0.13 reported 100% compliance for the default rendered resources under MITRE, NSA and SOC2 frameworks. This
+is a Kubernetes configuration assessment, not an application audit. Actual posture also depends on ingress policy, TLS,
 secret management, feed choices and the cluster's enforcing CNI.
 
 ## Resources and related charts
@@ -1127,3 +1001,11 @@ secret management, feed choices and the cluster's enforcing CNI.
 - [Chart source and examples](https://github.com/helmforgedev/charts/tree/main/charts/glance)
 - [Report chart issues](https://github.com/helmforgedev/charts/issues)
 - [Memos for persistent notes](/docs/charts/memos)
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

@@ -434,19 +434,11 @@ ingress:
   # -- Tls.
   tls: []
 # -- Gateway.
-gateway:
-  # -- Enabled.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
   enabled: false
-  # -- Annotations.
-  annotations: {}
-  # -- Parent Refs.
-  parentRefs: []
-  # -- Hostnames.
-  hostnames: []
-  # -- Path.
-  path: /
-  # -- Path Type.
-  pathType: PathPrefix
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
 # -- External Secrets.
 externalSecrets:
   # -- Enabled.
@@ -611,3 +603,11 @@ runtime:
   # -- Home Size.
   homeSize: 256Mi
 ```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).
