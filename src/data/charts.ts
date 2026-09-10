@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Stirling PDF',
+    slug: 'stirling-pdf',
+    description: 'Authenticated PDF, OCR and office conversion with durable state and private native Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'ByteStash',
     slug: 'bytestash',
     description: 'Private snippets with protected bootstrap, native MCP, optional OIDC and verified SQLite snapshots.',

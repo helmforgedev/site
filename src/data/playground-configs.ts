@@ -8,6 +8,48 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'stirling-pdf': [
+    {
+      name: 'Document processing',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2.14.3',
+          description: 'Pinned official full-tool image',
+        },
+        {
+          label: 'Existing administrator Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Initial password; existing accounts are preserved',
+        },
+        {
+          label: 'Workspace capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Single-writer H2 configuration and pipelines',
+        },
+        {
+          label: 'Maximum file upload',
+          key: 'server.maxUploadSize',
+          type: 'text',
+          default: '100MB',
+          description: 'Align proxy limits and concurrent conversion memory',
+        },
+        {
+          label: 'Native Prometheus',
+          key: 'metrics.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Private endpoint requires X-API-KEY and additional scrape configuration',
+        },
+      ],
+    },
+  ],
   bytestash: [
     {
       name: 'Private snippets',

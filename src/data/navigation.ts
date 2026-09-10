@@ -135,6 +135,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'BentoPDF', href: '/docs/charts/bentopdf', maturity: 'stable' },
       { label: 'SiYuan', href: '/docs/charts/siyuan', maturity: 'stable' },
       { label: 'ByteStash', href: '/docs/charts/bytestash', maturity: 'stable' },
+      { label: 'Stirling PDF', href: '/docs/charts/stirling-pdf', maturity: 'stable' },
       { label: 'Glance', href: '/docs/charts/glance', maturity: 'stable' },
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
       { label: 'Discount Bandit', href: '/docs/charts/discount-bandit', maturity: 'stable' },
