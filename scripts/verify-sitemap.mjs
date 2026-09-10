@@ -29,8 +29,13 @@ if (!fs.existsSync(sitemapPath)) {
 }
 
 const sitemap = fs.readFileSync(sitemapPath, 'utf8');
-const sitemapUrls = new Set([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]));
-const pageUrls = new Set(walkHtml(distDir).map(pageUrl).filter(Boolean));
+const sitemapUrls = new Set([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => new URL(match[1]).href));
+const pageUrls = new Set(
+  walkHtml(distDir)
+    .map(pageUrl)
+    .filter(Boolean)
+    .map((url) => new URL(url).href),
+);
 
 const missing = [...pageUrls].filter((url) => !sitemapUrls.has(url)).sort();
 const extra = [...sitemapUrls].filter((url) => !pageUrls.has(url)).sort();
