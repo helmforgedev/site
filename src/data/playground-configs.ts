@@ -8,6 +8,144 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'pocket-id': [
+    {
+      name: 'Identity and onboarding',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'v2.14.0',
+          description: 'Pinned official Pocket ID release',
+        },
+        {
+          label: 'HTTPS origin',
+          key: 'server.publicUrl',
+          type: 'text',
+          default: 'https://id.example.com',
+          description: 'Stable relying-party origin; changing it affects existing passkeys',
+        },
+        {
+          label: 'Administrator username',
+          key: 'bootstrap.username',
+          type: 'text',
+          default: 'admin',
+          description: 'Created privately only when the database is empty',
+        },
+        {
+          label: 'Administrator email',
+          key: 'bootstrap.email',
+          type: 'text',
+          default: 'admin@example.test',
+          description: 'Set before initial deployment',
+        },
+        {
+          label: 'Encryption Secret',
+          key: 'encryption.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Retain the exact key with database and uploads',
+        },
+        {
+          label: 'Persistent capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'SQLite identity state and native uploads',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      fields: [
+        {
+          label: 'Database engine',
+          key: 'database.type',
+          type: 'select',
+          default: 'sqlite',
+          description:
+            'SQLite by default; selecting PostgreSQL also requires bundled or external connection configuration',
+          options: ['sqlite', 'postgresql'],
+          valueActivationValues: {
+            sqlite: {
+              'postgresql.enabled': 'false',
+              'database.host': '',
+              'database.passwordSecret': '',
+              'database.caSecret': '',
+            },
+          },
+        },
+        {
+          label: 'Install PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Installs the HelmForge subchart and selects the PostgreSQL engine',
+          toggleActivationValues: {
+            true: {
+              'database.type': 'postgresql',
+              'database.host': '',
+              'database.passwordSecret': '',
+              'database.caSecret': '',
+            },
+          },
+        },
+        {
+          label: 'External host',
+          key: 'database.host',
+          type: 'text',
+          default: '',
+          description: 'Leave empty when the HelmForge subchart is enabled',
+        },
+        {
+          label: 'External password Secret',
+          key: 'database.passwordSecret',
+          type: 'text',
+          default: '',
+          description: 'DBA must prepare citext and pgcrypto',
+        },
+        {
+          label: 'External CA Secret',
+          key: 'database.caSecret',
+          type: 'text',
+          default: '',
+          description: 'External connections verify the certificate and hostname',
+        },
+      ],
+    },
+    {
+      name: 'Native monitoring',
+      fields: [
+        {
+          label: 'Prometheus metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Dedicated private native exporter; no sidecar',
+          toggleActivationValues: {
+            false: { 'metrics.serviceMonitor.enabled': 'false', 'metrics.prometheusRule.enabled': 'false' },
+          },
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires installed Prometheus Operator CRDs',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+        {
+          label: 'PrometheusRule',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Alert for discovered native targets that remain down',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+      ],
+    },
+  ],
   ryot: [
     {
       name: 'Private tracking',

@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Pocket ID',
+    slug: 'pocket-id',
+    description:
+      'Passkey identity provider with private onboarding, native OIDC, PostgreSQL and Prometheus monitoring.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Ryot',
     slug: 'ryot',
     description:

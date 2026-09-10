@@ -17,6 +17,22 @@ test.describe('Playground', () => {
       await expect(page.locator('#playground-code')).not.toContainText(`${key}=true`);
     });
   }
+  test('pocket-id keeps database and monitoring dependencies consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="pocket-id"]').click();
+    const engine = page.locator('select[data-field-key="database.type"]');
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(engine).toHaveValue('postgresql');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await engine.selectOption('sqlite');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+  });
   test('memos keeps database driver and bundled databases consistent', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="memos"]').click();

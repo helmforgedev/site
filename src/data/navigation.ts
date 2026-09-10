@@ -138,6 +138,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Stirling PDF', href: '/docs/charts/stirling-pdf', maturity: 'stable' },
       { label: 'Papra', href: '/docs/charts/papra', maturity: 'stable' },
       { label: 'Ryot', href: '/docs/charts/ryot', maturity: 'stable' },
+      { label: 'Pocket ID', href: '/docs/charts/pocket-id', maturity: 'stable' },
       { label: 'Glance', href: '/docs/charts/glance', maturity: 'stable' },
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
       { label: 'Discount Bandit', href: '/docs/charts/discount-bandit', maturity: 'stable' },
