@@ -1,6 +1,55 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('langflow keeps automatic login opt-in', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="langflow"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('1.12.0');
+    const code = page.locator('#playground-code');
+    await expect(code).not.toContainText('auth.autoLogin=true');
+    await page.locator('button[data-field-key="auth.autoLogin"]').click();
+    await expect(code).toContainText('auth.autoLogin=true');
+    await page.locator('button[data-field-key="auth.autoLogin"]').click();
+    await expect(code).not.toContainText('auth.autoLogin=true');
+  });
+  test('minecraft uses its verified image tag', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="minecraft"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.9.0');
+    await expect(page.locator('#playground-code')).not.toContainText('2026.8.3');
+  });
+  test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="n8n"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.38.4');
+    await page.locator('[data-section-toggle="Queue"]').click();
+    const queue = page.locator('button[data-field-key="queue.enabled"]');
+    await queue.click();
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('queue.enabled=true');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await expect(code).toContainText('redis.enabled=true');
+    await expect(code).toContainText('postgresql.auth.password=change-me-n8n-postgresql');
+    await expect(code).not.toContainText('mysql.enabled');
+    const password = page.locator('input[data-field-key="postgresql.auth.password"]');
+    await password.fill('custom-fixture-password');
+    await queue.click();
+    await queue.click();
+    await expect(password).toHaveValue('custom-fixture-password');
+    await page.locator('button[data-field-key="redis.enabled"]').click();
+    await expect(code).not.toContainText('queue.enabled=true');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await page
+      .locator('.playground-scenario-btn')
+      .filter({ hasText: /^Production$/ })
+      .click();
+    await expect(code).toContainText('ingress.hosts[0].host=n8n.example.com');
+    await expect(code).toContainText('ingress.hosts[0].paths[0].pathType=Prefix');
+    await expect(code).toContainText('ingress.tls[0].secretName=n8n-tls');
+    await expect(code).toContainText('ingress.tls[0].hosts[0]=n8n.example.com');
+    await expect(code).not.toContainText('ingress.hostname=');
+    await expect(code).not.toContainText('ingress.tls=true');
+  });
   test('renders chart list and config panel', async ({ page }) => {
     await page.goto('/playground');
     await expect(page).toHaveTitle(/Playground/i);
@@ -30,7 +79,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="netbird"]').click();
 
-    await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.77.1');
+    await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.78.1');
     await expect(page.locator('input[data-field-key="dashboard.auth.clientId"]')).toHaveValue('netbird-dashboard');
   });
 
@@ -38,7 +87,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="notediscovery"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.4');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.5');
     await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
   });
 
@@ -85,7 +134,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.68.7');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.80.0');
     await expect(page.locator('input[data-field-key="persistence.data.size"]')).toHaveValue('5Gi');
     await expect(page.locator('#playground-code')).not.toContainText('poznote.sharing.hideRestrictUsers');
     await page.locator('button[data-field-key="poznote.sharing.hideRestrictUsers"]').click();
@@ -118,8 +167,8 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="valkey"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('9.1.1');
-    await expect(page.locator('input[data-field-key="tests.image.tag"]')).toHaveValue('9.1.1');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('9.1.2');
+    await expect(page.locator('input[data-field-key="tests.image.tag"]')).toHaveValue('9.1.2');
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
   });
 

@@ -860,7 +860,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Server Tag',
           key: 'server.image.tag',
           type: 'text',
-          default: '0.77.1',
+          default: '0.78.1',
           description: 'Pinned NetBird server image tag',
         },
         {
@@ -1949,7 +1949,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.568.2-lts-jdk21',
+          default: '2.568.3-lts-jdk21',
           description: 'Pinned Jenkins LTS image tag',
         },
         {
@@ -3410,14 +3410,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '9.1.1',
+          default: '9.1.2',
           description: 'Pinned Valkey image tag',
         },
         {
           label: 'Helm Test Image Tag',
           key: 'tests.image.tag',
           type: 'text',
-          default: '9.1.1',
+          default: '9.1.2',
           description: 'Pinned Valkey image tag for helm test',
         },
         {
@@ -5606,7 +5606,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.35.3',
+          default: '2.38.4',
           description: 'Pinned n8n image tag',
         },
         {
@@ -5642,6 +5642,34 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'false',
           description: 'Run n8n in Redis-backed queue mode',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Queue mode requires PostgreSQL; enabled automatically with the queue',
+        },
+        {
+          label: 'PostgreSQL Password',
+          key: 'postgresql.auth.password',
+          type: 'text',
+          default: '',
+          description: 'Replace the example password before deploying',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Queue broker; enabled automatically with the queue',
+        },
+        {
+          label: 'Redis Password',
+          key: 'redis.auth.password',
+          type: 'text',
+          default: '',
+          description: 'Replace the example password before deploying',
         },
         {
           label: 'Workers',
@@ -5694,7 +5722,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'n8n.example.com',
           description: 'Ingress hostname',
@@ -5707,7 +5735,35 @@ export const chartConfigs: Record<string, ChartConfig> = {
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
         },
-        { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Ingress route path',
+        },
+        {
+          label: 'Path Type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact'],
+          description: 'Ingress path matching',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'ingress.tls[0].secretName',
+          type: 'text',
+          default: '',
+          description: 'Existing TLS Secret; also set the TLS hostname',
+        },
+        {
+          label: 'TLS Hostname',
+          key: 'ingress.tls[0].hosts[0]',
+          type: 'text',
+          default: '',
+          description: 'Hostname covered by the TLS certificate',
+        },
       ],
     },
     {
@@ -6662,8 +6718,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.11.5',
+          default: '1.12.0',
           description: 'Pinned Langflow image tag',
+        },
+        {
+          label: 'Automatic Login',
+          key: 'auth.autoLogin',
+          type: 'toggle',
+          default: 'false',
+          description: 'Development only: enable automatic login without credentials',
         },
         {
           label: 'HTTP Port',
@@ -9553,7 +9616,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2026.8.2',
+          default: '2026.9.0',
           description: 'Minecraft server image tag',
         },
         {
@@ -10355,7 +10418,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.68.7',
+          default: '6.80.0',
           description: 'Pinned Poznote image tag',
         },
         {
@@ -10603,7 +10666,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.31.4',
+          default: '0.31.5',
           description: 'Pinned NoteDiscovery image tag',
         },
         {
@@ -12283,7 +12346,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.63.15',
+          default: 'v0.63.16',
           description: 'Pinned Metabase image tag',
         },
         {
@@ -13018,7 +13081,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '3.10.7',
+          default: '3.10.8',
           description: 'Pinned official Matterbridge image tag',
         },
         {

@@ -208,7 +208,7 @@ ingress:
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/metabase/metabase` | Metabase container image.            |
-| `image.tag`        | string | `"v0.63.15"`                  | Image tag.                           |
+| `image.tag`        | string | `"v0.63.16"`                  | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
@@ -220,7 +220,7 @@ cluster must pull helper images from an internal registry or proxy.
 ```yaml
 image:
   repository: registry.example.com/proxy/metabase/metabase
-  tag: v0.63.15
+  tag: v0.63.16
 
 waitForDatabase:
   image:
@@ -488,11 +488,32 @@ externalSecrets:
 
 ## Upgrade Notes
 
-Metabase v0.63.15 is a public maintenance release. Back up the Metabase
+Metabase v0.63.16 is a public maintenance release. Back up the Metabase
 application database, keep the encryption key stable, and review the
-[official Metabase 63 changelog](https://www.metabase.com/changelog/63#metabase-6315)
+[official Metabase 63 changelog](https://www.metabase.com/changelog/63#metabase-6316)
 before upgrading. Validate `/api/health` after rollout; first startup can take
 several minutes while database migrations run.
+
+The generated application encryption key is reused from the existing Kubernetes
+Secret during connected Helm upgrades. For GitOps or offline rendering, set
+`metabase.existingSecret` to a stable Secret; `helm template` cannot look up the
+cluster's current key. An explicit `metabase.encryptionSecretKey` takes precedence
+and must not change after installation.
+
+Starting with 0.63.16, adding encryption to an existing unencrypted application
+database requires an explicit migration. Back up the database and key, stop all
+Metabase instances, and run the upstream `enable-encryption` JAR command with the
+same database environment and `MB_ENCRYPTION_SECRET_KEY` used by the deployment.
+Restart with that same key. Existing encrypted databases do not need this command.
+If encryption was already configured and Metabase reports an unencrypted database,
+investigate and restore a known-good backup; do not automatically re-encrypt it.
+See [Metabase encryption instructions](https://www.metabase.com/docs/latest/databases/encrypting-details-at-rest).
+
+For signed database sessions, inject `MB_SESSION_SECRET_KEY` through
+`metabase.extraEnv` using a Kubernetes `secretKeyRef`. Use a separate stable secret
+of at least 16 characters. Setting or changing it logs out existing sessions;
+coordinate activation with users. See the
+[session secret documentation](https://www.metabase.com/docs/latest/configuring-metabase/environment-variables#mb_session_secret_key).
 
 ## More Information
 
