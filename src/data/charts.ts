@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'OpenCloud',
+    slug: 'opencloud',
+    description:
+      'Native file collaboration with retained identity, xattr recovery, verified TLS and authenticated Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Pocket ID',
     slug: 'pocket-id',
     description:

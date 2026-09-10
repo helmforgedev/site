@@ -8,6 +8,87 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'opencloud': [{"name":"Identity and storage","fields":[{"label":"Image tag","key":"image.tag","type":"text","default":"7.2.4","description":"Pinned official OpenCloud release"},{"label":"HTTPS origin","key":"server.publicUrl","type":"text","default":"","description":"Set the stable public origin before storing production data"},{"label":"TLS Secret","key":"server.tls.existingSecret","type":"text","default":"","description":"Externally managed certificate; retain ca.crt for private trust"},{"label":"Administrator Secret","key":"bootstrap.existingSecret","type":"text","default":"","description":"Key admin-password; used only for initial native identity"},{"label":"Persistent capacity","key":"persistence.size","type":"text","default":"20Gi","description":"Config, identity keys, metadata and files on an xattr-capable volume"}]},{"name":"Native metrics","fields":[{"label":"Prometheus metrics","key":"metrics.enabled","type":"toggle","default":"false","description":"Authenticated native metrics; debug configuration stays on loopback","toggleActivationValues":{"false":{"metrics.serviceMonitor.enabled":"false","metrics.prometheusRule.enabled":"false"}}},{"label":"Metrics token Secret","key":"metrics.existingSecret","type":"text","default":"","description":"Optional external Secret with a token of at least 16 bytes"},{"label":"ServiceMonitor","key":"metrics.serviceMonitor.enabled","type":"toggle","default":"false","description":"Prometheus Operator scrapes with Secret Bearer credentials","toggleActivationValues":{"true":{"metrics.enabled":"true"}}},{"label":"PrometheusRule","key":"metrics.prometheusRule.enabled","type":"toggle","default":"false","description":"Availability alert for native metrics targets","toggleActivationValues":{"true":{"metrics.enabled":"true"}}}]}],
+  opencloud: [
+    {
+      name: 'Identity and storage',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '7.2.4',
+          description: 'Pinned official OpenCloud release',
+        },
+        {
+          label: 'HTTPS origin',
+          key: 'server.publicUrl',
+          type: 'text',
+          default: '',
+          description: 'Set the stable public origin before storing production data',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'server.tls.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Externally managed certificate; retain ca.crt for private trust',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'bootstrap.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Key admin-password; used only for initial native identity',
+        },
+        {
+          label: 'Persistent capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Config, identity keys, metadata and files on an xattr-capable volume',
+        },
+      ],
+    },
+    {
+      name: 'Native metrics',
+      fields: [
+        {
+          label: 'Prometheus metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Authenticated native metrics; debug configuration stays on loopback',
+          toggleActivationValues: {
+            false: { 'metrics.serviceMonitor.enabled': 'false', 'metrics.prometheusRule.enabled': 'false' },
+          },
+        },
+        {
+          label: 'Metrics token Secret',
+          key: 'metrics.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Optional external Secret with a token of at least 16 bytes',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Prometheus Operator scrapes with Secret Bearer credentials',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+        {
+          label: 'PrometheusRule',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Availability alert for native metrics targets',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+      ],
+    },
+  ],
   'pocket-id': [
     {
       name: 'Identity and onboarding',

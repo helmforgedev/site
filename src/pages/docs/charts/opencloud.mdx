@@ -1,0 +1,642 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OpenCloud Chart
+description:
+  Native file collaboration with retained identity, xattr-preserving recovery, verified TLS and authenticated Prometheus
+  monitoring.
+---
+
+# OpenCloud Helm Chart
+
+OpenCloud file collaboration with the official `opencloudeu/opencloud:7.2.4` image, native identity initialization,
+extended-attribute storage checks and retained configuration. The chart runs one monolithic instance with planned
+downtime during upgrades.
+
+## Production configuration
+
+```yaml
+server:
+  publicUrl: https://files.example.com
+  tls:
+    enabled: true
+    existingSecret: opencloud-server-tls
+bootstrap:
+  existingSecret: opencloud-initial-admin
+persistence:
+  size: 100Gi
+```
+
+Create the bootstrap Secret with key `admin-password` and at least 16 bytes before installation. Create a TLS Secret
+whose certificate matches the canonical hostname. Include `ca.crt` when a private CA is needed by OpenCloud's own OIDC
+clients, or supply `server.trustedCaSecret`. Both browsers and the application must resolve and trust the same public
+HTTPS origin. Configure ingress-to-backend HTTPS verification when retaining native TLS.
+
+If the ingress terminates TLS and forwards HTTP, set `server.tls.enabled: false` while keeping the external
+`server.publicUrl` on HTTPS. Allow required public issuer access through `networkPolicy.extraEgress`. The chart does not
+disable OIDC certificate verification to make an internal/public DNS mismatch work.
+
+Without a configured public URL, the chart uses an internal Service hostname and a retained private certificate for
+initial evaluation. That private certificate is valid for one year and is not automatically renewed. Production
+certificate management should own `server.tls.existingSecret`; coordinate certificate rotation and application restart
+so the trust bundle and listener use matching material. Changing the public hostname does not regenerate retained
+identity or TLS Secrets.
+
+## Initial identity
+
+The initializer runs the upstream `opencloud init --insecure=false --quiet` command as UID1000 before the server starts.
+It consumes the administrator password privately and persists native configuration. The first username is `admin`. Demo
+users and Basic authentication are disabled; browser login uses the native identity provider.
+
+Existing nonempty identity configuration is preserved. Data without matching configuration fails initialization;
+ordinary upgrades never force-overwrite identity or reset accounts. Changing the bootstrap Secret after initialization
+is not a password-rotation operation.
+
+## Storage and recovery
+
+One PVC contains `config` and `data` directories, mounted at `/etc/opencloud` and `/var/lib/opencloud`. The official
+image's extended-attribute tools verify user xattr access on the mounted filesystem before starting OpenCloud. Choose a
+storage class compatible with the native PosixFS backend.
+
+Back up consistent config and data together, including all extended attributes and exact native encryption/signing keys.
+A plain file-content copy is insufficient. Use a volume snapshot or an archive tool that preserves xattrs, ownership and
+modes. Retain the bootstrap and TLS Secrets separately. Test restoration into a fresh isolated volume with a new login
+and exact file-content comparison before accepting a recovery procedure.
+
+## Security and availability
+
+- UID/GID1000, read-only root filesystem, dropped capabilities and no Kubernetes API token.
+- One replica and Recreate upgrades; this chart does not implement distributed OpenCloud HA.
+- Separate writable config, data and bounded temporary storage.
+- Native OIDC TLS verification remains enabled, with explicit CA trust.
+- The debug listener stays on loopback because it includes a configuration endpoint.
+- Ingress, Gateway API, dual-stack Services, External Secrets and placement controls follow HelmForge contracts.
+
+NetworkPolicy requires an enforcing CNI. Open required integration destinations explicitly and configure the public
+issuer before users begin storing files or enrolling clients.
+
+## Validation
+
+The full HelmForge gate passed all 20 layers, including 21 Helm tests and ten Kubernetes runtime profiles. Acceptance
+covers native OIDC with verified PS256 signatures and S256 verifiers, private Graph/WebDAV operations, wrong-password
+and unauthorized-access denial, retained identity across restart and upgrade, and fresh-PVC xattr-preserving recovery.
+ExternalSecret Ready, actual Prometheus ServiceMonitor up=1 and its loaded rule, and the Gateway backend CA/hostname
+contract also passed. Gateway/Ingress controller-specific public routing remains an operator acceptance check.
+
+## Documentation
+
+- [Onboarding and identity](#onboarding-details)
+- [Networking, Gateway API and TLS](#networking-details)
+- [Prometheus monitoring](#monitoring-details)
+- [Recovery procedure](#recovery-details)
+- [Production NGINX ingress](#production-ingress-example)
+- [Production Gateway](#production-gateway-example)
+- [Authenticated monitoring](#monitoring-example)
+
+## Security Scan: `opencloud`
+
+| Framework | Score      |
+| --------- | ---------- |
+| Overall   | **98.48%** |
+| MITRE     | **97.06%** |
+| NSA       | **97.50%** |
+| SOC2      | **90.00%** |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-10. The sole C-0012 finding flags the literal
+`AUTH_BEARER_OIDC_INSECURE=false` environment setting in native init and server containers because its name contains
+`BEARER`. It is a certificate-verification policy flag, not a credential. No controls were suppressed. This manifest
+scan does not replace application review or image vulnerability management.
+
+## Sources
+
+- [OpenCloud v7.2.4](https://github.com/opencloud-eu/opencloud/tree/v7.2.4)
+- [PosixFS storage requirements](https://docs.opencloud.eu/docs/admin/configuration/storage/storage-posix)
+
+## Onboarding details
+
+Choose the canonical HTTPS hostname before storing production data. Browser callbacks, issuer discovery and bearer
+validation share this origin. Set server.publicUrl, a trusted server.tls.existingSecret, bootstrap.existingSecret and an
+xattr-capable PVC. The initial Secret key is admin-password and requires at least 16 bytes.
+
+The chart runs the official native initializer before any public server. Log in as admin with that initial password,
+then manage accounts and credentials through OpenCloud. Changing the bootstrap Secret does not reset an existing
+account. Never rerun forced initialization against existing data: restore the matching configuration instead.
+
+With no public URL, a private Service origin and one-year retained private certificate support evaluation. This
+certificate is not automatically renewed. Production should use externally managed certificates and deliberate
+certificate/trust-bundle rollout. Both browser and Pod must resolve the public origin and trust its CA.
+
+External Secrets supports the canonical items[] contract. Map the remote password to admin-password and set
+bootstrap.existingSecret to the target Secret. Wait for ExternalSecret Ready before diagnosing a blocked bootstrap. Do
+not put live credentials in committed Helm values. Generated bootstrap Secrets and Helm release history also contain
+credentials: protect Kubernetes Secret access and retain identity/configuration backups separately.
+
+## Networking details
+
+### Native HTTPS
+
+The application listener uses HTTPS on 9200 by default. Probes use loopback debug HTTP; readiness additionally checks
+NATS. An HTTP 200 or ready Pod alone is insufficient evidence for identity and file operations.
+
+Ingress controllers need an HTTPS backend and certificate verification, including a DNS identity matching the server
+certificate. The NGINX example configures backend-protocol, proxy-ssl-verify, proxy-ssl-name, server-name and a Secret
+containing ca.crt. Configure upload size/timeouts for your expected file sizes; avoid disabling backend verification.
+
+### Gateway API
+
+Use gatewayAPI.enabled and gatewayAPI.httpRoutes[]. Each route supports parentRefs, hostnames, labels, annotations and
+rules with matches, filters and optional backendRefs. An omitted backend targets the application Service. Distinct
+unnamed routes receive unique suffixes. Duplicate explicit names are rejected.
+
+Native HTTPS automatically renders a v1 BackendTLSPolicy targeting the application Service port. The Gateway controller
+must support this resource. For the generated evaluation certificate, the chart creates a public CA ConfigMap from the
+same certificate material. With an existing TLS Secret, configure server.backendTLS.caCertificateRefs or useSystemCAs.
+References identify ConfigMaps in the application namespace; a Secret is not a supported CA reference. The default
+validation hostname comes from server.publicUrl. Custom route backends require their own TLS policies.
+
+A shared Gateway must allow routes from this namespace. Verify HTTPRoute Accepted/ResolvedRefs and BackendTLSPolicy
+Accepted/ResolvedRefs using your actual controller, then test the public hostname. The local chart matrix validates
+resource schemas and the native HTTPS backend; it does not claim validation of every Gateway/Ingress implementation.
+
+### Edge termination
+
+To terminate TLS exclusively at the edge, set server.tls.enabled=false and keep server.publicUrl on HTTPS. The Pod must
+reach the trusted HTTPS edge for its own OIDC discovery and token validation. Allow DNS and that exact edge through
+NetworkPolicy. A public URL resolving to a loopback HTTP listener is not a valid replacement.
+
+### Isolation
+
+Application ingress defaults to same-namespace Pods. Configure networkPolicy.ingressFrom for your controller. Metrics
+have separate peers under metrics.ingressFrom and never appear on the application Service or routes. Egress permits DNS
+and the native self-service path; external integrations require explicit extraEgress/webEgress. NetworkPolicy requires
+an enforcing CNI and does not constrain trusted node or control-plane access.
+
+## Monitoring details
+
+Enable metrics.enabled for native Prometheus exposition through a private metrics Service. The native debug listener
+remains on 127.0.0.1:9205: it also exposes an unauthenticated configuration endpoint. A small official Node sidecar
+forwards only exact GET /metrics, preserving the native Bearer authentication. It returns 404 for /config, debug paths
+and query-string variants, and 405 for other methods. It is a path filter, not a synthetic application exporter.
+
+The generated token is retained across upgrades, or set metrics.existingSecret and metrics.tokenKey. Tokens require at
+least 16 bytes. Native authentication rejects missing and incorrect credentials. Keep the token private, restrict
+metrics.ingressFrom to scraper Pods and use a trusted cluster network; this internal scrape path uses HTTP.
+
+metrics.serviceMonitor.enabled renders Secret-backed Bearer credentials with configurable labels, interval and
+scrapeTimeout. The timeout must not exceed the interval. metrics.prometheusRule.enabled adds a target availability alert
+and supports additionalRules. Install Prometheus Operator CRDs first and align its selectors with these labels.
+
+The monolithic native registry includes OpenCloud component collectors. Runtime evidence checks
+opencloud_proxy_requests_total and opencloud_proxy_build_info, actual Prometheus up=1, and the loaded availability rule.
+This does not establish complete coverage of every optional OpenCloud integration. Review native metrics before adding
+alert thresholds; a live scrape alone does not prove login or storage health.
+
+To rotate an externally managed metrics token, update its Secret and restart the Deployment so the native server loads
+the new environment value. Coordinate scraper updates. Application identity keys are separate from this token.
+
+## Recovery details
+
+### Recovery unit
+
+Preserve the whole PVC: config/opencloud.yaml and all data, including IDM, IDP keys, file storage, metadata and extended
+attributes. Copying only visible file content loses native identity or PosixFS metadata. Keep bootstrap and TLS Secrets
+separately. Encrypt backups and restrict access: the native configuration and identity files contain secrets.
+
+### Consistent archive
+
+Schedule maintenance, stop writes, scale the monolithic Deployment to zero and wait for its Pod to terminate. Mount the
+source volume read-only in an authorized helper. Use a volume snapshot or GNU tar with --xattrs --acls; verify your
+backup product preserves all filesystem attributes required by your storage backend. Keep UID/GID 1000 and private file
+modes. The validation archive uses the official PostgreSQL image only as a pinned GNU tar helper; OpenCloud does not
+depend on a PostgreSQL server.
+
+Restore into a fresh, isolated xattr-capable PVC. Extract with --xattrs --acls --no-same-owner --no-overwrite-dir as the
+application UID when using an fsGroup-prepared destination. Restore both config and data; configure
+persistence.existingClaim with that new volume and retain the canonical origin and certificate trust.
+
+### Acceptance
+
+Verify exact checksums of native configuration, IDP encryption.key and private-key.pem. Check xattrs on restored
+metadata, perform a new native browser login and compare private WebDAV file bytes. Also confirm anonymous and
+incorrect-token requests are denied. Only then switch production traffic; retain the previous recovery source until your
+rollback window closes. Do not run two instances concurrently against one identity/data directory.
+
+The local recovery scenario passed fresh-PVC restoration with an xattr sentinel, identical identity keys, fresh OIDC
+login and exact private file bytes. This is a tested maintenance procedure, not an automated backup scheduler, remote S3
+backup integration, or a measured recovery-time objective.
+
+## production-ingress example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://files.example.com
+  tls:
+    existingSecret: opencloud-server-tls
+bootstrap:
+  existingSecret: opencloud-initial-admin
+persistence:
+  size: 100Gi
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: 'on'
+    nginx.ingress.kubernetes.io/proxy-ssl-secret: files/opencloud-server-tls
+    nginx.ingress.kubernetes.io/proxy-ssl-name: files.example.com
+    nginx.ingress.kubernetes.io/proxy-ssl-server-name: 'on'
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '600'
+  hosts:
+    - host: files.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: opencloud-server-tls
+      hosts:
+        - files.example.com
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  extraEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+## production-gateway example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://files.example.com
+  tls:
+    existingSecret: opencloud-server-tls
+  backendTLS:
+    caCertificateRefs:
+      - group: ''
+        kind: ConfigMap
+        name: opencloud-backend-ca
+bootstrap:
+  existingSecret: opencloud-initial-admin
+persistence:
+  size: 100Gi
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: shared
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - files.example.com
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: gateway-system
+  extraEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+## monitoring example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://files.example.com
+  tls:
+    existingSecret: opencloud-server-tls
+bootstrap:
+  existingSecret: opencloud-initial-admin
+persistence:
+  size: 100Gi
+metrics:
+  enabled: true
+  existingSecret: opencloud-prometheus-token
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: monitoring
+  prometheusRule:
+    enabled: true
+    labels:
+      release: monitoring
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- nameOverride.
+nameOverride: ''
+# -- fullnameOverride.
+fullnameOverride: ''
+# -- commonLabels.
+commonLabels: {}
+# -- One monolithic replica; distributed HA is not supported.
+replicaCount: 1
+# -- image.
+image:
+  # -- repository.
+  repository: docker.io/opencloudeu/opencloud
+  # -- tag.
+  tag: 7.2.4
+  # -- pullPolicy.
+  pullPolicy: IfNotPresent
+# -- imagePullSecrets.
+imagePullSecrets: []
+# -- server.
+server:
+  # -- port.
+  port: 9200
+  # -- Canonical HTTPS origin shared by browser redirects and native OIDC clients.
+  publicUrl: ''
+  # -- tls.
+  tls:
+    # -- enabled.
+    enabled: true
+    # -- existingSecret.
+    existingSecret: ''
+  # -- Optional Secret containing additional trusted issuer CA certificates.
+  trustedCaSecret: ''
+  # -- trustedCaKey.
+  trustedCaKey: ca.crt
+  # -- backendTLS.
+  backendTLS:
+    # -- enabled.
+    enabled: true
+    # -- Backend certificate DNS identity; empty uses the canonical OpenCloud hostname.
+    hostname: ''
+    # -- BackendTLSPolicy ConfigMap CA references for an operator-owned TLS certificate.
+    caCertificateRefs: []
+    # -- Use controller system roots for backend TLS; mutually exclusive with custom CA references.
+    useSystemCAs: false
+# -- extraEnv.
+extraEnv: []
+# -- serviceAccount.
+serviceAccount:
+  # -- create.
+  create: true
+  # -- name.
+  name: ''
+  # -- annotations.
+  annotations: {}
+  # -- automountServiceAccountToken.
+  automountServiceAccountToken: false
+# -- service.
+service:
+  # -- type.
+  type: ClusterIP
+  # -- port.
+  port: 9200
+  # -- annotations.
+  annotations: {}
+  # -- ipFamilyPolicy.
+  ipFamilyPolicy: ''
+  # -- ipFamilies.
+  ipFamilies: []
+# -- ingress.
+ingress:
+  # -- enabled.
+  enabled: false
+  # -- ingressClassName.
+  ingressClassName: ''
+  # -- annotations.
+  annotations: {}
+  # -- hosts.
+  hosts: []
+  # -- tls.
+  tls: []
+# -- externalSecrets.
+externalSecrets:
+  # -- enabled.
+  enabled: false
+  # -- refreshInterval.
+  refreshInterval: 1h
+  # -- items.
+  items: []
+# -- networkPolicy.
+networkPolicy:
+  # -- enabled.
+  enabled: true
+  # -- Allowed scraper peers; empty selects Pods in this namespace.
+  ingressFrom: []
+  # -- egressIsolation.
+  egressIsolation: true
+  # -- dnsEgress.
+  dnsEgress:
+    - namespaceSelector:
+        # -- matchLabels.
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      # -- podSelector.
+      podSelector:
+        # -- matchLabels.
+        matchLabels:
+          # -- k8s-app.
+          k8s-app: kube-dns
+  # -- webEgress.
+  webEgress: []
+  # -- webPorts.
+  webPorts:
+    - 443
+  # -- extraEgress.
+  extraEgress: []
+# -- probes.
+probes:
+  # -- startup.
+  startup:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 60
+    # -- periodSeconds.
+    periodSeconds: 5
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- readiness.
+  readiness:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 10
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- liveness.
+  liveness:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 20
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+# -- resources.
+resources:
+  # -- requests.
+  requests:
+    # -- cpu.
+    cpu: 250m
+    # -- memory.
+    memory: 512Mi
+  # -- limits.
+  limits:
+    # -- cpu.
+    cpu: '2'
+    # -- memory.
+    memory: 2Gi
+# -- podSecurityContext.
+podSecurityContext:
+  # -- runAsNonRoot.
+  runAsNonRoot: true
+  # -- runAsUser.
+  runAsUser: 1000
+  # -- runAsGroup.
+  runAsGroup: 1000
+  # -- fsGroup.
+  fsGroup: 1000
+  # -- fsGroupChangePolicy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- seccompProfile.
+  seccompProfile:
+    # -- type.
+    type: RuntimeDefault
+# -- securityContext.
+securityContext:
+  # -- allowPrivilegeEscalation.
+  allowPrivilegeEscalation: false
+  # -- readOnlyRootFilesystem.
+  readOnlyRootFilesystem: true
+  # -- capabilities.
+  capabilities:
+    # -- drop.
+    drop:
+      - ALL
+# -- podLabels.
+podLabels: {}
+# -- podAnnotations.
+podAnnotations: {}
+# -- nodeSelector.
+nodeSelector: {}
+# -- tolerations.
+tolerations: []
+# -- affinity.
+affinity: {}
+# -- topologySpreadConstraints.
+topologySpreadConstraints: []
+# -- priorityClassName.
+priorityClassName: ''
+# -- terminationGracePeriodSeconds.
+terminationGracePeriodSeconds: 30
+# -- persistence.
+persistence:
+  # -- enabled.
+  enabled: true
+  # -- Existing volume containing matching config and data, including extended attributes.
+  existingClaim: ''
+  # -- storageClass.
+  storageClass: ''
+  # -- size.
+  size: 20Gi
+  # -- accessModes.
+  accessModes:
+    - ReadWriteOnce
+  # -- retain.
+  retain: true
+  # -- annotations.
+  annotations: {}
+# -- bootstrap.
+bootstrap:
+  # -- Initial administrator password; prefer an existing Secret in production.
+  password: ''
+  # -- existingSecret.
+  existingSecret: ''
+  # -- Key containing the initial administrator password (at least 16 bytes).
+  passwordKey: admin-password
+# -- runtime.
+runtime:
+  # -- Bounded emptyDir space for native temporary files.
+  temporarySize: 1Gi
+# -- metrics.
+metrics:
+  # -- enabled.
+  enabled: false
+  # -- port.
+  port: 9464
+  # -- existingSecret.
+  existingSecret: ''
+  # -- Secret key containing a metrics Bearer token of at least 16 bytes.
+  tokenKey: token
+  # -- image.
+  image:
+    # -- repository.
+    repository: docker.io/library/node
+    # -- tag.
+    tag: 24.21.0-alpine3.23
+    # -- pullPolicy.
+    pullPolicy: IfNotPresent
+  # -- resources.
+  resources:
+    # -- requests.
+    requests:
+      # -- cpu.
+      cpu: 10m
+      # -- memory.
+      memory: 32Mi
+    # -- limits.
+    limits:
+      # -- cpu.
+      cpu: 100m
+      # -- memory.
+      memory: 128Mi
+  # -- Allowed scraper peers; empty selects Pods in this namespace.
+  ingressFrom: []
+  # -- serviceMonitor.
+  serviceMonitor:
+    # -- enabled.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- interval.
+    interval: 30s
+    # -- scrapeTimeout.
+    scrapeTimeout: 10s
+  # -- prometheusRule.
+  prometheusRule:
+    # -- enabled.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- additionalRules.
+    additionalRules: []
+# -- gatewayAPI.
+gatewayAPI:
+  # -- enabled.
+  enabled: false
+  # -- Canonical HTTPRoute definitions; omitted backends target this application Service.
+  httpRoutes: []
+```

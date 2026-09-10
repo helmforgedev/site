@@ -33,6 +33,19 @@ test.describe('Playground', () => {
     await page.locator('button[data-field-key="metrics.enabled"]').click();
     await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
   });
+  test('opencloud keeps monitoring dependencies consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="opencloud"]').click();
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.prometheusRule.enabled"]').click();
+    await expect(code).toContainText('metrics.prometheusRule.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+    await expect(code).not.toContainText('metrics.prometheusRule.enabled=true');
+  });
   test('memos keeps database driver and bundled databases consistent', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="memos"]').click();
