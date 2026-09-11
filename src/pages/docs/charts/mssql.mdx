@@ -1,0 +1,425 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Microsoft SQL Server Chart
+description: Persistent SQL Server with selectable editions, explicit license consent, verified TLS, separate operational accounts and scheduled native backups to S3.
+---
+
+# Microsoft SQL Server
+
+Deploy [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server) as one persistent instance with an explicit edition and license contract.
+The chart uses official pinned MCR images, encrypted SQL connections, independent operational accounts and native full backups uploaded to S3.
+
+## Features
+
+- SQL Server 2025 by default, with a pinned SQL Server 2022 compatibility profile.
+- Express, developer variants, commercial edition identifiers and product-key Secret references.
+- Explicit EULA consent before creating SQL Server workloads, credentials or persistent storage.
+- Singleton StatefulSet, retained PVCs, non-root execution and explicit CPU/memory budgets.
+- TLS with retained generated CA material or an existing certificate Secret; clients validate the server identity.
+- Separate administrative, probe, metrics and backup credentials; existing Secrets and External Secrets Operator.
+- Idempotent initial databases and application logins using per-application Secrets.
+- Native full COPY_ONLY backups to disk followed by S3 upload, including Express deployments.
+- Private SQL exporter, ServiceMonitor, PrometheusRule and explicit network peers.
+
+The chart does not configure Always On, automatic failover, horizontal scaling or a transaction-log backup chain.
+Pod replacement causes an interruption while the same instance recovers its databases.
+
+## Installation and license consent
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install database helmforge/mssql \
+  --namespace database --create-namespace \
+  --set license.acceptEULA=true
+```
+
+The equivalent OCI installation is:
+
+```bash
+helm install database oci://ghcr.io/helmforgedev/helm/mssql \
+  --namespace database --create-namespace \
+  --set license.acceptEULA=true
+```
+
+Set `license.acceptEULA` only after accepting Microsoft's terms. Its default is false: installing without explicit consent creates no SQL process,
+credentials or PVC. Express is the default edition. The chart does not provide a commercial SQL Server license.
+
+Both image tracks require Linux amd64 nodes. Default SQL resources reserve two CPUs and 4Gi of memory, with a 3072MiB engine memory ceiling.
+Measure application concurrency, database growth and storage performance before sizing production.
+
+The SQL Server container drops capabilities and adds only `NET_BIND_SERVICE`: the official executable carries this file capability and requires it
+in the permitted bounding set to start. Other containers drop all capabilities. This exception does not enable root or privilege escalation.
+
+## Engine version and edition
+
+`image.tag` includes a version and matching digest. `sql.edition` independently selects the edition. Update the tag and embedded digest together.
+An image rollback does not downgrade database files upgraded by a newer engine.
+
+| Edition                                 | Contract                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Express                                 | Free edition with limited capacity; valid for production applications within those limits.                    |
+| Developer                               | Development/test only; maps to EnterpriseDeveloper on 2025 and Developer on 2022.                             |
+| StandardDeveloper / EnterpriseDeveloper | SQL Server 2025 developer variants; development/test only.                                                    |
+| Standard / EnterpriseCore               | Commercial editions requiring appropriate licensing.                                                          |
+| Enterprise                              | Legacy Enterprise Server + CAL identifier, limited to 20 cores; prefer EnterpriseCore for new core licensing. |
+| Web                                     | SQL Server 2022 only, under its licensing terms.                                                              |
+| Evaluation                              | Time-limited Enterprise evaluation, 180 days.                                                                 |
+| ProductKey                              | Read the key from `license.existingSecret`, entry `license.productKeyKey`.                                    |
+
+Express supports a maximum relational database size of 50GB on SQL Server 2025 and 10GB on 2022. Both limit the buffer pool to 1,410MB and compute to
+the lesser of one socket or four cores. That buffer pool limit is not the total process memory requirement.
+
+Express does not include SQL Server Agent, native S3 REST backups, native backup compression, encrypted native backups or TDE.
+The chart's disk-backup-plus-uploader design supports Express without those features. `sql.agent.enabled` is available only for eligible editions.
+See the [edition guide](https://github.com/helmforgedev/charts/blob/main/charts/mssql/docs/editions.md) and
+[Microsoft's edition matrix](https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2025?view=sql-server-ver17).
+
+## Authentication and initialization
+
+The chart generates independent credentials and retains them through live Helm lookup. For GitOps renderers, use `auth.existingSecret` with
+`sa-password`, `probe-password`, `metrics-password` and `backup-password`. Keep those credentials with the retained SQL data directory.
+Changing a Secret does not execute `ALTER LOGIN` against existing SQL logins; coordinate SQL-side rotation and client Secret updates explicitly.
+
+Applications should use dedicated logins. `initdb.databases` creates missing database/login pairs, with a separate existing Secret for each password:
+
+```yaml
+license:
+  acceptEULA: true
+initdb:
+  databases:
+    - name: application
+      username: application
+      existingSecret: application-db
+      passwordKey: password
+      recoveryModel: SIMPLE
+```
+
+Create the referenced Secret through your secret-management process before installation. Bootstrap is not an application schema migration engine
+and does not automatically rotate existing logins. Reviewed SQL ConfigMaps can be supplied through `initdb.scriptsConfigMaps`; their content ledger
+prevents silently rerunning changed initialization scripts.
+
+External Secrets uses `externalSecrets.items[]` with each item's complete spec. Install ESO and your SecretStore separately and point the chart's
+existing-Secret fields at the synchronized targets. Protect administrative access; routine probes, monitoring and backup use separate accounts.
+
+## TLS and networking
+
+The default generates retained certificate material with a private self-signed CA. For production, provide `tls.existingSecret` with `tls.crt`,
+`tls.key` and `ca.crt`, using your approved CA and renewal process. Certificates must cover the Service or external hostname clients actually use.
+Distribute the CA to clients and validate server identity rather than disabling certificate validation.
+
+`tls.extraDnsNames` adds names to generated certificates. Plan certificate renewal and SQL Server restart together. Generated certificates are not
+an automatic certificate renewal service.
+
+The default Service is ClusterIP on TCP 1433. Configure `networkPolicy.ingressFrom` for real application peers; the default does not admit arbitrary
+application Pods. SQL Server uses TCP, so this chart has no HTTP Ingress. Configure externally exposed TCP Services and certificate names deliberately.
+
+## Storage and recovery
+
+`persistence.enabled` defaults to true and the generated claim is retained by default. `persistence.existingClaim` reuses independently managed storage.
+Keep compatible database files, ownership and SQL credentials together. Never mount one data directory into two active SQL Server instances.
+
+Monitor free data and backup staging space. Helm rollback changes Kubernetes resources, not SQL Server data format or application migrations.
+Before an engine or edition migration, restore a recent backup into an isolated instance and run application acceptance tests.
+
+## Scheduled S3 backups
+
+Backups use full native COPY_ONLY files and an AWS CLI upload. They do not require SQL Agent and do not provide point-in-time recovery.
+An example for an initialized `application` database is:
+
+```yaml
+backup:
+  enabled: true
+  schedule: '0 2 * * *'
+  databases:
+    - application
+  s3:
+    bucket: sql-server-backups
+    region: us-east-1
+    existingSecret: sql-server-backup-s3
+    sse: AES256
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.0/24
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+Replace the documentation CIDR with the actual object-store destination and create the bucket and credentials Secret before deployment.
+The Secret contains `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, optionally `AWS_SESSION_TOKEN`. An explicit AWS web-identity role can replace
+static credentials through `backup.workloadIdentity`. For a private HTTPS endpoint, configure `backup.s3.endpoint` and its CA Secret as needed.
+
+The staging claim must hold the backup set and allow the SQL Server Pod and backup Job to mount it concurrently on the same node. Choose compatible
+storage and capacity. Uploaded backups require their own access policy, encryption, lifecycle and recovery tests. The chart does not create or delete buckets.
+
+Run restore drills into an isolated compatible instance and query recovered application records. A successful upload or RESTORE VERIFYONLY is not
+equivalent to a real restore. Database backups do not automatically recreate every server-level login, credential or certificate. Keep the required
+server configuration and security material in the protected recovery process. FULL recovery requires a separately operated log backup strategy.
+
+## Prometheus
+
+`metrics.enabled` deploys a separate SQL exporter. With generated authentication, the chart also generates its matching TLS-verifying DSN Secret.
+When using `auth.existingSecret`, supply `metrics.existingSecret`, whose `metrics.secretKey` contains a TLS-verifying DSN for the dedicated `hf_metrics`
+login. Its password must match `metrics-password` in the auth Secret. The exporter mounts the TLS Secret's `ca.crt` key as `/tls/ca.pem`;
+external DSNs must use `encrypt=true&TrustServerCertificate=false&certificate=/tls/ca.pem` because the Go SQL driver requires a supported certificate filename extension.
+Configure `metrics.ingressFrom` for actual Prometheus peers. ServiceMonitor and PrometheusRule require Prometheus Operator CRDs and matching selectors.
+Verify a real successful scrape; rendered monitoring resources alone do not prove connectivity or database health.
+
+See [production operations](https://github.com/helmforgedev/charts/blob/main/charts/mssql/docs/operations.md) for credential rotation,
+storage, upgrades, troubleshooting and recovery boundaries.
+
+## Complete values reference
+
+The following is the complete chart values file. Commented application entries illustrate structure and do not create a database by default.
+
+{/* prettier-ignore */}
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Resource name prefix override.
+nameOverride: ""
+# -- Complete release resource name (maximum 40 characters, reserving suffix space).
+fullnameOverride: ""
+# -- Additional resource labels; selectors cannot be overridden.
+commonLabels: {}
+# -- Labels on SQL Server Pods.
+podLabels: {}
+# -- Annotations on SQL Server Pods.
+podAnnotations: {}
+# -- Registry credentials.
+imagePullSecrets: []
+image:
+  # -- Official Microsoft Container Registry image.
+  repository: mcr.microsoft.com/mssql/server
+  # -- Engine version selected independently of sql.edition; tested 2025 and 2022 pins in examples.
+  tag: 2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a
+  # -- Container image pull policy.
+  pullPolicy: IfNotPresent
+license:
+  # -- Explicitly accept Microsoft's EULA. False installs only a consent notice; no SQL process, credentials or PVC.
+  acceptEULA: false
+  # -- Existing Secret containing the product key when sql.edition=ProductKey.
+  existingSecret: ""
+  # -- Product-key Secret entry. Never place a product key in plain values.
+  productKeyKey: product-key
+sql:
+  # -- Express is production-eligible within its limits; Developer editions are development/test only.
+  edition: Express
+  # -- Native server memory ceiling in MiB; leave headroom below the container memory limit.
+  memoryLimitMB: 3072
+  # -- Default collation for newly initialized system databases; does not migrate persisted data.
+  collation: SQL_Latin1_General_CP1_CI_AS
+  # -- Default server language locale identifier.
+  lcid: 1033
+  agent:
+    # -- Enable SQL Server Agent on eligible editions; Kubernetes backup scheduling does not require Agent.
+    enabled: false
+auth:
+  # -- Existing Secret with sa-password, probe-password, metrics-password and backup-password entries.
+  existingSecret: ""
+tls:
+  # -- Existing TLS Secret with tls.crt, tls.key and ca.crt. Empty generates a retained private CA/server certificate.
+  existingSecret: ""
+  # -- Additional certificate DNS SANs for generated certificates, such as an external TCP hostname.
+  extraDnsNames: []
+  # -- Generated certificate lifetime in days; renewal requires an explicit documented operation.
+  durationDays: 365
+initdb:
+  # -- Idempotent database/login provisioning. Passwords come from per-application existing Secrets.
+  databases: []
+  # - name: application
+  #   username: application
+  #   existingSecret: application-db
+  #   passwordKey: password
+  #   recoveryModel: SIMPLE
+  # -- Existing ConfigMaps with reviewed *.sql scripts. Each script runs once with an immutable content ledger.
+  scriptsConfigMaps: []
+persistence:
+  # -- Persist all SQL Server state, including master and encryption hierarchy.
+  enabled: true
+  # -- Reuse an existing claim instead of creating one.
+  existingClaim: ""
+  # -- Requested storage class; empty uses default, '-' disables dynamic provisioning.
+  storageClass: ""
+  # -- Data volume size.
+  size: 20Gi
+  # -- Single-writer claim access mode.
+  accessMode: ReadWriteOnce
+  # -- Keep the generated claim when uninstalling.
+  retain: true
+  # -- Extra PVC annotations.
+  annotations: {}
+service:
+  # -- SQL TCP exposure; keep ClusterIP unless external access is deliberately configured.
+  type: ClusterIP
+  # -- SQL Server client port on the Service.
+  port: 1433
+  # -- Service annotations.
+  annotations: {}
+  # -- Kubernetes Service address-family policy; empty uses cluster default.
+  ipFamilyPolicy: ""
+  # -- Explicit ordered address families.
+  ipFamilies: []
+  # -- Restrict external load balancer source CIDRs when supported by the provider.
+  loadBalancerSourceRanges: []
+serviceAccount:
+  # -- Create a dedicated SQL Pod service account; no Kubernetes API token is mounted.
+  create: true
+  # -- Existing or created account name override.
+  name: ""
+  # -- ServiceAccount annotations.
+  annotations: {}
+resources:
+  # -- Production reservation, equal to limits for Guaranteed QoS on the SQL Pod.
+  requests: {cpu: "2", memory: 4Gi}
+  # -- Hard container budget; server memory must fit with runtime headroom.
+  limits: {cpu: "2", memory: 4Gi}
+# -- Architecture supported by Microsoft; emulated ARM is not supported.
+nodeSelector: {kubernetes.io/os: linux, kubernetes.io/arch: amd64}
+# -- Pod scheduling tolerations.
+tolerations: []
+# -- Optional scheduling affinity.
+affinity: {}
+# -- Pod priority class.
+priorityClassName: ""
+# -- Time allowed for SQL Server to shut down cleanly.
+terminationGracePeriodSeconds: 120
+probes:
+  startup:
+    # -- Native SQL bootstrap completion check period.
+    periodSeconds: 10
+    # -- Startup probe timeout.
+    timeoutSeconds: 5
+    # -- Up to ten minutes for initial database creation/recovery.
+    failureThreshold: 60
+  readiness:
+    # -- Authenticated SELECT 1 readiness period.
+    periodSeconds: 10
+    # -- Readiness probe timeout.
+    timeoutSeconds: 5
+    # -- Fail readiness before routing more clients to an unready database.
+    failureThreshold: 3
+  liveness:
+    # -- TCP-only liveness avoids restarting a healthy database because of credential drift.
+    periodSeconds: 20
+    # -- Liveness TCP timeout.
+    timeoutSeconds: 5
+    # -- Tolerate short pauses before restarting SQL Server.
+    failureThreshold: 6
+networkPolicy:
+  # -- Enforce SQL client and optional monitoring/backup network boundaries.
+  enabled: true
+  # -- Explicit authorized SQL client peers. Empty allows only chart-owned backup/exporter Pods.
+  ingressFrom: []
+  # -- Cluster DNS selector for optional outgoing DNS.
+  dnsNamespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+  # -- Additional workload egress rules for deliberate integrations.
+  extraEgress: []
+backup:
+  # -- Native full COPY_ONLY backups uploaded to S3, including Express. Does not provide log backups or PITR.
+  enabled: false
+  # -- Cron schedule in UTC by default.
+  schedule: "0 2 * * *"
+  # -- IANA time zone used by the Kubernetes CronJob controller.
+  timeZone: Etc/UTC
+  # -- Pause scheduling without removing the backup configuration.
+  suspend: false
+  # -- Explicit database names to back up; must be provisioned through initdb.databases or pre-existing with grants.
+  databases: []
+  # -- Native compression for eligible editions; must remain false for Express/Web.
+  compression: false
+  # -- Job execution deadline in seconds.
+  activeDeadlineSeconds: 3600
+  # -- Retry budget; every retry uses a unique staging directory.
+  backoffLimit: 1
+  # -- Successful Job history count.
+  successfulJobsHistoryLimit: 3
+  # -- Failed Job history count.
+  failedJobsHistoryLimit: 3
+  image:
+    # -- Original AWS-maintained uploader image.
+    repository: public.ecr.aws/aws-cli/aws-cli
+    # -- Pinned AWS CLI release and multiarch manifest.
+    tag: 2.36.43@sha256:d948ee299a7ffcaec0d6052a00b9f4c513c61cacfaedfe68b098c85808394441
+  staging:
+    # -- Existing staging claim. Must support concurrent mounts on the same node (RWO or RWX, not RWOP).
+    existingClaim: ""
+    # -- Backup staging capacity; size for the largest backup set plus failed-run headroom.
+    size: 20Gi
+    # -- StorageClass for generated staging PVC.
+    storageClass: ""
+    # -- Preserve staging PVC for failed-upload recovery after uninstall.
+    retain: true
+  s3:
+    # -- Existing destination bucket. The chart never creates or deletes buckets.
+    bucket: ""
+    # -- Dedicated object prefix; each completed run has a unique subdirectory and manifest.json.
+    prefix: mssql
+    # -- AWS region or S3-compatible signing region.
+    region: us-east-1
+    # -- HTTPS endpoint override; empty uses AWS S3.
+    endpoint: ""
+    # -- Existing Secret with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, optionally AWS_SESSION_TOKEN.
+    existingSecret: ""
+    # -- Server-side encryption mode: empty, AES256 or aws:kms.
+    sse: AES256
+    # -- AWS KMS key identifier when sse=aws:kms.
+    kmsKeyId: ""
+    # -- Optional Secret with ca.crt for private HTTPS object storage.
+    caSecret: ""
+  workloadIdentity:
+    # -- Use explicit AWS web identity instead of static credentials.
+    enabled: false
+    # -- IAM role ARN for the projected sts.amazonaws.com token.
+    roleArn: ""
+    # -- Backup-only ServiceAccount annotations.
+    annotations: {}
+  # -- Resources for each sequential backup/uploader container.
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  # -- Egress rules authorizing the S3 endpoint (required when NetworkPolicy is enabled).
+  egress: []
+metrics:
+  # -- Separate original-maintainer SQL exporter with a least-privilege login.
+  enabled: false
+  image:
+    # -- Original SQL exporter maintainer image.
+    repository: burningalchemist/sql_exporter
+    # -- Verified exporter release.
+    tag: 0.24.8@sha256:2586aa37f140128fb92cf9b764ca30fbfab898c8740268ae1a6e1f39260f4d5d
+  # -- Existing DSN Secret, required together with auth.existingSecret when metrics are enabled.
+  existingSecret: ""
+  # -- Key containing a TLS-verifying DSN whose hf_metrics password matches auth.metrics-password.
+  secretKey: dsn
+  # -- Private metrics port.
+  port: 9399
+  # -- Explicit authorized Prometheus peers.
+  ingressFrom: []
+  # -- Exporter resource allocation.
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  serviceMonitor:
+    # -- Render Prometheus Operator ServiceMonitor.
+    enabled: false
+    # -- Scrape interval.
+    interval: 30s
+    # -- Scrape timeout.
+    scrapeTimeout: 10s
+    # -- Additional ServiceMonitor labels.
+    labels: {}
+  prometheusRule:
+    # -- Render target/database health alerts; requires ServiceMonitor.
+    enabled: false
+    # -- Additional alert labels.
+    labels: {}
+externalSecrets:
+  # -- Render canonical external-secrets.io/v1 resources.
+  enabled: false
+  # -- Default Secret synchronization interval.
+  refreshInterval: 1h
+  # -- Complete ExternalSecret definitions with item-level spec.
+  items: []
+```

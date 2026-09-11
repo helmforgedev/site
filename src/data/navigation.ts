@@ -26,6 +26,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Databases',
     charts: [
+      { label: 'Microsoft SQL Server', href: '/docs/charts/mssql', maturity: 'stable' },
       { label: 'MySQL', href: '/docs/charts/mysql', maturity: 'stable' },
       { label: 'PostgreSQL', href: '/docs/charts/postgresql', maturity: 'stable' },
       { label: 'MongoDB', href: '/docs/charts/mongodb', maturity: 'stable' },

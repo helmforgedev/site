@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Microsoft SQL Server',
+    slug: 'mssql',
+    description:
+      'Persistent SQL Server with explicit edition selection, verified TLS, separate operational accounts and native backups to S3.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'Text Embeddings Inference',
     slug: 'text-embeddings-inference',
     description:

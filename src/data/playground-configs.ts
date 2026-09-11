@@ -8,6 +8,214 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  mssql: [
+    {
+      name: 'License and engine',
+      fields: [
+        {
+          label: 'Accept Microsoft EULA',
+          key: 'license.acceptEULA',
+          type: 'toggle',
+          default: 'false',
+          description: 'Explicit consent is required before SQL Server, credentials or storage are created',
+        },
+        {
+          label: 'SQL Server image version',
+          key: 'image.tag',
+          type: 'select',
+          default: '2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a',
+          options: [
+            '2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a',
+            '2022-CU26-GDR1-ubuntu-22.04@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb',
+          ],
+          valueActivationValues: {
+            '2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a': {
+              'sql.edition': 'Express',
+            },
+            '2022-CU26-GDR1-ubuntu-22.04@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb': {
+              'sql.edition': 'Express',
+            },
+          },
+          description: 'Pinned amd64 engine; selecting a track resets the edition to Express',
+        },
+        {
+          label: 'SQL Server edition',
+          key: 'sql.edition',
+          type: 'select',
+          default: 'Express',
+          options: [
+            'Express',
+            'Developer',
+            'StandardDeveloper',
+            'EnterpriseDeveloper',
+            'Standard',
+            'EnterpriseCore',
+            'Enterprise',
+            'Web',
+            'Evaluation',
+            'ProductKey',
+          ],
+          valueActivationValues: {
+            StandardDeveloper: {
+              'image.tag':
+                '2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a',
+            },
+            EnterpriseDeveloper: {
+              'image.tag':
+                '2025-CU8-GDR1-ubuntu-24.04@sha256:b036b61e953e6e660f04514fc3f703b995a9cdda569cf96d07d3f751240f615a',
+            },
+            Web: {
+              'image.tag':
+                '2022-CU26-GDR1-ubuntu-22.04@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb',
+            },
+            ProductKey: { 'license.existingSecret': 'sql-server-license' },
+          },
+          description:
+            'Developer is test-only; paid editions require licensing. Version-specific editions select the matching engine',
+        },
+        {
+          label: 'License Secret',
+          key: 'license.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Required for ProductKey; contains product-key. Never enter a license key here',
+        },
+      ],
+    },
+    {
+      name: 'Persistent instance',
+      fields: [
+        {
+          label: 'Existing credentials Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Contains sa-password, probe-password, metrics-password and backup-password',
+        },
+        {
+          label: 'Existing TLS Secret',
+          key: 'tls.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Contains tls.crt, tls.key and ca.crt; empty generates retained private CA material',
+        },
+        {
+          label: 'Data volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Storage for databases, logs and security material',
+        },
+        {
+          label: 'Existing data claim',
+          key: 'persistence.existingClaim',
+          type: 'text',
+          default: '',
+          description: 'Requires matching persisted credentials and compatible engine version',
+        },
+      ],
+    },
+    {
+      name: 'S3 full backups',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      activationValues: {
+        'backup.databases[0]': 'application',
+        'initdb.databases[0].name': 'application',
+        'initdb.databases[0].username': 'application',
+        'initdb.databases[0].existingSecret': 'application-db',
+        'initdb.databases[0].passwordKey': 'password',
+      },
+      fields: [
+        {
+          label: 'Initial application database',
+          key: 'initdb.databases[0].name',
+          type: 'text',
+          default: 'application',
+          description: 'Create if missing; match the backup database unless it is already managed separately',
+        },
+        {
+          label: 'Application login',
+          key: 'initdb.databases[0].username',
+          type: 'text',
+          default: 'application',
+          description: 'Dedicated initial application login',
+        },
+        {
+          label: 'Application credentials Secret',
+          key: 'initdb.databases[0].existingSecret',
+          type: 'text',
+          default: 'application-db',
+          description: 'Existing Secret with the application password',
+        },
+        {
+          label: 'Application password key',
+          key: 'initdb.databases[0].passwordKey',
+          type: 'text',
+          default: 'password',
+          description: 'Entry in the existing application Secret',
+        },
+        {
+          label: 'Application recovery model',
+          key: 'initdb.databases[0].recoveryModel',
+          type: 'select',
+          default: 'SIMPLE',
+          options: ['SIMPLE'],
+          description: 'Full backup automation does not operate a transaction-log backup chain',
+        },
+        {
+          label: 'Backup database',
+          key: 'backup.databases[0]',
+          type: 'text',
+          default: 'application',
+          description:
+            'Database must exist with backup grants; defaults provision application using application-db Secret',
+        },
+        {
+          label: 'Backup schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 2 * * *',
+          description: 'Full COPY_ONLY backups in UTC; no transaction-log chain or point-in-time recovery',
+        },
+        {
+          label: 'S3 bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'sql-server-backups',
+          description: 'Existing destination bucket managed outside this chart',
+        },
+        {
+          label: 'S3 credentials Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: 'sql-server-backup-s3',
+          description: 'Contains AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY',
+        },
+        {
+          label: 'S3 endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: '',
+          description: 'Empty uses AWS S3; compatible endpoints must use HTTPS',
+        },
+        {
+          label: 'S3 destination CIDR',
+          key: 'backup.egress[0].to[0].ipBlock.cidr',
+          type: 'text',
+          default: '203.0.113.0/24',
+          description: 'Replace this documentation CIDR with the real object-store network before deployment',
+        },
+        {
+          label: 'S3 HTTPS port',
+          key: 'backup.egress[0].ports[0].port',
+          type: 'number',
+          default: '443',
+          description: 'TCP port permitted to the object-store destination',
+        },
+      ],
+    },
+  ],
   'text-embeddings-inference': [
     {
       name: 'Network compatibility',
