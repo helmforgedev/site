@@ -17,6 +17,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'proxy.ipv6',
           type: 'toggle',
           default: 'false',
+          toggleActivationValues: { false: { 'service.ipFamilyPolicy': '' } },
           description: 'Enable for IPv6 or dual-stack Services; requires kernel IPv6 support',
         },
         {
@@ -25,6 +26,10 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'SingleStack', 'PreferDualStack', 'RequireDualStack'],
+          valueActivationValues: {
+            PreferDualStack: { 'proxy.ipv6': 'true' },
+            RequireDualStack: { 'proxy.ipv6': 'true' },
+          },
           description: 'Empty uses the cluster default; dual-stack policies require IPv6 listeners',
         },
       ],
