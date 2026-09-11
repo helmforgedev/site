@@ -1,0 +1,479 @@
+---
+# @AI-METADATA: production chart documentation synchronized with native runtime contracts
+layout: ../../../layouts/DocsLayout.astro
+title: Stirling PDF Chart
+description:
+  Authenticated PDF processing with full OCR and office tools, durable H2 state, verified recovery and private native
+  Prometheus.
+---
+
+# Stirling PDF
+
+[Official upstream repository](https://github.com/Stirling-Tools/Stirling-PDF).
+
+Authenticated document processing using the official full image
+`docker.stirlingpdf.com/stirlingtools/stirling-pdf:2.14.3`. Verified Linux amd64 and arm64 manifests. This chart targets
+the Community edition's embedded H2 deployment.
+
+## Features
+
+- Native administrator login from first start, retained generated password, existing Secret and ESO.
+- One retained PVC containing H2 authentication state, configuration, custom files and pipelines.
+- Non-root, read-only filesystem, dropped capabilities, seccomp and no Kubernetes API token.
+- Preserved full OCR and office toolchain with seeded writable tool links and bounded temporary volumes.
+- Authenticated native Prometheus on a separate Service, with a Secret-backed additional scrape job.
+- Ingress class, Gateway API, dual-stack Service and explicit network isolation.
+- Single-writer guards and Recreate upgrades; no unsupported shared-H2 replicas.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install stirling-pdf helmforge/stirling-pdf --namespace documents --create-namespace
+kubectl -n documents port-forward service/stirling-pdf-stirling-pdf 8080:8080
+```
+
+Open `http://localhost:8080`. The initial administrator is `admin`; Helm NOTES identifies its credential Secret. For
+production, supply `auth.existingSecret`, use a dedicated HTTPS hostname and restrict ingress to your edge controller.
+Bootstrap credentials initialize a new database; rotate existing passwords through native account administration.
+
+See [production values](#production-example), [operations](#operations), [monitoring](#monitoring),
+[recovery](#recovery) and [design](https://github.com/helmforgedev/charts/blob/main/charts/stirling-pdf/DESIGN.md).
+
+## Capacity and availability
+
+Defaults request 500m CPU and 1Gi memory, with limits of 2 CPU and 4Gi. The JVM heap ceiling is 60% of the container
+memory limit; OCR, LibreOffice and native processes share the remaining budget. Load-test concurrent conversions and
+monitor memory, temporary storage and PVC capacity. Upload limits are 100MB per file and 200MB per request; align proxy
+limits.
+
+One Deployment uses Recreate and a 10Gi RWO claim. Restart and upgrade operations interrupt processing; drain traffic
+and finish active jobs before maintenance. Shared RWX storage does not make H2 a supported distributed database.
+Fresh-install native OAuth SSO and external SQL have upstream license constraints. This chart does not claim paid
+clustering or successful licensed SSO validation.
+
+## Validation
+
+From the charts repository, install the pinned PDF fixture dependency:
+
+```bash
+npm ci --prefix charts/stirling-pdf/scripts
+```
+
+Then run the canonical gate from helmforge-ops:
+
+```bash
+make validate-chart CHART=stirling-pdf
+```
+
+Runtime checks exercise native login, anonymous conversion rejection, a real two-document merge with independent
+page-text extraction, API-key persistence and Secret retention. Dedicated profiles cover OCR, recovery and authenticated
+Prometheus.
+
+## Security Scan
+
+Security Scan: stirling-pdf
+
+| Framework          | Score |
+| ------------------ | ----- |
+| MITRE + NSA + SOC2 | 100%  |
+
+Security posture acceptable. Local Kubescape 4.0.13 scanned the default rendered resources. This is a Kubernetes
+configuration assessment, not an image vulnerability or document-processing security audit.
+
+## Operations
+
+Use a dedicated HTTPS origin and existing administrator Secret. Restrict document processing to trusted users. Native
+login is always enabled. Use dedicated native accounts for automation and rotate or revoke API keys in the app.
+
+Default NetworkPolicy permits same-namespace application HTTP and DNS egress. Select the ingress controller namespace
+for a cross-namespace edge. Add narrow extraEgress rules for approved integrations. Remote URL conversion requires
+intentional outbound access; broad internet access is not automatic. Preserve native SSRF protection. The CNI must
+enforce policies.
+
+Align controller-specific body limits and timeouts with server.maxUploadSize, server.maxRequestSize and
+server.connectionTimeoutMilliseconds. Application values do not configure the proxy. A dedicated root hostname is the
+default; when using server.basePath, align edge routes and public callbacks with that prefix.
+
+The full image includes English OCR data. Additional language data must come from trusted compatible sources and is not
+downloaded automatically. Temporary files disappear with the pod. Processed documents are not a durable document
+library; the upstream experimental storage feature is disabled.
+
+Load-test realistic concurrent documents. Native tools share memory with Java, so allocating nearly all memory to heap
+can starve OCR and office conversion. Inspect tool diagnostics and readiness rather than disabling probes to hide
+failures. Keep API credentials and document contents out of operational logs.
+
+Fresh-install native OAuth SSO and external SQL have upstream license constraints. This Community deployment validates
+password authentication and H2; it does not manufacture grandfathered accounts or promise licensed clustering.
+
+## Monitoring
+
+Enable metrics.enabled for /actuator/prometheus on a separate ClusterIP Service. It rejects requests without a valid
+native X-API-KEY. Restrict metrics.ingressFrom to Prometheus pods. The application Ingress targets only the HTTP
+Service.
+
+Native samples are http_requests_total with method, uri and session labels. Upstream excludes JVM/GC meters. Session
+cardinality can grow; set sample limits and retention. Dropping session labels without aggregation can produce duplicate
+series. Monitor Kubernetes memory, restarts and volume capacity separately.
+
+### Prometheus Operator
+
+The supported ServiceMonitor schema cannot send arbitrary headers. An API key is not a Bearer JWT. Use a native job:
+
+```yaml
+metrics:
+  enabled: true
+  ingressFrom:
+    - podSelector:
+        matchLabels:
+          prometheus: documents-monitor
+  scrapeConfig:
+    enabled: true
+    apiKeySecret: stirling-monitoring-key
+    apiKeyKey: api-key
+```
+
+Create stirling-monitoring-key from a dedicated native monitoring account's API key in the Prometheus namespace. Keep it
+out of values files and ConfigMaps. The generated scrape Secret is in the application namespace; a Prometheus resource
+referencing it must share that namespace, or incorporate the job into your independently managed scrape Secret. ESO can
+synchronize credential material across namespaces.
+
+For a standalone same-namespace Prometheus, merge these fields into its existing spec:
+
+```yaml
+spec:
+  additionalScrapeConfigs:
+    name: stirling-pdf-stirling-pdf-scrape
+    key: additional-scrape-configs.yaml
+  secrets:
+    - stirling-monitoring-key
+```
+
+The job uses http_headers.X-API-KEY.files to read /etc/prometheus/secrets/stirling-monitoring-key/api-key.
+additionalScrapeConfigs is a single Secret reference: combine job lists and mounts instead of replacing other jobs.
+Validate the final configuration with your version's promtool. The runtime fixture uses Prometheus 3.14.0 and verifies a
+real successful scrape and native conversion request counter.
+
+Rotate the native key and Secret together, allow projected-volume propagation and verify target up=1. Limit Secret RBAC.
+
+## Recovery
+
+Back up the whole workspace claim and all credential Secrets, including a generated initial-password Secret. It includes
+configs with H2 state, customFiles and pipeline. Copying one live H2 file is not a consistent backup.
+
+1. Restrict new traffic and finish active conversions and pipeline jobs.
+2. Record values, image version, claim name and Secret references.
+3. Scale the Deployment to zero and wait for termination so H2 closes cleanly.
+4. Archive the complete claim from a restricted helper. Store the archive independently, encrypted with suitable
+   retention.
+5. Resume the Deployment and verify native login and conversion.
+
+Restore into a fresh PVC with compatible ownership and set persistence.existingClaim. Start with the original image.
+Verify login, retained API keys, custom files, pipeline state and a real conversion before switching traffic. Never run
+source and restored instances against the same H2 files.
+
+No automatic online H2 backup is claimed. Coordinate volume snapshots with quiescing and regularly test restoration.
+Helm rollback does not reverse database migrations.
+
+For GNU tar without root, archive the complete `configs`, `customFiles` and `pipeline` directories without a mount-root
+`.` entry. Restore with `--no-same-owner --no-overwrite-dir`. The PVC mount root may be root-owned with writable fsGroup
+permissions; attempting to restore its metadata fails even when file extraction succeeds. Preserve provider-owned root
+metadata and verify ownership and content of restored files. Include any operator-added state directories explicitly.
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+fullnameOverride: stirling-pdf
+auth:
+  existingSecret: documents-admin
+persistence:
+  size: 20Gi
+  retain: true
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: pdf.example.test
+      paths:
+        - { path: /, pathType: Prefix }
+  tls:
+    - secretName: pdf-tls
+      hosts: [pdf.example.test]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Name Override.
+nameOverride: ''
+# -- Fullname Override.
+fullnameOverride: ''
+# -- Common Labels.
+commonLabels: {}
+# -- Replica Count.
+replicaCount: 1
+# -- Image.
+image:
+  # -- Repository.
+  repository: docker.stirlingpdf.com/stirlingtools/stirling-pdf
+  # -- Tag.
+  tag: 2.14.3
+  # -- Pull Policy.
+  pullPolicy: IfNotPresent
+# -- Image Pull Secrets.
+imagePullSecrets: []
+# -- Auth.
+auth:
+  # -- Username.
+  username: admin
+  # -- Password.
+  password: ''
+  # -- Existing Secret.
+  existingSecret: ''
+  # -- Password Key.
+  passwordKey: password
+# -- Server.
+server:
+  # -- Port.
+  port: 8080
+  # -- Base Path.
+  basePath: ''
+  # -- Max Upload Size.
+  maxUploadSize: 100MB
+  # -- Max Request Size.
+  maxRequestSize: 200MB
+  # -- Connection Timeout Milliseconds.
+  connectionTimeoutMilliseconds: 300000
+# -- Extra Env.
+extraEnv: []
+# -- Env From.
+envFrom: []
+# -- Service Account.
+serviceAccount:
+  # -- Create.
+  create: true
+  # -- Name.
+  name: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Automount Service Account Token.
+  automountServiceAccountToken: false
+# -- Service.
+service:
+  # -- Type.
+  type: ClusterIP
+  # -- Port.
+  port: 8080
+  # -- Annotations.
+  annotations: {}
+  # -- Ip Family Policy.
+  ipFamilyPolicy: ''
+  # -- Ip Families.
+  ipFamilies: []
+# -- Ingress.
+ingress:
+  # -- Enabled.
+  enabled: false
+  # -- Ingress Class Name.
+  ingressClassName: ''
+  # -- Annotations.
+  annotations: {}
+  # -- Hosts.
+  hosts: []
+  # -- Tls.
+  tls: []
+# -- Gateway.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
+  enabled: false
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
+# -- External Secrets.
+externalSecrets:
+  # -- Enabled.
+  enabled: false
+  # -- Refresh Interval.
+  refreshInterval: 1h
+  # -- Items.
+  items: []
+# -- Network Policy.
+networkPolicy:
+  # -- Enabled.
+  enabled: true
+  # -- Ingress From.
+  ingressFrom: []
+  # -- Egress Isolation.
+  egressIsolation: true
+  # -- Dns Egress.
+  dnsEgress:
+    - namespaceSelector: {}
+  # -- Web Egress.
+  webEgress: []
+  # -- Web Ports.
+  webPorts:
+    - 443
+  # -- Extra Egress.
+  extraEgress: []
+# -- Probes.
+probes:
+  # -- Startup.
+  startup:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/v1/info/status
+    # -- Period Seconds.
+    periodSeconds: 5
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+    # -- Failure Threshold.
+    failureThreshold: 60
+  # -- Liveness.
+  liveness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/v1/info/status
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+    # -- Failure Threshold.
+    failureThreshold: 3
+  # -- Readiness.
+  readiness:
+    # -- Enabled.
+    enabled: true
+    # -- Path.
+    path: /api/v1/info/status
+    # -- Period Seconds.
+    periodSeconds: 20
+    # -- Timeout Seconds.
+    timeoutSeconds: 5
+    # -- Failure Threshold.
+    failureThreshold: 3
+# -- Resources.
+resources:
+  # -- Requests.
+  requests:
+    # -- Cpu.
+    cpu: 500m
+    # -- Memory.
+    memory: 1Gi
+  # -- Limits.
+  limits:
+    # -- Cpu.
+    cpu: '2'
+    # -- Memory.
+    memory: 4Gi
+# -- Pod Security Context.
+podSecurityContext:
+  # -- Run As Non Root.
+  runAsNonRoot: true
+  # -- Run As User.
+  runAsUser: 1000
+  # -- Run As Group.
+  runAsGroup: 1000
+  # -- Fs Group.
+  fsGroup: 1000
+  # -- Fs Group Change Policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Seccomp Profile.
+  seccompProfile:
+    # -- Type.
+    type: RuntimeDefault
+# -- Security Context.
+securityContext:
+  # -- Allow Privilege Escalation.
+  allowPrivilegeEscalation: false
+  # -- Read Only Root Filesystem.
+  readOnlyRootFilesystem: true
+  # -- Capabilities.
+  capabilities:
+    # -- Drop.
+    drop:
+      - ALL
+# -- Pod Labels.
+podLabels: {}
+# -- Pod Annotations.
+podAnnotations: {}
+# -- Node Selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity.
+affinity: {}
+# -- Topology Spread Constraints.
+topologySpreadConstraints: []
+# -- Priority Class Name.
+priorityClassName: ''
+# -- Termination Grace Period Seconds.
+terminationGracePeriodSeconds: 60
+# -- Persistence.
+persistence:
+  # -- Enabled.
+  enabled: true
+  # -- Existing Claim.
+  existingClaim: ''
+  # -- Storage Class.
+  storageClass: ''
+  # -- Size.
+  size: 10Gi
+  # -- Access Modes.
+  accessModes:
+    - ReadWriteOnce
+  # -- Retain.
+  retain: true
+  # -- Annotations.
+  annotations: {}
+# -- Native authenticated Prometheus endpoint, isolated from the application Service.
+metrics:
+  # -- Enable only health and prometheus actuator endpoints on a separate internal port.
+  enabled: false
+  # -- Internal management port, distinct from server.port.
+  port: 9090
+  # -- NetworkPolicy peers permitted to access management. Empty denies remote scrapes when isolation is enabled.
+  ingressFrom: []
+  # -- Optional native Prometheus job; Operator ServiceMonitor cannot represent X-API-KEY authentication.
+  scrapeConfig:
+    # -- Generate a Secret for Prometheus.spec.additionalScrapeConfigs in this namespace.
+    enabled: false
+    # -- Existing Secret with a dedicated user's API key. Add it to Prometheus.spec.secrets.
+    apiKeySecret: ''
+    # -- Secret key mounted by Prometheus under /etc/prometheus/secrets.
+    apiKeyKey: api-key
+    # -- Scrape interval.
+    interval: 30s
+    # -- Scrape timeout, no greater than interval.
+    timeout: 10s
+    # -- Maximum samples accepted from one scrape; session labels can increase cardinality.
+    sampleLimit: 10000
+# -- Runtime.
+runtime:
+  # -- Java Custom Options.
+  javaCustomOptions: '-XX:MaxRAMPercentage=60.0'
+  # -- Temporary Size.
+  temporarySize: 4Gi
+  # -- Home Size.
+  homeSize: 1Gi
+  # -- Logs Size.
+  logsSize: 512Mi
+  # -- Tools Size.
+  toolsSize: 1Gi
+```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

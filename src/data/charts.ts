@@ -14,6 +14,104 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Twenty',
+    slug: 'twenty',
+    description:
+      'Private CRM workspace with native server and worker, PostgreSQL, authenticated Redis and retained identity.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Reactive Resume',
+    slug: 'reactive-resume',
+    description: 'Private resume authoring with native PDF generation, retained identity, PostgreSQL, SMTP and S3.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Dawarich',
+    slug: 'dawarich',
+    description:
+      'Private location history with PostGIS, native two-factor authentication, queued imports and authenticated Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'AFFiNE',
+    slug: 'affine',
+    description:
+      'Collaborative workspaces with private onboarding, pgvector, verified database TLS and native Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'OpenCloud',
+    slug: 'opencloud',
+    description:
+      'Native file collaboration with retained identity, xattr recovery, verified TLS and authenticated Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Pocket ID',
+    slug: 'pocket-id',
+    description:
+      'Passkey identity provider with private onboarding, native OIDC, PostgreSQL and Prometheus monitoring.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Ryot',
+    slug: 'ryot',
+    description:
+      'Private personal tracking with protected local accounts, HelmForge PostgreSQL and verified database recovery.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Papra',
+    slug: 'papra',
+    description: 'Private document archive with protected bootstrap, encrypted originals, libSQL and S3 storage.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Stirling PDF',
+    slug: 'stirling-pdf',
+    description: 'Authenticated PDF, OCR and office conversion with durable state and private native Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'ByteStash',
+    slug: 'bytestash',
+    description: 'Private snippets with protected bootstrap, native MCP, optional OIDC and verified SQLite snapshots.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'SiYuan',
+    slug: 'siyuan',
+    description:
+      'Private knowledge workspace with retained authentication, strict OIDC admission and verified full-workspace recovery.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'BentoPDF',
+    slug: 'bentopdf',
+    description: 'Browser-local PDF tools with isolated NGINX, runtime controls and optional Prometheus monitoring.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Glance',
+    slug: 'glance',
+    description: 'Private dashboard with retained login credentials, secret-backed widgets and restricted networking.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Moodle',
     slug: 'moodle',
     description:
@@ -516,7 +614,8 @@ export const charts: Chart[] = [
   {
     name: 'Memos',
     slug: 'memos',
-    description: 'Self-hosted notes with SQLite, external database support, backups, and secure defaults.',
+    description:
+      'Private notes with protected bootstrap, SQLite or HelmForge SQL, OAuth, MCP, S3 and verified recovery.',
     maturity: 'stable',
     backup: false,
   },

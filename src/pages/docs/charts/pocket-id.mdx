@@ -1,0 +1,723 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Pocket ID Chart
+description:
+  Passkey identity provider with private onboarding, native OIDC, optional HelmForge PostgreSQL and native Prometheus
+  monitoring.
+---
+
+# Pocket ID Helm Chart
+
+A singleton Pocket ID identity provider using the official pinned image, passkey authentication and native OpenID
+Connect. The chart initializes its first administrator privately before exposing HTTP and retains the application's
+encryption key across upgrades.
+
+## Installation
+
+Configure a dedicated HTTPS origin before enrolling any passkeys:
+
+```yaml
+server:
+  publicUrl: https://id.example.com
+bootstrap:
+  username: administrator
+  email: administrator@example.com
+  firstName: Identity
+  lastName: Administrator
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: id.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: identity-tls
+      hosts: [id.example.com]
+```
+
+Install with `helm install identity helmforge/pocket-id -n identity --create-namespace -f values.yaml`. See
+[onboarding](#onboarding-details) before the first login.
+
+## Authentication and onboarding
+
+The initializer copies the unchanged static application binary from the official image and starts it with native HTTP
+and actor listeners bound to loopback. It uses the native initial-signup API, verifies the administrator role and closed
+setup endpoint, then stops before the main container starts. It never changes an existing user or generates another
+access token during upgrades.
+
+Generate the native single-use, one-hour login link when ready to enroll a passkey. Treat its command output as a
+credential. No initial password is generated because Pocket ID authenticates with passkeys.
+
+Setting `bootstrap.enabled: false` skips account creation, but still checks privately that the database is initialized.
+An uninitialized database fails before public exposure.
+
+## Persistence and recovery
+
+SQLite is the default. Select `database.type: postgresql` and `postgresql.enabled: true` to install the HelmForge
+PostgreSQL dependency, or supply external connection components and a password Secret. External connections default to
+certificate and hostname verification. The chart prepares required extensions on a fresh bundled database and checks
+prerequisites before native migrations. See [database preparation](#database-details) before changing engines or
+upgrading an existing database.
+
+The default 5 GiB retained PVC stores SQLite and uploads. The application encryption key is generated once in a retained
+Secret or supplied through `encryption.existingSecret` and `encryption.secretKey`. Back up the complete data directory
+and original key together. The key protects sensitive application fields, including signing material; it does not
+encrypt the entire SQLite database file. Keep a consistent, quiesced snapshot rather than copying a live database alone.
+
+Passkeys depend on the HTTPS relying-party origin. Changing `server.publicUrl` can invalidate existing credentials;
+treat origin changes as an identity migration. See [recovery](#recovery-details) for consistent backups, fresh-volume
+restoration and operator access.
+
+## Security and availability
+
+- Exactly one application replica and Recreate upgrades, with planned downtime.
+- UID/GID 1000, read-only root filesystem, dropped Linux capabilities and no mounted service account token.
+- HTTP probes on `/healthz`; actor listener is private and is not exposed by a Service.
+- NetworkPolicy enables ingress control and isolates egress to DNS plus explicitly configured destinations.
+- Insecure OIDC callback URLs, query-argument logging, downgrade allowance, analytics and version checks are disabled.
+- Ingress, Gateway API, dual-stack Services and External Secrets Operator use the standard HelmForge contracts.
+
+Do not claim high availability by raising the replica count. The pinned upstream release does not expose its unfinished
+HA mode as an environment configuration option.
+
+## Monitoring
+
+Enable `metrics.enabled` for the native Prometheus exporter on its own private Service. Optional ServiceMonitor and
+PrometheusRule resources integrate with Prometheus Operator. The bootstrap process never opens that listener. See
+[monitoring](#monitoring-details) for selectors, network access and alert boundaries.
+
+## Validation
+
+The complete HelmForge gate passed: 23 layers, 13 runtime scenarios and 12 Helm unit tests. Coverage includes native
+bootstrap, browser passkey enrollment/login, OIDC code flow with PKCE, bundled and external PostgreSQL, real Prometheus
+scraping, External Secrets and fresh-volume identity recovery. Runtime tests use the owned local k3d cluster; production
+capacity and external relying-party availability remain deployment-specific.
+
+## Security Scan: `pocket-id`
+
+| Framework | Score       |
+| --------- | ----------- |
+| Overall   | **100.00%** |
+| MITRE     | **100.00%** |
+| NSA       | **100.00%** |
+| SOC2      | **100.00%** |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-10. No findings and no control suppressions. This configuration
+scan does not replace image vulnerability management or application security review.
+
+## Sources
+
+- [Pocket ID v2.14.0](https://github.com/pocket-id/pocket-id/tree/v2.14.0)
+- [Official configuration documentation](https://pocket-id.org/docs/configuration/environment-variables)
+
+## Onboarding details
+
+Set `server.publicUrl` to the final HTTPS origin and deploy its trusted TLS certificate before enrolling a passkey. The
+chart closes the native first-user setup endpoint inside a loopback-only initializer. The created account has
+administrator privileges but no passkey yet.
+
+### First login
+
+Run the native operator command in a private terminal:
+
+```sh
+kubectl -n identity exec deployment/identity-pocket-id -c pocket-id -- \
+  /app/pocket-id one-time-access-token administrator
+```
+
+Use the returned URL once, within one hour. It is a bearer credential: do not store it in a ticket, screenshot, shared
+shell transcript or deployment log. Enroll a passkey through the application's account settings. Add an independent
+recovery authenticator and verify that it can sign in before relying on the service for other applications.
+
+The CLI looks up an existing username or email. It does not create an account and does not reset its other credentials.
+Use the configured `bootstrap.username`, not the example name above, when they differ.
+
+### Expired or interrupted setup
+
+If the initial link expires, run the native command again when ready. The chart deliberately does not store an expiring
+token in a Secret or rotate it on every restart. User creation and token issuance are separate native operations.
+Existing account state always wins over changed bootstrap values.
+
+Disabling bootstrap is supported only for an already initialized database. The private initializer rejects an empty
+database with account creation disabled rather than exposing first-user setup publicly.
+
+### State protection
+
+Keep the database, uploads and original encryption key as one recovery set. Restrict access to the entire database even
+though sensitive fields are encrypted. A restored database with a replacement encryption key cannot be assumed to retain
+its signing identity. Keep the original HTTPS origin so enrolled passkeys retain their relying-party identity.
+
+## Database details
+
+SQLite is the default. Keep the database, uploads and encryption Secret together when backing up or restoring an
+identity provider. Selecting PostgreSQL does not migrate an existing SQLite database automatically.
+
+### Bundled PostgreSQL
+
+```yaml
+database:
+  type: postgresql
+postgresql:
+  enabled: true
+```
+
+The chart uses the HelmForge PostgreSQL subchart. Its administrator installs `citext` for Pocket ID and `pgcrypto` for
+the Francis actor runtime during first initialization. Preserve this initialization script when overriding
+`postgresql.initdb.scripts`. The application role needs USAGE and CREATE on its schema, but does not need to be a
+superuser or have CREATE permission on the database. Database name, user and password references follow the subchart's
+actual authentication values.
+
+Initialization scripts run only on a fresh database volume. Prepare an existing database with the DBA before upgrading;
+changing init scripts does not apply them retroactively.
+
+### External PostgreSQL
+
+```yaml
+database:
+  type: postgresql
+  host: postgres.example.com
+  port: 5432
+  name: pocketid
+  username: pocketid
+  passwordSecret: pocket-id-database
+  passwordKey: password
+  sslMode: verify-full
+  caSecret: postgres-ca
+  caKey: ca.crt
+postgresql:
+  enabled: false
+```
+
+Create the password and CA Secrets in the release namespace. External PostgreSQL defaults to `verify-full`, which checks
+the certificate chain and server hostname. Omit `caSecret` for a server trusted by the image's root store. Allow the
+destination explicitly with `networkPolicy.extraEgress`. Credentials are encoded as URI components and the resulting
+connection URL is written to a private memory volume, rather than a ConfigMap or command argument.
+
+Before the first deployment, the DBA must connect to the target database and install both extensions in the
+application's search path:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+GRANT USAGE, CREATE ON SCHEMA public TO pocketid;
+```
+
+The initializer checks prerequisites using a read-only connection before starting the native migration runners. Pocket
+ID owns its application migrations; Francis separately owns its actor tables, functions, triggers and views. Do not
+reuse a schema managed by a different application or transfer objects away from the application role.
+
+### Failed migrations
+
+Back up before upgrading. An interrupted or failed Pocket ID migration can leave `schema_migrations.dirty` set. The
+chart refuses to start against that state. Installing a missing extension does not repair partially applied SQL or clear
+migration state. Inspect the failed migration and restore or repair under the upstream migration procedure; the chart
+never forces a migration version or clears dirty state automatically.
+
+The chart remains a singleton with PostgreSQL because uploads and other local identity-provider files still require
+consistent persistent storage. A database subchart by itself does not establish an application HA deployment.
+
+## Monitoring details
+
+Pocket ID exports OpenTelemetry metrics through its native Prometheus exporter. The chart enables that listener
+separately from the public identity endpoint; no exporter sidecar is required.
+
+```yaml
+metrics:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: monitoring
+  prometheusRule:
+    enabled: true
+    labels:
+      release: monitoring
+```
+
+Install Prometheus Operator CRDs before enabling these resources. Match the labels to your Prometheus resource's
+ServiceMonitor and rule selectors, and match the network peers to the actual Prometheus pods. NetworkPolicy requires an
+enforcing CNI. Without explicit `ingressFrom`, the chart permits metric scraping from the release namespace. Keep
+`serviceMonitor.scrapeTimeout` no greater than `serviceMonitor.interval`; the operator rejects invalid timing.
+
+The metrics Service is separate from HTTP and is omitted from the chart's Ingress and HTTPRoute. The native metrics
+listener is not an authenticated public API; keep access limited to monitoring workloads. The private bootstrap process
+always disables metric export, even when the main application exporter is enabled.
+
+The included `PocketIDMetricsUnavailable` alert detects a discovered target with `up == 0` for five minutes. It does not
+detect an absent ServiceMonitor, broken discovery or an unavailable Prometheus server. Monitor those conditions in the
+monitoring platform. `metrics.prometheusRule.additionalRules` accepts application-specific recording or alert rules
+based on the native series available in your version.
+
+Health probes use the application's HTTP health endpoint. A successful health probe does not prove a relying party can
+complete authentication; keep a synthetic login check for your production origin and OIDC clients.
+
+## Recovery details
+
+An identity provider backup must preserve the database, native uploads, exact encryption key and relying-party origin.
+Changing any one independently can invalidate credentials, signing material or sessions. Store backups and Secrets under
+access controls appropriate for the identities they contain.
+
+### SQLite
+
+1. Schedule downtime and stop the application Deployment. Wait for its pod to terminate so native SQLite connections and
+   actor processing are closed.
+2. Snapshot the complete persistent volume or archive every entry in `/app/data`, including hidden files and any SQLite
+   sidecars. Preserve file modes and ownership. Archive directory contents rather than overwriting the root metadata of
+   a provisioned destination PVC.
+3. Back up the encryption Secret through your secret-management system. An externally managed key must be restored from
+   the same source; generating another random key does not recover the old encrypted fields.
+4. Restore the archive into a fresh PVC that UID/GID1000 can access. Keep the same public HTTPS origin and original
+   encryption Secret, then set `persistence.existingClaim` to the restored claim.
+5. Start one replica. Confirm the initializer preserves the existing account and the public setup endpoint remains
+   closed. Verify a previously enrolled passkey, existing OIDC client, signed token and private account state before
+   routing production traffic to the restored instance.
+
+Keep the source backup and original volume until recovery has been accepted. Recovery testing should use an isolated
+environment and controlled DNS routing so two independent instances do not serve the same production identity.
+
+### PostgreSQL
+
+Quiesce Pocket ID before taking a consistent PostgreSQL backup and matching uploads snapshot. Include application and
+Francis actor schemas and preserve the same encryption Secret. Use a database backup procedure appropriate to the actual
+PostgreSQL major, extension versions, ownership and recovery objective. Prepare `citext` and `pgcrypto` on the
+destination before native startup.
+
+The chart does not automatically convert SQLite into PostgreSQL, coordinate database PITR with upload snapshots or
+reverse database migrations during Helm rollback. A successful PostgreSQL startup/restart check is not a PostgreSQL
+disaster-recovery drill; validate that procedure separately against your managed database or subchart deployment.
+
+### Operator access
+
+If no enrolled device remains usable, an authorized operator can invoke the native `one-time-access-token` CLI as
+described in [onboarding](#onboarding-details). This produces a short-lived access credential; it does not replace a
+lost database or encryption key. Treat the command output as a Secret and enroll a new device promptly.
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://id.example.com
+bootstrap:
+  username: administrator
+  email: administrator@example.com
+encryption:
+  existingSecret: pocket-id-encryption
+persistence:
+  size: 10Gi
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: id.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: pocket-id-tls
+      hosts: [id.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Override the chart name used in labels and generated resource names.
+nameOverride: ''
+# -- Override generated resource names; configure before creating persistent state.
+fullnameOverride: ''
+# -- commonLabels.
+commonLabels: {}
+# -- Exactly one instance; PostgreSQL does not enable the unfinished upstream HA mode.
+replicaCount: 1
+# -- image.
+image:
+  # -- Official Pocket ID image repository.
+  repository: ghcr.io/pocket-id/pocket-id
+  # -- Pinned upstream release; validate migrations and passkey/OIDC behavior before upgrading.
+  tag: v2.14.0
+  # -- pullPolicy.
+  pullPolicy: IfNotPresent
+# -- imagePullSecrets.
+imagePullSecrets: []
+# -- server.
+server:
+  # -- Native application HTTP listener, exposed through the application Service.
+  port: 1411
+  # -- Stable HTTPS issuer and WebAuthn origin; changing it can invalidate existing credentials.
+  publicUrl: https://id.example.com
+  # -- Native TRUST_PROXY value; restrict forwarded-header trust to your actual proxy network.
+  trustedProxies: ''
+# -- Additional native environment settings; managed security and bootstrap variables cannot be overridden.
+extraEnv: []
+# -- serviceAccount.
+serviceAccount:
+  # -- create.
+  create: true
+  # -- name.
+  name: ''
+  # -- annotations.
+  annotations: {}
+  # -- automountServiceAccountToken.
+  automountServiceAccountToken: false
+# -- service.
+service:
+  # -- type.
+  type: ClusterIP
+  # -- port.
+  port: 1411
+  # -- annotations.
+  annotations: {}
+  # -- ipFamilyPolicy.
+  ipFamilyPolicy: ''
+  # -- ipFamilies.
+  ipFamilies: []
+# -- ingress.
+ingress:
+  # -- enabled.
+  enabled: false
+  # -- ingressClassName.
+  ingressClassName: ''
+  # -- annotations.
+  annotations: {}
+  # -- hosts.
+  hosts: []
+  # -- tls.
+  tls: []
+# -- Gateway API HTTPRoute configuration.
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
+  enabled: false
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
+# -- externalSecrets.
+externalSecrets:
+  # -- enabled.
+  enabled: false
+  # -- refreshInterval.
+  refreshInterval: 1h
+  # -- items.
+  items: []
+# -- networkPolicy.
+networkPolicy:
+  # -- enabled.
+  enabled: true
+  # -- ingressFrom.
+  ingressFrom: []
+  # -- egressIsolation.
+  egressIsolation: true
+  # -- dnsEgress.
+  dnsEgress:
+    - namespaceSelector:
+        # -- matchLabels.
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      # -- podSelector.
+      podSelector:
+        # -- matchLabels.
+        matchLabels:
+          k8s-app: kube-dns
+  # -- webEgress.
+  webEgress: []
+  # -- webPorts.
+  webPorts:
+    - 443
+  # -- extraEgress.
+  extraEgress: []
+# -- probes.
+probes:
+  # -- startup.
+  startup:
+    # -- enabled.
+    enabled: true
+    # -- path.
+    path: /healthz
+    # -- failureThreshold.
+    failureThreshold: 60
+    # -- periodSeconds.
+    periodSeconds: 5
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- readiness.
+  readiness:
+    # -- enabled.
+    enabled: true
+    # -- path.
+    path: /healthz
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 10
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- liveness.
+  liveness:
+    # -- enabled.
+    enabled: true
+    # -- path.
+    path: /healthz
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 20
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+# -- resources.
+resources:
+  # -- requests.
+  requests:
+    # -- cpu.
+    cpu: 100m
+    # -- memory.
+    memory: 128Mi
+  # -- limits.
+  limits:
+    # -- cpu.
+    cpu: '1'
+    # -- memory.
+    memory: 512Mi
+# -- podSecurityContext.
+podSecurityContext:
+  # -- runAsNonRoot.
+  runAsNonRoot: true
+  # -- runAsUser.
+  runAsUser: 1000
+  # -- runAsGroup.
+  runAsGroup: 1000
+  # -- fsGroup.
+  fsGroup: 1000
+  # -- fsGroupChangePolicy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- seccompProfile.
+  seccompProfile:
+    # -- type.
+    type: RuntimeDefault
+# -- securityContext.
+securityContext:
+  # -- allowPrivilegeEscalation.
+  allowPrivilegeEscalation: false
+  # -- readOnlyRootFilesystem.
+  readOnlyRootFilesystem: true
+  # -- capabilities.
+  capabilities:
+    # -- drop.
+    drop:
+      - ALL
+# -- podLabels.
+podLabels: {}
+# -- podAnnotations.
+podAnnotations: {}
+# -- nodeSelector.
+nodeSelector: {}
+# -- tolerations.
+tolerations: []
+# -- affinity.
+affinity: {}
+# -- topologySpreadConstraints.
+topologySpreadConstraints: []
+# -- priorityClassName.
+priorityClassName: ''
+# -- terminationGracePeriodSeconds.
+terminationGracePeriodSeconds: 30
+# -- persistence.
+persistence:
+  # -- enabled.
+  enabled: true
+  # -- Use a preexisting or restored PVC instead of creating another claim.
+  existingClaim: ''
+  # -- storageClass.
+  storageClass: ''
+  # -- Capacity for SQLite and native uploads; PostgreSQL mode still persists local files.
+  size: 5Gi
+  # -- accessModes.
+  accessModes:
+    - ReadWriteOnce
+  # -- Keep the data PVC when the Helm release is uninstalled.
+  retain: true
+  # -- annotations.
+  annotations: {}
+  # -- Fixed native data path used by database, upload and recovery contracts.
+  mountPath: /app/data
+# -- bootstrap.
+bootstrap:
+  # -- Create the initial administrator privately when the database is empty; false refuses uninitialized databases.
+  enabled: true
+  # -- Username used only for the first native administrator.
+  username: admin
+  # -- Email used only during initial administrator creation.
+  email: admin@example.test
+  # -- Initial administrator first name.
+  firstName: Pocket
+  # -- Initial administrator last name.
+  lastName: Administrator
+  # -- Official Node helper that runs the unchanged native application binary on loopback during setup.
+  helperImage:
+    # -- repository.
+    repository: docker.io/library/node
+    # -- tag.
+    tag: 24.21.0-alpine3.23
+    # -- pullPolicy.
+    pullPolicy: IfNotPresent
+# -- runtime.
+runtime:
+  # -- Bound for the application temporary emptyDir.
+  temporarySize: 256Mi
+# -- encryption.
+encryption:
+  # -- Optional 32-byte base64 key; empty generates a retained Secret. Prefer existingSecret for operator-owned keys.
+  key: ''
+  # -- Existing Secret containing the exact retained native encryption key.
+  existingSecret: ''
+  # -- Key within the encryption Secret, mounted read-only as a file.
+  secretKey: encryption-key
+# -- database.
+database:
+  # -- Official PostgreSQL client used only for read-only database admission.
+  clientImage:
+    # -- Official client repository.
+    repository: docker.io/library/postgres
+    # -- Pinned client release.
+    tag: 18.6-trixie
+    # -- Client pull policy.
+    pullPolicy: IfNotPresent
+  # -- Native database engine: sqlite or postgresql; engine selection does not migrate existing data.
+  type: sqlite
+  # -- External PostgreSQL hostname; must remain empty when the bundled database is enabled.
+  host: ''
+  # -- External PostgreSQL port; the bundled database uses its own Service port.
+  port: 5432
+  # -- External database name; bundled connections follow postgresql.auth.database.
+  name: pocketid
+  # -- External application role; bundled connections follow postgresql.auth.username.
+  username: pocketid
+  # -- External database password Secret in the release namespace.
+  passwordSecret: ''
+  # -- Key containing the external application password.
+  passwordKey: password
+  # -- Empty selects verify-full externally and disable for the bundled in-cluster connection.
+  sslMode: ''
+  # -- Optional CA Secret for external PostgreSQL certificate verification.
+  caSecret: ''
+  # -- Key containing the trusted PostgreSQL CA PEM.
+  caKey: ca.crt
+# -- postgresql.
+postgresql:
+  # -- DBA preparation on a fresh volume. Existing and external databases require equivalent preparation before upgrading.
+  initdb:
+    # -- First-volume initialization scripts; preserve required extensions when overriding.
+    scripts:
+      # -- Installs application and actor extensions using the subchart administrator connection.
+      20-pocket-id-extensions.sh: |
+        #!/bin/bash
+        set -euo pipefail
+        export PGPASSWORD="${POSTGRES_PASSWORD}"
+        psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${APP_DATABASE}" <<'SQL'
+        CREATE EXTENSION IF NOT EXISTS citext;
+        CREATE EXTENSION IF NOT EXISTS pgcrypto;
+        SQL
+  # -- securityContext.
+  securityContext:
+    # -- readOnlyRootFilesystem.
+    readOnlyRootFilesystem: true
+  # -- extraVolumes.
+  extraVolumes:
+    - name: postgres-tmp
+      # -- emptyDir.
+      emptyDir:
+        # -- sizeLimit.
+        sizeLimit: 1Gi
+    - name: postgres-socket
+      # -- emptyDir.
+      emptyDir:
+        # -- medium.
+        medium: Memory
+        # -- sizeLimit.
+        sizeLimit: 16Mi
+  # -- extraVolumeMounts.
+  extraVolumeMounts:
+    - name: postgres-tmp
+      # -- mountPath.
+      mountPath: /tmp
+    - name: postgres-socket
+      # -- mountPath.
+      mountPath: /var/run/postgresql
+  # -- networkPolicy.
+  networkPolicy:
+    # -- enabled.
+    enabled: true
+    # -- egress.
+    egress:
+      # -- enabled.
+      enabled: true
+      # -- allowDNS.
+      allowDNS: true
+      # -- allowSameNamespacePostgreSQL.
+      allowSameNamespacePostgreSQL: false
+      # -- allowHTTPS.
+      allowHTTPS: false
+  # -- Install the HelmForge PostgreSQL dependency; also select database.type=postgresql.
+  enabled: false
+  # -- architecture.
+  architecture: standalone
+  # -- auth.
+  auth:
+    # -- database.
+    database: pocketid
+    # -- username.
+    username: pocketid
+    # -- existingSecret.
+    existingSecret: ''
+    # -- existingSecretUserPasswordKey.
+    existingSecretUserPasswordKey: user-password
+# -- metrics.
+metrics:
+  # -- Enable the native Prometheus exporter on a dedicated private listener.
+  enabled: false
+  # -- Native metrics port; must differ from the HTTP port.
+  port: 9464
+  # -- NetworkPolicy peers allowed to scrape metrics; empty permits the release namespace.
+  ingressFrom: []
+  # -- serviceMonitor.
+  serviceMonitor:
+    # -- Create a ServiceMonitor; requires metrics.enabled and installed Prometheus Operator CRDs.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- Prometheus scrape interval; must be at least scrapeTimeout.
+    interval: 30s
+    # -- Maximum scrape duration; cannot exceed interval.
+    scrapeTimeout: 10s
+  # -- prometheusRule.
+  prometheusRule:
+    # -- Create the native target availability rule; requires metrics.enabled and operator CRDs.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- Additional Prometheus rules evaluated against actual native series.
+    additionalRules: []
+```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).

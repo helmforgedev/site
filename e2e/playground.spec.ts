@@ -1,6 +1,90 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('affine clears conflicting external settings and keeps native monitoring consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="affine"]').click();
+    const code = page.locator('#playground-code');
+    for (const [dependency, field] of [
+      ['postgresql', 'database.host'],
+      ['redis', 'cache.host'],
+    ]) {
+      const toggle = page.locator(`button[data-field-key="${dependency}.enabled"]`);
+      const host = page.locator(`input[data-field-key="${field}"]`);
+      await toggle.click();
+      await host.fill('external.example.test');
+      await expect(code).toContainText(`${field}=external.example.test`);
+      await toggle.click();
+      await expect(host).toHaveValue('');
+      await expect(code).not.toContainText(`${field}=external.example.test`);
+    }
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+  });
+  for (const [slug, key] of [
+    ['stirling-pdf', 'metrics.enabled'],
+    ['bytestash', 'backup.enabled'],
+    ['minecraft', 'server.preferIPv6'],
+  ]) {
+    test(`${slug} renders its boolean option as a working toggle`, async ({ page }) => {
+      await page.goto('/playground');
+      await page.locator(`.playground-chart-btn[data-slug="${slug}"]`).click();
+      const toggle = page.locator(`button[data-field-key="${key}"]`);
+      await expect(toggle).toBeVisible();
+      await toggle.click();
+      await expect(page.locator('#playground-code')).toContainText(`${key}=true`);
+      await toggle.click();
+      await expect(page.locator('#playground-code')).not.toContainText(`${key}=true`);
+    });
+  }
+  test('pocket-id keeps database and monitoring dependencies consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="pocket-id"]').click();
+    const engine = page.locator('select[data-field-key="database.type"]');
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(engine).toHaveValue('postgresql');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await engine.selectOption('sqlite');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+  });
+  test('opencloud keeps monitoring dependencies consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="opencloud"]').click();
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.prometheusRule.enabled"]').click();
+    await expect(code).toContainText('metrics.prometheusRule.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+    await expect(code).not.toContainText('metrics.prometheusRule.enabled=true');
+  });
+  test('memos keeps database driver and bundled databases consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="memos"]').click();
+    const driver = page.locator('select[data-field-key="database.driver"]');
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="postgresql.enabled"]').click();
+    await expect(driver).toHaveValue('postgres');
+    await expect(code).toContainText('postgresql.enabled=true');
+    await page.locator('button[data-field-key="mysql.enabled"]').click();
+    await expect(driver).toHaveValue('mysql');
+    await expect(code).toContainText('mysql.enabled=true');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+    await driver.selectOption('sqlite');
+    await expect(code).not.toContainText('mysql.enabled=true');
+    await expect(code).not.toContainText('postgresql.enabled=true');
+  });
   test('langflow keeps automatic login opt-in', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="langflow"]').click();

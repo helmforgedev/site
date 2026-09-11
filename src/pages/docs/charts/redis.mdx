@@ -1,7 +1,9 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Redis Chart
-description: Redis Helm chart for Kubernetes with standalone, replication, Sentinel HA, cluster mode, TLS, External Secrets, dual-stack Services, metrics, and PDB.
+description:
+  Redis Helm chart for Kubernetes with standalone, replication, Sentinel HA, cluster mode, TLS, External Secrets,
+  dual-stack Services, metrics, and PDB.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -11,11 +13,10 @@ import RedisDiagram from '../../../components/diagrams/RedisDiagram.astro';
 
 # Redis
 
-Deploy [Redis](https://redis.io/) on Kubernetes using the official `redis` Docker image. Supports
-four architectures: standalone (single instance), replication (primary + replicas), Sentinel
-(automatic HA failover), and cluster (horizontal sharding). The chart keeps simple defaults for development while
-exposing production controls for authentication, TLS, persistence, memory limits, dual-stack Services, and External
-Secrets Operator integration.
+Deploy [Redis](https://redis.io/) on Kubernetes using the official `redis` Docker image. Supports four architectures:
+standalone (single instance), replication (primary + replicas), Sentinel (automatic HA failover), and cluster
+(horizontal sharding). The chart keeps simple defaults for development while exposing production controls for
+authentication, TLS, persistence, memory limits, dual-stack Services, and External Secrets Operator integration.
 
 <Callout type="warning" title="Redis 8.10.1 security update">
   Redis 8.10.1 fixes multiple memory-safety issues in RDB loading, Vector Sets, TLS, and blocked-client handling,
@@ -69,10 +70,12 @@ Secrets Operator integration.
 - **Sentinel master set** — configurable primary discovery name for Sentinel-aware clients
 - **Safe Sentinel lifecycle** — stable hostname announcements, graceful failover, and an empty-data startup guard
 - **Cluster mode** — 6 nodes by default (3 master + 3 replica), auto-initialized via init Job
-- **TLS encryption** — mutual TLS for all Redis connections
+- **TLS encryption** — certificate-based transport protection with password authentication; client-certificate
+  requirements depend on the selected architecture
 - **`existingSecret`** — keep credentials out of the values file
 - **External Secrets Operator** — optional `external-secrets.io/v1` resource for Redis auth Secret materialization
-- **Dual-stack Services** — optional Service `ipFamilyPolicy` and `ipFamilies` across Redis, Sentinel, cluster, and metrics Services
+- **Dual-stack Services** — optional Service `ipFamilyPolicy` and `ipFamilies` across Redis, Sentinel, cluster, and
+  metrics Services
 - **`config.redis`** — custom `redis.conf` lines (maxmemory, eviction policy, etc.)
 - **Prometheus exporter** — `oliver006/redis_exporter` sidecar with ServiceMonitor
 - **Non-root** — runs as UID/GID 999 by default
@@ -295,14 +298,14 @@ externalSecrets:
 
 ## Production Path
 
-Use defaults for local development, cache experiments, and disposable clusters. For production, choose the topology first:
-`sentinel` for automatic failover of a single logical dataset, or `cluster` when the dataset must be sharded across
-multiple masters.
+Use defaults for local development, cache experiments, and disposable clusters. For production, choose the topology
+first: `sentinel` for automatic failover of a single logical dataset, or `cluster` when the dataset must be sharded
+across multiple masters.
 
 Always set `resources.limits.memory` and `config.redis` `maxmemory` together. Keep `maxmemory` below the memory limit so
 Redis has room for client buffers, persistence buffers, Lua, and allocator overhead. Use existing Secrets or External
-Secrets for credentials, enable TLS when traffic crosses a trust boundary, and enable PodDisruptionBudget for Sentinel or
-clustered deployments.
+Secrets for credentials, enable TLS when traffic crosses a trust boundary, and enable PodDisruptionBudget for Sentinel
+or clustered deployments.
 
 ## Configuration Reference
 
@@ -324,6 +327,11 @@ clustered deployments.
 | `auth.sentinel`                  | boolean | `false`          | Require password authentication on Sentinel. |
 
 ### TLS
+
+Startup, readiness, and liveness probes use the configured Redis port and TLS certificate files when TLS is enabled.
+They authenticate through `REDISCLI_AUTH` and require an exact `PONG` response. A TLS-only listener therefore does not
+rely on a separate plaintext health port. Standalone Redis does not require client certificates by default; do not
+assume that enabling TLS alone enables mutual TLS for every architecture.
 
 | Parameter            | Type    | Default   | Description                                                 |
 | -------------------- | ------- | --------- | ----------------------------------------------------------- |
@@ -435,7 +443,8 @@ service:
   from 1.x.
 </Callout>
 
-- Switching from `standalone` to `sentinel` or `cluster` requires a fresh deployment and data migration (`redis-cli --rdb`, Valkey migration tools, or a `DUMP`/`RESTORE` approach)
+- Switching from `standalone` to `sentinel` or `cluster` requires a fresh deployment and data migration
+  (`redis-cli --rdb`, Valkey migration tools, or a `DUMP`/`RESTORE` approach)
 - Persistence changes only affect new pods; existing PVCs retain their size
 - Custom `config.redis` lines are appended to the generated `redis.conf`
 

@@ -1,98 +1,74 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Memos Chart
-description: Memos Helm chart for self-hosted notes with SQLite, external database support, backup guidance, and secure defaults.
+description:
+  Protected administrator bootstrap, SQLite or HelmForge SQL, private notes, verified OAuth and MCP, encrypted SQL
+  transport and recovery.
 ---
 
-# Memos
+# Memos Helm Chart
 
-Deploy [Memos](https://github.com/usememos/memos) on Kubernetes as a lightweight self-hosted note-taking service.
+Deploy [Memos](https://github.com/usememos/memos), a lightweight self-hosted note-taking service, with
+production-oriented Kubernetes defaults.
 
-## Overview
+This chart packages the official `docker.io/neosmemo/memos:0.30.0` image and exposes the runtime settings that matter
+for Kubernetes: persistent data, SQLite or external database configuration, public instance URL, ingress/Gateway API
+exposure, network policy, pod disruption budgets, file-backed deployment configuration, and non-root security context.
 
-The HelmForge Memos chart uses the official `docker.io/neosmemo/memos:0.30.0` image and deploys a StatefulSet.
-Memos listens on port `5230` and stores durable data under `/var/opt/memos`.
+## Architecture
 
-Memos 0.30 adds the Web Clipper, a rebuilt Markdown editor, multi-column feeds, signed webhooks, a rebuilt MCP toolset, and file-backed deployment
-configuration. The chart uses the upstream `/healthz` endpoint for startup, readiness, and liveness probes.
+Memos is a single Go service with an HTTP UI and API. The upstream container listens on port `5230`, runs as non-root
+UID/GID `10001`, and stores persistent data under `/var/opt/memos`.
 
-The default topology is one persistent pod with SQLite. PostgreSQL and MySQL are supported through `MEMOS_DRIVER` and `MEMOS_DSN`, but the
-data PVC remains required because Memos can still store local assets and instance data on disk.
+The default chart topology is intentionally conservative:
 
-## Configuration Reference
+- one StatefulSet replica
+- one PersistentVolumeClaim mounted at `/var/opt/memos`
+- SQLite database stored in that data directory
+- ServiceAccount token automount disabled
+- non-root container security context
 
-Core runtime:
+When `database.driver` is `mysql` or `postgres`, the chart uses a complete DSN Secret or builds the native DSN from
+Secret-backed password components in a memory volume. Optional HelmForge PostgreSQL and MySQL subcharts manage their own
+application credentials; the connection helper reads those credentials without rendering passwords into arguments. The
+data volume remains required because Memos can still store local assets and instance data outside the external database.
+Ingress class rendering is optional. Set `ingress.ingressClassName: ""` to omit `spec.ingressClassName`. NetworkPolicy
+is enabled by default: same-namespace HTTP ingress, DNS egress and the selected database subchart. Add
+ingress-controller peers to `networkPolicy.ingressFrom`, external SQL peers to `database.networkPolicyPeers`, and
+explicit integration destinations to `networkPolicy.httpsEgress` or `networkPolicy.extraEgress`. DNS defaults to
+`kube-system` pods labeled `k8s-app: kube-dns`; override `networkPolicy.dnsEgress` for other DNS configurations.
+Enforcement requires a CNI that implements Kubernetes NetworkPolicy. HTTP startup, readiness, and liveness probes call
+the upstream `/healthz` endpoint instead of accepting a bare TCP connection.
 
-- `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Memos image and pull behavior.
-- `imagePullSecrets`: optional registry pull secrets.
-- `replicaCount`: Memos pod count. Keep `1` with SQLite; scale external database mode only with shared `MEMOS_DATA` storage.
-- `app.port`: HTTP port.
-- `app.command`, `app.args`: optional command and argument overrides.
-- `app.env`, `app.envFrom`, `app.extraEnv`: additional runtime environment and Secret or ConfigMap imports.
-- `commonLabels`, `nameOverride`, `fullnameOverride`: naming and common metadata controls.
-
-Memos application:
-
-- `memos.addr`: bind address passed to `MEMOS_ADDR`.
-- `memos.instanceUrl`: public URL for Ingress, Gateway API, or another reverse proxy.
-- `memos.demo`: upstream demo mode. Keep disabled for real instances.
-- `memos.allowPrivateWebhooks`: private webhook target control.
-- `memos.logLevel`: `debug`, `info`, `warn`, or `error`.
-
-Database and storage:
-
-- `database.driver`: `sqlite`, `mysql`, or `postgres`.
-- `database.dsn`: inline lab DSN for MySQL or PostgreSQL.
-- `database.existingSecret`, `database.existingSecretKey`: production DSN Secret.
-- `persistence.enabled`, `persistence.size`, `persistence.storageClass`: Memos data directory storage.
-- `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
-- The chart rejects SQLite scaling, external database without DSN, external database without a data volume, and scaled MySQL/PostgreSQL without `persistence.existingClaim`.
-- `provisioning.existingSecret`, `provisioning.defaultMode`: read-only Memos deployment-configuration files mounted at `/etc/secrets`.
-
-Exposure and operations:
-
-- `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
-- `service.type`, `service.port`, `service.annotations`, `service.ipFamilyPolicy`, `service.ipFamilies`.
-- `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`. Set
-  `ingress.ingressClassName: ""` to omit `spec.ingressClassName`.
-- `gateway.enabled`, `gateway.parentRefs`, `gateway.hostnames`, `gateway.path`, `gateway.pathType`.
-- `pdb.enabled`, `pdb.minAvailable`.
-- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.egressIsolation`, `networkPolicy.dnsEgress`,
-  `networkPolicy.httpsEgress`, `networkPolicy.extraEgress`.
-  Enabling only `networkPolicy.enabled` creates an ingress-only policy.
-  Set `networkPolicy.egressIsolation=true` for baseline DNS and HTTPS egress rules without custom rules.
-  `networkPolicy.dnsEgress` defaults to `kube-system` pods labeled `k8s-app: kube-dns` and can be overridden for different DNS labels.
-  `networkPolicy.httpsEgress` defaults to IPv4 and IPv6 internet destinations on port 443 and can be overridden for restricted webhook or
-  integration destinations.
-  Setting `networkPolicy.extraEgress` also enables egress isolation and appends the supplied rules.
-- `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
-- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
-- `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
-- `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
-
-## Installation
+## Install
 
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
-helm repo update
 helm install memos helmforge/memos
 ```
 
-OCI install:
+Forward the service for local validation:
 
 ```bash
-helm install memos oci://ghcr.io/helmforgedev/helm/memos
+kubectl port-forward svc/memos-memos 5230:5230
 ```
 
-## Production Example
+Then open `http://127.0.0.1:5230`.
+
+Protected bootstrap creates the initial `admin` account on a loopback-only listener before the public process starts.
+Helm NOTES identifies the password Secret. Existing administrators and passwords are preserved. Prefer
+`bootstrap.existingSecret` for GitOps, and use the application's password flow to rotate an existing account.
+
+The generated GENERAL provisioning policy closes registration and retains password authentication. It owns the whole
+native setting group; settings backed by that file cannot be changed in the UI. For an existing installation with
+database-managed policy, set `provisioning.manageGeneralSettings=false` to preserve that policy. An explicit
+`provisioning.existingSecret` remains authoritative and suppresses the generated file.
+
+## Production Values
 
 ```yaml
 memos:
   instanceUrl: https://memos.example.com
-
-persistence:
-  enabled: true
-  size: 20Gi
 
 ingress:
   enabled: true
@@ -107,28 +83,56 @@ ingress:
       hosts:
         - memos.example.com
 
+persistence:
+  enabled: true
+  size: 20Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
 networkPolicy:
   enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
 ```
 
-Set `memos.instanceUrl` when Memos is behind Ingress, Gateway API, or another reverse proxy.
-In Memos 0.30, an unset instance URL also selects private mode, redirects anonymous visitors to sign in, and disables RSS.
-Set `networkPolicy.egressIsolation=true` when outbound DNS and HTTPS should be explicitly allowed by the chart-managed NetworkPolicy.
+Set `memos.instanceUrl` only when public-mode behavior is intended. A nonempty value enables anonymous access to public
+content and RSS; it is not merely reverse-proxy metadata. Leave it empty for private instances, even behind HTTPS
+Ingress. The production example above deliberately enables public mode; private memos remain subject to application
+authorization.
 
 ## Deployment Configuration
 
-Memos can load OAuth2 identity providers and instance settings from a Kubernetes Secret:
+Memos 0.30 can load OAuth2 identity providers and instance settings from JSON files under `/etc/secrets`. Keep the JSON
+in a Kubernetes Secret and let the chart mount it read-only:
 
 ```yaml
 provisioning:
   existingSecret: memos-provisioning
 ```
 
-The Secret keys become filenames under `/etc/secrets`. Identity-provider files use
-`memos-idp-<label>.json`; instance settings use the fixed filenames
-`memos-instance-setting-general.json`, `memos-instance-setting-storage.json`,
-`memos-instance-setting-memo-related.json`, `memos-instance-setting-notification.json`, and
-`memos-instance-setting-ai.json`. Unsupported instance-setting suffixes are ignored. For example:
+The Secret keys become filenames and must use Memos' supported names:
+
+- `memos-idp-<label>.json`
+- `memos-instance-setting-general.json`
+- `memos-instance-setting-storage.json`
+- `memos-instance-setting-memo-related.json`
+- `memos-instance-setting-notification.json`
+- `memos-instance-setting-ai.json`
+
+Unsupported instance-setting suffixes are ignored.
+
+For example:
 
 ```yaml
 apiVersion: v1
@@ -141,19 +145,62 @@ stringData:
     {
       "key": "GENERAL",
       "generalSetting": {
-        "disallowUserRegistration": false,
+        "disallowUserRegistration": true,
         "disallowPasswordAuth": false,
         "weekStartDayOffset": 1
       }
     }
 ```
 
-Memos validates the complete file set before serving traffic. Each setting file replaces its complete database-backed group rather than merging with
-it; omitted scalar fields reset to defaults, so include every required field needed to preserve the intended configuration. Files cannot be edited
-through the UI/API while mounted. Every replica must mount identical files, and Secret changes require an orderly restart of every replica. Supported
-setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`.
+Files are validated atomically during startup and remain authoritative for the process lifetime. Each setting file
+replaces its complete database-backed group; omitted scalar fields reset to defaults, so include every required field.
+Every replica must mount identical files, and Secret changes require an orderly restart of every replica. Supported
+instance setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`; Memos rejects `BASIC`, `TAGS`,
+unknown fields, duplicate stable keys, and invalid cross-resource authentication configuration.
 
 ## External Database
+
+Choose one backend. Bundled databases use the maintained HelmForge subcharts, including their authentication, backup,
+monitoring and topology options. Configure those options under `postgresql` or `mysql`.
+
+```yaml
+database:
+  driver: postgres
+postgresql:
+  enabled: true
+  auth:
+    database: memos
+    username: memos
+```
+
+For MySQL, set `database.driver: mysql`, `mysql.enabled: true` and leave PostgreSQL disabled. The chart rejects two
+enabled databases, a mismatched driver, or mixing bundled credentials with external components/full DSNs.
+
+External component mode separates the endpoint from its password Secret:
+
+```yaml
+database:
+  driver: postgres
+  host: postgres.database.example.com
+  name: memos
+  username: memos
+  passwordSecret: memos-database-password
+  passwordKey: password
+  sslMode: verify-full
+  caSecret: database-ca
+  networkPolicyPeers:
+    - ipBlock:
+        cidr: 192.0.2.8/32
+```
+
+Replace the example address with your database destination. Component mode defaults to certificate-verified TLS for
+external databases and plaintext inside the cluster for bundled databases. Set TLS explicitly when securing a bundled
+database. PostgreSQL credentials are URI-encoded; MySQL uses its native Go DSN rather than a PostgreSQL-style URL. Never
+move an existing SQLite deployment to SQL merely by switching the driver; migrate and verify its data separately.
+
+SQLite is the safest default for a small single-pod deployment. Use PostgreSQL or MySQL when you need shared database
+state or want the database managed outside the pod volume. For `replicaCount > 1`, provide `persistence.existingClaim`
+backed by shared storage for `MEMOS_DATA`; generated StatefulSet PVCs are per-pod and can diverge.
 
 ```yaml
 database:
@@ -164,7 +211,7 @@ persistence:
   existingClaim: memos-shared-data
 ```
 
-The Secret should contain a Memos-compatible DSN:
+The Secret must contain a DSN compatible with Memos:
 
 ```yaml
 apiVersion: v1
@@ -173,40 +220,703 @@ metadata:
   name: memos-postgres
 type: Opaque
 stringData:
-  dsn: postgres://memos:password@postgresql:5432/memos?sslmode=disable
+  dsn: postgres://memos:replace-with-encoded-password@postgres.database.example.com:5432/memos?sslmode=verify-full
 ```
 
-The chart blocks unsafe configurations:
+The chart blocks unsafe topologies:
 
-- multiple replicas with SQLite
-- multiple replicas with MySQL/PostgreSQL and no shared existing data claim
-- MySQL/PostgreSQL without a DSN Secret or inline DSN
-- external database with no data volume
+- `replicaCount > 1` with SQLite
+- `replicaCount > 1` with MySQL/PostgreSQL and no `persistence.existingClaim`
+- MySQL/PostgreSQL without a bundled database, external components or complete DSN source
+- external database with no persistent data volume
 
 ## Upgrading To Memos 0.30
 
-Back up the PVC, any external database, and the Secret selected by `provisioning.existingSecret` first. The Secret backup must preserve the mounted
-OAuth2/IdP and instance-setting JSON files. Check these upstream compatibility changes:
+This chart revision also changes deployment defaults: protected initial setup, closed registration through a complete
+GENERAL provisioning file, a read-only root filesystem, and default network isolation. Existing users and passwords are
+preserved. To retain database-managed GENERAL settings, set `provisioning.manageGeneralSettings: false` before upgrade.
+Configure ingress-controller and external-service peers before applying network isolation to an existing release.
 
-- set `memos.instanceUrl` to preserve public anonymous access and RSS
-- shared-memo clients must use `GET /api/v1/shares/{share_token}/memo`
-- saved time filters use CEL timestamp fields and `now` instead of `now()`; for example, `created_ts >= now - duration("24h")`
-- MCP clients must use the stateless tools-only `/mcp` endpoint and service-prefixed tool names
+Back up the data volume and external database before upgrading. Review these upstream compatibility changes:
+
+- an unset `memos.instanceUrl` now creates a private instance; set it to retain anonymous public access and RSS
+- the shared-memo endpoint is now `GET /api/v1/shares/{share_token}/memo`
+- saved filters use CEL timestamp fields and `now` instead of `now()`; for example,
+  `created_ts >= now - duration("24h")`
+- MCP is now a stateless tools-only endpoint at `/mcp` with service-prefixed tool names
+
+The release also adds the Web Clipper, a rebuilt Markdown editor, multi-column feeds, signed webhooks, file-backed
+settings, and a rebuilt MCP toolset.
+
+## Backups
+
+Back up the PersistentVolumeClaim even when using an external database. With SQLite, it contains the database and local
+assets. With MySQL/PostgreSQL, it can still contain assets and instance data. Also back up the Secret selected by
+`provisioning.existingSecret`; PVC and database backups do not include its mounted OAuth2/IdP and instance-setting JSON
+files.
+
+For SQLite, stop the writer and archive the entire data directory, including SQLite WAL files and local assets, or use
+an application-consistent storage snapshot. Verify a restore into a fresh volume before relying on the backup.
 
 ## Security
 
-The chart runs the upstream non-root UID/GID `10001`, disables ServiceAccount token automount by default, drops Linux capabilities, and keeps
-`memos.allowPrivateWebhooks=false`.
+Defaults are designed for a private self-hosted service:
 
-Only enable private webhooks when the targets are trusted internal services and cluster egress is controlled.
+- no ServiceAccount token mounted by default
+- non-root UID/GID `10001`
+- dropped Linux capabilities
+- default NetworkPolicy ingress and egress isolation
+- protected bootstrap and closed registration
+- read-only image filesystem
+- optional Secret-backed DSN
+- `memos.allowPrivateWebhooks=false` by default
+
+Only enable `memos.allowPrivateWebhooks` when webhook targets are trusted internal services. It allows requests to
+private or reserved IP ranges.
+
+## Documentation
+
+- [Operations](https://github.com/helmforgedev/charts/blob/main/charts/memos/docs/operations.md)
+- [Database](#database)
+- [Security](#security)
+- [Backup and restore](#backup)
+- [OAuth2 and MCP](#integrations)
+
+## Security Scan: `memos`
+
+| Framework | Score       |
+| --------- | ----------- |
+| Overall   | **100.00%** |
+| MITRE     | **100.00%** |
+| NSA       | **100.00%** |
+| SOC2      | **100.00%** |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-10. This is a Kubernetes configuration scan; it does not replace
+image vulnerability management or application security review.
+
+## Database
+
+Memos supports SQLite, MySQL, and PostgreSQL.
+
+### SQLite
+
+SQLite is the default chart mode:
+
+```yaml
+database:
+  driver: sqlite
+persistence:
+  enabled: true
+```
+
+When `database.driver=sqlite` and no DSN is set, Memos stores the database under the data directory, typically
+`/var/opt/memos/memos_prod.db`.
+
+Do not scale SQLite mode above one replica. The chart blocks that topology.
+
+### PostgreSQL
+
+To provision the maintained HelmForge subchart in the release:
+
+```yaml
+database:
+  driver: postgres
+postgresql:
+  enabled: true
+```
+
+The chart selects the writable Service and retained application password from the dependency. Its backup, monitoring,
+TLS and topology settings remain available under `postgresql`. PostgreSQL and MySQL cannot both be enabled.
+
+For an external server, component mode builds the DSN from an existing password Secret:
+
+```yaml
+database:
+  driver: postgres
+  host: postgres.database.example.com
+  passwordSecret: memos-password
+  passwordKey: password
+  sslMode: verify-full
+  caSecret: database-ca
+  networkPolicyPeers:
+    - ipBlock:
+        cidr: 192.0.2.8/32
+```
+
+Replace the example IP and hostname. The CA Secret key defaults to `ca.crt`; omit it for certificates already trusted by
+the image. External component mode defaults to `verify-full`. Complete DSNs retain their own explicit TLS options.
+
+Use an existing Secret for production:
+
+```yaml
+database:
+  driver: postgres
+  existingSecret: memos-postgres
+  existingSecretKey: dsn
+```
+
+Example Secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: memos-postgres
+type: Opaque
+stringData:
+  dsn: postgres://memos:encoded-password@postgres.database.example.com:5432/memos?sslmode=verify-full
+```
+
+### MySQL
+
+Set `database.driver: mysql` and `mysql.enabled: true` for the HelmForge dependency. External components use
+`database.host`, `database.passwordSecret` and optional `database.caSecret`; their default `database.mysqlTls: true`
+verifies the server certificate and hostname. The bundled default is plaintext unless TLS is explicitly configured.
+
+The complete-DSN Secret contract remains available:
+
+```yaml
+database:
+  driver: mysql
+  existingSecret: memos-mysql
+  existingSecretKey: dsn
+```
+
+Example DSN:
+
+```text
+memos:password@tcp(mysql.database.example.com:3306)/memos?tls=true&parseTime=true&charset=utf8mb4
+```
+
+### Volume Requirement
+
+Keep persistence enabled even with an external database. Memos can store local assets and instance data in `MEMOS_DATA`,
+so database backup alone may not fully protect the instance.
+
+Changing the driver or endpoint is not a data migration. Restore or migrate the native data into the target backend and
+validate account, memo and attachment access before switching production traffic. Password Secrets are consumed during
+pod startup; coordinate database-side credential changes and an orderly rollout.
+
+When scaling MySQL or PostgreSQL mode above one replica, set `persistence.existingClaim` to a shared data PVC. The chart
+blocks scaled external-database releases that would otherwise create one StatefulSet PVC per pod, because those PVCs can
+hold divergent local assets.
+
+## Security
+
+### Container Identity
+
+The official image runs as non-root UID/GID `10001`. The chart sets:
+
+```yaml
+podSecurityContext:
+  fsGroup: 10001
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+```
+
+The data PVC must be writable by this identity.
+
+The image filesystem is read-only. A dedicated temporary volume supports runtime operations. The initial administrator
+is created by the unchanged Memos binary listening only on loopback inside the init container; the public process never
+mounts the initial password. Existing accounts and passwords are preserved during adoption and upgrade.
+
+### ServiceAccount
+
+The chart does not create or mount a ServiceAccount token by default:
+
+```yaml
+serviceAccount:
+  create: false
+  automountServiceAccountToken: false
+```
+
+Memos does not need Kubernetes API access for normal operation.
+
+### Database Secrets
+
+Prefer `database.existingSecret` for production so credentials are managed outside Helm release values.
+
+External components can instead use `database.passwordSecret`. Their runtime-built DSN is stored in a memory volume with
+mode `0600`, not in ConfigMaps or container arguments. Certificate verification is enabled for external component
+connections by default. Existing full DSNs retain the TLS policy chosen by their owner.
+
+```yaml
+database:
+  driver: postgres
+  existingSecret: memos-postgres
+  existingSecretKey: dsn
+```
+
+### Webhooks
+
+`memos.allowPrivateWebhooks` defaults to false. Enabling it allows webhook URLs that resolve to private or reserved IP
+ranges. Only use it when the targets are trusted internal services and egress is controlled.
+
+### Deployment Configuration Secrets
+
+Use `provisioning.existingSecret` for OAuth2 client secrets, SMTP credentials, S3 credentials, and AI provider keys that
+Memos 0.30 loads from `/etc/secrets`. The chart mounts the Secret read-only with group-readable mode `0440` for the
+non-root container.
+
+Treat every matching JSON file as sensitive plaintext. Do not place provisioning JSON directly in Helm values, logs, or
+ConfigMaps. Memos rejects invalid files before serving traffic, redacts secret fields from APIs, and keeps file-backed
+resources immutable until the file is removed and the pod restarts.
+
+### NetworkPolicy
+
+NetworkPolicy is enabled by default and requires a compatible CNI. Add your ingress-controller peers:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+```
 
 ## Backup
 
-Back up the PVC in every mode. With SQLite, it contains the database and assets. With PostgreSQL or MySQL, it can still contain local assets
-and instance data, so database backup alone is not enough.
+### What to Back Up
 
-## Additional Resources
+Always back up the PersistentVolumeClaim mounted at `persistence.mountPath`.
 
-- [Memos Docker deployment](https://usememos.com/docs/deploy/docker)
-- [Memos source](https://github.com/usememos/memos)
-- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/memos)
+SQLite mode:
+
+- SQLite database
+- local assets
+- instance data
+- initial administrator and provisioning Secrets, preserved separately from the PVC
+
+External database mode:
+
+- external MySQL/PostgreSQL database
+- PVC contents for local assets and instance data
+
+### SQLite Backup
+
+For small instances, stop writes before taking a snapshot or file copy. Storage-level snapshots are preferred when
+available.
+
+```bash
+kubectl scale statefulset memos-memos --replicas=0
+# take a PVC snapshot or copy the volume contents
+kubectl scale statefulset memos-memos --replicas=1
+```
+
+If downtime is not acceptable, use a CSI snapshot mechanism that provides crash-consistent or application-consistent
+snapshots according to your storage backend.
+
+Wait for the writer pod to terminate before archiving. Include the complete directory, with SQLite WAL files and assets;
+copying only a live `memos_prod.db` can lose committed state. Preserve the original `persistence.mountPath` on recovery.
+The runtime recovery profile archives all top-level state entries and restores them into a fresh PVC, then verifies the
+same private memo, exact attachment bytes and persisted refresh-token identity.
+
+### External Database Backup
+
+Back up the database with native tooling such as `pg_dump` or `mysqldump`, then back up the PVC separately.
+
+Coordinate application writes so database references and original assets represent the same recovery point. Bundled
+database charts expose their own native backup options; configure storage and retention explicitly. S3 storage also
+needs matching bucket objects, database state and the native provisioning Secret. A database dump alone does not include
+S3 objects or locally stored attachments.
+
+### Restore Order
+
+1. Restore or recreate the PVC contents.
+2. Restore the external database, if used.
+3. Recreate the DSN Secret.
+4. Install or upgrade the chart with the same `database.driver` and `persistence.mountPath`.
+5. Watch logs for migrations and startup errors.
+
+Set `persistence.existingClaim` to the recovered volume. When converting an existing StatefulSet from generated claim
+templates to an existing claim, Kubernetes requires recreating the stopped controller because claim templates are
+immutable. Preserve both old and recovered PVCs, recreate the controller through Helm, and verify native login, memo
+content, original checksums and search before reopening access. Never delete the source volume as part of this
+operation. Helm rollback does not reverse database migrations.
+
+## Integrations
+
+### Native OAuth2
+
+Memos 0.30 uses generic OAuth2 authorization-code exchange and a configured HTTPS UserInfo endpoint. It does not perform
+OIDC issuer/JWKS/ID-token validation merely because `openid` is included in scopes. Configure only a trusted provider,
+exact callback URLs and stable subject mapping; keep client credentials in `provisioning.existingSecret`.
+
+Native file-backed providers use `memos-idp-<label>.json` with a stable `uid`, display `name`, type `OAUTH2` and
+`config.oauth2Config`. Include all required fields: clientId, clientSecret, authUrl, tokenUrl, userInfoUrl, scopes and
+fieldMapping. The provider's authorization endpoint must enforce PKCE for clients that require it.
+
+Closed registration also blocks unlinked SSO users. An existing authenticated user must deliberately link their identity
+through the native account flow before SSO login can reuse that account. Matching email or display name does not replace
+the stable provider subject. The runtime fixture verifies trusted HTTPS, explicit admin linkage, S256 exchange, one-use
+codes, rejected new enrollment and rejected subject replacement, including after pod restart. It exercises native APIs;
+it does not claim browser-level state handling or full OIDC validation.
+
+When using a private CA, mount its public certificate bundle and configure the Go client's `SSL_CERT_FILE`. Keep the
+bundle read-only and allow the issuer's HTTPS destination through NetworkPolicy. Do not disable certificate
+verification.
+
+### Native MCP
+
+The stateless Streamable HTTP endpoint is `/mcp`. Create a native Personal Access Token in the user account and send it
+as `Authorization: Bearer <token>` on each request. Tool discovery does not itself prove authorization: protected tool
+operations validate the user token and can return `result.isError` inside an HTTP 200 JSON-RPC response.
+
+The runtime gate creates and revokes an actual PAT, initializes MCP, discovers tools, performs private memo CRUD through
+`memo_create_memo`, `memo_get_memo` and `memo_delete_memo`, verifies data through the REST API, and checks anonymous and
+revoked-token denial. Keep PATs out of URLs, logs and plain Helm values. Use least-privilege accounts and expiration.
+
+### Native S3 storage
+
+Set a complete `STORAGE` provisioning group with `storageType: S3`, `filepathTemplate`, `uploadSizeLimitMb` and
+`s3Config`. The credential field is `accessKeySecret`; use `usePathStyle` for compatible endpoints and keep
+`insecureSkipTlsVerify: false`. The upstream client requires explicit static credentials; ambient workload identity and
+temporary session-token authentication are not part of this configuration contract.
+
+The bucket must exist. Allow the endpoint in NetworkPolicy and provide its trusted CA when needed. Storage policy
+changes affect new uploads and do not move historical objects. Native S3 attachment state contains the object reference
+and its storage configuration; protect database backups as credential-bearing data. Presigned original URLs are bearer
+access URLs and must remain private. Back up matching database references and objects together.
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+
+# -- Override the chart name used in Kubernetes object names.
+nameOverride: ''
+
+# -- Override the full release name used in Kubernetes object names.
+fullnameOverride: ''
+
+# -- Extra labels applied to all Kubernetes objects rendered by this chart.
+commonLabels: {}
+
+image:
+  # -- Official Memos container image repository.
+  repository: docker.io/neosmemo/memos
+  # -- Pinned Memos image tag. Floating tags such as latest or stable are not used by default.
+  tag: '0.30.0'
+  # -- Kubernetes image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- Optional image pull secrets for private registries or mirrored images.
+imagePullSecrets: []
+
+# -- Native External Secrets Operator resources for bootstrap, SQL credentials or provisioning files.
+externalSecrets:
+  # -- Render ExternalSecret resources; the operator and CRDs must already exist.
+  enabled: false
+  # -- Default refresh interval; an item's spec can override it.
+  refreshInterval: 1h
+  # -- Full native spec per item, with name/fullnameOverride and optional metadata.
+  items: []
+
+# -- Number of Memos pods. Keep 1 when using SQLite; scale external database mode only with a shared existing data claim.
+replicaCount: 1
+
+app:
+  # -- HTTP port exposed by Memos inside the container.
+  port: 5230
+  # -- Optional command override. Leave empty to use the upstream image entrypoint.
+  command: []
+  # -- Optional argument override. Leave empty to use the upstream image defaults.
+  args: []
+  # -- Additional environment variables for integrations or advanced upstream flags.
+  env: []
+  # -- Additional envFrom sources such as Secret or ConfigMap references.
+  envFrom: []
+  # -- Backward-compatible extra environment variables appended after app.env.
+  extraEnv: []
+
+memos:
+  # -- Bind address passed to MEMOS_ADDR. Empty means all interfaces, matching upstream defaults.
+  addr: ''
+  # -- Explicit instance URL. Nonempty also enables anonymous access to public content; never infer from ingress.
+  instanceUrl: ''
+  # -- Enable upstream demo mode. Keep disabled for real instances.
+  demo: false
+  # -- Allow outbound webhooks to private or reserved IP ranges. Enable only for trusted internal targets.
+  allowPrivateWebhooks: false
+  # -- Log verbosity. Options: debug, info, warn, error.
+  logLevel: info
+
+database:
+  # -- Database backend used by Memos. Options: sqlite, mysql, postgres.
+  driver: sqlite
+  # -- Database DSN. Required for mysql/postgres unless database.existingSecret is set.
+  dsn: ''
+  # -- Existing Secret containing the database DSN.
+  existingSecret: ''
+  # -- Key in database.existingSecret containing the database DSN.
+  existingSecretKey: dsn
+  # -- External SQL host in components mode. Do not combine with a complete DSN or DSN Secret.
+  host: ''
+  # -- External SQL port; zero selects 5432 for PostgreSQL or 3306 for MySQL.
+  port: 0
+  # -- External SQL database name in components mode.
+  name: memos
+  # -- External SQL application user in components mode.
+  username: memos
+  # -- Existing Secret containing an external SQL password, distinct from the complete DSN Secret.
+  passwordSecret: ''
+  # -- Password key in database.passwordSecret.
+  passwordKey: password
+  # -- PostgreSQL TLS mode; empty uses disable for bundled databases and verify-full for external components.
+  sslMode: ''
+  # -- MySQL TLS mode; empty uses false for bundled databases and true for external components.
+  mysqlTls: ''
+  # -- Optional CA Secret for database clients; SSL_CERT_FILE and PostgreSQL sslrootcert use this certificate.
+  caSecret: ''
+  # -- CA certificate key in database.caSecret.
+  caKey: ca.crt
+  # -- Maximum wait for bundled/component database TCP availability before native authenticated startup.
+  connectionTimeout: 180
+  # -- Explicit external database peers when NetworkPolicy egress isolation is enabled.
+  networkPolicyPeers: []
+
+# -- Optional maintained HelmForge PostgreSQL. Full subchart values remain available.
+postgresql:
+  # -- Enable PostgreSQL; requires database.driver=postgres and mysql.enabled=false.
+  enabled: false
+  # -- PostgreSQL topology. The application always connects to the writable Service.
+  architecture: standalone
+  # -- Application credentials are initialized and retained by the PostgreSQL subchart.
+  auth:
+    # -- Initial application database.
+    database: memos
+    # -- Initial application user.
+    username: memos
+    # -- Existing subchart authentication Secret, including its required administrative keys.
+    existingSecret: ''
+    # -- Application password key in the subchart Secret.
+    existingSecretUserPasswordKey: user-password
+
+# -- Optional maintained HelmForge MySQL. Full subchart values remain available.
+mysql:
+  # -- Enable MySQL; requires database.driver=mysql and postgresql.enabled=false.
+  enabled: false
+  # -- MySQL topology. The application always connects to the writable Service.
+  architecture: standalone
+  # -- Application credentials are initialized and retained by the MySQL subchart.
+  auth:
+    # -- Initial application database.
+    database: memos
+    # -- Initial application user.
+    username: memos
+    # -- Existing subchart authentication Secret, including its required administrative keys.
+    existingSecret: ''
+    # -- Application password key in the subchart Secret.
+    existingSecretUserPasswordKey: mysql-user-password
+
+provisioning:
+  # -- Own the complete native GENERAL policy through a read-only file. Disable to preserve database-managed settings.
+  manageGeneralSettings: true
+  # -- Existing Secret whose keys are Memos provisioning filenames mounted under /etc/secrets.
+  existingSecret: ''
+  # -- Secret volume file mode. 288 is decimal for 0440 so the non-root fsGroup can read the files.
+  defaultMode: 288
+  # -- Close registration in generated GENERAL settings. existingSecret owns all provisioning when supplied.
+  disallowUserRegistration: true
+
+# -- Protected first-administrator setup using the unchanged upstream binary on loopback.
+bootstrap:
+  # -- Initialize only when native needsSetup is true; existing accounts and passwords are preserved.
+  enabled: true
+  # -- Initial administrator username.
+  username: admin
+  # -- Initial administrator display name.
+  displayName: Administrator
+  # -- Initial password. Empty generates a retained random Secret; prefer existingSecret for GitOps.
+  password: ''
+  # -- Existing Secret containing the initial password.
+  existingSecret: ''
+  # -- Key containing the initial password.
+  passwordKey: password
+  # -- Official Node helper image; the application binary is copied unchanged from the Memos image.
+  image:
+    # -- Official helper repository.
+    repository: docker.io/library/node
+    # -- Verified pinned helper tag.
+    tag: 24.21.0-alpine3.23
+    # -- Helper pull policy.
+    pullPolicy: IfNotPresent
+  # -- Resources for the temporary local Memos process and JSON-safe setup helper.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 256Mi
+
+persistence:
+  # -- Persist the Memos data directory, including the SQLite database and local assets.
+  enabled: true
+  # -- PersistentVolumeClaim size for the Memos data directory.
+  size: 5Gi
+  # -- StorageClass for the generated PersistentVolumeClaim. Empty uses the cluster default.
+  storageClass: ''
+  # -- Access modes for the generated PersistentVolumeClaim.
+  accessModes:
+    - ReadWriteOnce
+  # -- Existing PersistentVolumeClaim to mount instead of creating a new claim. Required for replicaCount > 1 with MySQL/PostgreSQL.
+  existingClaim: ''
+  # -- Container data directory. Upstream Docker images default this path to /var/opt/memos.
+  mountPath: /var/opt/memos
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount.
+  create: false
+  # -- ServiceAccount name. Defaults to the release fullname when create=true.
+  name: ''
+  # -- Annotations for the ServiceAccount.
+  annotations: {}
+  # -- Mount the ServiceAccount token in the pod.
+  automountServiceAccountToken: false
+
+service:
+  # -- Service type.
+  type: ClusterIP
+  # -- Service port.
+  port: 5230
+  # -- Service annotations.
+  annotations: {}
+  # -- Service IP family policy. Options: SingleStack, PreferDualStack, RequireDualStack.
+  ipFamilyPolicy: ''
+  # -- Service IP families, for example ["IPv4", "IPv6"].
+  ipFamilies: []
+
+ingress:
+  # -- Enable Kubernetes Ingress.
+  enabled: false
+  # -- IngressClassName for the generated Ingress.
+  ingressClassName: traefik
+  # -- Ingress annotations.
+  annotations: {}
+  # -- Ingress hosts and paths.
+  hosts: []
+  # -- Ingress TLS blocks.
+  tls: []
+
+gatewayAPI:
+  # -- Render canonical Gateway API HTTPRoutes.
+  enabled: false
+  # -- Route definitions with parentRefs, hostnames, rules, labels and annotations.
+  httpRoutes: []
+
+probes:
+  # -- Startup probe settings.
+  startup:
+    {
+      enabled: true,
+      path: /healthz,
+      initialDelaySeconds: 5,
+      periodSeconds: 10,
+      timeoutSeconds: 3,
+      failureThreshold: 60,
+    }
+  # -- Liveness probe settings.
+  liveness:
+    { enabled: true, path: /healthz, initialDelaySeconds: 0, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+  # -- Readiness probe settings.
+  readiness:
+    { enabled: true, path: /healthz, initialDelaySeconds: 0, periodSeconds: 10, timeoutSeconds: 5, failureThreshold: 6 }
+
+# -- Container resource requests and limits.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: '1'
+    memory: 512Mi
+
+# -- Pod security context. The upstream image runs as non-root UID/GID 10001.
+podSecurityContext:
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+
+# -- Container security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+pdb:
+  # -- Create a PodDisruptionBudget. Useful when Memos is scaled with an external database.
+  enabled: false
+  # -- Minimum available pods during voluntary disruptions.
+  minAvailable: 1
+
+networkPolicy:
+  # -- Create a NetworkPolicy that restricts inbound HTTP traffic to Memos.
+  enabled: true
+  # -- Custom ingress peers. Empty allows only same-namespace pods; add ingress controller peers explicitly.
+  ingressFrom: []
+  # -- Enable baseline egress isolation without requiring custom extraEgress rules.
+  egressIsolation: true
+  # -- DNS peers allowed by baseline egress isolation. Override for clusters with different DNS labels.
+  dnsEgress:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  # -- HTTPS peers allowed by baseline egress isolation. Override to restrict webhook and integration destinations.
+  httpsEgress: []
+  # -- Additional egress rules appended after the built-in DNS and HTTPS allowances.
+  extraEgress: []
+
+# -- Node selector for scheduling the pod.
+nodeSelector: {}
+
+# -- Tolerations for scheduling the pod.
+tolerations: []
+
+# -- Affinity rules for scheduling the pod.
+affinity: {}
+
+# -- Topology spread constraints for multi-node scheduling.
+topologySpreadConstraints: []
+
+# -- Optional PriorityClass name.
+priorityClassName: ''
+
+# -- Pod termination grace period in seconds.
+terminationGracePeriodSeconds: 30
+
+# -- Extra labels applied to the pod template.
+podLabels: {}
+
+# -- Extra annotations applied to the pod template.
+podAnnotations: {}
+
+# -- Extra volumes mounted into the pod.
+extraVolumes: []
+
+# -- Extra volume mounts added to the Memos container.
+extraVolumeMounts: []
+
+# -- Additional Kubernetes manifests rendered with the chart.
+extraManifests: []
+```
+
+## Gateway API contract
+
+Use `gatewayAPI.enabled` and `gatewayAPI.httpRoutes[]`. Set each route's `parentRefs` to a shared Gateway that allows
+this namespace, and configure its HTTPS listener and public hostname. Routes accept labels, annotations and rules with
+matches, filters and optional backend references; omitted backends target this chart's application Service. Ingress and
+HTTPRoute resources can coexist. Verify controller conditions and public traffic before production use. See the
+[Gateway API documentation](https://gateway-api.sigs.k8s.io/).
