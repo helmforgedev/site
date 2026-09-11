@@ -48,19 +48,21 @@ The chart does not deploy a database or vector index.
 kubectl -n embeddings port-forward service/embeddings-text-embeddings-inference 8080:80
 ```
 
-In another terminal, retrieve the generated credential into an environment variable without printing it:
+In another terminal, retrieve the generated credential into a shell variable without printing it:
 
 ```bash
-export TEI_API_KEY="$(kubectl -n embeddings get secret embeddings-text-embeddings-inference-auth \
+TEI_API_KEY="$(kubectl -n embeddings get secret embeddings-text-embeddings-inference-auth \
   -o jsonpath='{.data.api-key}' | base64 --decode)"
 curl --fail-with-body http://localhost:8080/embed \
-  -H "Authorization: Bearer ${TEI_API_KEY}" -H 'Content-Type: application/json' \
-  -d '{"inputs":["A cat sits on the mat."],"normalize":true}'
+  -H @- -H 'Content-Type: application/json' \
+  -d '{"inputs":["A cat sits on the mat."],"normalize":true}' <<EOF
+Authorization: Bearer ${TEI_API_KEY}
+EOF
 unset TEI_API_KEY
 ```
 
-Shell process arguments may be visible to other local users. Use an appropriate secret-aware client in shared
-environments. Helm NOTES never print the credential. Native `/health` is intentionally unauthenticated.
+The bearer header is read from standard input; the key is not exported to the curl process environment.
+Helm NOTES never print the credential. Native `/health` is intentionally unauthenticated.
 
 ## Model and vector contract
 
@@ -115,7 +117,7 @@ See [model lifecycle](https://github.com/helmforgedev/charts/blob/main/charts/te
 ## Resource and admission limits
 
 The default native limits are 64 concurrent requests, 2048 batch tokens, eight batch requests, 16 client batch
-items and 1048576 payload bytes. The CPU backend supports at most eight batch requests in this pinned image.
+items and 1048576 payload bytes. The CPU backend forces exactly eight batch requests in this pinned image; other CPU values are rejected.
 The proxy also enforces the payload byte limit. Token limits and payload bytes are different controls.
 Requests beyond the client batch limit return 422; oversized bodies return 413. Inputs beyond the model's token
 length fail unless truncation is enabled. Explicit client truncation can override the default behavior.
@@ -423,7 +425,7 @@ inference:
   maxConcurrentRequests: 64
   # -- Total token budget per dynamic batch; must fit model input length when truncation is disabled.
   maxBatchTokens: 2048
-  # -- Maximum individual requests per backend batch; CPU image supports at most eight.
+  # -- Maximum individual requests per backend batch; the pinned CPU backend forces exactly eight.
   maxBatchRequests: 8
   # -- Maximum input count per client request; overflow returns native HTTP 422.
   maxClientBatchSize: 16
