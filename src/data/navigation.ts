@@ -132,6 +132,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Heimdall', href: '/docs/charts/heimdall', maturity: 'stable' },
       { label: 'Homarr', href: '/docs/charts/homarr', maturity: 'stable' },
+      { label: 'Text Embeddings Inference', href: '/docs/charts/text-embeddings-inference', maturity: 'stable' },
       { label: 'BentoPDF', href: '/docs/charts/bentopdf', maturity: 'stable' },
       { label: 'SiYuan', href: '/docs/charts/siyuan', maturity: 'stable' },
       { label: 'ByteStash', href: '/docs/charts/bytestash', maturity: 'stable' },

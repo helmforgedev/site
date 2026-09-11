@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Text Embeddings Inference',
+    slug: 'text-embeddings-inference',
+    description:
+      'Hugging Face embedding API with immutable models, offline inference, CPU scaling and private native Prometheus metrics.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Twenty',
     slug: 'twenty',
     description:
