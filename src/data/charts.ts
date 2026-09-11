@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Dawarich',
+    slug: 'dawarich',
+    description:
+      'Private location history with PostGIS, native two-factor authentication, queued imports and authenticated Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'AFFiNE',
     slug: 'affine',
     description:

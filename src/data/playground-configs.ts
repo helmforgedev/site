@@ -8,6 +8,161 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  dawarich: [
+    {
+      name: 'Location history and identity',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '1.14.4',
+          description: 'Pinned official Dawarich release',
+        },
+        {
+          label: 'Public origin',
+          key: 'server.publicUrl',
+          type: 'text',
+          default: '',
+          description: 'Stable HTTPS origin',
+        },
+        {
+          label: 'Administrator email',
+          key: 'bootstrap.email',
+          type: 'text',
+          default: 'admin@example.test',
+          description: 'Set before first installation',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'bootstrap.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with admin-password; 16 characters minimum, 72 UTF-8 bytes maximum',
+        },
+        {
+          label: 'Identity Secret',
+          key: 'identity.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Retain all four native Rails and OTP encryption keys',
+        },
+        {
+          label: 'Persistent capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Shared local objects, public assets, imports and identity fingerprint',
+        },
+      ],
+    },
+    {
+      name: 'Dependencies and workers',
+      fields: [
+        {
+          label: 'Bundled PostGIS',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'HelmForge PostgreSQL with official amd64 PostGIS image',
+        },
+        {
+          label: 'PostGIS hostname',
+          key: 'database.host',
+          type: 'text',
+          default: '',
+          description: 'External hostname matching the TLS certificate',
+        },
+        {
+          label: 'PostGIS password Secret',
+          key: 'database.passwordSecret',
+          type: 'text',
+          default: '',
+          description: 'External application role credentials',
+        },
+        {
+          label: 'PostGIS CA Secret',
+          key: 'database.tls.caSecret',
+          type: 'text',
+          default: '',
+          description: 'Required external TLS CA bundle, key ca.crt',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Authenticated Redis with persistence and noeviction',
+        },
+        {
+          label: 'Redis hostname',
+          key: 'cache.host',
+          type: 'text',
+          default: '',
+          description: 'External Redis hostname',
+        },
+        {
+          label: 'Redis password Secret',
+          key: 'cache.passwordSecret',
+          type: 'text',
+          default: '',
+          description: 'External credentials, key redis-password',
+        },
+        {
+          label: 'Redis CA Secret',
+          key: 'cache.tls.caSecret',
+          type: 'text',
+          default: '',
+          description: 'Optional private CA bundle',
+        },
+        {
+          label: 'Concurrent jobs',
+          key: 'worker.concurrency',
+          type: 'number',
+          default: '3',
+          description: 'Must not exceed runtime.threads',
+        },
+        {
+          label: 'Rails thread pool',
+          key: 'runtime.threads',
+          type: 'number',
+          default: '5',
+          description: 'Must cover concurrent jobs',
+        },
+      ],
+    },
+    {
+      name: 'Native metrics',
+      fields: [
+        {
+          label: 'Prometheus metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Private authenticated Rails and Sidekiq targets',
+          toggleActivationValues: {
+            false: { 'metrics.serviceMonitor.enabled': 'false', 'metrics.prometheusRule.enabled': 'false' },
+          },
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires Prometheus Operator and permitted scraper peers',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+        {
+          label: 'PrometheusRule',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Target availability alerts',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+      ],
+    },
+  ],
   affine: [
     {
       name: 'Workspace and identity',
