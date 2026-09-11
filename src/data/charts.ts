@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Hermes Agent',
+    slug: 'hermes-agent',
+    description:
+      'Persistent agent gateway with controlled tools, native telemetry, verified S3 backups and empty-volume recovery.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'Microsoft SQL Server',
     slug: 'mssql',
     description:

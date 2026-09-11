@@ -8,6 +8,148 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'hermes-agent': [
+    {
+      name: 'Agent and identity',
+      fields: [
+        {
+          label: 'Model',
+          key: 'agent.model',
+          type: 'text',
+          default: 'anthropic/claude-opus-4.6',
+          description: 'Model identifier accepted by the selected provider',
+        },
+        {
+          label: 'Provider',
+          key: 'agent.provider',
+          type: 'text',
+          default: 'openrouter',
+          description: 'Use custom:internal for a named OpenAI-compatible endpoint',
+        },
+        {
+          label: 'Provider credentials Secret',
+          key: 'credentials.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with upstream provider environment variables; required for inference',
+        },
+        {
+          label: 'API credentials Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Empty generates and retains a token; use an existing Secret for render-only GitOps',
+        },
+        {
+          label: 'Custom provider URL',
+          key: 'agent.baseUrl',
+          type: 'text',
+          default: '',
+          description: 'Complete API base URL for a named custom provider',
+        },
+        {
+          label: 'Custom key environment variable',
+          key: 'agent.apiKeyEnv',
+          type: 'text',
+          default: '',
+          description: 'Variable in the provider Secret; requires a named custom provider and a base URL',
+        },
+        {
+          label: 'Configuration ownership',
+          key: 'config.policy',
+          type: 'select',
+          default: 'managed',
+          options: ['managed', 'seed'],
+          description: 'Managed reconciles files on initialization; seed preserves operator/dashboard edits',
+        },
+        {
+          label: 'Persistent volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Retained state, sessions, memory, skills and workspace; one writer per release',
+        },
+      ],
+    },
+    {
+      name: 'Administrative dashboard',
+      collapsible: true,
+      gateField: 'dashboard.enabled',
+      activationValues: { 'config.policy': 'seed' },
+      fields: [
+        {
+          label: 'Dashboard authentication Secret',
+          key: 'dashboard.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Required basic-login or OIDC variables; distinct from API credentials',
+        },
+        {
+          label: 'Public HTTPS origin',
+          key: 'dashboard.publicUrl',
+          type: 'text',
+          default: '',
+          description: 'Origin used for Host validation and OAuth redirects; use a trusted tunnel or route',
+        },
+      ],
+    },
+    {
+      name: 'Native telemetry',
+      collapsible: true,
+      gateField: 'metrics.enabled',
+      fields: [
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires an existing Prometheus Operator and permitted metrics peers',
+        },
+        {
+          label: 'Gateway alert rules',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Detect unavailable gateway and missing native metrics',
+        },
+      ],
+    },
+    {
+      name: 'Verified S3 backups',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'Cron schedule in the configured backup time zone',
+        },
+        {
+          label: 'Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Dedicated existing bucket; archive verified before completion manifest publication',
+        },
+        {
+          label: 'S3 credentials Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY; requires PutObject and GetObject',
+        },
+        {
+          label: 'HTTPS endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: '',
+          description: 'Empty selects AWS S3; private endpoints need explicit network egress',
+        },
+      ],
+    },
+  ],
   mssql: [
     {
       name: 'License and engine',
