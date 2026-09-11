@@ -119,6 +119,14 @@ application Pods. SQL Server uses TCP, so this chart has no HTTP Ingress. Config
 `persistence.enabled` defaults to true and the generated claim is retained by default. `persistence.existingClaim` reuses independently managed storage.
 Keep compatible database files, ownership and SQL credentials together. Never mount one data directory into two active SQL Server instances.
 
+When `persistence.enabled` and `persistence.retain` are both true, uninstall keeps the generated data PVC and generated authentication/TLS Secrets.
+Reinstall with the same release identity to reuse their credentials and trust material. For a different identity, explicitly reference all retained
+resources with `persistence.existingClaim`, `auth.existingSecret` and `tls.existingSecret`.
+
+Retained Secrets remain sensitive resources after uninstall. Protect them with the recovery configuration and remove them deliberately only when
+the matching data is retired or its credentials and trust have been migrated. Existing Secrets remain externally managed; ESO deployments need
+stable provider values and appropriate target-Secret lifecycle policies. The chart does not copy or take ownership of those external credentials.
+
 Monitor free data and backup staging space. Helm rollback changes Kubernetes resources, not SQL Server data format or application migrations.
 Before an engine or edition migration, restore a recent backup into an isolated instance and run application acceptance tests.
 
@@ -153,6 +161,11 @@ static credentials through `backup.workloadIdentity`. For a private HTTPS endpoi
 
 The staging claim must hold the backup set and allow the SQL Server Pod and backup Job to mount it concurrently on the same node. Choose compatible
 storage and capacity. Uploaded backups require their own access policy, encryption, lifecycle and recovery tests. The chart does not create or delete buckets.
+
+Successful runs and graceful failures remove their own local archives, avoiding accumulation after repeated upload failures. A single bounded
+`/backup/.last-failure` JSON record preserves diagnostics. SIGKILL or node loss can leave orphaned files; inspect and remove only those confirmed
+inactive files manually. Monitor failed Jobs and last-success age: empty staging does not mean the upload succeeded. The chart never deletes S3
+objects; bucket lifecycle rules must handle incomplete remote prefixes and abandoned multipart uploads.
 
 Run restore drills into an isolated compatible instance and query recovered application records. A successful upload or RESTORE VERIFYONLY is not
 equivalent to a real restore. Database backups do not automatically recreate every server-level login, credential or certificate. Keep the required
@@ -246,7 +259,7 @@ persistence:
   size: 20Gi
   # -- Single-writer claim access mode.
   accessMode: ReadWriteOnce
-  # -- Keep the generated claim when uninstalling.
+  # -- Keep the generated data claim and generated auth/TLS Secrets on uninstall when persistence is enabled.
   retain: true
   # -- Extra PVC annotations.
   annotations: {}
@@ -345,11 +358,11 @@ backup:
   staging:
     # -- Existing staging claim. Must support concurrent mounts on the same node (RWO or RWX, not RWOP).
     existingClaim: ""
-    # -- Backup staging capacity; size for the largest backup set plus failed-run headroom.
+    # -- Backup staging capacity; size for the largest backup set plus headroom for interrupted-run orphan files.
     size: 20Gi
     # -- StorageClass for generated staging PVC.
     storageClass: ""
-    # -- Preserve staging PVC for failed-upload recovery after uninstall.
+    # -- Preserve staging PVC for diagnostic records and interrupted-run orphan inspection after uninstall.
     retain: true
   s3:
     # -- Existing destination bucket. The chart never creates or deletes buckets.
