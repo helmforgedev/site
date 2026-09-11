@@ -1,0 +1,339 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Hermes Agent Chart
+description: Persistent Hermes Agent with authenticated API, controlled tools, native telemetry, verified S3 backups and empty-volume recovery.
+---
+
+# Hermes Agent
+
+Deploy [Hermes Agent](https://hermes-agent.nousresearch.com/) as a persistent, authenticated agent gateway using the official Nous Research image. One release owns its sessions, memory, learned skills, schedules and workspace.
+
+## Features
+
+- Verified official release and immutable multi-platform image digest.
+- Singleton StatefulSet, retained data and API identity, non-root execution and read-only installation.
+- Authenticated OpenAI-compatible API, explicit toolsets and messaging user allowlists.
+- Managed or seed-once configuration, bundled skills and optional privileged dashboard with separate authentication.
+- Existing Secrets and canonical External Secrets Operator integration.
+- Default-deny inbound networking, Ingress, Gateway API and explicit dual-stack API and dashboard support.
+- Native OTLP gateway metrics, optional official collector, ServiceMonitor and PrometheusRule.
+- Scheduled S3 backups with SQLite snapshots, file inventories, remote byte verification and empty-volume-only recovery.
+
+## Install
+
+Create a provider Secret from an environment file that is not committed to Git. For the default OpenRouter provider, include OPENROUTER_API_KEY. Select another model/provider in values as needed.
+
+```bash
+kubectl create namespace agents
+kubectl -n agents create secret generic hermes-provider --from-env-file=provider.env
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm upgrade --install hermes helmforge/hermes-agent --namespace agents \
+  --set credentials.existingSecret=hermes-provider
+```
+
+OCI distribution is also available at `oci://ghcr.io/helmforgedev/helm/hermes-agent`. Kubernetes 1.30 or newer and a suitable StorageClass are required. The default gateway requests 1Gi memory; increase it for browser, terminal, MCP and concurrent work. An arm64 image manifest exists; the local runtime evidence is Linux amd64.
+
+The generated API Secret is `<fullname>-auth`, key `api-key`. Supply `auth.existingSecret` for stable render-only GitOps identity. A Ready Pod confirms gateway health, not provider billing/quota or external platform access.
+
+## Connect
+
+```bash
+kubectl -n agents port-forward service/hermes-hermes-agent 8642:8642
+```
+
+Use an OpenAI-compatible client with base URL `http://127.0.0.1:8642/v1` and the API bearer token. API credentials authorize the selected agent tools. For in-cluster clients, configure `networkPolicy.ingressFrom`; for external clients, terminate TLS at a trusted ingress/Gateway controller. Default toolsets permit memory only.
+
+## Production boundaries
+
+This chart runs one trusted agent, with one gateway writer. There is no horizontal scaling or transparent HA; upgrades and node replacement cause downtime. Separate untrusted agents into separate releases and credentials. The optional dashboard is a full administrative surface in the same trust boundary. No default host socket, privileged container or Kubernetes API token is granted.
+
+The chart-owned acceptance fixture drives real Hermes inference orchestration and tool calls without paid external requests. Cloud credentials, live messaging, remote execution and OIDC providers still require environment-specific acceptance. See the operational guides below before enabling additional tools.
+
+## Operating Hermes Agent
+
+### Provider credentials
+
+Create a Secret from an environment file kept outside version control, then set `credentials.existingSecret`:
+
+```bash
+kubectl -n agents create secret generic hermes-provider --from-env-file=provider.env
+helm upgrade --install hermes helmforge/hermes-agent -n agents \
+  --set credentials.existingSecret=hermes-provider
+```
+
+For OpenRouter, the file contains `OPENROUTER_API_KEY`. For a custom OpenAI-compatible endpoint, use `agent.provider=custom:internal`, `agent.baseUrl` and `agent.apiKeyEnv` naming the environment variable in that Secret. The pinned upstream release intentionally does not forward generic OPENAI_API_KEY credentials to arbitrary hosts. Provider URL, model and credentials must agree.
+
+The API implements OpenAI-compatible chat completions and requires `Authorization: Bearer <API token>`. This API token is distinct from the provider key and dashboard credentials. Use `X-Hermes-Session-Id` for gateway-backed conversation continuity. A new session reloads persistent memory; existing sessions can retain their original system prompt.
+
+### Tool and messaging access
+
+Default `agent.toolsets: [memory]` avoids exposing terminal/browser execution through a newly installed API. Configure additional native toolsets only for trusted API users. Terminal tools using the local backend can read and modify the agent's data and environment. Remote SSH or other upstream execution backends can be configured under `config.values.terminal`; provision their authentication, host verification, network access and independent runtime tests before use. The chart does not claim a sandbox merely because it uses a container.
+
+Telegram requires `TELEGRAM_BOT_TOKEN`; Discord requires `DISCORD_BOT_TOKEN`; Slack Socket Mode requires `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`. Store them in `credentials.existingSecret`, enable the corresponding `channels` entry and declare its `allowedUsers`. Use platform user/member IDs, not display names. Each adapter has its own `toolsets`. Do not set allow-all variables in the credential Secret. The chart explicitly sets supported adapter allow-all flags to false and owns the configured user lists.
+
+The supported default transports are outbound polling/WebSocket/Socket Mode. No extra inbound Service is needed. Upstream plugins, other channels and external tools may need additional dependencies or network access; they are not all included in the chart's runtime acceptance matrix.
+
+### Dashboard administration
+
+Enable the dashboard with `config.policy=seed` and `dashboard.existingSecret`. For basic login, that Secret contains `HERMES_DASHBOARD_BASIC_AUTH_USERNAME`, `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD` and a stable, random `HERMES_DASHBOARD_BASIC_AUTH_SECRET` of at least 32 bytes. Upstream also accepts a password hash instead of plaintext. For public access, use HTTPS and the upstream OIDC provider variables in this Secret, with `dashboard.publicUrl` and bounded `config.values.dashboard.trusted_proxies`.
+
+The chart exposes the dashboard through a separate ClusterIP Service. Use a trusted tunnel or an explicit HTTPRoute backend reference to `<fullname>-dashboard` and `dashboard.service.port`; permit the controller through `dashboard.ingressFrom`. API ingress defaults never silently expose the administration UI. OIDC identity-provider integration is environment-specific; basic login and session-cookie authentication are exercised locally.
+
+Dashboard users are administrators of the same agent, not isolated tenants. Kubernetes owns lifecycle and image updates: use Helm rollouts instead of UI self-update or gateway start/restart controls. The read-only installation intentionally prevents runtime package modifications. Changes to an existing seed-mode config survive Helm upgrades; to reconcile declared config again, disable the dashboard, switch to managed policy for the rollout, then deliberately return to seed mode.
+
+### Upgrades, retention and credentials
+
+Take and restore-test a backup before changing the image tag/digest together. Inspect upstream release notes for SQLite/config migrations; a Helm image rollback cannot undo an incompatible data migration. One writer means a rollout or node drain interrupts service. Avoid a mandatory singleton PDB that prevents deliberate maintenance.
+
+PVC and generated API Secret are retained after uninstall by default. Reinstall with the same release/namespace/fullname to reuse them. An existing claim and externally managed Secrets retain their own lifecycle. Keep the release identity stable and never attach its data to two gateways.
+
+For GitOps, select `auth.existingSecret` or configure `externalSecrets.items[]` to project that Secret through an already installed ESO. Rotating a Secret requires a Pod rollout because provider/API/dashboard credentials are environment variables. Do not change the key name of a retained generated Secret without an explicit Secret migration.
+
+### Troubleshooting
+
+- API 401/403: check the API token, not the provider credential; never post credential values in logs/issues.
+- Agent responds with provider authentication errors: verify the selected provider, model, endpoint and named custom provider `key_env` mapping.
+- Service timeout with a Ready Pod: inspect the relevant NetworkPolicy peer list and fixed container target port.
+- HTTP 200 from health but Pod not Ready: inspect authenticated detailed readiness and its individual checks.
+- New values do not affect runtime: check whether `config.policy=seed` is preserving an existing config.yaml.
+- Pending backup Pod: ensure the state PVC supports concurrent same-node mounts; ReadWriteOncePod is incompatible with this design.
+- Missing skills/browser binaries: inspect configure logs and the pinned official image; do not enable ad hoc dependency downloads to hide a broken image upgrade.
+- Restore refuses startup: preserve the incomplete volume for diagnosis and recover again into a new empty PVC. Do not bypass the incomplete marker.
+
+## Backup and restore
+
+### Scheduled backups
+
+Enable `backup.enabled`, select the schedule/time zone and configure `backup.s3`. Use a dedicated bucket/prefix and an existing Secret with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and optionally `AWS_SESSION_TOKEN`. AWS S3 uses the default endpoint; compatible storage accepts an HTTPS endpoint and optional `caSecret` containing `ca.crt`. TLS verification is never disabled. The HTTP opt-in exists for explicitly trusted test networks.
+
+The CronJob uses `concurrencyPolicy: Forbid`, no retry of a partially completed run and a bounded active deadline. A required same-node affinity permits a second Pod to mount a ReadWriteOnce volume. ReadWriteOncePod is rejected. The producer holds the native backup lock, creates SQLite online snapshots, checks full database integrity and builds an inventoried ZIP. The uploader cannot mount the agent PVC.
+
+Upload permissions need PutObject and GetObject for the dedicated prefix. The chart neither lists nor deletes backups. For SSE-KMS, grant the necessary KMS encryption/decryption permissions and configure the key ID. Bucket lifecycle controls retention and abandoned partial prefixes. The completed remote layout is:
+
+```text
+<prefix>/hermes-<UTC timestamp>-<random suffix>/backup.zip
+<prefix>/hermes-<UTC timestamp>-<random suffix>/manifest.json
+```
+
+The uploader streams the uploaded ZIP back through SHA-256 verification before writing `manifest.json`. An archive without its completion manifest is not a successful backup. Checksums detect corruption; they are not signatures against an authorized malicious bucket writer. Protect access and consider bucket versioning/immutability according to your retention requirements.
+
+### Consistency and scope
+
+SQLite snapshots use the native online backup API and include committed WAL state. Full integrity checks run without the native size-based shortcut. Files are captured as observed, with exact member hashes. Separate databases, config, cron definitions and workspace files are not captured in a single transaction. Quiesce agent work when your recovery point requires a stable cross-file application state.
+
+The backup follows the pinned native exclusion policy for regenerable caches, downloaded runtimes/models, dependencies, SQLite sidecars, nested backup artifacts and symlinks. The chart additionally excludes runtime PID/lock/status/process files, gateway control sockets and its own recovery markers. Unexpected special files, disappearing included files, unreadable files or failed SQLite snapshots fail the Job. Active file-set changes can require retrying during a quieter period.
+
+Included persistent data can contain config, `.env`, upstream authentication files, local vault encryption keys, profiles, memory, learned skills, sessions, cron and workspace contents. Treat the archive as sensitive as the live agent. Environment-only Kubernetes Secrets, mounted external credentials and remote memory/provider services need independent backup. The chart does not traverse arbitrary external paths or restore the native `_external/` namespace.
+
+### Recovery into a new volume
+
+Create a separate release/PVC and restore from the exact completed manifest key. Keep provider and other external Secrets available in the target namespace. Reuse the S3 connection settings even when scheduled backup is disabled:
+
+```yaml
+fullnameOverride: hermes-recovered
+credentials:
+  existingSecret: hermes-provider
+backup:
+  enabled: false
+  s3:
+    bucket: organization-agent-backups
+    existingSecret: hermes-recovery-s3
+restore:
+  enabled: true
+  manifestKey: hermes-agent/hermes-20260911T120000Z-0123456789abcdef/manifest.json
+```
+
+The prepare init container rejects nonempty state before downloading. Recovery checks the manifest/ZIP hashes, member inventory, paths, permissions, sizes and SQLite integrity in staging. Only a fully validated archive is copied to the empty target. The incomplete marker stays present until published files are reverified; a failed copy cannot start the agent.
+
+After success, the exact manifest key is recorded on the volume. Subsequent restarts skip downloading and preserve current state. Disable `restore.enabled` after recovery and verification. Changing the manifest key on an already populated volume is rejected; there is no force/overwrite mode. `config.policy=managed` then reconciles the new release's declared config, so explicitly choose the provider/model configuration you intend to run.
+
+Staging must hold the archive plus extracted files for restore, and the archive plus an individual database snapshot for backup. Size `backup.stagingSize`, `restore.maxArchiveBytes` and `restore.maxExpandedBytes` together. Staging is disk-backed emptyDir and consumes node ephemeral storage; monitor both the PVC and node disk.
+
+Verify an authenticated agent turn, old session history and memory in a fresh session before directing production traffic to the recovered release. The local acceptance suite performs this recovery against HTTPS S3-compatible storage and checks that a second Pod startup does not replay the restore.
+
+## Observability
+
+Set `metrics.enabled=true` to enable native Hermes gateway-health OTLP export. The optional pinned OpenTelemetry collector runs in the same Pod, binds its OTLP HTTP receiver to loopback and publishes Prometheus exposition on port 8889. It does not mount the agent data or provider credentials.
+
+With `metrics.collector.enabled=false`, configure `metrics.externalEndpoint` as the complete OTLP HTTP metrics URL ending in `/v1/metrics`, and allow its network destination. The upstream exporter does not append that path automatically. The built-in ServiceMonitor/PrometheusRule require the local collector and an existing Prometheus Operator installation.
+
+Permit your Prometheus Pods using `metrics.ingressFrom`. Add the operator's selection labels through `metrics.serviceMonitor.labels` and `metrics.prometheusRule.labels`; installing a ServiceMonitor alone does not cause an unrelated Prometheus instance to select it. The native metric names normalize to names such as `hermes_gateway_up`, `hermes_gateway_active_agents`, `hermes_platform_up` and scheduler/job gauges.
+
+The bundled rules detect an unavailable gateway and absent native gateway metrics. A healthy collector scrape alone cannot prove that the gateway is exporting. Set additional environment-specific rules through `metrics.prometheusRule.additionalRules`. Job metrics from kube-state-metrics can alert on failed/stale backup completion; these are separate from Hermes telemetry.
+
+This integration does not fabricate token-cost, model quality, request-latency or billing metrics. Diagnostic and warning-event OTLP export remain disabled. Kubernetes logs and authenticated detailed health supplement native metrics, but may contain user activity; restrict log access and retention appropriately.
+
+Size memory for the gateway's concurrent work and enabled tools. Browser/terminal/MCP workloads can exceed the default budget. Monitor agent PVC capacity, node ephemeral storage, container restarts, provider rate limits and backup recovery time. The local k3d suite verifies actual OTLP-to-Prometheus values and configuration of operator resources; your production Prometheus selection and notification routing require deployment-specific checks.
+
+## Values reference
+
+All default values are listed below; upstream pass-through configuration remains under `config.values`.
+
+| Value                                         | Default                                                                                     | Purpose                                                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `nameOverride`                                | `""`                                                                                        | Override the chart name used in resource labels.                                                                               |
+| `fullnameOverride`                            | `""`                                                                                        | Override all resource name prefixes for a stable existing installation.                                                        |
+| `image`                                       | Object                                                                                      | Official Hermes runtime, pinned to a verified multi-platform release digest.                                                   |
+| `image.repository`                            | `"docker.io/nousresearch/hermes-agent"`                                                     | Official container image repository.                                                                                           |
+| `image.tag`                                   | `"v2026.9.11@sha256:9469b3e78b9545b6d576eb8887a95352e9a0ea83730eaf31431cf862ca1010e1"`      | Pinned release tag and immutable digest.                                                                                       |
+| `image.pullPolicy`                            | `"IfNotPresent"`                                                                            | Kubernetes image pull policy.                                                                                                  |
+| `imagePullSecrets`                            | `[]`                                                                                        | image pull secrets setting for the gateway.                                                                                    |
+| `auth`                                        | Object                                                                                      | Bearer credential protecting API access and configured agent tools.                                                            |
+| `auth.existingSecret`                         | `""`                                                                                        | Use an existing Secret; empty generates a random token retained with persistent state.                                         |
+| `auth.key`                                    | `"api-key"`                                                                                 | Secret key containing the API bearer token.                                                                                    |
+| `credentials`                                 | Object                                                                                      | Provider and messaging credentials are injected only from a Kubernetes Secret.                                                 |
+| `credentials.existingSecret`                  | `""`                                                                                        | Secret containing upstream environment variables such as OPENROUTER_API_KEY.                                                   |
+| `agent`                                       | Object                                                                                      | Default model and explicitly allowed API toolsets.                                                                             |
+| `agent.model`                                 | `"anthropic/claude-opus-4.6"`                                                               | Upstream model identifier; a corresponding provider credential is required for inference.                                      |
+| `agent.provider`                              | `"openrouter"`                                                                              | Provider identifier, including custom:&lt;name&gt; for an OpenAI-compatible endpoint.                                          |
+| `agent.baseUrl`                               | `""`                                                                                        | Optional model endpoint; custom providers should use apiKeyEnv for credential selection.                                       |
+| `agent.toolsets`                              | `["memory"]`                                                                                | API toolsets. Memory-only by default; enabling terminal/browser grants additional capabilities.                                |
+| `agent.maxIterations`                         | `30`                                                                                        | Maximum tool execution turns for one agent request.                                                                            |
+| `agent.apiKeyEnv`                             | `""`                                                                                        | Credential environment variable for a named custom provider; never an inline API key.                                          |
+| `config`                                      | Object                                                                                      | Non-secret upstream configuration with explicit ownership on Pod initialization.                                               |
+| `config.policy`                               | `"managed"`                                                                                 | managed reconciles declared files; seed preserves existing files and permits dashboard edits.                                  |
+| `config.values`                               | `{}`                                                                                        | Additional upstream configuration. Do not place credentials here; chart-owned sections are validated.                          |
+| `config.soul`                                 | `""`                                                                                        | Optional SOUL.md persona. Empty leaves upstream/user persona unmanaged.                                                        |
+| `persistence`                                 | Object                                                                                      | One retained state volume per release; no concurrent gateway writers.                                                          |
+| `persistence.enabled`                         | `true`                                                                                      | Persist sessions, SQLite state, memory, skills and workspace.                                                                  |
+| `persistence.existingClaim`                   | `""`                                                                                        | Existing persistent claim to mount instead of creating one.                                                                    |
+| `persistence.storageClass`                    | `""`                                                                                        | StorageClass name; empty uses the cluster default.                                                                             |
+| `persistence.accessModes`                     | `["ReadWriteOnce"]`                                                                         | Claim access modes; shared backup mounts require RWO or RWX.                                                                   |
+| `persistence.size`                            | `"10Gi"`                                                                                    | Requested persistent volume capacity.                                                                                          |
+| `persistence.retain`                          | `true`                                                                                      | Keep chart-created PVC and generated API Secret after uninstall.                                                               |
+| `service`                                     | Object                                                                                      | service setting for the gateway.                                                                                               |
+| `service.type`                                | `"ClusterIP"`                                                                               | type setting for service.                                                                                                      |
+| `service.port`                                | `8642`                                                                                      | Service port; network policies use the fixed container port.                                                                   |
+| `service.annotations`                         | `{}`                                                                                        | Additional Kubernetes annotations.                                                                                             |
+| `service.ipFamilyPolicy`                      | `""`                                                                                        | ip family policy setting for service.                                                                                          |
+| `service.ipFamilies`                          | `[]`                                                                                        | ip families setting for service.                                                                                               |
+| `service.loadBalancerSourceRanges`            | `[]`                                                                                        | load balancer source ranges setting for service.                                                                               |
+| `serviceAccount`                              | Object                                                                                      | service account setting for the gateway.                                                                                       |
+| `serviceAccount.create`                       | `true`                                                                                      | create setting for serviceAccount.                                                                                             |
+| `serviceAccount.name`                         | `""`                                                                                        | Existing or overridden Kubernetes resource name.                                                                               |
+| `serviceAccount.annotations`                  | `{}`                                                                                        | Additional Kubernetes annotations.                                                                                             |
+| `resources`                                   | Object                                                                                      | Container CPU and memory requests and limits.                                                                                  |
+| `resources.requests`                          | Object                                                                                      | Guaranteed scheduler resource requests.                                                                                        |
+| `resources.requests.cpu`                      | `"250m"`                                                                                    | CPU quantity.                                                                                                                  |
+| `resources.requests.memory`                   | `"1Gi"`                                                                                     | Memory quantity.                                                                                                               |
+| `resources.limits`                            | Object                                                                                      | Enforced container resource limits.                                                                                            |
+| `resources.limits.cpu`                        | `"2"`                                                                                       | CPU quantity.                                                                                                                  |
+| `resources.limits.memory`                     | `"2Gi"`                                                                                     | Memory quantity.                                                                                                               |
+| `nodeSelector`                                | Object                                                                                      | node selector setting for the gateway.                                                                                         |
+| `nodeSelector.kubernetes.io/os`               | `"linux"`                                                                                   | See the values contract.                                                                                                       |
+| `tolerations`                                 | `[]`                                                                                        | tolerations setting for the gateway.                                                                                           |
+| `affinity`                                    | `{}`                                                                                        | affinity setting for the gateway.                                                                                              |
+| `podAnnotations`                              | `{}`                                                                                        | pod annotations setting for the gateway.                                                                                       |
+| `extraEnv`                                    | `[]`                                                                                        | extra env setting for the gateway.                                                                                             |
+| `networkPolicy`                               | Object                                                                                      | Default-deny ingress with separate API, dashboard and metrics peer allowlists.                                                 |
+| `networkPolicy.enabled`                       | `true`                                                                                      | Enable this optional integration.                                                                                              |
+| `networkPolicy.ingressFrom`                   | `[]`                                                                                        | Kubernetes NetworkPolicy peers allowed to call container port 8642.                                                            |
+| `networkPolicy.extraEgress`                   | `[]`                                                                                        | Explicit extra egress rules for custom providers, MCP servers or remote execution.                                             |
+| `networkPolicy.allowInternet`                 | `true`                                                                                      | Allow public IPv4/IPv6 HTTPS egress for providers; private networks require extraEgress.                                       |
+| `terminationGracePeriodSeconds`               | `120`                                                                                       | Time for gateway shutdown and in-flight work before Kubernetes terminates the Pod.                                             |
+| `channels`                                    | Object                                                                                      | Opt-in messaging adapters; credentials come from credentials.existingSecret and user allowlists are required.                  |
+| `channels.telegram`                           | Object                                                                                      | telegram setting for channels.                                                                                                 |
+| `channels.telegram.enabled`                   | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `channels.telegram.allowedUsers`              | `[]`                                                                                        | Explicit upstream user IDs permitted to interact with this messaging adapter.                                                  |
+| `channels.telegram.toolsets`                  | `["memory"]`                                                                                | Toolsets exposed to this messaging adapter.                                                                                    |
+| `channels.discord`                            | Object                                                                                      | discord setting for channels.                                                                                                  |
+| `channels.discord.enabled`                    | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `channels.discord.allowedUsers`               | `[]`                                                                                        | Explicit upstream user IDs permitted to interact with this messaging adapter.                                                  |
+| `channels.discord.toolsets`                   | `["memory"]`                                                                                | Toolsets exposed to this messaging adapter.                                                                                    |
+| `channels.slack`                              | Object                                                                                      | slack setting for channels.                                                                                                    |
+| `channels.slack.enabled`                      | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `channels.slack.allowedUsers`                 | `[]`                                                                                        | Explicit upstream user IDs permitted to interact with this messaging adapter.                                                  |
+| `channels.slack.toolsets`                     | `["memory"]`                                                                                | Toolsets exposed to this messaging adapter.                                                                                    |
+| `dashboard`                                   | Object                                                                                      | Optional privileged administration UI in the gateway Pod; requires config.policy=seed.                                         |
+| `dashboard.enabled`                           | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `dashboard.existingSecret`                    | `""`                                                                                        | Secret with HERMES_DASHBOARD_BASIC_AUTH_USERNAME, HERMES_DASHBOARD_BASIC_AUTH_PASSWORD and HERMES_DASHBOARD_BASIC_AUTH_SECRET. |
+| `dashboard.publicUrl`                         | `""`                                                                                        | External HTTPS dashboard origin, used by Host validation and OAuth redirects.                                                  |
+| `dashboard.resources`                         | Object                                                                                      | Container CPU and memory requests and limits.                                                                                  |
+| `dashboard.resources.requests`                | Object                                                                                      | Guaranteed scheduler resource requests.                                                                                        |
+| `dashboard.resources.requests.cpu`            | `"100m"`                                                                                    | CPU quantity.                                                                                                                  |
+| `dashboard.resources.requests.memory`         | `"256Mi"`                                                                                   | Memory quantity.                                                                                                               |
+| `dashboard.resources.limits`                  | Object                                                                                      | Enforced container resource limits.                                                                                            |
+| `dashboard.resources.limits.cpu`              | `"1"`                                                                                       | CPU quantity.                                                                                                                  |
+| `dashboard.resources.limits.memory`           | `"1Gi"`                                                                                     | Memory quantity.                                                                                                               |
+| `dashboard.service`                           | Object                                                                                      | service setting for dashboard.                                                                                                 |
+| `dashboard.service.port`                      | `9119`                                                                                      | Service port; network policies use the fixed container port.                                                                   |
+| `dashboard.service.annotations`               | `{}`                                                                                        | Additional Kubernetes annotations.                                                                                             |
+| `dashboard.ingressFrom`                       | `[]`                                                                                        | NetworkPolicy peers allowed to reach the administrative dashboard on container port 9119.                                      |
+| `ingress`                                     | Object                                                                                      | Optional API ingress. TLS termination is the ingress controller responsibility.                                                |
+| `ingress.enabled`                             | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `ingress.ingressClassName`                    | `""`                                                                                        | ingress class name setting for ingress.                                                                                        |
+| `ingress.annotations`                         | `{}`                                                                                        | Additional Kubernetes annotations.                                                                                             |
+| `ingress.hosts`                               | `[{"host":"hermes.example.com","paths":[{"path":"/","pathType":"Prefix"}]}]`                | hosts setting for ingress.                                                                                                     |
+| `ingress.tls`                                 | `[]`                                                                                        | tls setting for ingress.                                                                                                       |
+| `gatewayAPI`                                  | Object                                                                                      | Canonical Gateway API HTTPRoutes; backend defaults to the authenticated API Service.                                           |
+| `gatewayAPI.enabled`                          | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `gatewayAPI.httpRoutes`                       | `[]`                                                                                        | http routes setting for gatewayAPI.                                                                                            |
+| `externalSecrets`                             | Object                                                                                      | Optional integration with an existing External Secrets Operator installation.                                                  |
+| `externalSecrets.enabled`                     | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `externalSecrets.refreshInterval`             | `"1h"`                                                                                      | refresh interval setting for externalSecrets.                                                                                  |
+| `externalSecrets.items`                       | `[]`                                                                                        | items setting for externalSecrets.                                                                                             |
+| `metrics`                                     | Object                                                                                      | Native Hermes gateway health metrics exported through OTLP; no synthetic inference/cost metrics.                               |
+| `metrics.enabled`                             | `false`                                                                                     | Enable native upstream OTLP gateway-health metrics.                                                                            |
+| `metrics.intervalSeconds`                     | `15`                                                                                        | interval seconds setting for metrics.                                                                                          |
+| `metrics.externalEndpoint`                    | `""`                                                                                        | Full external OTLP HTTP metrics URL ending in /v1/metrics when the collector is disabled.                                      |
+| `metrics.collector`                           | Object                                                                                      | Optional local official collector translating OTLP to Prometheus on port 8889.                                                 |
+| `metrics.collector.enabled`                   | `true`                                                                                      | Enable this optional integration.                                                                                              |
+| `metrics.collector.image`                     | Object                                                                                      | image setting for metrics.collector.                                                                                           |
+| `metrics.collector.image.repository`          | `"ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib"` | Official container image repository.                                                                                           |
+| `metrics.collector.image.tag`                 | `"0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6"`         | Pinned release tag and immutable digest.                                                                                       |
+| `metrics.collector.image.pullPolicy`          | `"IfNotPresent"`                                                                            | Kubernetes image pull policy.                                                                                                  |
+| `metrics.collector.resources`                 | Object                                                                                      | Container CPU and memory requests and limits.                                                                                  |
+| `metrics.collector.resources.requests`        | Object                                                                                      | Guaranteed scheduler resource requests.                                                                                        |
+| `metrics.collector.resources.requests.cpu`    | `"50m"`                                                                                     | CPU quantity.                                                                                                                  |
+| `metrics.collector.resources.requests.memory` | `"64Mi"`                                                                                    | Memory quantity.                                                                                                               |
+| `metrics.collector.resources.limits`          | Object                                                                                      | Enforced container resource limits.                                                                                            |
+| `metrics.collector.resources.limits.cpu`      | `"500m"`                                                                                    | CPU quantity.                                                                                                                  |
+| `metrics.collector.resources.limits.memory`   | `"256Mi"`                                                                                   | Memory quantity.                                                                                                               |
+| `metrics.serviceMonitor`                      | Object                                                                                      | service monitor setting for metrics.                                                                                           |
+| `metrics.serviceMonitor.enabled`              | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `metrics.serviceMonitor.labels`               | `{}`                                                                                        | Additional Kubernetes labels.                                                                                                  |
+| `metrics.serviceMonitor.interval`             | `"30s"`                                                                                     | Prometheus scrape interval.                                                                                                    |
+| `metrics.serviceMonitor.scrapeTimeout`        | `"10s"`                                                                                     | Prometheus scrape timeout.                                                                                                     |
+| `metrics.prometheusRule`                      | Object                                                                                      | prometheus rule setting for metrics.                                                                                           |
+| `metrics.prometheusRule.enabled`              | `false`                                                                                     | Enable this optional integration.                                                                                              |
+| `metrics.prometheusRule.labels`               | `{}`                                                                                        | Additional Kubernetes labels.                                                                                                  |
+| `metrics.prometheusRule.additionalRules`      | `[]`                                                                                        | additional rules setting for metrics.prometheusRule.                                                                           |
+| `metrics.ingressFrom`                         | `[]`                                                                                        | NetworkPolicy peers allowed to scrape the private metrics Service.                                                             |
+| `backup`                                      | Object                                                                                      | Scheduled SQLite-consistent native snapshots uploaded to S3 with a completion manifest.                                        |
+| `backup.enabled`                              | `false`                                                                                     | Enable the backup CronJob; requires persistent storage and S3 configuration.                                                   |
+| `backup.schedule`                             | `"0 3 * * *"`                                                                               | schedule setting for backup.                                                                                                   |
+| `backup.timeZone`                             | `"Etc/UTC"`                                                                                 | time zone setting for backup.                                                                                                  |
+| `backup.suspend`                              | `false`                                                                                     | suspend setting for backup.                                                                                                    |
+| `backup.successfulJobsHistoryLimit`           | `1`                                                                                         | successful jobs history limit setting for backup.                                                                              |
+| `backup.failedJobsHistoryLimit`               | `2`                                                                                         | failed jobs history limit setting for backup.                                                                                  |
+| `backup.activeDeadlineSeconds`                | `1800`                                                                                      | active deadline seconds setting for backup.                                                                                    |
+| `backup.stagingSize`                          | `"10Gi"`                                                                                    | Ephemeral archive staging size; budget for the ZIP and temporary SQLite snapshots.                                             |
+| `backup.resources`                            | Object                                                                                      | Container CPU and memory requests and limits.                                                                                  |
+| `backup.resources.requests`                   | Object                                                                                      | Guaranteed scheduler resource requests.                                                                                        |
+| `backup.resources.requests.cpu`               | `"100m"`                                                                                    | CPU quantity.                                                                                                                  |
+| `backup.resources.requests.memory`            | `"256Mi"`                                                                                   | Memory quantity.                                                                                                               |
+| `backup.resources.limits`                     | Object                                                                                      | Enforced container resource limits.                                                                                            |
+| `backup.resources.limits.cpu`                 | `"1"`                                                                                       | CPU quantity.                                                                                                                  |
+| `backup.resources.limits.memory`              | `"1Gi"`                                                                                     | Memory quantity.                                                                                                               |
+| `backup.s3`                                   | Object                                                                                      | s3 setting for backup.                                                                                                         |
+| `backup.s3.bucket`                            | `""`                                                                                        | bucket setting for backup.s3.                                                                                                  |
+| `backup.s3.prefix`                            | `"hermes-agent"`                                                                            | prefix setting for backup.s3.                                                                                                  |
+| `backup.s3.region`                            | `"us-east-1"`                                                                               | region setting for backup.s3.                                                                                                  |
+| `backup.s3.endpoint`                          | `""`                                                                                        | endpoint setting for backup.s3.                                                                                                |
+| `backup.s3.allowInsecureEndpoint`             | `false`                                                                                     | Allow HTTP only for explicitly trusted local test/object-storage networks.                                                     |
+| `backup.s3.existingSecret`                    | `""`                                                                                        | Secret with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, optionally AWS_SESSION_TOKEN.                                         |
+| `backup.s3.sse`                               | `"AES256"`                                                                                  | sse setting for backup.s3.                                                                                                     |
+| `backup.s3.kmsKeyId`                          | `""`                                                                                        | kms key id setting for backup.s3.                                                                                              |
+| `backup.s3.caSecret`                          | `""`                                                                                        | Optional Secret containing ca.crt for a private HTTPS endpoint.                                                                |
+| `backup.image`                                | Object                                                                                      | image setting for backup.                                                                                                      |
+| `backup.image.repository`                     | `"public.ecr.aws/aws-cli/aws-cli"`                                                          | Official container image repository.                                                                                           |
+| `backup.image.tag`                            | `"2.36.43@sha256:d948ee299a7ffcaec0d6052a00b9f4c513c61cacfaedfe68b098c85808394441"`         | Pinned release tag and immutable digest.                                                                                       |
+| `backup.image.pullPolicy`                     | `"IfNotPresent"`                                                                            | Kubernetes image pull policy.                                                                                                  |
+| `backup.networkPolicy`                        | Object                                                                                      | network policy setting for backup.                                                                                             |
+| `backup.networkPolicy.extraEgress`            | `[]`                                                                                        | Additional backup Pod egress, for example private object storage.                                                              |
+| `restore`                                     | Object                                                                                      | Explicit disaster recovery into an empty volume before configuration initialization.                                           |
+| `restore.enabled`                             | `false`                                                                                     | Restore exactly once into empty state; existing nonempty state is never overwritten.                                           |
+| `restore.manifestKey`                         | `""`                                                                                        | Full S3 object key of the completed backup manifest; uses backup.s3 settings.                                                  |
+| `restore.maxArchiveBytes`                     | `10737418240`                                                                               | Maximum downloaded archive size accepted in bytes.                                                                             |
+| `restore.maxExpandedBytes`                    | `21474836480`                                                                               | Maximum aggregate uncompressed archive bytes accepted during restore.                                                          |
