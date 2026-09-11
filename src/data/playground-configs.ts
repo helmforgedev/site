@@ -10,6 +10,26 @@
 export const chartConfigs: Record<string, ChartConfig> = {
   'text-embeddings-inference': [
     {
+      name: 'Network compatibility',
+      fields: [
+        {
+          label: 'IPv6 listeners',
+          key: 'proxy.ipv6',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable for IPv6 or dual-stack Services; requires kernel IPv6 support',
+        },
+        {
+          label: 'Service IP family policy',
+          key: 'service.ipFamilyPolicy',
+          type: 'select',
+          default: '',
+          options: ['', 'SingleStack', 'PreferDualStack', 'RequireDualStack'],
+          description: 'Empty uses the cluster default; dual-stack policies require IPv6 listeners',
+        },
+      ],
+    },
+    {
       name: 'Immutable embedding model',
       fields: [
         {

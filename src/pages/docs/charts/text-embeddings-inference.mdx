@@ -161,7 +161,8 @@ when hostname restrictions are required. Local mode denies egress unless `extraE
 Policy enforcement requires a compatible CNI. Custom peer rules replace the default same-namespace rule.
 
 `service.ipFamilyPolicy` and `service.ipFamilies` configure API and metrics Services. RequireDualStack needs a
-dual-stack cluster; PreferDualStack may fall back. Both proxy listeners support IPv4 and IPv6.
+dual-stack cluster; PreferDualStack may fall back. IPv4 sockets are the default. Set `proxy.ipv6: true` for IPv6 or dual-stack Services;
+the chart rejects incompatible listener/Service settings. Keep it false when kernel IPv6 support is disabled.
 
 ## Observability
 
@@ -170,7 +171,7 @@ The private listener on 9464 serves only native `/metrics`. It exposes TEI reque
 inference duration histograms. Public `/metrics`, `/docs` and `/api-doc` paths return 404.
 Configure Prometheus selectors to discover the ServiceMonitor and network peers to permit actual scraping.
 
-The optional built-in PrometheusRule reports a down scrape target; it is not a semantic quality or latency SLO.
+The optional built-in PrometheusRule reports a down or absent scrape target; it is not a semantic quality or latency SLO.
 Add workload-specific recording and alert rules through `additionalRules`. Inspect native metrics for the pinned
 release before writing queries. Metrics may disclose model/workload metadata and belong in the trusted network.
 
@@ -287,6 +288,8 @@ Install ESO and an authorized SecretStore first. Each `externalSecrets.items[]` 
 overrides and the upstream `spec` contract, including data/dataFrom and source references. The chart supplies
 default refresh interval and target name only when omitted. Reference that target through `auth.existingSecret`.
 A separate item can provide the Hub token; the two credentials have unrelated trust and rotation lifecycles.
+Rendered ExternalSecret names must be unique, including after Kubernetes name truncation. Give multiple items
+distinct names or fullname overrides; duplicate implicit auth names are rejected before installation.
 
 After installation, inspect ExternalSecret readiness and verify that the target Secret contains the configured
 key. Do not print its value. ESO updates do not modify existing process environment; trigger a Pod rollout after
@@ -334,7 +337,7 @@ Install Prometheus Operator CRDs before enabling ServiceMonitor or PrometheusRul
 ServiceMonitor labels and namespace. A ServiceMonitor object alone does not prove a successful scrape.
 
 Inspect `up` for the metrics endpoint and native `te_request_count`, `te_request_success` and inference-duration
-histograms after real requests. The default alert detects a down target; define latency/error SLOs from measured
+histograms after real requests. The default alert detects a down or absent target; define latency/error SLOs from measured
 traffic and the exact release's metric labels. Restrict access to monitoring metadata.
 
 ### Troubleshooting
@@ -479,6 +482,8 @@ proxy:
     pullPolicy: IfNotPresent
   # -- Public Pod listener; native TEI always binds loopback port 8081.
   port: 8080
+  # -- Enable IPv6 sockets; required for IPv6/dual-stack Services and must be false when kernel IPv6 is disabled.
+  ipv6: false
   # -- Native response timeout; use a longer termination grace period.
   readTimeoutSeconds: 120
   # -- Proxy CPU and memory budgets, separate from model inference.

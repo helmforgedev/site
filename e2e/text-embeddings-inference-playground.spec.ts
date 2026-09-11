@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { test, expect } from '@playwright/test';
 
+test('embedding dual-stack configuration includes the required IPv6 listeners', async ({ page }) => {
+  await page.goto('/playground');
+  await page.locator('.playground-chart-btn[data-slug="text-embeddings-inference"]').click();
+  await page.locator('button[data-field-key="proxy.ipv6"]').click();
+  await page.locator('select[data-field-key="service.ipFamilyPolicy"]').selectOption('RequireDualStack');
+  await expect(page.locator('#playground-code')).toContainText('proxy.ipv6=true');
+  await expect(page.locator('#playground-code')).toContainText('service.ipFamilyPolicy=RequireDualStack');
+});
+
 test('embedding deployment preserves immutable model identity and secret references', async ({ page }) => {
   await page.goto('/playground');
   await page.locator('.playground-chart-btn[data-slug="text-embeddings-inference"]').click();
