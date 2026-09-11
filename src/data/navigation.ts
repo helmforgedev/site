@@ -139,6 +139,8 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Papra', href: '/docs/charts/papra', maturity: 'stable' },
       { label: 'Ryot', href: '/docs/charts/ryot', maturity: 'stable' },
       { label: 'Pocket ID', href: '/docs/charts/pocket-id', maturity: 'stable' },
+      { label: 'Twenty', href: '/docs/charts/twenty', maturity: 'stable' },
+      { label: 'Reactive Resume', href: '/docs/charts/reactive-resume', maturity: 'stable' },
       { label: 'Dawarich', href: '/docs/charts/dawarich', maturity: 'stable' },
       { label: 'AFFiNE', href: '/docs/charts/affine', maturity: 'stable' },
       { label: 'OpenCloud', href: '/docs/charts/opencloud', maturity: 'stable' },

@@ -14,6 +14,21 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Twenty',
+    slug: 'twenty',
+    description:
+      'Private CRM workspace with native server and worker, PostgreSQL, authenticated Redis and retained identity.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
+    name: 'Reactive Resume',
+    slug: 'reactive-resume',
+    description: 'Private resume authoring with native PDF generation, retained identity, PostgreSQL, SMTP and S3.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Dawarich',
     slug: 'dawarich',
     description:

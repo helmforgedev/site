@@ -1,0 +1,923 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Reactive Resume Chart
+description: Private resume authoring with native PDF generation, PostgreSQL, retained identity, authenticated SMTP, private S3 and existing-user OAuth.
+---
+
+# Reactive Resume Helm Chart
+
+Reactive Resume v5 with native PDF generation, PostgreSQL, retained authentication
+and encryption keys, and private initial enrollment before the public proxy starts.
+
+Optional integration scenarios have passed behavioral acceptance individually.
+The complete `make validate-chart` gate remains required before release.
+
+## Architecture and defaults
+
+The official image runs as UID/GID 1000 with a read-only root filesystem. One
+`Recreate` Pod shares its upload PVC with the initializer and serves public traffic
+through unprivileged NGINX. The application and its independent admission helper
+use tokenless ServiceAccounts, resource limits and explicit NetworkPolicies.
+
+The HelmForge PostgreSQL dependency is enabled by default. Disable it for an
+existing PostgreSQL database with an explicit role password Secret and verified
+TLS. Native migrations need permission to create their database-local schema;
+the bundled initialization grants that permission without granting superuser or
+cluster-wide `CREATEDB` privileges.
+
+The initial account is a native ordinary user. The chart does not silently promote
+it to administrator. Public signup remains disabled after private enrollment.
+An enforcing CNI and trusted namespace policy ownership are installation
+prerequisites: readiness alone cannot isolate the native wildcard listener.
+See [onboarding](#onboarding-details) for the admission checks and their limits.
+
+## Installation
+
+```sh
+helm repo add helmforge https://repo.helmforge.dev
+helm upgrade --install resumes helmforge/reactive-resume \
+  --namespace resumes --create-namespace -f values-production.yaml
+```
+
+Prepare the referenced Secrets and public HTTPS endpoint before installation.
+See [the production example](#production-example); its hostnames are placeholders.
+
+## Supported configuration
+
+| Capability       | Configuration and behavior                                                       |
+| ---------------- | -------------------------------------------------------------------------------- |
+| PostgreSQL       | HelmForge dependency or external database; external TLS verifies CA and hostname |
+| Uploads          | Local PVC or existing private S3-compatible bucket over HTTPS                    |
+| Native email     | Authenticated implicit TLS SMTP with optional additional CA                      |
+| Single sign-on   | Custom OAuth2 provider with explicit endpoints and linked existing accounts      |
+| Exposure         | Ingress with explicit class or canonical `gatewayAPI.httpRoutes[]`               |
+| Secrets          | Retained chart-managed identity Secrets, existing Secrets and ESO `items[]`      |
+| Address families | Configurable public Service families; admission checks every application Pod IP  |
+| Recovery         | Coordinated PostgreSQL, upload storage, identity marker and retained keys        |
+
+For S3, the application performs authenticated bucket requests and serves public
+picture URLs through its own proxy. A private bucket does not make picture URLs
+private to authenticated users. See [storage](#storage-details).
+
+SMTP exposes implicit TLS only. Without SMTP, mail-dependent account routes are
+blocked because the native fallback writes token-bearing links to logs. See
+[email configuration](#smtp-details). Additional integration CAs augment the native
+Node process trust store and apply to all its TLS clients.
+
+The pinned image uses Better Auth 1.7.3. The custom provider callback is
+`/api/auth/callback/custom`, and native PKCE defaults to enabled. This chart's
+manual OAuth2 contract does not claim OIDC ID-token validation. See
+[single sign-on](#oauth-details).
+
+## Operating limits
+
+Native v5 PDF generation needs no Browserless sidecar. It fetches fallback fonts
+over HTTPS even for a Latin-only resume using standard PDF fonts. The default
+egress policy permits public TCP 443 with private and special ranges excluded.
+Replace this with approved egress controls as needed; standard NetworkPolicy
+cannot enforce CDN hostname allowlists. An offline renderer is not claimed.
+
+One application replica serializes native migrations and owns the retained
+volume. Horizontal autoscaling and highly available application replicas are
+outside this contract. Kubernetes probes are health checks, not Prometheus
+metrics; no fabricated ServiceMonitor endpoint is exposed.
+
+Redis-backed AI agent queues, paid AI-provider behavior and private AI attachments
+are outside the validated feature set. The retained encryption key prepares
+correct identity preservation without claiming those integrations work.
+
+## Upgrades and recovery
+
+The image tag is paired with an immutable digest because the upstream `v5.3.0`
+tag has been rebuilt beyond its Git release tag. Validate the actual replacement
+image, migrations and integrations before changing that digest.
+
+Preserve `AUTH_SECRET`, `ENCRYPTION_SECRET`, PostgreSQL and the hidden identity
+marker together with uploads. Changing the bootstrap password Secret does not
+reset an existing native password. The initializer refuses mismatched keys,
+missing ownership markers and missing or banned initial users.
+
+See [dependency requirements](#dependencies-details) and
+[coordinated recovery](#retained-state-details). S3 backups also need a consistent
+bucket recovery point; the local restore profile does not prove S3 disaster recovery.
+
+## Validation
+
+The initial k3d MVP proved ordinary-user login, closed signup, native private resume
+CRUD, actual PDF text and retention after Pod replacement. Its admission test
+deliberately exposed the native port and verified refusal before ordinary
+positive-public/negative-native checks for every Pod address family.
+
+Behavioral acceptance also exercises delivered SMTP password recovery and one-use
+tokens, actual private S3 object bytes and certificate failures, external PostgreSQL
+TLS, native OAuth linking after email verification, state/PKCE/replay/closed signup,
+real HTTPS browser PDF download, existing Secrets/ESO and fresh database/PVC recovery.
+Recovery preserves the original session, private resume, upload hash and generated PDF.
+The final complete gate must pass against the release candidate; static tests alone
+are not a substitute for these application checks.
+
+## Security Scan: `reactive-resume`
+
+| Framework | Score |
+| --------- | ----- |
+| Overall   | 100%  |
+| NSA       | 100%  |
+| MITRE     | 100%  |
+| SOC2      | 100%  |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-11. No resources failed this
+configuration scan. This does not replace image vulnerability management or
+application security review.
+
+## onboarding details
+
+The initial behavioral gate passed native enrollment, ordinary-user authentication,
+closed signup, real resume/PDF content, Pod replacement and network-boundary checks.
+The complete production profile matrix also passed SMTP recovery, private S3,
+external PostgreSQL TLS, native OAuth linking, browser PDF download, ESO and fresh
+database/PVC recovery. See the README for the acceptance scope and limitations.
+
+Reactive Resume does not provide a first-user exception to disabled signup. The
+chart therefore starts an unchanged native server inside an initialization
+container, creates the initial ordinary user through native signup, verifies a
+native login/session, stops that server, and only then permits the public proxy
+and ordinary application containers to start. It does not promote that account
+to administrator or write password hashes into PostgreSQL.
+
+### Required network boundary
+
+The native server binds to wildcard port 3010. Its image has no supported loopback
+binding option. An enforcing Kubernetes NetworkPolicy implementation and trusted
+namespace policy administration are requirements, not optional hardening.
+
+Before enrollment, the same init process opens harmless listeners on 3010 and 3011. A separate helper verifies that 3011 is reachable while 3010 is blocked.
+It targets only its actual TCP caller at those fixed ports. Requests and responses
+use a separate HMAC key; application passwords, session cookies and database
+credentials are never sent to the helper.
+
+The probe runs for every init attempt and every Pod address family. Its internal
+Service uses PreferDualStack independently of public Service exposure. The native
+listener is checked locally before and after the remote sample, and every harmless
+connection is closed before the native application starts. No phase relabeling or
+temporary allow rule changes the Pod's isolation between those steps.
+
+These are bounded observations. NetworkPolicies are additive: another allow rule,
+an untrusted policy controller or a broken CNI can invalidate the boundary. The
+helper cannot prove universal denial from every source. Its egress must allow both
+probe ports so that blocked helper egress cannot manufacture a successful result.
+Node traffic, privileged debug access and cluster administrators are outside the
+ordinary Pod isolation boundary. Audit injected containers and policy ownership.
+
+### Credentials and retained identity
+
+Configure the initial name, email and username before installation. Supply an
+existing Secret containing a password of 16 to 64 characters (at most 72 UTF-8
+bytes and 64 JavaScript string units, matching native bcrypt/auth limits); alternatively Helm
+generates one. The password and helper key are mounted only in initialization.
+Ordinary application containers receive the retained AUTH_SECRET and independent
+ENCRYPTION_SECRET, plus connection credentials.
+
+The application PVC retains a fingerprint of both native keys and the initial
+user ID. An existing user database must match that marker before native migrations
+start. Initialization does not reset a password or rename an existing account.
+Missing keys, marker or initial account require an explicit migration/recovery
+review. A crash after native signup but before writing the marker also fails
+closed; it does not retry signup and silently adopt an unrelated database.
+
+### Operational boundaries
+
+Ordinary operation keeps native signup disabled. A second proxy rule blocks the
+public signup namespace. Initial-session verification over isolated loopback is
+not evidence of browser HTTPS cookie behavior; that requires separate acceptance
+through the real public origin.
+
+Native SMTP delivery and password recovery passed behavioral acceptance. Additional-user
+enrollment is outside the chart's initial account contract. Without SMTP, upstream can print sensitive email
+links to its logs. Bootstrap output is suppressed for that reason. The public proxy
+also blocks password-reset requests, verification-email requests and email changes
+until authenticated SMTP support is configured and accepted.
+
+If native startup fails, initialization retains a mode-0600 diagnostic file at
+`/tmp/helmforge-native-bootstrap.log`. It may contain sensitive native output and
+is restricted to the workload identity and authorized cluster administrators.
+Initialization deletes it before ordinary containers start successfully. Public
+bootstrap logs report only the chart-owned failure stage.
+
+## dependencies details
+
+Behavioral acceptance of this chart is still in progress. The following describes
+the implemented configuration contract, not completed runtime evidence.
+
+### Bundled PostgreSQL
+
+The chart uses the HelmForge PostgreSQL dependency in standalone mode. Its
+application role has CREATE permission on the configured database and runs the
+unchanged native Drizzle migrations in its dedicated schema. It is not granted
+superuser or permission to create other databases. Application containers receive the role password through a
+Secret reference. They do not receive the PostgreSQL superuser password.
+
+PostgreSQL temporary and socket directories have explicit writable volumes so
+that its root filesystem can remain read-only. Protect the database PVC and retain
+the role credential across upgrades. The application startup checks both database
+access and local storage before becoming ready.
+
+### External PostgreSQL
+
+Set `postgresql.enabled=false`, then configure `database.host`, `database.port`,
+`database.name`, `database.username` and `database.passwordSecret`. The selected
+Secret key defaults to `password`. The launcher constructs the native PostgreSQL
+URL with encoded credentials and database name; do not concatenate a password
+into `extraEnv` or expose it in a command line.
+
+External TLS is enabled by default. Verification uses the hostname in
+`database.host` and the trusted certificate chain. An optional `database.tls.caSecret`
+adds a PEM CA bundle from `database.tls.caKey`. Certificate bypasses are outside
+the contract. Explicit NetworkPolicy egress rules must permit the actual database
+endpoint and port. The external TLS profile still requires runtime acceptance,
+including rejection of an unknown CA and an incorrect certificate hostname.
+The external role also needs CREATE on this database and appropriate privileges
+on the public schema; connection permission alone cannot run Drizzle migrations.
+
+### Readiness and shutdown
+
+Native `/api/health` tests PostgreSQL and storage. Readiness uses that result;
+liveness checks the native listener so a database outage does not by itself cause
+a restart loop. The initialization budget includes network admission, dependency
+admission, migrations and private first-user enrollment. Inspect the reported
+initialization stage when an installation cannot become ready.
+
+The application uses one replica and the Recreate strategy. Changes cause planned
+downtime. A disruption budget cannot make a singleton highly available. Avoid
+concurrent releases pointing at the same database or upload volume.
+
+### PDF generation
+
+The native v5 server generates PDFs without Browserless. Its fonts and rendering
+behavior belong to the pinned application artifact. The runtime acceptance script
+creates a private resume through the native API, edits its contents, downloads a
+real PDF and extracts its text. Merely returning a PDF content type is insufficient.
+
+The verified image fetches a Noto punctuation fallback even when Helvetica is
+selected. It therefore needs font-network access for ordinary PDF rendering.
+The default policy permits public TCP 443, excluding private and special-use
+address ranges. This is an IP/port rule, not a DNS allowlist. Set
+`networkPolicy.allowPublicHttps=false` only when equivalent approved font egress
+is supplied through `extraEgress` or an operator-managed egress policy. Standard
+Kubernetes NetworkPolicy cannot enforce a hostname allowlist for changing CDNs.
+Offline PDF export is not currently part of the native image contract.
+
+## retained-state details
+
+Fresh-database and fresh-volume restoration still require behavioral acceptance
+before this chart is released.
+
+### State that belongs together
+
+Preserve the PostgreSQL database, local upload PVC and the Secret containing
+`AUTH_SECRET` and `ENCRYPTION_SECRET` as one recovery set. PostgreSQL stores native
+users, sessions, resume contents, ownership and authentication metadata. The PVC
+stores uploaded files and `.helmforge-identity.json`. The marker contains the
+initial native user ID and a fingerprint of the two retained keys; it is not a
+substitute for backing up those Secret values.
+
+`AUTH_SECRET` protects native authentication. `ENCRYPTION_SECRET` protects native
+provider credentials when those features are used. Replacing a Secret with a new
+random value is not an ordinary password rotation. The chart refuses an existing
+user database when the matching marker or initial account is missing, or when the
+retained key fingerprint differs.
+
+The bootstrap password Secret is only used for initial enrollment. Its value is
+not reapplied to an existing user account on restart or Helm upgrade. Native
+account changes remain native; the initializer does not reset passwords or
+promote an account into administrator privileges.
+
+### Coordinated recovery
+
+Quiesce the application before collecting a database dump and upload-volume
+snapshot. Restore the database and files into fresh destinations with matching
+role ownership, PVC permissions and retained native keys. Keep the application
+closed until the complete recovery set is present. Preserve the hidden identity
+marker when copying files; a shell wildcard that omits dotfiles is insufficient.
+
+Recovering only PostgreSQL can leave missing files. Recovering only the PVC can
+leave missing owners and metadata. Restoring a different database with an old
+marker deliberately fails admission instead of silently claiming the instance.
+
+Before reopening service, validate a retained native login, an existing private
+resume, the original upload bytes and a generated PDF containing that resume's
+content. The acceptance profile performed these checks against fresh database and
+PVC resources, including the original authenticated session. Its archive includes
+hidden top-level entries while preserving the storage provider's mount-root metadata.
+
+## storage details
+
+Local uploads use the retained application PVC by default. Set `storage.driver: s3`
+for an existing private bucket and provide its credentials through `storage.s3.existingSecret`.
+The native application explicitly supplies access and secret keys; this contract does not
+claim workload identity, temporary session credentials or automatic bucket provisioning.
+
+Custom endpoints must use HTTPS. `forcePathStyle` supports compatible services without
+bucket wildcard DNS. An optional PEM CA Secret augments the native Node trust store;
+certificate chain and hostname verification stay enabled. When SMTP and S3 supply different
+private CAs, the launcher combines them before starting the native process. These additional
+CAs apply to all TLS clients in that process, rather than only one integration.
+
+The bucket must permit scoped list, read, write and delete operations. Native readiness writes
+and deletes its `healthcheck` object. Uploads use authenticated requests without public object
+ACLs; the application serves picture URLs through its own public upload proxy. A private
+bucket therefore does not make a resume picture confidential to authenticated application users.
+Native private AI attachments have separate access rules and are outside this chart's current
+validated feature set.
+
+The PVC remains required in S3 mode for the retained user and key fingerprint marker. Back up
+PostgreSQL, the retained signing/encryption Secrets, that marker and the bucket together.
+Switching storage drivers does not migrate existing files. S3 runtime acceptance compared
+native upload bytes with the stored object, rejected unsigned reads, verified certificate
+and hostname failures, and retained public picture delivery after Pod replacement.
+
+## smtp details
+
+The k3d acceptance profile verified actual delivery, native password reset,
+single-use tokens, rejection of the old password and subsequent login. It also
+requires certificate, hostname and credential failures to be rejected distinctly.
+
+### Native transport
+
+Enable `smtp.enabled` and provide a certificate-matching DNS hostname, implicit
+TLS port, sender, username and existing password Secret. The default port is 465.
+The chart sets native `SMTP_SECURE=true` and verifies the connection, certificate
+and authentication during initialization. It does not grant credentials to the
+network-admission helper or proxy container.
+
+The upstream environment contract exposes opportunistic STARTTLS but not a
+`requireTLS` option. This chart therefore supports implicit TLS rather than
+presenting opportunistic STARTTLS as enforced encryption. Certificate validation
+cannot be disabled through the managed values contract.
+
+`smtp.tls.caSecret` optionally supplies an additional PEM CA bundle. Native Node
+loads it as additional TLS trust for the application process, including other
+HTTPS clients in that process. It is not a separate SMTP-only trust store.
+Certificate hostname verification remains enabled. Permit the actual SMTP
+destination and port through `networkPolicy.extraEgress`.
+
+### Delivery behavior
+
+Native Reactive Resume catches mail-send errors, so a successful HTTP recovery
+request alone does not prove delivery. The acceptance profile uses an owned,
+authenticated Mailpit server with TLS. It requests a native recovery email,
+retrieves the delivered message, follows the native callback and changes the
+password using its token. It also checks token replay rejection and authenticates
+with the recovered password before restoring the owned fixture password.
+
+The same profile tests an untrusted CA, a mismatched TLS hostname and an incorrect
+SMTP password. A successful SMTP verify only proves connection/authentication;
+message arrival and native account recovery are separate assertions.
+
+When SMTP is disabled, the proxy blocks password-reset requests, verification-email
+requests and email changes. This prevents the upstream no-SMTP fallback from
+publishing new token-bearing email links in application logs. Private bootstrap
+diagnostics are handled separately as described in [onboarding](onboarding.md).
+
+### Example
+
+```yaml
+server:
+  publicUrl: https://resume.example.com
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 465
+  from: Reactive Resume <noreply@example.com>
+  username: resume-smtp-user
+  existingSecret: resume-smtp
+  passwordKey: password
+```
+
+Supply the actual network egress rules and Secret before installation. These
+example hostnames do not represent a configured mail service.
+
+## oauth details
+
+The chart exposes the native custom OAuth2 provider with explicit HTTPS authorization,
+token and userinfo endpoints. Register the exact callback
+`https://YOUR_HOST/api/auth/callback/custom`, including any public port.
+Reference the confidential client Secret through `oauth.existingSecret`.
+
+The pinned image uses Better Auth 1.7.3: custom providers use the standard social API,
+PKCE defaults to enabled, and the earlier `/oauth2/callback/custom` URL is obsolete.
+The owned fixture requires S256 and client authentication. This manual endpoint contract
+uses authenticated userinfo; it does not advertise OIDC discovery or ID-token validation.
+The manual OAuth2 userinfo response must include a stable `id`; an OIDC-style
+`sub` by itself does not establish the provider identity in this mode.
+
+Sign in with the initial local account and explicitly link the provider using the native
+account settings. Global signup remains disabled, including OAuth signup. Keep the local
+credential as a recovery path and configure verified SMTP before depending on password reset.
+The native application owns account linking and email verification rules; the chart does not
+write provider accounts into PostgreSQL or grant administrator roles.
+For this custom provider, verify the local account's email through native email
+delivery before linking. The upstream profile mapper preserves the local account's
+verification state, so a provider's verified-email claim alone does not verify that
+existing local account. Configure SMTP for this enrollment step; do not bypass
+the rule with direct database writes or a patched list of trusted providers.
+
+An optional CA Secret augments trust for native Node TLS clients. Chain and hostname checks
+remain enabled. Permit the provider's token and userinfo endpoints through NetworkPolicy;
+the browser separately needs access to its authorization endpoint. Additional CAs are shared
+by the native process's integrations, not isolated per provider.
+
+Runtime acceptance verified native email confirmation through SMTP, authenticated
+linking, stable subject login, S256, state and callback replay rejection, closed signup
+for a new identity, and unknown-CA/wrong-host rejection. Native rate limiting remains enabled.
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://resume.example.com
+bootstrap:
+  email: owner@example.com
+  name: Resume Owner
+  username: owner
+  existingSecret: resume-initial-user
+  passwordKey: password
+identity:
+  existingSecret: resume-identity
+postgresql:
+  enabled: false
+database:
+  host: postgres.example.com
+  name: resumes
+  username: resumes
+  passwordSecret: resume-database
+  passwordKey: password
+  tls:
+    enabled: true
+    caSecret: resume-database-ca
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: resume.example.com
+      paths:
+        - { path: /, pathType: Prefix }
+  tls:
+    - secretName: resume-public-tls
+      hosts: [resume.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+  # Replace with the actual database destination before installing.
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.10/32
+      ports:
+        - { protocol: TCP, port: 5432 }
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Native custom OAuth2 provider with closed registration and confidential client credentials.
+oauth:
+  # -- Enable the native custom OAuth provider for linked existing users.
+  enabled: false
+  # -- Display name for the login provider.
+  name: Single sign-on
+  # -- OAuth client identifier registered for this installation.
+  clientId: ''
+  # -- Existing Secret containing the confidential client secret.
+  existingSecret: ''
+  # -- Secret key containing the client secret.
+  clientSecretKey: client-secret
+  # -- HTTPS authorization endpoint.
+  authorizationUrl: ''
+  # -- HTTPS token endpoint.
+  tokenUrl: ''
+  # -- HTTPS authenticated userinfo endpoint with stable id and email fields.
+  userInfoUrl: ''
+  # -- Space-separated scopes; manual OAuth2 does not claim ID-token validation.
+  scopes: profile email
+  # -- Optional additional PEM CA Secret for the provider's private PKI.
+  caSecret: ''
+  # -- Secret key containing CA certificates.
+  caKey: ca.crt
+# -- Native upload storage. The PVC remains required for the retained identity marker.
+storage:
+  # -- Store uploads on the local PVC or in an existing private S3 bucket.
+  driver: local
+  # -- Native S3-compatible object storage; credentials never appear in values.
+  s3:
+    # -- Existing bucket dedicated to this installation.
+    bucket: ''
+    # -- AWS signing region.
+    region: us-east-1
+    # -- Optional HTTPS endpoint; empty selects the native AWS regional endpoint.
+    endpoint: ''
+    # -- Put the bucket in the URL path for compatible endpoints without wildcard DNS.
+    forcePathStyle: false
+    # -- Existing Secret with access and secret key entries.
+    existingSecret: ''
+    # -- Secret key containing the access key ID.
+    accessKeyIdKey: access-key-id
+    # -- Secret key containing the secret access key.
+    secretAccessKeyKey: secret-access-key
+    # -- Optional additional CA Secret trusted by native Node TLS clients.
+    caSecret: ''
+    # -- Secret key containing PEM CA certificates.
+    caKey: ca.crt
+# -- Override the chart name used in application selectors.
+nameOverride: ''
+# -- Override the generated application resource name.
+fullnameOverride: ''
+# -- Additional labels on chart resources; preserve chart ownership labels.
+commonLabels: {}
+# -- One replica serializes native migrations and owns the local upload volume.
+replicaCount: 1
+# -- Registry Secret references for pulling mirrored official images.
+imagePullSecrets: []
+# -- Additional native environment entries; chart-owned security and integration settings are rejected.
+extraEnv: []
+# -- Tokenless ServiceAccount for application and admission helper Pods.
+serviceAccount:
+  # -- Create the chart ServiceAccount.
+  create: true
+  # -- Explicit ServiceAccount name or volume name.
+  name: ''
+  # -- Additional Kubernetes annotations.
+  annotations: {}
+  # -- Must remain false; workloads do not use the Kubernetes API.
+  automountServiceAccountToken: false
+# -- Public proxy Service; native enrollment and application ports are not exposed here.
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- Service port exposed to clients.
+  port: 3000
+  # -- Additional Kubernetes annotations.
+  annotations: {}
+  # -- Optional Kubernetes SingleStack, PreferDualStack or RequireDualStack policy.
+  ipFamilyPolicy: ''
+  # -- Optional ordered Service address families.
+  ipFamilies: []
+# -- Ingress controller exposure; select this or Gateway API.
+ingress:
+  # -- Enable this capability.
+  enabled: false
+  # -- Explicit IngressClass used by the controller.
+  ingressClassName: ''
+  # -- Additional Kubernetes annotations.
+  annotations: {}
+  # -- Ingress hostname and path definitions.
+  hosts: []
+  # -- TLS termination or upstream verification settings.
+  tls: []
+# -- Gateway API HTTPRoute exposure to an existing Gateway.
+gatewayAPI:
+  # -- Enable this capability.
+  enabled: false
+  # -- HTTPRoute definitions with parentRefs, hostnames and optional rules.
+  httpRoutes: []
+# -- External Secrets Operator resources that materialize referenced Secrets.
+externalSecrets:
+  # -- Enable this capability.
+  enabled: false
+  # -- ExternalSecret refresh interval.
+  refreshInterval: 1h
+  # -- ExternalSecret definitions using the HelmForge items contract.
+  items: []
+# -- Required native startup/readiness and listener liveness probes.
+probes:
+  # -- Wait for native migrations and healthy database/storage before startup completes.
+  startup:
+    # -- Consecutive probe failures before the relevant transition.
+    failureThreshold: 60
+    # -- Seconds between probe attempts.
+    periodSeconds: 5
+    # -- Timeout in seconds for one probe attempt.
+    timeoutSeconds: 5
+  # -- Withdraw readiness when native database or storage checks fail.
+  readiness:
+    # -- Consecutive probe failures before the relevant transition.
+    failureThreshold: 3
+    # -- Seconds between probe attempts.
+    periodSeconds: 10
+    # -- Timeout in seconds for one probe attempt.
+    timeoutSeconds: 5
+  # -- Check the native listener without restarting solely because a dependency is unavailable.
+  liveness:
+    # -- Consecutive probe failures before the relevant transition.
+    failureThreshold: 3
+    # -- Seconds between probe attempts.
+    periodSeconds: 20
+    # -- Timeout in seconds for one probe attempt.
+    timeoutSeconds: 5
+# -- Kubernetes compute requests and limits.
+resources:
+  # -- Resources reserved by the scheduler.
+  requests:
+    # -- Kubernetes CPU quantity.
+    cpu: 250m
+    # -- Kubernetes memory quantity.
+    memory: 512Mi
+  # -- Maximum container resource allocation.
+  limits:
+    # -- Kubernetes CPU quantity.
+    cpu: '2'
+    # -- Kubernetes memory quantity.
+    memory: 2Gi
+# -- Non-root Pod identity and volume ownership.
+podSecurityContext:
+  # -- Require an unprivileged container user.
+  runAsNonRoot: true
+  # -- Numeric runtime user ID.
+  runAsUser: 1000
+  # -- Numeric runtime group ID.
+  runAsGroup: 1000
+  # -- Supplementary group granted access to mounted files.
+  fsGroup: 1000
+  # -- Volume ownership reconciliation policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Kernel syscall filtering profile.
+  seccompProfile:
+    # -- Use the container runtime default seccomp profile.
+    type: RuntimeDefault
+# -- Container privilege and root filesystem restrictions.
+securityContext:
+  # -- Keep privilege escalation disabled.
+  allowPrivilegeEscalation: false
+  # -- Keep the image filesystem read-only; writes use explicit mounted paths.
+  readOnlyRootFilesystem: true
+  # -- Linux capability restrictions.
+  capabilities:
+    # -- Linux capabilities removed from containers.
+    drop:
+      - ALL
+# -- Additional application Pod labels; selector labels are protected.
+podLabels: {}
+# -- Additional application Pod annotations.
+podAnnotations: {}
+# -- Node labels required for application and helper scheduling.
+nodeSelector: {}
+# -- Node taints tolerated by application and helper Pods.
+tolerations: []
+# -- Application Pod scheduling affinity.
+affinity: {}
+# -- Application Pod topology constraints; the supported replica count remains one.
+topologySpreadConstraints: []
+# -- Optional application PriorityClass.
+priorityClassName: ''
+# -- Grace period for native process shutdown.
+terminationGracePeriodSeconds: 60
+# -- Required local uploads and retained identity marker.
+persistence:
+  # -- Must remain true to retain uploads and the identity marker.
+  enabled: true
+  # -- Use an existing application PVC.
+  existingClaim: ''
+  # -- PVC storage class; empty uses the cluster default.
+  storageClass: ''
+  # -- Requested PVC capacity.
+  size: 10Gi
+  # -- PVC access modes for the singleton application.
+  accessModes:
+    - ReadWriteOnce
+  # -- Retain chart-created PVC on uninstall.
+  retain: true
+  # -- Additional Kubernetes annotations.
+  annotations: {}
+# -- Writable temporary storage boundaries.
+runtime:
+  # -- Size limit of application temporary storage.
+  temporarySize: 256Mi
+# -- Official native application image.
+image:
+  # -- Official image repository or controlled mirror.
+  repository: ghcr.io/amruthpillai/reactive-resume
+  # -- Pinned image tag; the application also pins its verified manifest digest.
+  tag: v5.3.0@sha256:c487ec5edcfe054bcb312fcd498f868e56f274756d0046b01c83f210855017ab
+  # -- Kubernetes image pull policy.
+  pullPolicy: IfNotPresent
+# -- Application public origin and fixed proxy listener.
+server:
+  # -- Fixed public proxy listener 3000; enrollment ports are not configurable.
+  port: 3000
+  # -- External canonical HTTP(S) origin; empty uses the internal Service URL.
+  publicUrl: ''
+# -- Private first-user enrollment before public containers start.
+bootstrap:
+  # -- Display name of the initial ordinary account.
+  name: Initial Owner
+  # -- Initial ordinary user email; existing accounts are never renamed.
+  email: owner@example.test
+  # -- Username of the initial ordinary account.
+  username: owner
+  # -- Initial password; empty generates one. Prefer an existing Secret for production.
+  password: ''
+  # -- Existing Secret with the initial account password; mounted only during initialization.
+  existingSecret: ''
+  # -- Key containing the password in its referenced Secret.
+  passwordKey: user-password
+# -- Mandatory CNI-enforced enrollment and application isolation.
+networkPolicy:
+  # -- Must remain true; bootstrap requires an enforcing NetworkPolicy implementation.
+  enabled: true
+  # -- Allowed public-proxy peers; empty allows Pods in this namespace.
+  ingressFrom: []
+  # -- Must remain true for the admission contract.
+  egressIsolation: true
+  # -- Permit public HTTPS for native PDF fallback fonts; private and special-use ranges remain excluded.
+  allowPublicHttps: true
+  # -- DNS peer selectors allowed on TCP and UDP port 53.
+  dnsEgress:
+    # -- Namespace label selector for this network peer.
+    - namespaceSelector:
+        # -- Labels required by this selector.
+        matchLabels:
+          # -- Namespace containing the DNS Pods.
+          kubernetes.io/metadata.name: kube-system
+      # -- Pod label selector for this network peer.
+      podSelector:
+        # -- Labels required by this selector.
+        matchLabels:
+          # -- DNS Pod label used by the cluster resolver.
+          k8s-app: kube-dns
+  # -- Explicit egress rules for external PostgreSQL and accepted integrations.
+  extraEgress: []
+# -- External PostgreSQL settings when the HelmForge subchart is disabled.
+database:
+  # -- External PostgreSQL DNS hostname.
+  host: ''
+  # -- External PostgreSQL TCP port.
+  port: 5432
+  # -- External PostgreSQL database name.
+  name: reactive_resume
+  # -- External PostgreSQL application role.
+  username: reactive_resume
+  # -- Secret containing the external PostgreSQL role password.
+  passwordSecret: ''
+  # -- Key containing the password in its referenced Secret.
+  passwordKey: password
+  # -- TLS termination or upstream verification settings.
+  tls:
+    # -- Verify the external PostgreSQL certificate chain and DNS hostname.
+    enabled: true
+    # -- Optional Secret containing a trusted PostgreSQL CA bundle.
+    caSecret: ''
+    # -- Key containing PEM CA certificates.
+    caKey: ca.crt
+# -- HelmForge PostgreSQL dependency; disable when using an external database.
+postgresql:
+  # -- Application-specific permissions applied after the dependency creates its role.
+  initdb:
+    # -- Native Drizzle migrations create a dedicated schema in the selected database.
+    scripts:
+      # -- Grant database-local schema creation without granting superuser or CREATEDB.
+      20-reactive-resume-schema.sh: |
+        #!/bin/bash
+        set -euo pipefail
+        export PGPASSWORD="${POSTGRES_PASSWORD}"
+        psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${APP_DATABASE}" \
+          --set=app_database="${APP_DATABASE}" --set=app_username="${APP_USERNAME}" <<'SQL'
+        SELECT format('GRANT CREATE ON DATABASE %I TO %I', :'app_database', :'app_username') \gexec
+        SQL
+  # -- Container privilege and root filesystem restrictions.
+  securityContext:
+    # -- Keep the image filesystem read-only; writes use explicit mounted paths.
+    readOnlyRootFilesystem: true
+  # -- Writable runtime volumes required by the read-only PostgreSQL image.
+  extraVolumes:
+    # -- Explicit ServiceAccount name or volume name.
+    - name: postgres-tmp
+      # -- Ephemeral writable volume configuration.
+      emptyDir:
+        # -- Maximum capacity of this ephemeral volume.
+        sizeLimit: 1Gi
+    # -- Explicit ServiceAccount name or volume name.
+    - name: postgres-socket
+      # -- Ephemeral writable volume configuration.
+      emptyDir:
+        # -- Storage medium for the ephemeral volume.
+        medium: Memory
+        # -- Maximum capacity of this ephemeral volume.
+        sizeLimit: 16Mi
+  # -- Mount PostgreSQL temporary and socket directories.
+  extraVolumeMounts:
+    # -- Explicit ServiceAccount name or volume name.
+    - name: postgres-tmp
+      # -- Container path receiving the named volume.
+      mountPath: /tmp
+    # -- Explicit ServiceAccount name or volume name.
+    - name: postgres-socket
+      # -- Container path receiving the named volume.
+      mountPath: /var/run/postgresql
+  # -- Mandatory CNI-enforced enrollment and application isolation.
+  networkPolicy:
+    # -- Enable this capability.
+    enabled: true
+    # -- PostgreSQL dependency egress policy.
+    egress:
+      # -- Enable this capability.
+      enabled: true
+      # -- Allow DNS resolution from PostgreSQL.
+      allowDNS: true
+      # -- Allow PostgreSQL peers only when explicitly required.
+      allowSameNamespacePostgreSQL: false
+      # -- Allow broad HTTPS egress only when explicitly required.
+      allowHTTPS: false
+  # -- Enable this capability.
+  enabled: true
+  # -- Supported bundled database topology: standalone.
+  architecture: standalone
+  # -- Bundled database and application role credentials.
+  auth:
+    # -- Database created for the native application.
+    database: reactive_resume
+    # -- Non-superuser role with database-local schema creation and public schema privileges.
+    username: reactive_resume
+    # -- Optional existing PostgreSQL authentication Secret.
+    existingSecret: ''
+    # -- Secret key containing the bundled application role password.
+    existingSecretUserPasswordKey: user-password
+# -- Unprivileged NGINX that exposes the closed-enrollment application.
+proxy:
+  # -- Official unprivileged NGINX image.
+  image:
+    # -- Official image repository or controlled mirror.
+    repository: docker.io/nginxinc/nginx-unprivileged
+    # -- Pinned image tag; the application also pins its verified manifest digest.
+    tag: 1.30.4-alpine
+    # -- Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+  # -- Kubernetes compute requests and limits.
+  resources:
+    # -- Resources reserved by the scheduler.
+    requests:
+      # -- Kubernetes CPU quantity.
+      cpu: 50m
+      # -- Kubernetes memory quantity.
+      memory: 32Mi
+    # -- Maximum container resource allocation.
+    limits:
+      # -- Kubernetes CPU quantity.
+      cpu: 500m
+      # -- Kubernetes memory quantity.
+      memory: 128Mi
+  # -- Maximum public request body accepted by NGINX.
+  bodySize: 20m
+# -- Retained native signing and provider-secret encryption keys.
+identity:
+  # -- Existing Secret with AUTH_SECRET and ENCRYPTION_SECRET; retain both across upgrades and recovery.
+  existingSecret: ''
+# -- Authenticated SMTP with implicit TLS for native account email and recovery.
+smtp:
+  # -- Enable native SMTP and unblock mail-dependent account endpoints.
+  enabled: false
+  # -- SMTP DNS hostname matching its TLS certificate.
+  host: ''
+  # -- Implicit TLS port; the chart does not expose opportunistic STARTTLS mode.
+  port: 465
+  # -- Native sender address, optionally including a display name.
+  from: ''
+  # -- SMTP authentication username.
+  username: ''
+  # -- Existing Secret containing the SMTP password.
+  existingSecret: ''
+  # -- Key containing the SMTP password.
+  passwordKey: password
+  # -- Optional additional CA trust for the SMTP server.
+  tls:
+    # -- Secret containing a PEM CA bundle; empty uses native system trust.
+    caSecret: ''
+    # -- CA certificate bundle key.
+    caKey: ca.crt
+# -- Separate credential-free network probe helper; only its own HMAC key is mounted.
+admission:
+  # -- Official Node image for the fixed-target HMAC network probe.
+  image:
+    # -- Official image repository or controlled mirror.
+    repository: docker.io/library/node
+    # -- Pinned image tag; the application also pins its verified manifest digest.
+    tag: 24.21.0-alpine
+    # -- Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+  # -- Kubernetes compute requests and limits.
+  resources:
+    # -- Resources reserved by the scheduler.
+    requests:
+      # -- Kubernetes CPU quantity.
+      cpu: 25m
+      # -- Kubernetes memory quantity.
+      memory: 32Mi
+    # -- Maximum container resource allocation.
+    limits:
+      # -- Kubernetes CPU quantity.
+      cpu: 200m
+      # -- Kubernetes memory quantity.
+      memory: 128Mi
+```
