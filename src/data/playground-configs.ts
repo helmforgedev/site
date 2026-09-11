@@ -8,6 +8,74 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'text-embeddings-inference': [
+    {
+      name: 'Immutable embedding model',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: 'cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07',
+          description: 'Pinned official CPU image; GPU needs a compatible CUDA tag and device settings',
+        },
+        {
+          label: 'Hub model',
+          key: 'model.id',
+          type: 'text',
+          default: 'BAAI/bge-small-en-v1.5',
+          description: 'Backend-compatible model repository',
+        },
+        {
+          label: 'Model revision',
+          key: 'model.revision',
+          type: 'text',
+          default: '5c38ec7c405ec4b44b94cc5a9bb96e735b38267a',
+          description: 'Immutable 40-character commit; changing vectors requires an index migration',
+        },
+        {
+          label: 'Served model name',
+          key: 'model.servedName',
+          type: 'text',
+          default: '',
+          description: 'Public API alias; does not select a different model',
+        },
+      ],
+    },
+    {
+      name: 'Access and request budgets',
+      fields: [
+        {
+          label: 'Existing API Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing api-key; empty generates a credential during live Helm installation',
+        },
+        {
+          label: 'Concurrent requests',
+          key: 'inference.maxConcurrentRequests',
+          type: 'number',
+          default: '64',
+          description: 'Bound concurrent admission to available model memory',
+        },
+        {
+          label: 'Client batch size',
+          key: 'inference.maxClientBatchSize',
+          type: 'number',
+          default: '16',
+          description: 'Maximum input items per client batch',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Each replica loads a complete model with its own cache',
+        },
+      ],
+    },
+  ],
   twenty: [
     {
       name: 'Private CRM workspace',

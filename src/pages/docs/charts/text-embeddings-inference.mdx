@@ -1,0 +1,822 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Text Embeddings Inference Chart
+description: Authenticated Hugging Face embeddings with immutable models, offline PVCs, CPU scaling and private native Prometheus metrics.
+---
+
+# Text Embeddings Inference
+
+Deploy Hugging Face [Text Embeddings Inference](https://github.com/huggingface/text-embeddings-inference)
+as an authenticated HTTP embedding API with immutable model provenance and private native metrics.
+
+## Features
+
+- Official TEI 1.9.3 CPU image pinned by digest; optional pinned CUDA example.
+- BGE-small English model pinned to an immutable revision, with 384-dimensional embeddings.
+- Native `/embed` and OpenAI-compatible `/v1/embeddings` endpoints.
+- Generated API Secret retained across Helm upgrades, existing Secrets and External Secrets Operator.
+- Loopback-only inference process behind unprivileged NGINX; public metrics and Swagger paths blocked.
+- Private native Prometheus endpoint, ServiceMonitor, PrometheusRule and explicit monitoring peers.
+- Non-root containers, read-only filesystems, dropped capabilities, seccomp and no Kubernetes API token.
+- Immutable Hub downloads or a complete read-only local model PVC with denied outbound traffic.
+- Independent model replicas, CPU container HPA, disruption budgets and topology spreading.
+- Ingress, Gateway API HTTPRoute, dual-stack Services and NetworkPolicy.
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install embeddings helmforge/text-embeddings-inference \
+  --namespace embeddings --create-namespace
+```
+
+Alternatively, use the OCI repository:
+
+```bash
+helm install embeddings oci://ghcr.io/helmforgedev/helm/text-embeddings-inference \
+  --namespace embeddings --create-namespace
+```
+
+The pinned image requires Linux amd64. CPU requests and limits are starting points for the default small model;
+benchmark realistic sequence lengths, concurrent clients and latency objectives before sizing production.
+The chart does not deploy a database or vector index.
+
+## Quick start
+
+```bash
+kubectl -n embeddings port-forward service/embeddings-text-embeddings-inference 8080:80
+```
+
+In another terminal, retrieve the generated credential into an environment variable without printing it:
+
+```bash
+export TEI_API_KEY="$(kubectl -n embeddings get secret embeddings-text-embeddings-inference-auth \
+  -o jsonpath='{.data.api-key}' | base64 --decode)"
+curl --fail-with-body http://localhost:8080/embed \
+  -H "Authorization: Bearer ${TEI_API_KEY}" -H 'Content-Type: application/json' \
+  -d '{"inputs":["A cat sits on the mat."],"normalize":true}'
+unset TEI_API_KEY
+```
+
+Shell process arguments may be visible to other local users. Use an appropriate secret-aware client in shared
+environments. Helm NOTES never print the credential. Native `/health` is intentionally unauthenticated.
+
+## Model and vector contract
+
+The default model is `BAAI/bge-small-en-v1.5`, revision `5c38ec7c405ec4b44b94cc5a9bb96e735b38267a`.
+The CPU image loads its ONNX artifacts. `/info` identifies the model, revision, dtype, pooling and actual limits.
+`model.servedName` changes the exposed model name; it does not download or select another model.
+
+Pin `model.revision` to a full lowercase 40-character commit for Hub models. Changing the model, revision,
+pooling, prompt, normalization or embedding dimension can invalidate an existing vector index. Create a separate
+release and index, re-embed the corpus, compare retrieval quality and switch clients deliberately.
+Rolling two incompatible models behind one Service can silently mix embedding spaces.
+
+The default model produces embeddings, not reranking scores. A `/rerank` request against it returns 424.
+Other upstream model families need compatible artifacts and their own acceptance tests; the supplied runtime
+matrix validates the default embedding model. This chart deploys the HTTP image, not the separate gRPC variant.
+
+## Authentication and secrets
+
+Authentication is enabled by default. A generated Secret is reused through Helm `lookup` during upgrades.
+For declarative renderers without live lookup, use `auth.existingSecret` to avoid random credentials on each render.
+The Secret must contain `auth.secretKey` (default `api-key`). Disabling authentication is suitable only for a
+deliberately restricted trust boundary. The native key is shared across API clients, without per-user authorization.
+
+Private or gated Hub models can independently reference `model.hubToken.existingSecret`, key `token` by default.
+Accept the upstream model terms and grant the token only the required repository access.
+Neither token is embedded in the ConfigMap or command-line arguments.
+
+The pinned native release logs parsed arguments at INFO, including API credentials. The chart fixes
+`LOG_LEVEL=warn` and rejects overriding it with `extraEnv`; warning and error logs remain available.
+Native process environment access is still privileged secret access. Rotation of an existing Secret requires
+a Pod restart because environment variables are read at startup. Changing `auth.secretKey` is a credential change.
+
+External Secrets uses the canonical `externalSecrets.items[]` contract. Point `auth.existingSecret` and/or
+`model.hubToken.existingSecret` at the corresponding target Secrets. Install ESO and your SecretStore separately.
+See [secret operations](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/docs/security.md).
+
+## Storage and offline operation
+
+Each Pod defaults to a 5Gi ephemeral download cache. Replacement may download the pinned model again.
+`cache.persistence.enabled` creates or references a RWO PVC and requires one replica, Recreate and no HPA.
+This cache is reproducible model data; the chart does not provide database backup jobs.
+
+For offline operation, set `model.source: local` and `model.local.existingClaim` to a PVC containing the complete
+model directory. It mounts read-only at `/models`; optional `subPath` selects a directory. Preserve provenance
+and hashes outside the mutable volume. The correct weight format depends on the selected image backend.
+Setting an offline environment flag alone does not guarantee that missing artifacts will not trigger downloads.
+
+Local mode with default network isolation permits no outbound traffic. It must not need Hub DNS or HTTPS.
+Multi-replica local models require storage access modes and node placement that permit every scheduled reader.
+See [model lifecycle](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/docs/models.md) for seeding, rollback and index migration.
+
+## Resource and admission limits
+
+The default native limits are 64 concurrent requests, 2048 batch tokens, eight batch requests, 16 client batch
+items and 1048576 payload bytes. The CPU backend supports at most eight batch requests in this pinned image.
+The proxy also enforces the payload byte limit. Token limits and payload bytes are different controls.
+Requests beyond the client batch limit return 422; oversized bodies return 413. Inputs beyond the model's token
+length fail unless truncation is enabled. Explicit client truncation can override the default behavior.
+
+`inference.threads` controls Rayon, OpenMP and MKL thread budgets; tokenization workers are configured separately.
+Increasing concurrency does not create more model memory. Large batches and sequence lengths can exhaust RAM
+or VRAM. Admission limits are not per-client quotas or a durable queue. Apply edge rate limiting if needed.
+
+## Availability and scaling
+
+Recreate is the default strategy. It avoids concurrent old/new model instances but causes an update interruption.
+For compatible models and independent ephemeral caches, use multiple replicas with RollingUpdate and sufficient
+capacity for surge Pods. Every replica loads a complete model. Readiness checks execute native model health.
+
+CPU HPA measures only container `tei`, not NGINX, and requires metrics-server and CPU requests. It is rejected
+for GPU deployments. The production example uses two minimum replicas and a disruption budget allowing one
+unavailable Pod. A PDB covers voluntary disruption, not a failed node or an application rollout.
+
+The termination grace period must exceed the proxy read timeout (150 and 120 seconds by default). Native
+shutdown is graceful, but Pod failure can lose in-memory requests. Clients need bounded retries and deadlines.
+Do not claim zero downtime from readiness or grace periods alone.
+
+## GPU deployment
+
+[The CUDA example](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/cuda.yaml) pins the official CUDA image and requests NVIDIA GPUs through the device
+plugin. The native image entrypoint is preserved so upstream architecture selection and library setup execute.
+Use compatible NVIDIA drivers, runtime and hardware, and benchmark the selected model on that hardware.
+GPU manifest rendering and resource allocation are tested; GPU inference and throughput are not validated in
+the CPU-only development cluster. No GPU performance claim is made.
+
+## Networking
+
+The Service exposes HTTP on port 80. NGINX listens on 8080; native TEI binds only to `127.0.0.1:8081`.
+Do not expose the native process directly: upstream metrics share its HTTP listener and are unauthenticated.
+Ingress and HTTPRoute terminate at the controlled public Service. Configure existing TLS infrastructure and
+explicit ingress-controller peers. The chart does not create a Gateway or certificates.
+
+NetworkPolicy allows same-namespace clients by default. Hub mode permits DNS and public HTTPS model downloads,
+excluding private address ranges. CNI policies cannot filter by domain; use an egress proxy and explicit rules
+when hostname restrictions are required. Local mode denies egress unless `extraEgress` explicitly permits it.
+Policy enforcement requires a compatible CNI. Custom peer rules replace the default same-namespace rule.
+
+`service.ipFamilyPolicy` and `service.ipFamilies` configure API and metrics Services. RequireDualStack needs a
+dual-stack cluster; PreferDualStack may fall back. Both proxy listeners support IPv4 and IPv6.
+
+## Observability
+
+Enable `metrics.enabled`, explicit `metrics.ingressFrom` and optionally `metrics.serviceMonitor.enabled`.
+The private listener on 9464 serves only native `/metrics`. It exposes TEI request counts, success counters and
+inference duration histograms. Public `/metrics`, `/docs` and `/api-doc` paths return 404.
+Configure Prometheus selectors to discover the ServiceMonitor and network peers to permit actual scraping.
+
+The optional built-in PrometheusRule reports a down scrape target; it is not a semantic quality or latency SLO.
+Add workload-specific recording and alert rules through `additionalRules`. Inspect native metrics for the pinned
+release before writing queries. Metrics may disclose model/workload metadata and belong in the trusted network.
+
+## Configuration reference
+
+Every supported option and default is documented in [values.yaml](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/values.yaml), with validation in
+[values.schema.json](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/values.schema.json). The [site guide](https://helmforge.dev/docs/charts/text-embeddings-inference)
+includes the complete values reference. Unsafe storage, model revision, monitoring and scaling combinations fail
+before Kubernetes resources are installed. `extraEnv` cannot override chart-owned model, auth or budget settings.
+
+## Examples and operations
+
+- [Simple CPU deployment](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/simple.yaml)
+- [Staging deployment](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/staging.yaml)
+- [Production CPU replicas](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/production.yaml)
+- [Private native monitoring](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/metrics.yaml)
+- [Local offline model](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/offline.yaml)
+- [External Secrets](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/external-secrets.yaml)
+- [CUDA GPU resources](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/cuda.yaml)
+- [Model lifecycle](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/docs/models.md), [security](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/docs/security.md), [operations](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/docs/operations.md)
+- [Design decisions](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/DESIGN.md)
+
+## Validation
+
+Run `make validate-chart CHART=text-embeddings-inference` from helmforge-ops. The matrix covers native model
+identity, finite normalized semantic vectors, OpenAI output equivalence, rejected requests, authentication,
+credential retention, network isolation, real Prometheus, persistent cache, offline model inference, replicas,
+CPU HPA and Pod replacement. GPU hardware and alternative model families require separate validation.
+
+## Security Scan
+
+### Security Scan: `text-embeddings-inference`
+
+| Framework          | Score         |
+| ------------------ | ------------- |
+| MITRE + NSA + SOC2 | **98.48485%** |
+
+> Security posture acceptable.
+
+Measured with Kubescape 4.0.13 against default manifests, without suppressed controls. This assesses
+Kubernetes configuration; it does not certify upstream application or model security.
+
+The unsuppressed C-0012 finding matches `MAX_BATCH_TOKENS=2048` and `TOKENIZATION_WORKERS=2`
+by the word token. These are numeric inference settings, not credentials. API and Hub credentials use Secret references.
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/../../CONTRIBUTING.md). Report model compatibility and runtime evidence with deployment
+details while keeping credentials and private input text out of issues and logs.
+
+## Models guide
+
+### Immutable Hub models
+
+Select a model supported by the pinned TEI backend, review its license and pin a full commit revision.
+The default CPU backend needs the ONNX directory as well as tokenizer/configuration files. A repository that
+works in another serving engine is not automatically compatible. Inspect `/info` after installation and submit
+representative input to `/embed` before directing index-writing clients to the new endpoint.
+
+Hub downloads require DNS and HTTPS, including artifact delivery hosts. The default policy allows public HTTPS
+because CNI NetworkPolicy cannot express domain names. For gated models, create a separate minimal-scope Hub
+token Secret and reference it through `model.hubToken`. Never use the inference API key as a Hub credential.
+
+### Offline local model
+
+Prepare a PVC with the complete model directory using a controlled artifact pipeline. Record repository, commit,
+artifact hashes, license and image backend. For the default CPU model the directory includes `onnx/model.onnx`,
+`config.json`, `tokenizer.json`, tokenizer/sentence configuration and pooling metadata. Verify the complete
+bundle against the selected revision, rather than copying an arbitrary warm cache directory.
+
+Set `model.source: local`, `model.local.existingClaim` and optionally `model.local.subPath`. Files are mounted
+read-only at `/models`. The application cache and temporary directories remain writable for native startup.
+With network isolation enabled and no `extraEgress`, the deployed Pod cannot download missing files. Test startup
+and actual inference under that restriction. The CI fixture seeds the pinned public model before applying the
+application policy; the workload then serves requests and restarts with outbound traffic denied.
+
+### Cache ownership and capacity
+
+The Pod uses fsGroup 1000. The storage driver must support appropriate volume ownership and permissions.
+No root init container is required by the default chart. Reserve capacity for all artifacts and replacement
+downloads. A small model cache does not bound in-memory model or batch allocations.
+
+Persistent cache uses RWO storage, one replica and Recreate. Claim deletion depends on ownership: a chart-created
+PVC is a release resource and may be deleted on uninstall. Use an existing claim or an explicit retention policy
+when retaining downloaded artifacts is operationally necessary. Cache retention is not vector-index backup.
+
+### Vector-index migration
+
+1. Record the old model revision, prompts, pooling, dimensions and normalization used by indexing and queries.
+2. Deploy the new contract under a separate release and endpoint.
+3. Validate dimensions, stable outputs, retrieval quality and realistic resource use.
+4. Re-embed source documents into a separate vector index with provenance metadata.
+5. Switch indexing and query clients together; retain the old release/index for rollback.
+
+Helm rollback can restore a Deployment but cannot translate vectors already written with a different model.
+Rollback must restore the corresponding index and client settings. Do not mix incompatible models behind a
+rolling Service and rely on HTTP health to detect semantic corruption.
+
+## Security guide
+
+### API credential ownership
+
+Default installation generates a 48-character random API key. Live Helm upgrades reuse the existing Secret value.
+Render-only GitOps controllers should use an existing Secret to avoid unstable random rendering. The chart never
+accepts inline API or Hub credentials in values. Secret encryption at rest and access controls are cluster concerns.
+
+For rotation, update the source Secret and restart the Deployment. API clients and server must coordinate because
+the native API accepts one key at a time. Keep secrets out of shell history, debug traces and issue attachments.
+Changing the Secret key name or deleting a generated Secret can change credentials on the next reconciliation.
+
+### External Secrets Operator
+
+Install ESO and an authorized SecretStore first. Each `externalSecrets.items[]` object supports name/metadata
+overrides and the upstream `spec` contract, including data/dataFrom and source references. The chart supplies
+default refresh interval and target name only when omitted. Reference that target through `auth.existingSecret`.
+A separate item can provide the Hub token; the two credentials have unrelated trust and rotation lifecycles.
+
+After installation, inspect ExternalSecret readiness and verify that the target Secret contains the configured
+key. Do not print its value. ESO updates do not modify existing process environment; trigger a Pod rollout after
+rotation. The CI fake-store profile verifies a real reconciled Secret and authenticated inference.
+
+### Native logging
+
+The pinned TEI release logs parsed arguments, including API_KEY, at INFO. The chart enforces LOG_LEVEL=warn,
+preserves warning/error output and disallows chart-owned environment overrides. This is a version-specific
+mitigation and should be revisited against upstream code during upgrades. Do not enable verbose native logging
+with live credentials while investigating startup failures.
+
+### Listeners and peers
+
+Native TEI binds to loopback port 8081. NGINX exposes the API on 8080 and blocks `/metrics`, `/docs` and `/api-doc`.
+The optional 9464 listener permits only `/metrics` and has a separate Service. No bearer key is required for those
+native metrics; `metrics.ingressFrom` must explicitly identify trusted monitoring peers.
+
+NetworkPolicy enforcement requires a CNI that implements it. Disabling the policy removes the monitoring network
+boundary even though the public proxy still blocks metric paths. Namespace selectors and Pod selectors in the
+same peer are conjunctive; separate peer entries are alternatives. Use both to select a specific Prometheus
+workload in a specific namespace. Ingress-controller permissions are independent of monitoring permissions.
+
+TLS terminates at an existing ingress or Gateway. The chart's internal Service is HTTP; use suitable cluster
+transport controls when internal encryption is required. Health paths remain public for readiness. API-key
+authentication supplies shared access control, not tenancy, per-user audit identity or client rate quotas.
+
+## Operations guide
+
+### Acceptance and capacity
+
+Verify `/info`, real `/embed` output and `/v1/embeddings` compatibility before routing production traffic.
+Use application-specific retrieval quality checks in addition to finite vector shape. Load-test realistic token
+lengths and batch distributions; CPU, RAM and VRAM costs depend on the selected model and backend.
+The default resources support the small validation model and do not constitute a capacity recommendation for all models.
+
+Multiple replicas independently load model weights. CPU HPA requires metrics-server and measures container `tei`.
+Increasing replicas can increase Hub traffic during a cold rollout. Persistent RWO cache disables this topology.
+For local models, the existing volume must be readable by every scheduled replica.
+
+### Monitoring
+
+Enable the private metrics listener and select real Prometheus Pods with explicit namespace/Pod peers.
+Install Prometheus Operator CRDs before enabling ServiceMonitor or PrometheusRule. Prometheus must select the
+ServiceMonitor labels and namespace. A ServiceMonitor object alone does not prove a successful scrape.
+
+Inspect `up` for the metrics endpoint and native `te_request_count`, `te_request_success` and inference-duration
+histograms after real requests. The default alert detects a down target; define latency/error SLOs from measured
+traffic and the exact release's metric labels. Restrict access to monitoring metadata.
+
+### Troubleshooting
+
+| Symptom                                            | Check and correction                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Pod remains Pending                                | Inspect node architecture, CPU/RAM requests, PVC binding and device-plugin resources.               |
+| Model download fails                               | Check pinned revision, artifact availability, Hub token permissions and DNS/public HTTPS policy.    |
+| Gated model returns 401/403 during download        | Accept model terms and supply a separate authorized Hub token Secret.                               |
+| Native container cannot write cache                | Check fsGroup 1000 support and existing-claim ownership; inspect storage driver behavior.           |
+| Offline startup tries to resolve missing artifacts | Verify the complete backend-specific model directory and local source selection.                    |
+| API returns 401                                    | Check the referenced Secret key and client bearer credential; restart Pods after rotation.          |
+| API returns 413                                    | Reduce request bytes or deliberately increase both the chart payload budget and capacity.           |
+| API returns 422                                    | Inspect input token length and client batch count; truncation may discard meaningful input.         |
+| Reranking returns 424                              | The default embedding model is not a reranker; select and validate an appropriate model separately. |
+| OOMKilled or GPU allocation failure                | Reduce concurrent/batch/token budgets or reserve sufficient model and activation memory.            |
+| Startup health returns 502                         | NGINX may start before model loading finishes; inspect native logs and startup-probe budget.        |
+| Prometheus target absent                           | Check ServiceMonitor namespace/label selection and installed Operator CRDs.                         |
+| Metrics target is down                             | Check explicit monitoring peers, Service endpoints and the private metrics port.                    |
+| CPU HPA has unknown metrics                        | Check metrics-server health, CPU requests and container `tei` resource metrics.                     |
+| Model outputs changed after upgrade                | Compare revision, dtype, pooling, prompts and normalization against index provenance.               |
+| Rolling update stalls                              | Check surge capacity and volume access; do not use RollingUpdate with the RWO cache.                |
+
+### Recovery and rollback
+
+Retain declared values, immutable model provenance and credential references. Download cache can be reconstructed;
+local model volumes need a separate artifact copy or snapshot strategy. This chart contains no user-document or
+vector-index backup job. Restore your external vector index together with its corresponding model contract.
+
+After restoring or rolling back, verify credentials and actual vector output again. Keep client retry budgets
+bounded: in-memory requests are not durable, and repeated load during recovery can delay model readiness.
+
+## Complete values reference
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- Override the short chart name.
+nameOverride: ''
+# -- Override the complete resource name.
+fullnameOverride: ''
+# -- Additional resource labels; selector keys are reserved.
+commonLabels: {}
+# -- Independent model replicas; each loads its own RAM or VRAM copy.
+replicaCount: 1
+# -- Official TEI image; preserve its native entrypoint, including CUDA selection.
+image:
+  # -- Official image repository or your trusted mirror.
+  repository: ghcr.io/huggingface/text-embeddings-inference
+  # -- Pinned version and immutable image digest.
+  tag: cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07
+  # -- Kubernetes image pull policy.
+  pullPolicy: IfNotPresent
+# -- Registry credential Secret references.
+imagePullSecrets: []
+# -- One immutable model per release. Changing model identity requires a vector-index migration.
+model:
+  # -- Hub download or a complete read-only local model PVC.
+  source: hub
+  # -- Hugging Face repository ID used in hub mode.
+  id: BAAI/bge-small-en-v1.5
+  # -- Required immutable 40-character Hub commit in hub mode.
+  revision: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  # -- Optional OpenAI response model name; empty uses the native model ID.
+  servedName: ''
+  # -- Optional native pooling override: cls, mean, last-token or splade.
+  pooling: ''
+  # -- Native numerical type; match the model and selected hardware.
+  dtype: float32
+  # -- Optional literal embedding prompt, mutually exclusive with defaultPromptName.
+  defaultPrompt: ''
+  # -- Optional named prompt already present in the model configuration.
+  defaultPromptName: ''
+  # -- Complete local model artifacts mounted read-only at /models.
+  local:
+    # -- Prepopulated PVC required in local mode; multi-node replicas require compatible read-only storage.
+    existingClaim: ''
+    # -- Optional relative directory within the model PVC.
+    subPath: ''
+  # -- Independent read-only Hub credential for private or gated models.
+  hubToken:
+    # -- Existing Secret name.
+    existingSecret: ''
+    # -- Secret data key.
+    key: token
+# -- Native batching and admission limits, not throughput guarantees.
+inference:
+  # -- Maximum admitted concurrent requests; saturation applies native backpressure.
+  maxConcurrentRequests: 64
+  # -- Total token budget per dynamic batch; must fit model input length when truncation is disabled.
+  maxBatchTokens: 2048
+  # -- Maximum individual requests per backend batch; CPU image supports at most eight.
+  maxBatchRequests: 8
+  # -- Maximum input count per client request; overflow returns native HTTP 422.
+  maxClientBatchSize: 16
+  # -- Maximum request body bytes, enforced by the public proxy and native router.
+  payloadLimit: 1048576
+  # -- Automatically truncate overlength inputs; false preserves explicit rejection.
+  autoTruncate: false
+  # -- Tokenizer workers independent of the inference thread budget.
+  tokenizationWorkers: 2
+  # -- CPU Rayon, OpenMP and MKL thread budget per model replica.
+  threads: 2
+# -- Native API bearer authentication; /health remains unauthenticated.
+auth:
+  # -- Require native bearer authentication on inference and model information.
+  enabled: true
+  # -- Existing API credential Secret; empty creates and retains a random key across Helm upgrades.
+  existingSecret: ''
+  # -- Key within the generated or existing Secret.
+  secretKey: api-key
+# -- Reproducible model cache, not application data or a backup.
+cache:
+  # -- Optional single-replica ReadWriteOnce cache; requires Recreate and no HPA.
+  persistence:
+    # -- Use persistent cache storage instead of a per-Pod emptyDir.
+    enabled: false
+    # -- Reuse an existing writable cache PVC instead of creating one.
+    existingClaim: ''
+    # -- StorageClass for a new cache PVC; empty uses the cluster default, dash disables dynamic provisioning.
+    storageClass: ''
+    # -- Requested capacity of the cache PVC.
+    size: 5Gi
+    # -- Annotations on the cache PVC.
+    annotations: {}
+  # -- Ephemeral per-Pod cache limit; include full model artifacts and download overhead.
+  emptyDirSizeLimit: 5Gi
+# -- Optional NVIDIA allocation; set a compatible pinned CUDA image explicitly.
+gpu:
+  # -- Allocate NVIDIA GPUs; GPU runtime is not validated by the CPU-only lab.
+  enabled: false
+  # -- GPU units requested and limited per replica.
+  count: 1
+# -- Official unprivileged NGINX separates native API and private metrics paths.
+proxy:
+  # -- Official unprivileged proxy image and pull policy.
+  image:
+    # -- Official image repository or your trusted mirror.
+    repository: docker.io/nginxinc/nginx-unprivileged
+    # -- Pinned version and immutable image digest.
+    tag: 1.30.4-alpine@sha256:442753882674b49ae2c1de83ed67896131c0777f56df5005e356e62bc3f7e7ce
+    # -- Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+  # -- Public Pod listener; native TEI always binds loopback port 8081.
+  port: 8080
+  # -- Native response timeout; use a longer termination grace period.
+  readTimeoutSeconds: 120
+  # -- Proxy CPU and memory budgets, separate from model inference.
+  resources:
+    # -- Resources reserved by the scheduler.
+    requests:
+      # -- Kubernetes CPU quantity.
+      cpu: 50m
+      # -- Kubernetes memory quantity.
+      memory: 32Mi
+    # -- Maximum container resources.
+    limits:
+      # -- Kubernetes CPU quantity.
+      cpu: 500m
+      # -- Kubernetes memory quantity.
+      memory: 128Mi
+# -- Public inference Service; never includes the metrics port.
+service:
+  # -- Kubernetes Service exposure type.
+  type: ClusterIP
+  # -- Public Service port routed to the NGINX listener.
+  port: 80
+  # -- Annotations on the public Service.
+  annotations: {}
+  # -- Kubernetes IP family policy; empty uses the cluster default.
+  ipFamilyPolicy: ''
+  # -- Requested Service families, such as IPv4 and IPv6.
+  ipFamilies: []
+# -- Optional Ingress terminating at the public inference Service.
+ingress:
+  # -- Render an Ingress.
+  enabled: false
+  # -- Ingress controller class; empty omits the field.
+  ingressClassName: ''
+  # -- Annotations on the Ingress.
+  annotations: {}
+  # -- Explicit host/path rules required when Ingress is enabled.
+  hosts: []
+  # -- TLS host and Secret references managed by the edge controller.
+  tls: []
+# -- Canonical HTTPRoute definitions targeting a shared Gateway.
+gatewayAPI:
+  # -- Render Gateway API HTTPRoutes.
+  enabled: false
+  # -- Route items with parentRefs, hostnames, matches and optional filters.
+  httpRoutes: []
+# -- Canonical External Secrets Operator resources for referenced credentials.
+externalSecrets:
+  # -- Render ExternalSecret items.
+  enabled: false
+  # -- Default provider refresh interval.
+  refreshInterval: 1h
+  # -- Complete ExternalSecret item specs with explicit Secret store references.
+  items: []
+# -- Native TEI Prometheus exposition through a separate private NGINX listener.
+metrics:
+  # -- Enable the private metrics listener and Service.
+  enabled: false
+  # -- Private Pod and Service scrape port; never exposed by application routes.
+  port: 9464
+  # -- Explicit NetworkPolicy peers allowed to scrape; required when metrics is enabled.
+  ingressFrom: []
+  # -- Optional Prometheus Operator scraping resource.
+  serviceMonitor:
+    # -- Render a ServiceMonitor; requires an installed Prometheus Operator.
+    enabled: false
+    # -- Scrape interval.
+    interval: 30s
+    # -- Per-scrape timeout, no longer than interval.
+    scrapeTimeout: 10s
+    # -- Discovery labels expected by your Prometheus.
+    labels: {}
+  # -- Optional scrape availability alert and additional native metric rules.
+  prometheusRule:
+    # -- Render PrometheusRule; requires ServiceMonitor for the built-in target alert.
+    enabled: false
+    # -- Rule discovery labels.
+    labels: {}
+    # -- Additional valid Prometheus alerting or recording rules.
+    additionalRules: []
+# -- Pod network boundaries; CNI enforcement is required.
+networkPolicy:
+  # -- Render application ingress and optional egress isolation.
+  enabled: true
+  # -- Allowed application peers; empty permits same-namespace Pods.
+  ingressFrom: []
+  # -- Enable outbound isolation.
+  egressIsolation: true
+  # -- Allow DNS and public HTTPS for Hub/CDN artifacts in hub mode; ignored in local mode.
+  allowHubDownloads: true
+  # -- Additional explicit egress rules, for example a managed telemetry collector.
+  extraEgress: []
+# -- Dedicated tokenless workload identity.
+serviceAccount:
+  # -- Create the workload ServiceAccount.
+  create: true
+  # -- Existing or overridden ServiceAccount name.
+  name: ''
+  # -- ServiceAccount annotations.
+  annotations: {}
+  # -- Mount a Kubernetes API token; false is the secure default.
+  automountServiceAccountToken: false
+# -- Pod identity and cache volume ownership; default UID/GID/fsGroup 1000.
+podSecurityContext:
+  # -- Require a non-root process.
+  runAsNonRoot: true
+  # -- Numeric process UID.
+  runAsUser: 1000
+  # -- Numeric process group.
+  runAsGroup: 1000
+  # -- Group owning writable mounted volumes.
+  fsGroup: 1000
+  # -- Volume ownership reconciliation policy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- Pod seccomp configuration.
+  seccompProfile:
+    # -- Seccomp profile type applied to the Pod.
+    type: RuntimeDefault
+# -- Native and proxy container hardening.
+securityContext:
+  # -- Allow process privilege escalation.
+  allowPrivilegeEscalation: false
+  # -- Mount the image filesystem read-only.
+  readOnlyRootFilesystem: true
+  # -- Linux capability policy.
+  capabilities:
+    # -- Capabilities removed from the container.
+    drop:
+      - ALL
+# -- Native TEI CPU/memory budget; each replica loads a complete model.
+resources:
+  # -- Resources reserved by the scheduler.
+  requests:
+    # -- Kubernetes CPU quantity.
+    cpu: 500m
+    # -- Kubernetes memory quantity.
+    memory: 512Mi
+  # -- Maximum container resources.
+  limits:
+    # -- Kubernetes CPU quantity.
+    cpu: '2'
+    # -- Kubernetes memory quantity.
+    memory: 2Gi
+# -- Native loopback /health probes; startup budget includes download and warmup.
+probes:
+  # -- Native startup health budget; period, timeout and threshold also govern proxy startup.
+  startup:
+    # -- Enable this native health probe.
+    enabled: true
+    # -- Seconds between health probes.
+    periodSeconds: 5
+    # -- Maximum health probe duration.
+    timeoutSeconds: 3
+    # -- Consecutive failures before the probe action.
+    failureThreshold: 120
+  # -- Native model readiness; proxy readiness independently checks the public health path.
+  readiness:
+    # -- Enable this native health probe.
+    enabled: true
+    # -- Seconds between health probes.
+    periodSeconds: 10
+    # -- Maximum health probe duration.
+    timeoutSeconds: 3
+    # -- Consecutive failures before the probe action.
+    failureThreshold: 3
+  # -- Native model health restart policy; proxy liveness independently checks its TCP listener.
+  liveness:
+    # -- Enable this native health probe.
+    enabled: true
+    # -- Seconds between health probes.
+    periodSeconds: 30
+    # -- Maximum health probe duration.
+    timeoutSeconds: 3
+    # -- Consecutive failures before the probe action.
+    failureThreshold: 3
+# -- Use Recreate to avoid mixed model versions; RollingUpdate requires compatible model identity and spare capacity.
+rollout:
+  # -- Recreate or RollingUpdate; persistent RWO cache requires Recreate.
+  strategy: Recreate
+  # -- Extra Pods during RollingUpdate; a GPU surge needs spare GPUs.
+  maxSurge: 1
+  # -- Maximum unavailable Pods during RollingUpdate.
+  maxUnavailable: 0
+# -- Graceful native shutdown budget; requests are not durably queued.
+terminationGracePeriodSeconds: 150
+# -- CPU ContainerResource HPA; not a GPU utilization signal.
+autoscaling:
+  # -- Scale independent CPU replicas; requires ephemeral cache and CPU requests.
+  enabled: false
+  # -- Minimum replicas; at least two when a PDB is enabled.
+  minReplicas: 2
+  # -- Maximum replicas; reserve model RAM for every Pod.
+  maxReplicas: 4
+  # -- TEI container CPU target, excluding proxy consumption.
+  targetCPUUtilizationPercentage: 70
+# -- Protection against voluntary evictions; does not make a singleton highly available.
+podDisruptionBudget:
+  # -- Render a PDB only for at least two minimum replicas.
+  enabled: false
+  # -- Replicas allowed to be unavailable during voluntary eviction.
+  maxUnavailable: 1
+# -- Placement labels; pinned TEI 1.9.3 images support linux/amd64 only.
+nodeSelector:
+  # -- Required node architecture for the pinned CPU and CUDA images.
+  kubernetes.io/arch: amd64
+# -- Tolerations for dedicated inference or GPU nodes.
+tolerations: []
+# -- Pod/node affinity; spread independent replicas across failure domains.
+affinity: {}
+# -- Kubernetes topology spread constraints.
+topologySpreadConstraints: []
+# -- Optional scheduling priority class.
+priorityClassName: ''
+# -- Additional Pod labels; selector labels cannot be overridden.
+podLabels: {}
+# -- Additional Pod annotations; use a rotation annotation to restart after external Secret changes.
+podAnnotations: {}
+# -- Additional non-reserved native environment variables; credentials, binding and log safety are chart-owned.
+extraEnv: []
+```
+
+## Simple example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Authenticated CPU API using the pinned public model and independent ephemeral cache.
+replicaCount: 1
+```
+
+## Staging example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Two independent replicas for staging compatibility checks; model changes use a separate release.
+replicaCount: 2
+rollout:
+  strategy: RollingUpdate
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+```
+
+## Production example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Compatible model replicas; requires metrics-server and enough capacity for each model copy.
+replicaCount: 2
+rollout:
+  strategy: RollingUpdate
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: text-embeddings-inference
+```
+
+## Metrics example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Requires Prometheus Operator; match selectors to your actual monitoring Pods.
+metrics:
+  enabled: true
+  ingressFrom:
+    - podSelector:
+        matchLabels:
+          app: tei-monitor
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: true
+```
+
+## Offline example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Requires a pre-populated tei-local-model PVC with complete verified model artifacts.
+model:
+  source: local
+  servedName: bge-small-en-v1.5-offline
+  local:
+    existingClaim: tei-local-model
+networkPolicy:
+  allowHubDownloads: false
+```
+
+## External-secrets example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Requires ESO and an authorized ClusterSecretStore named production-secrets.
+auth:
+  existingSecret: embeddings-api
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: embeddings-api
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        data:
+          - secretKey: api-key
+            remoteRef:
+              key: applications/embeddings/api
+              property: api-key
+```
+
+## Cuda example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Requires a compatible NVIDIA GPU, driver and device plugin. Hardware execution is not covered by CPU CI.
+image:
+  tag: cuda-1.9.3@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a
+gpu:
+  enabled: true
+  count: 1
+model:
+  dtype: float16
+resources:
+  requests: { cpu: '2', memory: 2Gi }
+  limits: { cpu: '4', memory: 4Gi }
+nodeSelector:
+  kubernetes.io/arch: amd64
+  nvidia.com/gpu.present: 'true'
+rollout:
+  strategy: Recreate
+```
