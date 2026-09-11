@@ -8,7 +8,146 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
-  'opencloud': [{"name":"Identity and storage","fields":[{"label":"Image tag","key":"image.tag","type":"text","default":"7.2.4","description":"Pinned official OpenCloud release"},{"label":"HTTPS origin","key":"server.publicUrl","type":"text","default":"","description":"Set the stable public origin before storing production data"},{"label":"TLS Secret","key":"server.tls.existingSecret","type":"text","default":"","description":"Externally managed certificate; retain ca.crt for private trust"},{"label":"Administrator Secret","key":"bootstrap.existingSecret","type":"text","default":"","description":"Key admin-password; used only for initial native identity"},{"label":"Persistent capacity","key":"persistence.size","type":"text","default":"20Gi","description":"Config, identity keys, metadata and files on an xattr-capable volume"}]},{"name":"Native metrics","fields":[{"label":"Prometheus metrics","key":"metrics.enabled","type":"toggle","default":"false","description":"Authenticated native metrics; debug configuration stays on loopback","toggleActivationValues":{"false":{"metrics.serviceMonitor.enabled":"false","metrics.prometheusRule.enabled":"false"}}},{"label":"Metrics token Secret","key":"metrics.existingSecret","type":"text","default":"","description":"Optional external Secret with a token of at least 16 bytes"},{"label":"ServiceMonitor","key":"metrics.serviceMonitor.enabled","type":"toggle","default":"false","description":"Prometheus Operator scrapes with Secret Bearer credentials","toggleActivationValues":{"true":{"metrics.enabled":"true"}}},{"label":"PrometheusRule","key":"metrics.prometheusRule.enabled","type":"toggle","default":"false","description":"Availability alert for native metrics targets","toggleActivationValues":{"true":{"metrics.enabled":"true"}}}]}],
+  affine: [
+    {
+      name: 'Workspace and identity',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '0.27.4',
+          description: 'Pinned official AFFiNE release',
+        },
+        {
+          label: 'Public origin',
+          key: 'server.publicUrl',
+          type: 'text',
+          default: '',
+          description: 'Exact HTTPS origin for browser access',
+        },
+        {
+          label: 'Administrator email',
+          key: 'bootstrap.email',
+          type: 'text',
+          default: 'admin@example.test',
+          description: 'Replace before first installation',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'bootstrap.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with admin-password containing 16 to 32 characters',
+        },
+        {
+          label: 'Persistent capacity',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Local configuration, native signing key, blobs and avatars',
+        },
+      ],
+    },
+    {
+      name: 'Dependencies',
+      fields: [
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'HelmForge PostgreSQL with pgvector; external mode requires connection settings',
+          toggleActivationValues: {
+            true: { 'database.host': '', 'database.passwordSecret': '', 'database.tls.caSecret': '' },
+          },
+        },
+        {
+          label: 'PostgreSQL hostname',
+          key: 'database.host',
+          type: 'text',
+          default: '',
+          description: 'External hostname matching the TLS certificate',
+        },
+        {
+          label: 'PostgreSQL password Secret',
+          key: 'database.passwordSecret',
+          type: 'text',
+          default: '',
+          description: 'External Secret key password',
+        },
+        {
+          label: 'PostgreSQL CA Secret',
+          key: 'database.tls.caSecret',
+          type: 'text',
+          default: '',
+          description: 'Optional custom CA, key ca.crt',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Authenticated standalone Redis with persistence and noeviction',
+          toggleActivationValues: {
+            true: { 'cache.host': '', 'cache.passwordSecret': '', 'cache.tls.caSecret': '' },
+          },
+        },
+        {
+          label: 'Redis hostname',
+          key: 'cache.host',
+          type: 'text',
+          default: '',
+          description: 'External hostname matching the TLS certificate',
+        },
+        {
+          label: 'Redis password Secret',
+          key: 'cache.passwordSecret',
+          type: 'text',
+          default: '',
+          description: 'External Secret key redis-password',
+        },
+        {
+          label: 'Redis CA Secret',
+          key: 'cache.tls.caSecret',
+          type: 'text',
+          default: '',
+          description: 'Optional custom CA, key ca.crt',
+        },
+      ],
+    },
+    {
+      name: 'Native metrics',
+      fields: [
+        {
+          label: 'Prometheus metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Private native endpoint; restrict metrics.ingressFrom to your scrapers',
+          toggleActivationValues: {
+            false: { 'metrics.serviceMonitor.enabled': 'false', 'metrics.prometheusRule.enabled': 'false' },
+          },
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires Prometheus Operator',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+        {
+          label: 'PrometheusRule',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Native metrics availability alert',
+          toggleActivationValues: { true: { 'metrics.enabled': 'true' } },
+        },
+      ],
+    },
+  ],
   opencloud: [
     {
       name: 'Identity and storage',

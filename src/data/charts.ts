@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'AFFiNE',
+    slug: 'affine',
+    description:
+      'Collaborative workspaces with private onboarding, pgvector, verified database TLS and native Prometheus.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'OpenCloud',
     slug: 'opencloud',
     description:

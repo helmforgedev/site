@@ -139,6 +139,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Papra', href: '/docs/charts/papra', maturity: 'stable' },
       { label: 'Ryot', href: '/docs/charts/ryot', maturity: 'stable' },
       { label: 'Pocket ID', href: '/docs/charts/pocket-id', maturity: 'stable' },
+      { label: 'AFFiNE', href: '/docs/charts/affine', maturity: 'stable' },
       { label: 'OpenCloud', href: '/docs/charts/opencloud', maturity: 'stable' },
       { label: 'Glance', href: '/docs/charts/glance', maturity: 'stable' },
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },

@@ -1,0 +1,885 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: AFFiNE Chart
+description:
+  Collaborative workspaces with private administrator initialization, verified PostgreSQL and Redis TLS, native
+  Prometheus and coordinated recovery.
+---
+
+# AFFiNE Helm Chart
+
+AFFiNE collaborative workspaces with the official image, private administrator initialization, pgvector PostgreSQL,
+authenticated Redis and persistent native identity. The chart uses one Recreate application replica with explicit
+storage and dependency contracts.
+
+## Operational features
+
+- Native first-administrator API runs on verified loopback before public startup.
+- Retained bootstrap Secret and native SEC1 key; existing identities are preserved.
+- Non-root application, read-only image filesystem, bounded writable paths and no Kubernetes API token.
+- HelmForge PostgreSQL and Redis dependencies, or independently configured external services with verified TLS and
+  operator-managed credentials.
+- Separate Prisma and SQLx TLS settings, including certificate and hostname checks for both native PostgreSQL clients.
+- Authenticated native Socket.IO/Yjs synchronization, private workspace/blob access and dependency-aware readiness.
+- Native Prometheus endpoint, private metrics Service, ServiceMonitor and PrometheusRule; scoped NetworkPolicy and
+  DNS/dependency egress.
+- Ingress, canonical `gatewayAPI.httpRoutes[]`, dual-stack Services and External Secrets through the standard `items[]`
+  contract.
+- Coordinated PostgreSQL/configuration/storage recovery procedure and a dedicated fresh-database/fresh-PVC acceptance
+  scenario.
+
+## Install
+
+Create the namespace and an administrator credential through the cluster's approved Secret-management workflow. Use a
+password containing 16 to 32 characters.
+
+```yaml
+bootstrap:
+  email: owner@example.com
+  existingSecret: affine-administrator
+  passwordKey: password
+server:
+  publicUrl: https://knowledge.example.com
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+  hosts:
+    - host: knowledge.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: knowledge-tls
+      hosts: [knowledge.example.com]
+```
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm upgrade --install affine helmforge/affine \
+  --namespace knowledge --create-namespace --values production-values.yaml
+```
+
+The initial password is generated and retained when no existing Secret or explicit password is supplied. Changing the
+bootstrap Secret does not reset an existing account. Configure the exact browser-visible origin before first use and
+provide the edge certificate through the selected controller.
+
+## Dependencies and persistence
+
+Defaults enable PostgreSQL 16 with the official pgvector image and authenticated Redis. The application PVC stores
+native configuration, private keys, blobs and avatars. PostgreSQL stores users, permissions, document state and blob
+metadata. Redis uses several logical databases for cache, sessions, collaboration and queues.
+
+Set `postgresql.enabled=false` to use `database.*`, or `redis.enabled=false` to use `cache.*`. Both external transports
+enable TLS by default. Configure the server hostname, credential Secret, optional CA Secret and appropriate egress
+rules. The PostgreSQL DBA must install `vector` before application migrations. The chart rejects conflicting
+bundled/external settings and unsupported Redis topologies.
+
+The application requires one replica because local storage and background processing need a coordinated topology.
+Recreate avoids concurrent writers during an upgrade. Size the application PVC, PostgreSQL volume and Redis
+memory/storage independently. Retain the complete matching recovery set; PVC retention is not a backup.
+
+## Networking and monitoring
+
+Use `ingress.ingressClassName` for Ingress, or enable `gatewayAPI.enabled` and provide `gatewayAPI.httpRoutes[]`. Each
+route requires parent references. Omitted backends target the application Service; multiple routes, matches and filters
+use the standard HelmForge contract. Controllers must support WebSocket upgrades and the configured upload limits.
+Controller installation and edge certificate provisioning are separate.
+
+Enable `metrics.enabled` and the desired monitoring CRDs. The native endpoint has no authentication and remains on a
+separate private Service; restrict scraper peers through `metrics.ingressFrom`. The metric switch also activates
+upstream tracing, so review its destination and network policy. Native storage and collaboration metrics are exercised
+by the behavioral tests, with a real Prometheus scrape and loaded rule.
+
+## Important operations
+
+- Preserve `config/private.key` and database signing records across upgrades and restore. An existing user database with
+  a missing key fails initialization.
+- Back up before upgrading. Native schema and data migrations are serialized; unresolved migration history requires
+  explicit repair.
+- Public signup, OAuth signup and guest demo workspaces are disabled in chart-managed defaults. Review
+  administrator-owned database configuration before changing them.
+- Rotate connection credentials and CA trust through a controlled restart.
+- Keep filesystem/configuration archives encrypted and access-controlled; generated configuration includes database
+  credentials.
+
+## Documentation
+
+- [Administrator initialization and access](#onboarding-details)
+- [PostgreSQL, Redis and TLS](#dependencies-details)
+- [Native monitoring](#monitoring-details)
+- [Coordinated recovery](#recovery-details)
+- [Design and boundaries](https://github.com/helmforgedev/charts/blob/main/charts/affine/DESIGN.md)
+
+## Validation status
+
+The complete HelmForge gate passed all 21 layers, including 31 Helm assertions and 11 isolated k3d runtime scenarios.
+Acceptance covers private administrator setup, closed registration, native document collaboration and edits after
+replacement, PostgreSQL and Redis certificate/hostname rejection, a real Prometheus ServiceMonitor scrape, External
+Secrets, and recovery into a new database and PVC. The production scenario also verifies that application and dependency
+Pods have no projected Kubernetes API tokens.
+
+## Security Scan: `affine`
+
+| Framework | Score      |
+| --------- | ---------- |
+| Overall   | **98.96%** |
+| MITRE     | **99.16%** |
+| NSA       | **98.29%** |
+| SOC2      | **97.14%** |
+
+Kubescape 4.0.13, default rendered manifests, 2026-09-10. No controls were suppressed. C-0012 matches the literal
+private-key format check in the bootstrap program; the ConfigMap contains code, not a private key. C-0034 identifies the
+bundled Redis dependency's missing Pod-level token-automount field. Redis has a dedicated account without RBAC grants
+and denied egress. The production example shares the AFFiNE account with token automount disabled; its runtime test
+checks all dependency Pods for projected API tokens. See [dependency hardening](#dependencies-details). This manifest
+scan does not replace application review or image vulnerability management.
+
+## onboarding details
+
+Set `server.publicUrl` to the exact browser-visible origin, including HTTPS and any nondefault port. Configure either
+Ingress or a Gateway API HTTPRoute for that host. The chart serves HTTP to the controller; terminate public TLS at the
+edge and support WebSocket upgrades. Configure upload limits and timeouts deliberately.
+
+The default administrator email is `admin@example.test`; replace it before first installation. A generated 32-character
+password is stored in a retained Kubernetes Secret. For an operator-managed credential, set `bootstrap.existingSecret`
+and `bootstrap.passwordKey`. Supplied passwords must contain 16 to 32 characters. Use External Secrets through
+`externalSecrets.items[]` when appropriate.
+
+On an empty database, the initializer runs the native server on IPv4 loopback, verifies that its HTTP socket is
+inaccessible through the Pod IP, and calls the native first-administrator API. It checks the resulting administrator
+feature and terminates that server before the public process starts. No database password hash or user record is
+synthesized by the chart.
+
+An existing identity skips first-user HTTP initialization. Updating the bootstrap Secret does not reset its password.
+Perform account maintenance through AFFiNE's native administration features. Public registration, OAuth registration and
+guest demo workspaces are disabled in the chart-managed defaults. Administrator-owned database configuration remains
+authoritative and must be reviewed when changing these settings.
+
+The configuration file on the PVC is generated by the chart and contains connection credentials. Treat the complete
+configuration directory as secret material; use native administrator settings for supported mutable application
+configuration. Do not overwrite `config/private.key` or pair an existing database with a newly generated key.
+Initialization refuses an existing user database with a missing key and requires explicit review of an empty-user
+database with preexisting overrides. An existing database must contain an active administrator. Database overrides of
+chart-managed PostgreSQL, Redis and listener settings also block initialization; remove conflicting overrides through a
+reviewed native administration procedure before changing infrastructure connections or restoring to a new database.
+
+For a local demonstration, set `server.publicUrl=http://localhost:3010` and port-forward the application Service to
+local port 3010. This is a local HTTP configuration; production access should use the intended HTTPS origin.
+
+Useful diagnostics:
+
+```bash
+kubectl -n knowledge logs deployment/affine -c bootstrap
+kubectl -n knowledge logs deployment/affine -c affine
+kubectl -n knowledge describe pod -l app.kubernetes.io/name=affine
+```
+
+Replace the namespace and Deployment name with those of the installation.
+
+Ingress/Gateway controller routing and browser certificate trust are deployment responsibilities. A rendered route does
+not establish that its controller has accepted it or that the configured hostname resolves from clients.
+
+## dependencies details
+
+The defaults enable HelmForge PostgreSQL and Redis dependencies. PostgreSQL uses the official pinned pgvector PostgreSQL
+16 image and a DBA initialization script that installs `vector`. Redis uses password authentication, AOF persistence and
+`maxmemory-policy noeviction`. These bundled connections use plaintext within the configured namespace network boundary.
+
+Bundled Redis uses a dedicated account without RBAC grants and accepts connections only from this release's AFFiNE Pods
+when NetworkPolicy is enabled. Its image filesystem is read-only, capabilities are dropped and seccomp uses
+RuntimeDefault. The released Redis dependency does not expose a token-automount setting. To prevent token projection,
+set `serviceAccount.name` to a unique release-specific name and use that same name in `redis.serviceAccount.name`, with
+`redis.serviceAccount.create=false`. The production Ingress example and CI profile exercise this shared, unprivileged
+account; the AFFiNE account disables token automount. Redis egress is denied by the parent chart's policy.
+
+For managed services or independently operated databases, disable the relevant subchart and configure `database.*` or
+`cache.*`. The two choices are independent. External TLS is enabled by default. Provide the DNS name present in the
+server certificate and an optional Secret containing its CA certificate. If `caSecret` is empty, the client's system
+trust applies. Disabling TLS is an explicit decision for a trusted transport boundary; it does not provide encryption.
+
+The PostgreSQL application user needs permission to run the native schema/data migrations and own application objects.
+Have the DBA install `vector` before startup. An existing unresolved Prisma migration blocks admission; repair it using
+the upstream-supported procedure after backup and diagnosis. The chart does not automatically roll back
+migration-history records.
+
+### Different PostgreSQL clients
+
+AFFiNE 0.27.4 contains both Prisma and native SQLx connection pools. Their TLS URL parameters are incompatible. The
+chart builds separate URLs from the same database coordinates and credential:
+
+| Client      | Encryption, certificate and hostname verification              |
+| ----------- | -------------------------------------------------------------- |
+| Prisma      | `sslmode=require&sslaccept=strict`, optional `sslcert` CA file |
+| Native SQLx | `sslmode=verify-full`, optional `sslrootcert` CA file          |
+
+The application Prisma URL is supplied through native `db.prisma.datasourceUrl`; `DATABASE_URL` supplies SQLx. Schema
+and data migrations use the corresponding environment in separate native commands. Do not inject a common `DATABASE_URL`
+through `extraEnv`, or substitute familiar libpq parameters without checking the specific driver. Connection credentials
+are URL-encoded before use.
+
+### Redis logical databases
+
+Redis must support database selection. AFFiNE uses base database N for cache, N+2 for sessions, N+3 for Socket.IO and
+N+4 for queues. The default base is zero; ensure the server provides all required databases. This chart supports the
+validated standalone endpoint contract and rejects Redis Cluster or unvalidated bundled replication topologies.
+
+Native ioredis TLS receives the actual CA PEM contents and the configured hostname with `rejectUnauthorized=true`. This
+configuration applies to all logical clients, including sessions and collaboration. Keep noeviction for queue
+reliability and size Redis for the expected workload.
+
+### NetworkPolicy and rotation
+
+The default policy permits DNS and bundled dependencies. External services require appropriate
+`networkPolicy.extraEgress` entries. Use namespace/pod selectors for in-cluster services or reviewed CIDRs for managed
+endpoints. Kubernetes NetworkPolicy does not resolve arbitrary domain-name allowlists.
+
+Rotate dependency credentials and CAs through a coordinated restart. Replacing a mounted CA file alone does not
+guarantee that existing pools reload it. Back up the matching database, configuration, private key and storage before
+changing endpoints or database ownership. Test native login, a persisted document edit and blob bytes after a change; a
+TCP connection or one successful PING is insufficient.
+
+## monitoring details
+
+Enable `metrics.enabled` to expose the upstream Prometheus exporter on a separate private port, 9464 by default.
+`metrics.serviceMonitor.enabled` and `metrics.prometheusRule.enabled` create the corresponding Prometheus Operator
+resources. Install the operator CRDs and configure its selectors to discover these resources. The chart does not install
+a monitoring stack.
+
+The native metrics endpoint has no authentication. Keep it internal and limit `metrics.ingressFrom` to the intended
+scrapers. The default permits the namespace named `monitoring`; adjust this to the installation. The application Ingress
+and HTTPRoutes target only the application port.
+
+Validated native metric families include `storage_function_calls_total`, `storage_function_timer`,
+`gql_query_counter_total`, `socketio_connections`, `socketio_doc_updates_broadcast_total` and `queue_active_jobs_total`.
+Storage `putObject` and `getObject` counters are exercised through actual authenticated uploads and downloads. These are
+application metrics, not an invented exporter endpoint. The bundled alert detects an unavailable scrape target; add
+workload alerts through `metrics.prometheusRule.additionalRules` based on observed demand.
+
+Enabling the native metrics switch also enables upstream tracing and a Zipkin exporter. The chart does not add
+unrestricted trace egress or assume an environment variable disables an exporter explicitly created by the application.
+Review the upstream trace configuration and your intended destination before enabling trace delivery. Keep unwanted
+destinations outside the network allowlist.
+
+Readiness checks a fresh PostgreSQL query, authenticated Redis PING and HTTP availability. Liveness checks HTTP only, so
+a dependency outage does not deliberately restart the application. Monitor PVC capacity, database capacity, Redis memory
+and eviction counts alongside the application series.
+
+The behavioral monitoring scenario verifies native exposition, actual storage activity, a real ServiceMonitor scrape
+with `up=1`, and a loaded PrometheusRule. Controller routing, alert delivery and external monitoring retention require
+their own environment validation.
+
+## recovery details
+
+The recovery unit comprises PostgreSQL, all application filesystem storage, the complete configuration directory and
+referenced Secrets. This includes the exact SEC1 `config/private.key` and database-managed signing/configuration
+records. The generated configuration contains database credentials and must be protected with the same care as other
+secrets.
+
+Use a maintenance window to stop every application writer before taking the database and filesystem snapshots. A
+consistent `pg_dump` alone does not coordinate with files that are still changing. Retain the complete storage tree,
+including avatars and any configured auxiliary storage, rather than selecting one known blob.
+
+1. Record the chart/application image, dependency versions, values and Secret references. Suspend application traffic
+   and background writers.
+2. Take a checked PostgreSQL logical backup and archive or snapshot the entire application PVC. Protect and retain the
+   matching Secrets separately.
+3. Restore into an empty target database and a fresh application PVC. Have a DBA install `vector`; preserve the intended
+   application-role ownership and privileges.
+4. Restore configuration and storage with UID/GID 1000 and restrictive private-key permissions before allowing the
+   application to start.
+5. Point the release at the restored database and claim, then allow the pinned native migration sequence to complete.
+   Diagnose migration failures explicitly.
+6. Verify the original identity and private key, a native login, workspace permissions, exact blob bytes and a persisted
+   document edit/reopen. Confirm the intended origin and integration endpoints before restoring public traffic.
+
+The chart's dedicated `ci/restore-values.yaml` scenario quiesces the singleton, uses `pg_dump`/`pg_restore` into a
+separate empty database, and copies the complete private configuration/storage archive into a new PVC. The original
+database and PVC remain separate from the restore target until disposable namespace cleanup. The scenario passed with
+the original signing key and session, exact blob bytes, and native document editing and reopening against the restored
+state.
+
+The fixture preinstalls `vector` as DBA and excludes only that extension's creation and comment entries from the restore
+list, so application objects are restored under the application role with checked errors. Adapt ownership and extension
+handling to the privileges of the target database; do not suppress arbitrary restore failures.
+
+PVC retention protects against an accidental Helm uninstall; it is not a backup. Configure off-cluster retention,
+encryption, access controls and restore rehearsals for the actual storage platform. If native administrator
+configuration uses external object storage, include all referenced objects and their matching database state in the same
+recovery plan. No application-consistent live backup or automatic downgrade is asserted by this chart.
+
+## production-ingress example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+server:
+  publicUrl: https://knowledge.example.com
+# Use a unique account name per release. Both workloads inherit token automount=false.
+serviceAccount:
+  name: knowledge-affine-runtime
+redis:
+  serviceAccount:
+    create: false
+    name: knowledge-affine-runtime
+bootstrap:
+  email: owner@example.com
+  existingSecret: affine-administrator
+  passwordKey: password
+persistence:
+  size: 100Gi
+postgresql:
+  standalone:
+    persistence:
+      size: 50Gi
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+  hosts:
+    - host: knowledge.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: knowledge-tls
+      hosts: [knowledge.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+```
+
+## external-tls example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Install vector in the target PostgreSQL database before starting AFFiNE.
+# Replace documentation CIDRs with the actual database/cache destination ranges.
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+database:
+  host: postgres.example.com
+  name: affine
+  username: affine
+  passwordSecret: affine-postgres
+  passwordKey: password
+  tls:
+    enabled: true
+    caSecret: postgres-ca
+    caKey: ca.crt
+cache:
+  host: redis.example.com
+  port: 6380
+  passwordSecret: affine-redis
+  passwordKey: password
+  tls:
+    enabled: true
+    caSecret: redis-ca
+    caKey: ca.crt
+networkPolicy:
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.10/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.20/32
+      ports:
+        - protocol: TCP
+          port: 6380
+```
+
+## gateway-eso-monitoring example
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# Requires an existing HTTPS Gateway, SecretStore and Prometheus Operator.
+server:
+  publicUrl: https://knowledge.example.com
+bootstrap:
+  email: owner@example.com
+  existingSecret: affine-administrator
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: affine-administrator
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        data:
+          - secretKey: admin-password
+            remoteRef:
+              key: applications/affine/admin-password
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - parentRefs:
+        - name: public
+          namespace: gateway-system
+          sectionName: https
+      hostnames: [knowledge.example.com]
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: gateway-system
+metrics:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+```
+
+## Complete values
+
+```yaml
+# SPDX-License-Identifier: Apache-2.0
+# -- nameOverride.
+nameOverride: ''
+# -- fullnameOverride.
+fullnameOverride: ''
+# -- commonLabels.
+commonLabels: {}
+# -- Single application replica; native local storage uses Recreate upgrades.
+replicaCount: 1
+# -- imagePullSecrets.
+imagePullSecrets: []
+# -- Additional native settings; chart-managed connection and identity variables are reserved.
+extraEnv: []
+# -- serviceAccount.
+serviceAccount:
+  # -- create.
+  create: true
+  # -- name.
+  name: ''
+  # -- annotations.
+  annotations: {}
+  # -- automountServiceAccountToken.
+  automountServiceAccountToken: false
+# -- service.
+service:
+  # -- type.
+  type: ClusterIP
+  # -- port.
+  port: 3010
+  # -- annotations.
+  annotations: {}
+  # -- ipFamilyPolicy.
+  ipFamilyPolicy: ''
+  # -- ipFamilies.
+  ipFamilies: []
+# -- ingress.
+ingress:
+  # -- enabled.
+  enabled: false
+  # -- ingressClassName.
+  ingressClassName: ''
+  # -- annotations.
+  annotations: {}
+  # -- hosts.
+  hosts: []
+  # -- tls.
+  tls: []
+# -- gatewayAPI.
+gatewayAPI:
+  # -- enabled.
+  enabled: false
+  # -- Canonical HTTPRoutes; each route requires parentRefs and defaults to the application Service.
+  httpRoutes: []
+# -- externalSecrets.
+externalSecrets:
+  # -- enabled.
+  enabled: false
+  # -- refreshInterval.
+  refreshInterval: 1h
+  # -- Native ExternalSecret specifications with explicit store references and target keys.
+  items: []
+# -- probes.
+probes:
+  # -- startup.
+  startup:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 60
+    # -- periodSeconds.
+    periodSeconds: 5
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- Fresh PostgreSQL query, authenticated Redis PING and native HTTP health check.
+  readiness:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 10
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+  # -- Native HTTP process health; dependency outages affect readiness instead.
+  liveness:
+    # -- enabled.
+    enabled: true
+    # -- failureThreshold.
+    failureThreshold: 3
+    # -- periodSeconds.
+    periodSeconds: 20
+    # -- timeoutSeconds.
+    timeoutSeconds: 5
+# -- resources.
+resources:
+  # -- requests.
+  requests:
+    # -- cpu.
+    cpu: 500m
+    # -- memory.
+    memory: 1Gi
+  # -- limits.
+  limits:
+    # -- cpu.
+    cpu: '2'
+    # -- memory.
+    memory: 3Gi
+# -- podSecurityContext.
+podSecurityContext:
+  # -- runAsNonRoot.
+  runAsNonRoot: true
+  # -- runAsUser.
+  runAsUser: 1000
+  # -- runAsGroup.
+  runAsGroup: 1000
+  # -- fsGroup.
+  fsGroup: 1000
+  # -- fsGroupChangePolicy.
+  fsGroupChangePolicy: OnRootMismatch
+  # -- seccompProfile.
+  seccompProfile:
+    # -- type.
+    type: RuntimeDefault
+# -- securityContext.
+securityContext:
+  # -- allowPrivilegeEscalation.
+  allowPrivilegeEscalation: false
+  # -- readOnlyRootFilesystem.
+  readOnlyRootFilesystem: true
+  # -- capabilities.
+  capabilities:
+    # -- drop.
+    drop:
+      - ALL
+# -- podLabels.
+podLabels: {}
+# -- podAnnotations.
+podAnnotations: {}
+# -- nodeSelector.
+nodeSelector: {}
+# -- tolerations.
+tolerations: []
+# -- affinity.
+affinity: {}
+# -- topologySpreadConstraints.
+topologySpreadConstraints: []
+# -- priorityClassName.
+priorityClassName: ''
+# -- terminationGracePeriodSeconds.
+terminationGracePeriodSeconds: 30
+# -- persistence.
+persistence:
+  # -- enabled.
+  enabled: true
+  # -- Existing complete configuration, identity and blob volume, including a restored claim.
+  existingClaim: ''
+  # -- storageClass.
+  storageClass: ''
+  # -- Capacity for native configuration, SEC1 signing key, blobs and avatars.
+  size: 20Gi
+  # -- accessModes.
+  accessModes:
+    - ReadWriteOnce
+  # -- Retain the application claim during uninstall; this is not a backup.
+  retain: true
+  # -- annotations.
+  annotations: {}
+# -- runtime.
+runtime:
+  # -- Bounded temporary volume used by the native application and initializer.
+  temporarySize: 1Gi
+# -- image.
+image:
+  # -- repository.
+  repository: ghcr.io/toeverything/affine
+  # -- tag.
+  tag: 0.27.4
+  # -- pullPolicy.
+  pullPolicy: IfNotPresent
+# -- server.
+server:
+  # -- Native application port; bootstrap binds it only to loopback before public startup.
+  port: 3010
+  # -- Exact browser-visible origin; empty uses the in-cluster Service origin for local evaluation.
+  publicUrl: ''
+# -- bootstrap.
+bootstrap:
+  # -- Display name for the first native administrator.
+  name: Administrator
+  # -- First administrator email; replace before production installation.
+  email: admin@example.test
+  # -- Optional initial password with 16 to 32 characters; empty generates a retained Secret.
+  password: ''
+  # -- Existing initial credential Secret, mounted only in the initializer.
+  existingSecret: ''
+  # -- Secret key holding the initial password; changing it does not reset an existing account.
+  passwordKey: admin-password
+# -- networkPolicy.
+networkPolicy:
+  # -- enabled.
+  enabled: true
+  # -- Application ingress peers; empty permits Pods in this namespace.
+  ingressFrom: []
+  # -- egressIsolation.
+  egressIsolation: true
+  # -- dnsEgress.
+  dnsEgress:
+    - namespaceSelector:
+        # -- matchLabels.
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      # -- podSelector.
+      podSelector:
+        # -- matchLabels.
+        matchLabels:
+          # -- k8s-app.
+          k8s-app: kube-dns
+  # -- Explicit egress rules for external dependencies and approved integrations.
+  extraEgress: []
+# -- database.
+database:
+  # -- External PostgreSQL hostname when the bundled subchart is disabled.
+  host: ''
+  # -- port.
+  port: 5432
+  # -- name.
+  name: affine
+  # -- username.
+  username: affine
+  # -- Secret containing the external PostgreSQL application password.
+  passwordSecret: ''
+  # -- passwordKey.
+  passwordKey: password
+  # -- tls.
+  tls:
+    # -- Verify external PostgreSQL encryption, certificate chain and hostname in both native drivers.
+    enabled: true
+    # -- Optional CA Secret; empty uses client system trust.
+    caSecret: ''
+    # -- caKey.
+    caKey: ca.crt
+# -- cache.
+cache:
+  # -- External standalone Redis hostname when the bundled subchart is disabled.
+  host: ''
+  # -- port.
+  port: 6379
+  # -- username.
+  username: ''
+  # -- Secret containing the external Redis password.
+  passwordSecret: ''
+  # -- passwordKey.
+  passwordKey: redis-password
+  # -- Base logical database N; AFFiNE also requires N+2, N+3 and N+4.
+  database: 0
+  # -- tls.
+  tls:
+    # -- Verify external Redis TLS certificate chain and hostname.
+    enabled: true
+    # -- Optional Redis CA Secret; empty uses system trust.
+    caSecret: ''
+    # -- caKey.
+    caKey: ca.crt
+# -- postgresql.
+postgresql:
+  # -- initdb.
+  initdb:
+    # -- scripts.
+    scripts:
+      # -- 20-affine-vector.sh.
+      20-affine-vector.sh: |
+        #!/bin/bash
+        set -euo pipefail
+        export PGPASSWORD="${POSTGRES_PASSWORD}"
+        psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${APP_DATABASE}" <<'SQL'
+        CREATE EXTENSION IF NOT EXISTS vector;
+        SQL
+  # -- securityContext.
+  securityContext:
+    # -- readOnlyRootFilesystem.
+    readOnlyRootFilesystem: true
+  # -- extraVolumes.
+  extraVolumes:
+    - name: postgres-tmp
+      # -- emptyDir.
+      emptyDir:
+        # -- sizeLimit.
+        sizeLimit: 1Gi
+    - name: postgres-socket
+      # -- emptyDir.
+      emptyDir:
+        # -- medium.
+        medium: Memory
+        # -- sizeLimit.
+        sizeLimit: 16Mi
+  # -- extraVolumeMounts.
+  extraVolumeMounts:
+    - name: postgres-tmp
+      # -- mountPath.
+      mountPath: /tmp
+    - name: postgres-socket
+      # -- mountPath.
+      mountPath: /var/run/postgresql
+  # -- networkPolicy.
+  networkPolicy:
+    # -- enabled.
+    enabled: true
+    # -- egress.
+    egress:
+      # -- enabled.
+      enabled: true
+      # -- allowDNS.
+      allowDNS: true
+      # -- allowSameNamespacePostgreSQL.
+      allowSameNamespacePostgreSQL: false
+      # -- allowHTTPS.
+      allowHTTPS: false
+  # -- enabled.
+  enabled: true
+  # -- architecture.
+  architecture: standalone
+  # -- auth.
+  auth:
+    # -- database.
+    database: affine
+    # -- username.
+    username: affine
+    # -- existingSecret.
+    existingSecret: ''
+    # -- existingSecretUserPasswordKey.
+    existingSecretUserPasswordKey: user-password
+  # -- image.
+  image:
+    # -- repository.
+    repository: pgvector/pgvector
+    # -- tag.
+    tag: 0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+# -- redis.
+redis:
+  # -- Dedicated Redis service account; released dependency does not expose token automount control.
+  serviceAccount:
+    # -- Create a release-scoped account without RBAC grants.
+    create: true
+  # -- Redis runs non-root with a read-only image filesystem.
+  securityContext:
+    # -- Redis writes only to its persistent /data mount.
+    readOnlyRootFilesystem: true
+    # -- Drop unnecessary Linux capabilities.
+    capabilities:
+      # -- Redis needs no additional capabilities.
+      drop: [ALL]
+    # -- Use the container runtime syscall profile.
+    seccompProfile:
+      # -- Standard container runtime seccomp policy.
+      type: RuntimeDefault
+  # -- enabled.
+  enabled: true
+  # -- architecture.
+  architecture: standalone
+  # -- auth.
+  auth:
+    # -- enabled.
+    enabled: true
+    # -- password.
+    password: ''
+    # -- existingSecret.
+    existingSecret: ''
+    # -- existingSecretPasswordKey.
+    existingSecretPasswordKey: redis-password
+  # -- config.
+  config:
+    # -- redis.
+    redis: |
+      maxmemory-policy noeviction
+      appendonly yes
+  # -- standalone.
+  standalone:
+    # -- persistence.
+    persistence:
+      # -- enabled.
+      enabled: true
+      # -- size.
+      size: 5Gi
+    # -- resources.
+    resources:
+      # -- requests.
+      requests:
+        # -- cpu.
+        cpu: 100m
+        # -- memory.
+        memory: 128Mi
+      # -- limits.
+      limits:
+        # -- cpu.
+        cpu: 500m
+        # -- memory.
+        memory: 512Mi
+# -- metrics.
+metrics:
+  # -- Enable the private native Prometheus endpoint and upstream trace instrumentation.
+  enabled: false
+  # -- port.
+  port: 9464
+  # -- NetworkPolicy peers allowed to scrape the unauthenticated native metrics port.
+  ingressFrom:
+    - namespaceSelector:
+        # -- matchLabels.
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+  # -- serviceMonitor.
+  serviceMonitor:
+    # -- enabled.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- interval.
+    interval: 30s
+    # -- scrapeTimeout.
+    scrapeTimeout: 10s
+  # -- prometheusRule.
+  prometheusRule:
+    # -- enabled.
+    enabled: false
+    # -- labels.
+    labels: {}
+    # -- additionalRules.
+    additionalRules: []
+```

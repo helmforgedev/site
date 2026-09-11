@@ -1,6 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('affine clears conflicting external settings and keeps native monitoring consistent', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="affine"]').click();
+    const code = page.locator('#playground-code');
+    for (const [dependency, field] of [
+      ['postgresql', 'database.host'],
+      ['redis', 'cache.host'],
+    ]) {
+      const toggle = page.locator(`button[data-field-key="${dependency}.enabled"]`);
+      const host = page.locator(`input[data-field-key="${field}"]`);
+      await toggle.click();
+      await host.fill('external.example.test');
+      await expect(code).toContainText(`${field}=external.example.test`);
+      await toggle.click();
+      await expect(host).toHaveValue('');
+      await expect(code).not.toContainText(`${field}=external.example.test`);
+    }
+    await page.locator('button[data-field-key="metrics.serviceMonitor.enabled"]').click();
+    await expect(code).toContainText('metrics.enabled=true');
+    await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
+    await page.locator('button[data-field-key="metrics.enabled"]').click();
+    await expect(code).not.toContainText('metrics.serviceMonitor.enabled=true');
+  });
   for (const [slug, key] of [
     ['stirling-pdf', 'metrics.enabled'],
     ['bytestash', 'backup.enabled'],
