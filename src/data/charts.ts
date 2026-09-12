@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'OpenClaw',
+    slug: 'openclaw',
+    description: 'Persistent agent gateway with secure device pairing, native telemetry and verified S3 recovery.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'Hermes Agent',
     slug: 'hermes-agent',
     description:
