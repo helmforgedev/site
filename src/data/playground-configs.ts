@@ -8,6 +8,120 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  openclaw: [
+    {
+      name: 'Agent and identity',
+      fields: [
+        {
+          label: 'Model',
+          key: 'agent.model',
+          type: 'text',
+          default: 'anthropic/claude-opus-4-6',
+          description: 'Provider/model identifier; configure the matching credentials Secret',
+        },
+        {
+          label: 'Tool profile',
+          key: 'agent.toolProfile',
+          type: 'select',
+          default: 'minimal',
+          description: 'Enable only tools intended for this installation',
+          options: ['minimal', 'coding', 'messaging', 'full'],
+        },
+        {
+          label: 'Provider credentials Secret',
+          key: 'credentials.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with provider and channel environment credentials',
+        },
+        {
+          label: 'Gateway token Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Use an existing Secret for stable render-only GitOps identity',
+        },
+        {
+          label: 'Configuration ownership',
+          key: 'config.policy',
+          type: 'select',
+          default: 'managed',
+          description: 'Managed applies declared files; seed preserves existing UI/CLI edits',
+          options: ['managed', 'seed'],
+        },
+        {
+          label: 'Persistent volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Sessions, credentials, workspaces and device state; one writer',
+        },
+      ],
+    },
+    {
+      name: 'Native telemetry',
+      collapsible: true,
+      gateField: 'metrics.enabled',
+      fields: [
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires Prometheus Operator and permitted monitoring peers',
+        },
+        {
+          label: 'Alert rules',
+          key: 'metrics.prometheusRule.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable the chart PrometheusRule',
+        },
+      ],
+    },
+    {
+      name: 'Verified S3 backups',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Existing bucket for sensitive native archives',
+        },
+        {
+          label: 'S3 credentials Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY',
+        },
+        {
+          label: 'Object prefix',
+          key: 'backup.s3.prefix',
+          type: 'text',
+          default: 'openclaw',
+          description: 'Keep this release separate from other application backups',
+        },
+        {
+          label: 'Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: '',
+          description: 'Optional HTTPS S3-compatible endpoint',
+        },
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'CronJob schedule; configure capacity and retention separately',
+        },
+      ],
+    },
+  ],
   'hermes-agent': [
     {
       name: 'Agent and identity',
