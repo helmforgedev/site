@@ -27,6 +27,7 @@ test('S3 activation emits the required bucket and Secret', async ({ page }) => {
   await page.locator('input[data-field-key="backup.s3.existingSecret"]').fill('agent-s3');
   await expect(page.locator('#playground-code')).toContainText('backup.enabled=true');
   await expect(page.locator('#playground-code')).toContainText('backup.s3.bucket=agent-backups');
+  await expect(page.locator('#playground-code')).toContainText('backup.s3.existingSecret=agent-s3');
 });
 
 test('documentation, values and official icon are available on mobile', async ({ page, request }) => {
