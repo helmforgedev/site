@@ -71,6 +71,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Requires Prometheus Operator and permitted monitoring peers',
         },
         {
+          label: 'Monitoring namespace',
+          key: 'metrics.ingressFrom[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
+          type: 'text',
+          default: 'monitoring',
+          description: 'Namespace allowed to scrape the private metrics Service; match your Prometheus installation',
+        },
+        {
           label: 'Alert rules',
           key: 'metrics.prometheusRule.enabled',
           type: 'toggle',

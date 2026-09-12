@@ -188,19 +188,24 @@ Replace hostnames, Secret names and selectors with your environment's actual res
 OpenClaw is a personal/operator-trusted gateway. Deploy separate releases and claims for independent trust domains.
 There is one writer per release. Do not scale its StatefulSet or reuse its claim in another active gateway.
 
-### First access and device pairing
+#### First access and device pairing
 
 Port-forward the Service to local port 18789 and open `http://localhost:18789`. Retrieve the gateway token from the Secret
 named in Helm NOTES. Supply it in the Control UI connection settings. Treat token-bearing URLs as credentials and keep
 them out of logs and tickets. Remote browser access needs HTTPS, an exact `gateway.controlUi.allowedOrigins` entry,
 WebSocket-capable routing, and a NetworkPolicy peer allowlist.
 
+With NetworkPolicy enabled, Ingress or Gateway API requires nonempty `networkPolicy.ingressFrom` selectors for the
+actual controller Pods/namespaces. Missing selectors fail rendering. Route names must be unique; rendered HTTPRoute
+names include a deterministic hash to keep long names distinct. Parent Helm `global` values are accepted when using
+this chart as a dependency; application settings and images still use this chart's explicit values.
+
 Remote device enrollment remains enabled. Inspect `openclaw devices list` in the running container and approve only the
 request ID associated with the intended browser using `openclaw devices approve <requestId>`. Local loopback connections
 can be auto-approved after authentication; this is not evidence of remote pairing. Do not enable dangerous device or
 origin bypass flags. Configure `gateway.trustedProxies` only for the actual reverse-proxy addresses.
 
-### Models, tools, agents and channels
+#### Models, tools, agents and channels
 
 Set `agent.model` to an upstream provider/model ID and supply its environment key through `credentials.existingSecret`.
 Custom provider definitions belong in `config.values.models.providers`; use SecretRef or environment placeholders for
@@ -220,7 +225,7 @@ Telegram and Discord are opt-in and require nonempty `allowFrom` lists plus thei
 credentials Secret. Group traffic is disabled by the simple chart contract. Test account access and permissions before
 connecting real users. External APIs, channels and browser services have their own permissions and recovery requirements.
 
-### Ownership and upgrades
+#### Ownership and upgrades
 
 Managed mode applies declared JSON, AGENTS.md and SOUL.md on initialization. Existing state and sessions are preserved;
 operator edits to managed files are overwritten at the next restart. Empty instruction values leave those workspace
@@ -236,7 +241,7 @@ Before upgrading, create and verify a recovery point, review upstream migrations
 owns restarts and the image is immutable: do not run self-update inside the gateway. Helm rollback does not reverse
 database migrations. If an older release cannot read the upgraded schema, recover a pre-upgrade archive into a new claim.
 
-### Health and networking
+#### Health and networking
 
 Startup/readiness inspect `/startupz` JSON; liveness inspects `/healthz`. `/readyz` includes individual channel health and
 is useful for diagnosis without evicting the entire UI when a channel is down. Probes reject the UI's HTML fallback.
@@ -297,6 +302,7 @@ expanded entries. Test recovery with representative data and storage throughput 
 to a loopback collector. The pinned official collector translates metrics into Prometheus format on a separate private
 Service, port 8889. Enable `metrics.serviceMonitor.enabled` for an installed Prometheus Operator and set its discovery
 labels and `metrics.ingressFrom` peer selectors.
+When NetworkPolicy is enabled, an enabled ServiceMonitor without these selectors fails rendering.
 
 This integration does not install the separate diagnostics-prometheus plugin at startup and does not share the gateway
 operator token with the scraper. The collector receives metrics only; prompt/tool content capture, traces and logs are
@@ -304,7 +310,8 @@ disabled. Native usage and latency series depend on activity and provider report
 not guaranteed billing records. Empty activity-dependent series are expected before requests occur.
 
 To use an existing OTLP collector, disable the local collector and set `metrics.externalEndpoint` to its OTLP HTTP base
-URL. Allow the destination in NetworkPolicy. ServiceMonitor and chart Prometheus rules require the local collector.
+URL, such as `https://collector.example.com`, or its complete `/v1/metrics` URL. Allow the destination in NetworkPolicy.
+ServiceMonitor and chart Prometheus rules require the local collector.
 External collector authentication and TLS policy can be supplied through supported upstream environment configuration
 in the credentials Secret; verify the endpoint integration in your environment.
 

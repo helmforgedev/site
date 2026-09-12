@@ -30,6 +30,13 @@ test('S3 activation emits the required bucket and Secret', async ({ page }) => {
   await expect(page.locator('#playground-code')).toContainText('backup.s3.existingSecret=agent-s3');
 });
 
+test('telemetry activation includes a permitted monitoring namespace', async ({ page }) => {
+  await page.locator('[data-section-toggle="Native telemetry"]').click();
+  await expect(page.locator('#playground-code')).toContainText('metrics.enabled=true');
+  await expect(page.locator('#playground-code')).toContainText('metrics.ingressFrom[0].namespaceSelector');
+  await expect(page.locator('#playground-code')).toContainText('=monitoring');
+});
+
 test('documentation, values and official icon are available on mobile', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/docs/charts/openclaw');
