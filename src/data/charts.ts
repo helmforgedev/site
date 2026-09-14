@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Nextcloud',
+    slug: 'nextcloud',
+    description: 'File collaboration with PostgreSQL, Redis, coordinated S3 backups and fresh-storage recovery.',
+    maturity: 'stable',
+    backup: true,
+  },
+  {
     name: 'RustDesk Server',
     slug: 'rustdesk-server',
     description:
