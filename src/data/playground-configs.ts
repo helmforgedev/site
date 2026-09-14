@@ -8,6 +8,81 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  nextcloud: [
+    {
+      name: 'Application and storage',
+      fields: [
+        {
+          label: 'Trusted hostname',
+          key: 'nextcloud.trustedDomains[0]',
+          type: 'text',
+          default: 'localhost',
+          description: 'Exact hostname used by browsers and WebDAV clients',
+        },
+        {
+          label: 'Public URL',
+          key: 'nextcloud.overwriteCliUrl',
+          type: 'text',
+          default: 'http://localhost:8080',
+          description: 'Canonical URL for background jobs and email links',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'nextcloud.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with the admin-password key',
+        },
+        {
+          label: 'Application volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Stores configuration, custom apps, themes and user files',
+        },
+        {
+          label: 'Background cron',
+          key: 'cron.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Runs in the application Pod every five minutes',
+        },
+      ],
+    },
+    {
+      name: 'Coordinated backup',
+      fields: [
+        {
+          label: 'Enable backup',
+          key: 'backup.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Stops application and cron during consistent SQL and file capture',
+        },
+        {
+          label: 'Backup schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 2 * * *',
+          description: 'Cron schedule for the maintenance window',
+        },
+        {
+          label: 'S3 bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Existing private bucket; required when backup is enabled',
+        },
+        {
+          label: 'S3 credential Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret with access-key and secret-key; required for backup',
+        },
+      ],
+    },
+  ],
   'rustdesk-server': [
     {
       name: 'Server and identity',
