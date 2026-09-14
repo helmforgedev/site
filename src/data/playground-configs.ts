@@ -8,6 +8,82 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'rustdesk-server': [
+    {
+      name: 'Server and identity',
+      fields: [
+        {
+          label: 'Advertised relay endpoint',
+          key: 'server.relayServers[0]',
+          type: 'text',
+          default: '',
+          description: 'Client-reachable host:port, for example rustdesk.example.com:21117',
+        },
+        {
+          label: 'Existing identity Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Matching native private/public key files; empty generates identity on the data volume',
+        },
+        {
+          label: 'Force relay',
+          key: 'server.alwaysUseRelay',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use relay instead of direct hole punching; configure a reachable relay address',
+        },
+        {
+          label: 'Persistent volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '1Gi',
+          description: 'Stores the native identity and SQLite peer associations',
+        },
+      ],
+    },
+    {
+      name: 'Client access',
+      fields: [
+        {
+          label: 'Allowed client CIDR',
+          key: 'networkPolicy.ingressFrom[0].ipBlock.cidr',
+          type: 'text',
+          default: '',
+          description: 'Office or VPN source range; empty permits only same-namespace Pods',
+        },
+        {
+          label: 'Service type',
+          key: 'service.type',
+          type: 'select',
+          default: 'ClusterIP',
+          options: ['ClusterIP', 'NodePort', 'LoadBalancer'],
+          description: 'External access requires matching firewall, DNS and NetworkPolicy rules',
+        },
+        {
+          label: 'Rendezvous base port',
+          key: 'server.rendezvousPort',
+          type: 'number',
+          default: '21116',
+          description: 'TCP and UDP; NAT uses base minus one',
+        },
+        {
+          label: 'Relay port',
+          key: 'server.relayPort',
+          type: 'number',
+          default: '21117',
+          description: 'Native relay TCP listener',
+        },
+        {
+          label: 'WebSocket endpoints',
+          key: 'websocket.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose optional WebSocket ports for compatible clients; no web console',
+        },
+      ],
+    },
+  ],
   openclaw: [
     {
       name: 'Agent and identity',

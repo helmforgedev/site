@@ -85,6 +85,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Networking & DNS',
     charts: [
+      { label: 'RustDesk Server', href: '/docs/charts/rustdesk-server', maturity: 'stable' },
       { label: 'Cloudflared', href: '/docs/charts/cloudflared', maturity: 'stable' },
       { label: 'Envoy Gateway', href: '/docs/charts/envoy-gateway', maturity: 'stable' },
       { label: 'Envoy Gateway CRDs', href: '/docs/charts/envoy-gateway-crds', maturity: 'stable' },
