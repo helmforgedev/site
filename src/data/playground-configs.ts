@@ -10,6 +10,113 @@
 export const chartConfigs: Record<string, ChartConfig> = {
   nextcloud: [
     {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Ingress hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'cloud.example.com',
+          description: 'Match the trusted hostname and public URL',
+        },
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: '',
+          description: 'Installed controller class',
+        },
+        {
+          label: 'Ingress path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Public application path',
+        },
+        {
+          label: 'Path type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact'],
+          description: 'Ingress path matching',
+        },
+        {
+          label: 'TLS Secret',
+          key: 'ingress.tls[0].secretName',
+          type: 'text',
+          default: 'nextcloud-public-tls',
+          description: 'Existing TLS certificate Secret',
+        },
+        {
+          label: 'TLS hostname',
+          key: 'ingress.tls[0].hosts[0]',
+          type: 'text',
+          default: 'cloud.example.com',
+          description: 'Hostname covered by the certificate',
+        },
+      ],
+    },
+    {
+      name: 'Gateway API',
+      collapsible: true,
+      gateField: 'gatewayAPI.enabled',
+      fields: [
+        {
+          label: 'Route name',
+          key: 'gatewayAPI.httpRoutes[0].name',
+          type: 'text',
+          default: 'nextcloud-public',
+          description: 'Unique HTTPRoute resource name',
+        },
+        {
+          label: 'Gateway name',
+          key: 'gatewayAPI.httpRoutes[0].parentRefs[0].name',
+          type: 'text',
+          default: 'public-gateway',
+          description: 'Existing Gateway',
+        },
+        {
+          label: 'Gateway namespace',
+          key: 'gatewayAPI.httpRoutes[0].parentRefs[0].namespace',
+          type: 'text',
+          default: 'gateway-system',
+          description: 'Gateway must allow routes from this namespace',
+        },
+        {
+          label: 'Gateway listener',
+          key: 'gatewayAPI.httpRoutes[0].parentRefs[0].sectionName',
+          type: 'text',
+          default: 'https',
+          description: 'Existing HTTPS listener with a TLS certificate',
+        },
+        {
+          label: 'Route hostname',
+          key: 'gatewayAPI.httpRoutes[0].hostnames[0]',
+          type: 'text',
+          default: 'cloud.example.com',
+          description: 'Match trusted hostname and public URL',
+        },
+        {
+          label: 'Route path',
+          key: 'gatewayAPI.httpRoutes[0].rules[0].matches[0].path.value',
+          type: 'text',
+          default: '/',
+          description: 'Nextcloud backend is supplied automatically',
+        },
+        {
+          label: 'Route path type',
+          key: 'gatewayAPI.httpRoutes[0].rules[0].matches[0].path.type',
+          type: 'select',
+          default: 'PathPrefix',
+          options: ['PathPrefix', 'Exact'],
+          description: 'HTTPRoute path matching',
+        },
+      ],
+    },
+    {
       name: 'Application and storage',
       fields: [
         {
