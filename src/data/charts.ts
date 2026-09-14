@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'RustDesk Server',
+    slug: 'rustdesk-server',
+    description:
+      'Native remote desktop rendezvous and relay with persistent identity, controlled network access and verified recovery.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'OpenClaw',
     slug: 'openclaw',
     description: 'Persistent agent gateway with secure device pairing, native telemetry and verified S3 recovery.',
