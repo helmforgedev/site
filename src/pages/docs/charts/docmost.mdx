@@ -19,6 +19,19 @@ platform. Supports bundled or external PostgreSQL and Redis, local PVC or S3 upl
   OAuth redirects to reference the wrong address.
 </Callout>
 
+## Upgrade to 0.96
+
+Keep `APP_SECRET` stable: the new encryption service derives its AES-256-GCM
+key from it. Back up PostgreSQL and uploaded files before upgrading. Connected
+Helm upgrades preserve the generated Secret; explicitly manage
+`docmost.appSecret` when rendering offline.
+
+The release updates Node and collaboration services, adds page-version comparison
+and attachments, fixes Redis ACL/URL/TLS handling, and includes security fixes.
+Review the [official notes](https://github.com/docmost/docmost/releases/tag/v0.96.0).
+The bundled Redis chart moves to 3.0.0, retaining its image, storage and
+authentication defaults while fixing its health probes.
+
 ## Key Features
 
 - **Collaborative wiki** — real-time editing, spaces, pages, and permissions
@@ -271,7 +284,7 @@ ingress:
 | Parameter          | Type   | Default                     | Description        |
 | ------------------ | ------ | --------------------------- | ------------------ |
 | `image.repository` | string | `docker.io/docmost/docmost` | Docmost image.     |
-| `image.tag`        | string | `"0.95.0"`                  | Image tag.         |
+| `image.tag`        | string | `"0.96.0"`                  | Image tag.         |
 | `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy. |
 
 ### Docmost Configuration
