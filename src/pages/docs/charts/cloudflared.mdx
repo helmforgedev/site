@@ -210,7 +210,7 @@ pdb:
 | Parameter          | Type   | Default                            | Description                          |
 | ------------------ | ------ | ---------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/cloudflare/cloudflared` | cloudflared container image.         |
-| `image.tag`        | string | `"2026.8.3"`                       | Image tag.                           |
+| `image.tag`        | string | `"2026.9.1"`                       | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                     | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                               | Pull secrets for private registries. |
 
@@ -223,6 +223,7 @@ pdb:
 | `tunnel.existingSecretKey`      | string  | `token`                 | Key inside the existing Secret for the token value.                                       |
 | `tunnel.quickTunnel.enabled`    | boolean | `true`                  | Run an ephemeral quick tunnel for demos and smoke tests. Set `false` for managed tunnels. |
 | `tunnel.quickTunnel.helloWorld` | boolean | `true`                  | Use cloudflared's built-in hello-world origin in quick tunnel mode.                       |
+| `tunnel.quickTunnel.protocol`   | string  | `"http2"`               | Quick tunnel edge transport: `http2`, `auto`, or `quic`.                                  |
 | `tunnel.quickTunnel.url`        | string  | `http://localhost:8080` | Origin URL when quick tunnel mode does not use hello-world.                               |
 
 <Callout type="danger" title="Do not store the tunnel token inline in values.yaml for production">
@@ -296,7 +297,7 @@ pdb:
 | `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.        |
 | `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.               |
 | `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.              |
-| `probes.startup.failureThreshold`      | integer | `12`    | Startup probe failure threshold.    |
+| `probes.startup.failureThreshold`      | integer | `36`    | Startup probe failure threshold.    |
 | `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe on `/ready`.  |
 | `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.       |
 | `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.              |
@@ -348,15 +349,23 @@ pdb:
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
-## Upgrading to 2026.8.3
+Quick tunnels use HTTP/2 by default to avoid requiring outbound UDP. Set
+`tunnel.quickTunnel.protocol` to `auto` or `quic` when needed. Managed tunnels
+retain the upstream transport default.
 
-Cloudflared 2026.8.3 updates its WebSocket dependency and distroless base image,
-and removes obsolete test reconnect and remote protocol-selection code.
-Automatic reconnection remains supported. The chart's tunnel command, metrics
-endpoints, probes, and values contract are unchanged.
+The startup probe allows 180 seconds of failed readiness checks plus the initial
+delay, giving edge retries and protocol fallback time to complete. Readiness
+still requires an active tunnel.
+
+## Upgrading to 2026.9.1
+
+Cloudflared 2026.9.1 fixes Access token locking and QUIC registration, edge
+rotation and fallback handling. It updates Go and the distroless base image.
+The deprecated `transport-loglevel` flag is restored after its removal in 2026.9.0. The chart retains its tunnel command and metrics endpoints; the startup probe
+now allows more time for edge registration.
 
 Review the
-[official 2026.8.3 release](https://github.com/cloudflare/cloudflared/releases/tag/2026.8.3)
+[official 2026.9.1 release](https://github.com/cloudflare/cloudflared/releases/tag/2026.9.1)
 before production rollout.
 
 ## More Information

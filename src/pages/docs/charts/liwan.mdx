@@ -13,9 +13,23 @@ Liwan is a lightweight, privacy-focused web analytics application with embedded 
 deploys it as one Kubernetes workload with durable `/data` storage, explicit public URL wiring, and production-oriented
 security defaults.
 
+## Upgrade to 1.7
+
+Liwan 1.7 trusts only loopback proxies and `X-Forwarded-For` by default.
+Behind an Ingress or Gateway, set `LIWAN_TRUSTED_PROXIES` through
+`liwan.extraEnv` to the actual proxy IPs or CIDRs. Multiple entries are
+comma-separated, for example `127.0.0.1/8,10.42.0.0/16` only when those ranges
+belong to your trusted proxies. Configure `LIWAN_TRUSTED_HEADERS` if your proxy
+uses a different header. Avoid unrestricted `*` proxy trust.
+
+Remove `LIWAN_USE_FORWARD_HEADERS`; upstream removed it and the chart now
+rejects it with a migration message. Back up `/data` and review the
+[official release](https://github.com/explodingcamera/liwan/releases/tag/liwan-v1.7.0)
+before upgrading.
+
 ## Key Features
 
-- **Official image** - pinned `ghcr.io/explodingcamera/liwan:1.5.0`
+- **Official image** - pinned `ghcr.io/explodingcamera/liwan:1.7.0`
 - **Embedded DuckDB** - no external database dependency
 - **PVC-backed data** - analytics and runtime assets stored under `/data`
 - **Recreate rollout** - avoids overlapping DuckDB writers during upgrades
@@ -162,7 +176,7 @@ rolling update that could briefly run two pods against the same data volume.
 | Parameter          | Type   | Default                         | Description                          |
 | ------------------ | ------ | ------------------------------- | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/explodingcamera/liwan` | Liwan container image.               |
-| `image.tag`        | string | `"1.5.0"`                       | Image tag.                           |
+| `image.tag`        | string | `"1.7.0"`                       | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
