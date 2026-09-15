@@ -186,7 +186,7 @@ where required.
 | Parameter          | Type   | Default                                     | Description                          |
 | ------------------ | ------ | ------------------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/chiefonboarding/chiefonboarding` | ChiefOnboarding container image.     |
-| `image.tag`        | string | `"v2.4.1"`                                  | Image tag.                           |
+| `image.tag`        | string | `"v2.5.0"`                                  | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                              | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                                        | Pull secrets for private registries. |
 
@@ -337,3 +337,18 @@ where required.
 - [ChiefOnboarding Documentation](https://docs.chiefonboarding.com)
 - [ChiefOnboarding GitHub Repository](https://github.com/chiefonboarding/ChiefOnboarding)
 - [HelmForge ChiefOnboarding Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/chiefonboarding)
+
+## Upgrading to 2.5.0
+
+[Upstream 2.5.0](https://github.com/chiefonboarding/ChiefOnboarding/releases/tag/v2.5.0)
+adds access reports and CSV exports, external user-ID backfill, pagination fixes,
+and background offboarding account checks. Back up PostgreSQL and preserve the
+Django secret before upgrading; startup applies the application migrations.
+Update custom integration manifests for user-ID lookup before using backfill.
+
+Presigned S3 uploads remain the upstream default. The optional
+`AWS_USE_PRESIGNED_UPLOADS=False` environment variable routes uploads through the
+server; account for proxy timeouts and upload limits. `AWS_CDN_URL` optionally
+sets the download URL base. Configure these through
+`chiefonboarding.extraEnv`, with S3 credentials from Secrets. Existing ports,
+database configuration and deployment topology are unchanged.

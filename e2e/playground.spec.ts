@@ -105,7 +105,7 @@ test.describe('Playground', () => {
   test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="n8n"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.38.4');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.39.5');
     await page.locator('[data-section-toggle="Queue"]').click();
     const queue = page.locator('button[data-field-key="queue.enabled"]');
     await queue.click();
