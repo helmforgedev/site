@@ -22,7 +22,7 @@ multi-workload chart (~20 Kubernetes Deployments) with bundled MariaDB and Redis
 
 ## Key Features
 
-- **Full Appwrite stack** — API, Console v8.7.38, Realtime WebSocket, 12 workers, schedulers, maintenance
+- **Full Appwrite stack** — API, Console IV 1.1.78, Realtime WebSocket, 15 workers, schedulers, maintenance
 - **~20 Kubernetes workloads** — each component runs independently and scales separately
 - **MariaDB + Redis** — bundled subcharts or external connections
 - **Shared PVCs** — uploads, cache, certificates, functions, builds, and sites shared across pods
@@ -237,12 +237,72 @@ ingress:
 
 ## Upgrade Notes
 
-<Callout type="warning" title="Run the Appwrite 1.9.6 database migration">
-  Appwrite 1.9.6 repairs missing Functions and Sites Git-provider attributes left by upgrades from 1.9.5 and makes
-  migration batches idempotent. After `helm upgrade`, run the Appwrite migrate command against an Appwrite API pod
-  before returning production traffic to the release, for example `kubectl exec
-  deploy/<release>-appwrite-api -- appwrite migrate` adjusted to your release name and namespace.
-</Callout>
+### Appwrite 2.1.0
+
+The [2.1 release](https://github.com/appwrite/appwrite/releases/tag/2.1.0) fixes
+password-protected Redis queue publishers and consumers, including ACL users and
+reserved characters in passwords. It adds the S3-compatible API at `/v1/s3` using
+project API keys; the existing storage backend and bucket permissions still apply.
+Automatic crop gravity remains unconfigured unless an external service is provided
+through `_APP_AUTOGRAVITY_HOST`. This chart does not deploy that optional service.
+
+Error reporting now supports only `sentry://` DSNs through
+`appwrite.logging.sentryDsn`. `appwrite.logging.format` selects `pretty` or `json`
+container logs. The old `logging.provider` field is retained only for compatible
+empty/default/sentry values and no longer emits the removed environment variable.
+Remove `_APP_LOGGING_PROVIDER`, `_APP_LOGGING_CONFIG_REALTIME` and experimental
+logging provider/config variables from custom environment values before upgrading.
+The bundled Redis chart is 3.0.0, retaining its image, credentials and storage.
+
+The following [2.0 migration](https://github.com/appwrite/appwrite/releases/tag/2.0.0)
+requirements also apply when upgrading directly from 1.9.x.
+
+Back up MariaDB, all shared PVCs and the application Secret before upgrading from
+1.9.x. Keep traffic paused during the upgrade and migration. This chart retains
+MariaDB explicitly; the upstream installer's new PostgreSQL default does not move
+existing data between engines.
+
+Use `helm upgrade --reset-then-reuse-values` (or explicitly set the new image tag),
+then run `kubectl exec -n <namespace> deploy/<api-deployment> -c api -- migrate`.
+Verify the API, worker logs and existing projects before restoring traffic. For
+rollback, restore the database, volumes, Secret and matching old images together.
+
+Console IV uses `appwrite/new:1.1.78` on port 3000 with the API on the same origin;
+the console Service still exposes port 80. `worker-audits` was removed upstream:
+set `workers.audits.enabled=false` in retained values. Jobs, screenshots,
+executions and notifications now have separate worker toggles, alongside the
+remaining workers. Disabled workers do not process their respective queues.
+
+Generated encryption and JWT Secret entries are retained on upgrade. Supplying a
+new `appwrite.openSslKeyV1` overrides the retained key and requires an application
+key-rotation procedure; it is not an automatic data re-encryption mechanism.
+
+DocumentsDB, VectorsDB, embeddings and execution-log dual writes remain disabled.
+This chart does not provision the extra engines, embedding server, executor or
+orchestrator needed for those features and Functions/Sites execution. Provision
+and configure those dependencies separately before opting in through extraEnv.
+
+Usage statistics now require ClickHouse. `appwrite.usageStats` defaults to
+`disabled`; to retain or enable usage reporting, provision a private ClickHouse
+service (the HelmForge ClickHouse chart can provide it) and supply its HTTP DSN
+through a Secret:
+
+```yaml
+appwrite:
+  usageStats: enabled
+  extraEnv:
+    - name: _APP_CONNECTIONS_DB_USAGE
+      valueFrom:
+        secretKeyRef:
+          name: appwrite-usage
+          key: dsn
+```
+
+The DSN has the form `http://user:password@clickhouse:8123/appwrite`; URL-encode
+credentials containing reserved characters. Run `usage-setup` in the API pod to
+verify schema initialization before enabling traffic. Plan retention of historical
+usage data separately from new usage schema setup. Back up external ClickHouse
+independently; the chart S3 backup covers the core MariaDB and shared-volume data.
 
 ## Configuration Reference
 
@@ -259,9 +319,9 @@ ingress:
 | Parameter                  | Type   | Default                       | Description            |
 | -------------------------- | ------ | ----------------------------- | ---------------------- |
 | `image.repository`         | string | `docker.io/appwrite/appwrite` | Appwrite server image. |
-| `image.tag`                | string | `"1.9.6"`                     | Appwrite image tag.    |
-| `console.image.repository` | string | `docker.io/appwrite/console`  | Console image.         |
-| `console.image.tag`        | string | `"8.7.38"`                    | Console image tag.     |
+| `image.tag`                | string | `"2.1.0"`                     | Appwrite image tag.    |
+| `console.image.repository` | string | `docker.io/appwrite/new`      | Console image.         |
+| `console.image.tag`        | string | `"1.1.78"`                    | Console image tag.     |
 
 ### Appwrite Configuration
 
@@ -273,11 +333,19 @@ ingress:
 | `appwrite.existingSecretOpenSslKey` | string  | `appwrite-openssl-key` | Key for the OpenSSL encryption key in the existing secret.             |
 | `appwrite.existingSecretJwtKey`     | string  | `appwrite-jwt-secret`  | Key for the JWT secret in the existing secret.                         |
 | `appwrite.locale`                   | string  | `en`                   | Appwrite locale (ISO 639-1).                                           |
-| `appwrite.usageStats`               | string  | `enabled`              | Usage statistics collection.                                           |
+| `appwrite.usageStats`               | string  | `disabled`             | Requires an external ClickHouse DSN.                                   |
 | `appwrite.graphql`                  | string  | `enabled`              | GraphQL API.                                                           |
 | `appwrite.storage.limit`            | integer | `30000000`             | Maximum file upload size in bytes (default 30 MB).                     |
 | `appwrite.functions.timeout`        | integer | `900`                  | Maximum function execution timeout in seconds.                         |
 | `appwrite.extraEnv`                 | array   | `[]`                   | Extra environment variables applied to all Appwrite pods.              |
+
+### Logging
+
+| Parameter                    | Type   | Default  | Description                                                                                          |
+| ---------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------- |
+| `appwrite.logging.format`    | string | `pretty` | Container log format, `pretty` or `json`.                                                            |
+| `appwrite.logging.sentryDsn` | string | `""`     | Error reporting DSN, must use `sentry://`.                                                           |
+| `appwrite.logging.provider`  | string | `""`     | Deprecated compatibility field; empty/default/sentry only, no provider environment variable emitted. |
 
 ### SMTP
 
@@ -301,30 +369,34 @@ Each service can be scaled independently:
 
 ### Workers
 
-12 workers, each enabled by default at `replicaCount: 1`:
+15 workers, each enabled by default at `replicaCount: 1`:
 
-| Worker           | Key                      | Description                     |
-| ---------------- | ------------------------ | ------------------------------- |
-| `audits`         | `workers.audits`         | Audit log processing.           |
-| `webhooks`       | `workers.webhooks`       | Outbound webhook delivery.      |
-| `deletes`        | `workers.deletes`        | Soft-delete cleanup.            |
-| `databases`      | `workers.databases`      | Database event processing.      |
-| `builds`         | `workers.builds`         | Function build jobs.            |
-| `certificates`   | `workers.certificates`   | SSL certificate management.     |
-| `functions`      | `workers.functions`      | Function invocation worker.     |
-| `mails`          | `workers.mails`          | Email delivery.                 |
-| `messaging`      | `workers.messaging`      | SMS/push notification delivery. |
-| `migrations`     | `workers.migrations`     | Data migration worker.          |
-| `statsResources` | `workers.statsResources` | Resource usage statistics.      |
-| `statsUsage`     | `workers.statsUsage`     | API usage statistics.           |
+| Worker           | Key                      | Description                             |
+| ---------------- | ------------------------ | --------------------------------------- |
+| `audits`         | `workers.audits`         | Removed upstream; must remain disabled. |
+| `jobs`           | `workers.jobs`           | Background jobs.                        |
+| `screenshots`    | `workers.screenshots`    | Screenshot generation.                  |
+| `executions`     | `workers.executions`     | Execution processing.                   |
+| `notifications`  | `workers.notifications`  | Notification processing.                |
+| `webhooks`       | `workers.webhooks`       | Outbound webhook delivery.              |
+| `deletes`        | `workers.deletes`        | Soft-delete cleanup.                    |
+| `databases`      | `workers.databases`      | Database event processing.              |
+| `builds`         | `workers.builds`         | Function build jobs.                    |
+| `certificates`   | `workers.certificates`   | SSL certificate management.             |
+| `functions`      | `workers.functions`      | Function invocation worker.             |
+| `mails`          | `workers.mails`          | Email delivery.                         |
+| `messaging`      | `workers.messaging`      | SMS/push notification delivery.         |
+| `migrations`     | `workers.migrations`     | Data migration worker.                  |
+| `statsResources` | `workers.statsResources` | Resource usage statistics.              |
+| `statsUsage`     | `workers.statsUsage`     | API usage statistics.                   |
 
 Each worker accepts `enabled`, `replicaCount`, and `resources` fields.
 
 ### Database
 
 <Callout type="warning" title="External MariaDB requires root credentials for schema migrations">
-  Appwrite runs its own schema migrations on startup using MariaDB root access. Unlike typical applications, providing
-  only an app-level user is not sufficient. Supply the root password via `database.external.existingSecret`.
+  Appwrite schema setup and the explicit upgrade migration require MariaDB root access. Unlike typical applications,
+  providing only an app-level user is not sufficient. Supply the root password via `database.external.existingSecret`.
 </Callout>
 
 | Parameter                                     | Type   | Default                 | Description                                       |
