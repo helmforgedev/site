@@ -20,11 +20,11 @@ desktop apps). Supports SQLite, PostgreSQL, and MySQL backends.
   prefixes startup, readiness, and liveness probe paths with it.
 </Callout>
 
-<Callout type="danger" title="Vaultwarden 1.37.2 compatibility update">
+<Callout type="danger" title="Vaultwarden 1.37.3 compatibility update">
   Vaultwarden 1.37.0 fixes security advisories covering icon-endpoint SSRF, cross-organization access, organization
   policy and import authorization, Send access counts, and unauthenticated WebSocket flooding. It is also required for
-  Bitwarden clients 2026.7.0 and newer. HelmForge pins 1.37.2 because it includes the follow-up fixes and is required
-  for compatibility with Bitwarden clients 2026.8.0 and newer. Upgrade all older deployments.
+  Bitwarden clients 2026.7.0 and newer. HelmForge pins 1.37.3, retaining compatibility with Bitwarden clients 2026.8.0
+  and newer and adding password-change, authentication and database migration fixes. Upgrade older deployments.
 </Callout>
 
 ## Key Features
@@ -273,7 +273,7 @@ ingress:
   Argon2 is significantly more secure. Generate one using the container itself:
 
 ```bash
-docker run --rm -it vaultwarden/server:1.37.2 /vaultwarden hash
+docker run --rm -it vaultwarden/server:1.37.3 /vaultwarden hash
 # or with argon2 CLI:
 echo -n 'your-password' | argon2 "$(openssl rand -base64 32)" -e -id -k 65540 -t 3 -p 4
 ```
@@ -300,7 +300,7 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/vaultwarden/server` | Vaultwarden container image.         |
-| `image.tag`        | string | `"1.37.2"`                     | Image tag.                           |
+| `image.tag`        | string | `"1.37.3"`                     | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
@@ -422,14 +422,15 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 
 ### NetworkPolicy
 
-| Parameter                                  | Type    | Default | Description                                                       |
-| ------------------------------------------ | ------- | ------- | ----------------------------------------------------------------- |
-| `networkPolicy.enabled`                    | boolean | `false` | Create a NetworkPolicy for Vaultwarden.                           |
-| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow traffic from pods in the same namespace.                    |
-| `networkPolicy.ingress.additionalFrom`     | array   | `[]`    | Extra ingress peer selectors.                                     |
-| `networkPolicy.egress.enabled`             | boolean | `false` | Enable egress policy (blocks all egress when enabled, add rules). |
-| `networkPolicy.egress.allowDns`            | boolean | `true`  | Allow DNS egress (port 53) when egress is restricted.             |
-| `networkPolicy.egress.additionalTo`        | array   | `[]`    | Extra egress peer selectors.                                      |
+| Parameter                                  | Type    | Default | Description                                                                                    |
+| ------------------------------------------ | ------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `networkPolicy.enabled`                    | boolean | `false` | Create a NetworkPolicy for Vaultwarden.                                                        |
+| `networkPolicy.extraEgress`                | array   | `[]`    | Additional native egress rules when egress is enabled, for example SMTP or external databases. |
+| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow traffic from pods in the same namespace.                                                 |
+| `networkPolicy.ingress.additionalFrom`     | array   | `[]`    | Extra ingress peer selectors.                                                                  |
+| `networkPolicy.egress.enabled`             | boolean | `false` | Enable egress policy (blocks all egress when enabled, add rules).                              |
+| `networkPolicy.egress.allowDns`            | boolean | `true`  | Allow DNS egress (port 53) when egress is restricted.                                          |
+| `networkPolicy.egress.additionalTo`        | array   | `[]`    | Extra egress peer selectors.                                                                   |
 
 ### Backup
 
@@ -527,6 +528,7 @@ Vaultwarden runs fully hardened: non-root (`UID 1000`), all capabilities dropped
 - [Vaultwarden GitHub Repository](https://github.com/dani-garcia/vaultwarden)
 - [Vaultwarden 1.37.0 security release](https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0)
 - [Vaultwarden 1.37.2 release](https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.2)
+- [Vaultwarden 1.37.3 release](https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.3)
 - [Vaultwarden Wiki](https://github.com/dani-garcia/vaultwarden/wiki)
 - [Enabling Admin Page](https://github.com/dani-garcia/vaultwarden/wiki/Enabling-admin-page)
 - [Bitwarden Client Apps](https://bitwarden.com/download/)
