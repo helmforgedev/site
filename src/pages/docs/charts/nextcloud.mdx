@@ -79,6 +79,82 @@ disable the corresponding subchart and provide `externalDatabase` or
 supports PostgreSQL and standalone Redis; it does not perform database-engine
 conversion or configure Redis Sentinel/Cluster discovery.
 
+## Optional integrations
+
+Both integrations are disabled by default. They run alongside Nextcloud in its
+single application Pod and inherit its non-root security context. No additional
+public Service, Ingress or HTTPRoute is created. Enabling either adds its resource
+requests to the Pod; reserve capacity before upgrading.
+
+### Imaginary previews
+
+Set `imaginary.enabled: true` to use the official Nextcloud AIO Imaginary image,
+pinned by an immutable multi-platform digest. Imaginary listens on loopback port
+9000, receives preview uploads from Nextcloud and has no access to the data PVC.
+Remote URL fetching is disabled. Its temporary files use a bounded emptyDir.
+
+The chart manages `preview_imaginary_url` and `enabledPreviewProviders` in its
+configuration snippet. The default providers preserve text, Markdown,
+OpenDocument and Krita previews and offload supported images to Imaginary.
+`imaginary.previewProviders` replaces the whole list; PDF preview is deliberately
+opt-in through `OC\Preview\ImaginaryPDF`. Set `imaginary.maxAllowedResolution`
+(megapixels) and resource limits to suit your workloads. Unsupported formats
+remain without previews unless an appropriate provider is configured.
+
+Disabling the integration removes the managed settings on the next rollout.
+Existing cached previews remain on the Nextcloud volume. Do not maintain competing
+preview settings in another config snippet.
+
+### Client Push
+
+Set `notifyPush.enabled: true` to start the official `nextcloud/notify_push` daemon.
+The chart generates its configuration in a memory-backed volume from the same
+database and Redis Secrets as Nextcloud. Existing database table prefixes are
+preserved. Restart the Deployment after credential rotation, as the daemon reads
+configuration at startup. The daemon does not mount the application/data PVC.
+
+Apache proxies `/push/` and `/push/ws` to the daemon. Your existing Ingress or
+Gateway must route these paths, support WebSocket upgrades and allow long-lived
+connections. Configure TLS and `nextcloud.overwriteCliUrl` with the public URL.
+The chart trusts loopback for the daemon's callback requests; retain the actual
+ingress/Gateway addresses in `nextcloud.trustedProxies` as well.
+
+The Nextcloud **Client Push** app remains operator-managed. Once Nextcloud is
+installed, install a compatible app release and run the upstream setup test:
+
+```bash
+kubectl -n nextcloud exec deployment/nextcloud -c nextcloud -- php occ app:install notify_push
+kubectl -n nextcloud exec deployment/nextcloud -c nextcloud -- php occ notify_push:setup https://cloud.example.com/push
+```
+
+For an already installed app use `occ app:enable notify_push`. The pinned daemon
+version is 1.4.1; keep the app and daemon compatible when upgrading. Helm does not
+download or update apps automatically. Air-gapped installations must stage the
+compatible official app using Nextcloud's supported app installation workflow.
+Run `occ notify_push:setup` again after changing the public hostname or routing.
+Its successful result verifies Redis messages, database mappings, callback
+connectivity, trusted proxies and version compatibility. Verify client sync
+through your actual external endpoint too.
+
+Daemon readiness checks its listener, not whether the Nextcloud app has been
+installed or the public route configured. Installation is complete only after
+the setup test passes. Clients still periodically poll because push delivery is
+best-effort.
+
+Enable `networkPolicy.enabled` to prevent other Pods from directly accessing
+daemon port 7867. Keep ingress peers allowed for Apache port 8080. App Store
+downloads need HTTPS egress; external database and Redis endpoints need their
+normal explicit egress rules. Imaginary uses only loopback and needs no egress.
+
+Before disabling Client Push, run `occ app:disable notify_push`, then disable
+`notifyPush.enabled`. This prevents advertising an unavailable push endpoint.
+The daemon stops with the application during coordinated backup and restore;
+the app itself is retained in the application PVC and database backup.
+
+See the [integration values example](https://github.com/helmforgedev/charts/blob/main/charts/nextcloud/examples/integrations.yaml),
+[official Client Push instructions](https://github.com/nextcloud/notify_push), and
+[Nextcloud preview tuning](https://docs.nextcloud.com/server/stable/admin_manual/installation/server_tuning.html#previews).
+
 ## Backup and restore
 
 Integrated backups stop the application and cron, capture PostgreSQL and the
@@ -111,125 +187,143 @@ selected upstream release. Helm rollback cannot reverse database migrations.
 
 ## Parameters
 
-| Parameter                                    | Description                                                                          | Default                                                                         |
-| -------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `nameOverride`                               | Override the chart name.                                                             | `""`                                                                            |
-| `fullnameOverride`                           | Override the release resource name.                                                  | `""`                                                                            |
-| `commonLabels`                               | Extra labels on resources.                                                           | `{}`                                                                            |
-| `image.repository`                           | Official image repository.                                                           | `"docker.io/library/nextcloud"`                                                 |
-| `image.tag`                                  | Pinned application release.                                                          | `"34.0.4-apache"`                                                               |
-| `image.pullPolicy`                           | Image pull policy.                                                                   | `"IfNotPresent"`                                                                |
-| `imagePullSecrets`                           | Registry authentication Secret references.                                           | `[]`                                                                            |
-| `nextcloud.adminUser`                        | Initial administrator login; changing this does not rename existing users.           | `"admin"`                                                                       |
-| `nextcloud.adminPassword`                    | Initial administrator password; generated and retained when empty.                   | `""`                                                                            |
-| `nextcloud.existingSecret`                   | Existing Secret containing the initial administrator password.                       | `""`                                                                            |
-| `nextcloud.existingSecretPasswordKey`        | Password key in the administrator Secret.                                            | `"admin-password"`                                                              |
-| `nextcloud.trustedDomains`                   | Allowed HTTP Host names, reconciled on upgrades.                                     | `["localhost"]`                                                                 |
-| `nextcloud.trustedProxies`                   | Explicit reverse proxy IP addresses or CIDRs.                                        | `[]`                                                                            |
-| `nextcloud.overwriteCliUrl`                  | Public URL for links generated by background jobs.                                   | `"http://localhost:8080"`                                                       |
-| `nextcloud.overwriteProtocol`                | Proxy protocol override; empty, http or https.                                       | `""`                                                                            |
-| `nextcloud.overwriteHost`                    | Public host override behind a trusted proxy.                                         | `""`                                                                            |
-| `nextcloud.defaultPhoneRegion`               | Default phone region for profile validation.                                         | `"US"`                                                                          |
-| `nextcloud.maintenanceWindowStart`           | Start hour in UTC for expensive maintenance background tasks.                        | `1`                                                                             |
-| `php.memoryLimit`                            | Maximum memory per PHP request.                                                      | `"512M"`                                                                        |
-| `php.uploadLimit`                            | Maximum upload and POST body size.                                                   | `"512M"`                                                                        |
-| `cron.enabled`                               | Enable Nextcloud cron processing.                                                    | `true`                                                                          |
-| `cron.interval`                              | Seconds between invocations; upstream recommends five minutes.                       | `300`                                                                           |
-| `cron.initialDelay`                          | Delay the first cron invocation after Pod startup, matching upstream timer guidance. | `300`                                                                           |
-| `cron.resources.requests.cpu`                | requests cpu                                                                         | `"25m"`                                                                         |
-| `cron.resources.requests.memory`             | requests memory                                                                      | `"128Mi"`                                                                       |
-| `cron.resources.limits.cpu`                  | limits cpu                                                                           | `"500m"`                                                                        |
-| `cron.resources.limits.memory`               | limits memory                                                                        | `"512Mi"`                                                                       |
-| `resources.requests.cpu`                     | requests cpu                                                                         | `"100m"`                                                                        |
-| `resources.requests.memory`                  | requests memory                                                                      | `"512Mi"`                                                                       |
-| `resources.limits.cpu`                       | limits cpu                                                                           | `"2"`                                                                           |
-| `resources.limits.memory`                    | limits memory                                                                        | `"1536Mi"`                                                                      |
-| `initResources.requests.cpu`                 | requests cpu                                                                         | `"25m"`                                                                         |
-| `initResources.requests.memory`              | requests memory                                                                      | `"64Mi"`                                                                        |
-| `initResources.limits.cpu`                   | limits cpu                                                                           | `"500m"`                                                                        |
-| `initResources.limits.memory`                | limits memory                                                                        | `"128Mi"`                                                                       |
-| `podSecurityContext.runAsNonRoot`            | podSecurityContext runAsNonRoot                                                      | `true`                                                                          |
-| `podSecurityContext.runAsUser`               | podSecurityContext runAsUser                                                         | `33`                                                                            |
-| `podSecurityContext.runAsGroup`              | podSecurityContext runAsGroup                                                        | `33`                                                                            |
-| `podSecurityContext.fsGroup`                 | podSecurityContext fsGroup                                                           | `33`                                                                            |
-| `podSecurityContext.fsGroupChangePolicy`     | podSecurityContext fsGroupChangePolicy                                               | `"OnRootMismatch"`                                                              |
-| `podSecurityContext.seccompProfile.type`     | seccompProfile type                                                                  | `"RuntimeDefault"`                                                              |
-| `securityContext.allowPrivilegeEscalation`   | securityContext allowPrivilegeEscalation                                             | `false`                                                                         |
-| `securityContext.readOnlyRootFilesystem`     | securityContext readOnlyRootFilesystem                                               | `true`                                                                          |
-| `securityContext.capabilities.drop`          | capabilities drop                                                                    | `["ALL"]`                                                                       |
-| `persistence.enabled`                        | Enable the complete /var/www/html PVC.                                               | `true`                                                                          |
-| `persistence.existingClaim`                  | Reuse a PVC, including a restored instance.                                          | `""`                                                                            |
-| `persistence.storageClass`                   | Storage class; empty uses the cluster default.                                       | `""`                                                                            |
-| `persistence.accessModes`                    | Access modes for the single application writer.                                      | `["ReadWriteOnce"]`                                                             |
-| `persistence.size`                           | Requested volume size.                                                               | `"10Gi"`                                                                        |
-| `service.type`                               | Kubernetes Service type.                                                             | `"ClusterIP"`                                                                   |
-| `service.port`                               | Service port mapped to Apache 8080.                                                  | `80`                                                                            |
-| `service.ipFamilyPolicy`                     | Optional IP family policy.                                                           | `""`                                                                            |
-| `service.ipFamilies`                         | Optional IP family order.                                                            | `[]`                                                                            |
-| `postgresql.enabled`                         | Enable the bundled database.                                                         | `true`                                                                          |
-| `postgresql.auth.database`                   | auth database                                                                        | `"nextcloud"`                                                                   |
-| `postgresql.auth.username`                   | auth username                                                                        | `"nextcloud"`                                                                   |
-| `externalDatabase.host`                      | PostgreSQL DNS name.                                                                 | `""`                                                                            |
-| `externalDatabase.port`                      | PostgreSQL port.                                                                     | `5432`                                                                          |
-| `externalDatabase.database`                  | Existing empty database on first installation.                                       | `"nextcloud"`                                                                   |
-| `externalDatabase.username`                  | Database owner login.                                                                | `"nextcloud"`                                                                   |
-| `externalDatabase.existingSecret`            | Secret containing the database password.                                             | `""`                                                                            |
-| `externalDatabase.existingSecretPasswordKey` | Database password key.                                                               | `"password"`                                                                    |
-| `redis.enabled`                              | Enable bundled standalone Redis.                                                     | `true`                                                                          |
-| `redis.architecture`                         | Supported topology.                                                                  | `"standalone"`                                                                  |
-| `externalRedis.host`                         | Standalone Redis DNS name.                                                           | `""`                                                                            |
-| `externalRedis.port`                         | Redis port.                                                                          | `6379`                                                                          |
-| `externalRedis.existingSecret`               | Secret containing the Redis password.                                                | `""`                                                                            |
-| `externalRedis.existingSecretPasswordKey`    | Redis password key.                                                                  | `"password"`                                                                    |
-| `podLabels`                                  | Pod labels.                                                                          | `{}`                                                                            |
-| `podAnnotations`                             | Pod annotations.                                                                     | `{}`                                                                            |
-| `nodeSelector`                               | Node scheduling constraints.                                                         | `{}`                                                                            |
-| `tolerations`                                | Tolerations.                                                                         | `[]`                                                                            |
-| `affinity`                                   | Pod affinity configuration.                                                          | `{}`                                                                            |
-| `terminationGracePeriodSeconds`              | Grace period for draining HTTP requests and active background jobs.                  | `120`                                                                           |
-| `ingress.enabled`                            | Render an Ingress.                                                                   | `false`                                                                         |
-| `ingress.ingressClassName`                   | Ingress controller class.                                                            | `""`                                                                            |
-| `ingress.annotations`                        | Controller-specific annotations, including request body size limits.                 | `{}`                                                                            |
-| `ingress.hosts`                              | Host/path rules.                                                                     | `[{"host":"nextcloud.example.com","paths":[{"path":"/","pathType":"Prefix"}]}]` |
-| `ingress.tls`                                | TLS Secret references and hosts.                                                     | `[]`                                                                            |
-| `gatewayAPI.enabled`                         | Render HTTPRoute resources.                                                          | `false`                                                                         |
-| `gatewayAPI.httpRoutes`                      | Complete route definitions; missing backends target Nextcloud.                       | `[]`                                                                            |
-| `externalSecrets.enabled`                    | Render ExternalSecret resources.                                                     | `false`                                                                         |
-| `externalSecrets.refreshInterval`            | Default refresh interval.                                                            | `"1h"`                                                                          |
-| `externalSecrets.items`                      | Complete ExternalSecret definitions with provider spec.                              | `[]`                                                                            |
-| `smtp.enabled`                               | Enable SMTP configuration.                                                           | `false`                                                                         |
-| `smtp.host`                                  | SMTP server hostname.                                                                | `""`                                                                            |
-| `smtp.port`                                  | SMTP port.                                                                           | `587`                                                                           |
-| `smtp.secure`                                | Transport security: tls for STARTTLS, ssl for implicit TLS, or empty.                | `"tls"`                                                                         |
-| `smtp.fromAddress`                           | Sender local part.                                                                   | `"nextcloud"`                                                                   |
-| `smtp.domain`                                | Sender domain.                                                                       | `"example.com"`                                                                 |
-| `smtp.username`                              | Authentication login; empty disables SMTP authentication.                            | `""`                                                                            |
-| `smtp.existingSecret`                        | Existing SMTP credential Secret.                                                     | `""`                                                                            |
-| `smtp.existingSecretPasswordKey`             | SMTP password key.                                                                   | `"password"`                                                                    |
-| `networkPolicy.enabled`                      | Enable NetworkPolicy.                                                                | `false`                                                                         |
-| `networkPolicy.extraIngress`                 | Additional inbound rules; default allows same-namespace clients.                     | `[]`                                                                            |
-| `networkPolicy.extraEgress`                  | Additional outbound rules for external databases, SMTP and Internet integrations.    | `[]`                                                                            |
-| `backup.enabled`                             | Enable scheduled integrated backups.                                                 | `false`                                                                         |
-| `backup.schedule`                            | Cron schedule.                                                                       | `"0 2 * * *"`                                                                   |
-| `backup.suspend`                             | Suspend scheduling, retaining manual job support.                                    | `false`                                                                         |
-| `backup.activeDeadlineSeconds`               | Maximum total job duration in seconds.                                               | `7200`                                                                          |
-| `backup.quiesceTimeout`                      | Maximum time to wait for web and cron termination.                                   | `180`                                                                           |
-| `backup.successfulJobsHistoryLimit`          | Successful job history.                                                              | `1`                                                                             |
-| `backup.failedJobsHistoryLimit`              | Failed jobs retained for diagnostics.                                                | `3`                                                                             |
-| `backup.databaseImage`                       | Official SQL client; must match the PostgreSQL server major.                         | `"docker.io/library/postgres:18.6-trixie"`                                      |
-| `backup.s3Image`                             | Official AWS CLI for S3-compatible object stores.                                    | `"public.ecr.aws/aws-cli/aws-cli:2.36.43"`                                      |
-| `backup.workspaceSize`                       | Maximum ephemeral staging storage; allow space for the complete archive and dump.    | `"20Gi"`                                                                        |
-| `backup.resources.requests.cpu`              | requests cpu                                                                         | `"100m"`                                                                        |
-| `backup.resources.requests.memory`           | requests memory                                                                      | `"256Mi"`                                                                       |
-| `backup.resources.limits.cpu`                | limits cpu                                                                           | `"2"`                                                                           |
-| `backup.resources.limits.memory`             | limits memory                                                                        | `"1Gi"`                                                                         |
-| `backup.s3.endpoint`                         | Optional endpoint URL for S3-compatible storage.                                     | `""`                                                                            |
-| `backup.s3.allowInsecureHTTP`                | Explicitly permit HTTP only on a trusted isolated network; use HTTPS in production.  | `false`                                                                         |
-| `backup.s3.bucket`                           | Existing private bucket.                                                             | `""`                                                                            |
-| `backup.s3.prefix`                           | Backup object prefix, without leading or trailing slash.                             | `"nextcloud"`                                                                   |
-| `backup.s3.region`                           | AWS signing region.                                                                  | `"us-east-1"`                                                                   |
-| `backup.s3.existingSecret`                   | Secret containing S3 credentials.                                                    | `""`                                                                            |
-| `backup.s3.existingSecretAccessKeyKey`       | Access key ID key.                                                                   | `"access-key"`                                                                  |
-| `backup.s3.existingSecretSecretKeyKey`       | Secret access key key.                                                               | `"secret-key"`                                                                  |
-| `restore.enabled`                            | Keep application stopped and create a restore Job. Disable after successful restore. | `false`                                                                         |
-| `restore.backupPath`                         | Exact S3 prefix for a completed backup, including its unique backup ID.              | `""`                                                                            |
+| Parameter                                    | Description                                                                          | Default                                                                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `nameOverride`                               | Override the chart name.                                                             | `""`                                                                                                                     |
+| `fullnameOverride`                           | Override the release resource name.                                                  | `""`                                                                                                                     |
+| `commonLabels`                               | Extra labels on resources.                                                           | `{}`                                                                                                                     |
+| `image.repository`                           | Official image repository.                                                           | `"docker.io/library/nextcloud"`                                                                                          |
+| `image.tag`                                  | Pinned application release.                                                          | `"34.0.4-apache"`                                                                                                        |
+| `image.pullPolicy`                           | Image pull policy.                                                                   | `"IfNotPresent"`                                                                                                         |
+| `imagePullSecrets`                           | Registry authentication Secret references.                                           | `[]`                                                                                                                     |
+| `nextcloud.adminUser`                        | Initial administrator login; changing this does not rename existing users.           | `"admin"`                                                                                                                |
+| `nextcloud.adminPassword`                    | Initial administrator password; generated and retained when empty.                   | `""`                                                                                                                     |
+| `nextcloud.existingSecret`                   | Existing Secret containing the initial administrator password.                       | `""`                                                                                                                     |
+| `nextcloud.existingSecretPasswordKey`        | Password key in the administrator Secret.                                            | `"admin-password"`                                                                                                       |
+| `nextcloud.trustedDomains`                   | Allowed HTTP Host names, reconciled on upgrades.                                     | `["localhost"]`                                                                                                          |
+| `nextcloud.trustedProxies`                   | Explicit reverse proxy IP addresses or CIDRs.                                        | `[]`                                                                                                                     |
+| `nextcloud.overwriteCliUrl`                  | Public URL for links generated by background jobs.                                   | `"http://localhost:8080"`                                                                                                |
+| `nextcloud.overwriteProtocol`                | Proxy protocol override; empty, http or https.                                       | `""`                                                                                                                     |
+| `nextcloud.overwriteHost`                    | Public host override behind a trusted proxy.                                         | `""`                                                                                                                     |
+| `nextcloud.defaultPhoneRegion`               | Default phone region for profile validation.                                         | `"US"`                                                                                                                   |
+| `nextcloud.maintenanceWindowStart`           | Start hour in UTC for expensive maintenance background tasks.                        | `1`                                                                                                                      |
+| `php.memoryLimit`                            | Maximum memory per PHP request.                                                      | `"512M"`                                                                                                                 |
+| `php.uploadLimit`                            | Maximum upload and POST body size.                                                   | `"512M"`                                                                                                                 |
+| `imaginary.enabled`                          | Enable private preview offloading.                                                   | `false`                                                                                                                  |
+| `imaginary.image.repository`                 | Official Nextcloud Imaginary image.                                                  | `"ghcr.io/nextcloud-releases/aio-imaginary"`                                                                             |
+| `imaginary.image.digest`                     | Immutable multi-platform image digest.                                               | `"sha256:ea96034f97e9921015001c43947ab88ee5516e7e793c4c753a3618feca9e8548"`                                              |
+| `imaginary.image.pullPolicy`                 | Image pull policy.                                                                   | `"IfNotPresent"`                                                                                                         |
+| `imaginary.maxAllowedResolution`             | Maximum source resolution in megapixels.                                             | `50`                                                                                                                     |
+| `imaginary.previewProviders`                 | Complete preview provider list when enabled.                                         | `["OC\\Preview\\TXT","OC\\Preview\\MarkDown","OC\\Preview\\OpenDocument","OC\\Preview\\Krita","OC\\Preview\\Imaginary"]` |
+| `imaginary.resources.requests.cpu`           | CPU request.                                                                         | `"25m"`                                                                                                                  |
+| `imaginary.resources.requests.memory`        | Memory request.                                                                      | `"128Mi"`                                                                                                                |
+| `imaginary.resources.limits.cpu`             | CPU limit.                                                                           | `"1"`                                                                                                                    |
+| `imaginary.resources.limits.memory`          | Memory limit.                                                                        | `"512Mi"`                                                                                                                |
+| `notifyPush.enabled`                         | Enable the daemon; install and configure the Client Push app separately.             | `false`                                                                                                                  |
+| `notifyPush.image.repository`                | Official Client Push daemon image.                                                   | `"ghcr.io/nextcloud/notify_push"`                                                                                        |
+| `notifyPush.image.tag`                       | Pinned daemon version.                                                               | `"v1.4.1"`                                                                                                               |
+| `notifyPush.image.pullPolicy`                | Image pull policy.                                                                   | `"IfNotPresent"`                                                                                                         |
+| `notifyPush.resources.requests.cpu`          | CPU request.                                                                         | `"10m"`                                                                                                                  |
+| `notifyPush.resources.requests.memory`       | Memory request.                                                                      | `"32Mi"`                                                                                                                 |
+| `notifyPush.resources.limits.cpu`            | CPU limit.                                                                           | `"500m"`                                                                                                                 |
+| `notifyPush.resources.limits.memory`         | Memory limit.                                                                        | `"128Mi"`                                                                                                                |
+| `cron.enabled`                               | Enable Nextcloud cron processing.                                                    | `true`                                                                                                                   |
+| `cron.interval`                              | Seconds between invocations; upstream recommends five minutes.                       | `300`                                                                                                                    |
+| `cron.initialDelay`                          | Delay the first cron invocation after Pod startup, matching upstream timer guidance. | `300`                                                                                                                    |
+| `cron.resources.requests.cpu`                | requests cpu                                                                         | `"25m"`                                                                                                                  |
+| `cron.resources.requests.memory`             | requests memory                                                                      | `"128Mi"`                                                                                                                |
+| `cron.resources.limits.cpu`                  | limits cpu                                                                           | `"500m"`                                                                                                                 |
+| `cron.resources.limits.memory`               | limits memory                                                                        | `"512Mi"`                                                                                                                |
+| `resources.requests.cpu`                     | requests cpu                                                                         | `"100m"`                                                                                                                 |
+| `resources.requests.memory`                  | requests memory                                                                      | `"512Mi"`                                                                                                                |
+| `resources.limits.cpu`                       | limits cpu                                                                           | `"2"`                                                                                                                    |
+| `resources.limits.memory`                    | limits memory                                                                        | `"1536Mi"`                                                                                                               |
+| `initResources.requests.cpu`                 | requests cpu                                                                         | `"25m"`                                                                                                                  |
+| `initResources.requests.memory`              | requests memory                                                                      | `"64Mi"`                                                                                                                 |
+| `initResources.limits.cpu`                   | limits cpu                                                                           | `"500m"`                                                                                                                 |
+| `initResources.limits.memory`                | limits memory                                                                        | `"128Mi"`                                                                                                                |
+| `podSecurityContext.runAsNonRoot`            | podSecurityContext runAsNonRoot                                                      | `true`                                                                                                                   |
+| `podSecurityContext.runAsUser`               | podSecurityContext runAsUser                                                         | `33`                                                                                                                     |
+| `podSecurityContext.runAsGroup`              | podSecurityContext runAsGroup                                                        | `33`                                                                                                                     |
+| `podSecurityContext.fsGroup`                 | podSecurityContext fsGroup                                                           | `33`                                                                                                                     |
+| `podSecurityContext.fsGroupChangePolicy`     | podSecurityContext fsGroupChangePolicy                                               | `"OnRootMismatch"`                                                                                                       |
+| `podSecurityContext.seccompProfile.type`     | seccompProfile type                                                                  | `"RuntimeDefault"`                                                                                                       |
+| `securityContext.allowPrivilegeEscalation`   | securityContext allowPrivilegeEscalation                                             | `false`                                                                                                                  |
+| `securityContext.readOnlyRootFilesystem`     | securityContext readOnlyRootFilesystem                                               | `true`                                                                                                                   |
+| `securityContext.capabilities.drop`          | capabilities drop                                                                    | `["ALL"]`                                                                                                                |
+| `persistence.enabled`                        | Enable the complete /var/www/html PVC.                                               | `true`                                                                                                                   |
+| `persistence.existingClaim`                  | Reuse a PVC, including a restored instance.                                          | `""`                                                                                                                     |
+| `persistence.storageClass`                   | Storage class; empty uses the cluster default.                                       | `""`                                                                                                                     |
+| `persistence.accessModes`                    | Access modes for the single application writer.                                      | `["ReadWriteOnce"]`                                                                                                      |
+| `persistence.size`                           | Requested volume size.                                                               | `"10Gi"`                                                                                                                 |
+| `service.type`                               | Kubernetes Service type.                                                             | `"ClusterIP"`                                                                                                            |
+| `service.port`                               | Service port mapped to Apache 8080.                                                  | `80`                                                                                                                     |
+| `service.ipFamilyPolicy`                     | Optional IP family policy.                                                           | `""`                                                                                                                     |
+| `service.ipFamilies`                         | Optional IP family order.                                                            | `[]`                                                                                                                     |
+| `postgresql.enabled`                         | Enable the bundled database.                                                         | `true`                                                                                                                   |
+| `postgresql.auth.database`                   | auth database                                                                        | `"nextcloud"`                                                                                                            |
+| `postgresql.auth.username`                   | auth username                                                                        | `"nextcloud"`                                                                                                            |
+| `externalDatabase.host`                      | PostgreSQL DNS name.                                                                 | `""`                                                                                                                     |
+| `externalDatabase.port`                      | PostgreSQL port.                                                                     | `5432`                                                                                                                   |
+| `externalDatabase.database`                  | Existing empty database on first installation.                                       | `"nextcloud"`                                                                                                            |
+| `externalDatabase.username`                  | Database owner login.                                                                | `"nextcloud"`                                                                                                            |
+| `externalDatabase.existingSecret`            | Secret containing the database password.                                             | `""`                                                                                                                     |
+| `externalDatabase.existingSecretPasswordKey` | Database password key.                                                               | `"password"`                                                                                                             |
+| `redis.enabled`                              | Enable bundled standalone Redis.                                                     | `true`                                                                                                                   |
+| `redis.architecture`                         | Supported topology.                                                                  | `"standalone"`                                                                                                           |
+| `externalRedis.host`                         | Standalone Redis DNS name.                                                           | `""`                                                                                                                     |
+| `externalRedis.port`                         | Redis port.                                                                          | `6379`                                                                                                                   |
+| `externalRedis.existingSecret`               | Secret containing the Redis password.                                                | `""`                                                                                                                     |
+| `externalRedis.existingSecretPasswordKey`    | Redis password key.                                                                  | `"password"`                                                                                                             |
+| `podLabels`                                  | Pod labels.                                                                          | `{}`                                                                                                                     |
+| `podAnnotations`                             | Pod annotations.                                                                     | `{}`                                                                                                                     |
+| `nodeSelector`                               | Node scheduling constraints.                                                         | `{}`                                                                                                                     |
+| `tolerations`                                | Tolerations.                                                                         | `[]`                                                                                                                     |
+| `affinity`                                   | Pod affinity configuration.                                                          | `{}`                                                                                                                     |
+| `terminationGracePeriodSeconds`              | Grace period for draining HTTP requests and active background jobs.                  | `120`                                                                                                                    |
+| `ingress.enabled`                            | Render an Ingress.                                                                   | `false`                                                                                                                  |
+| `ingress.ingressClassName`                   | Ingress controller class.                                                            | `""`                                                                                                                     |
+| `ingress.annotations`                        | Controller-specific annotations, including request body size limits.                 | `{}`                                                                                                                     |
+| `ingress.hosts`                              | Host/path rules.                                                                     | `[{"host":"nextcloud.example.com","paths":[{"path":"/","pathType":"Prefix"}]}]`                                          |
+| `ingress.tls`                                | TLS Secret references and hosts.                                                     | `[]`                                                                                                                     |
+| `gatewayAPI.enabled`                         | Render HTTPRoute resources.                                                          | `false`                                                                                                                  |
+| `gatewayAPI.httpRoutes`                      | Complete route definitions; missing backends target Nextcloud.                       | `[]`                                                                                                                     |
+| `externalSecrets.enabled`                    | Render ExternalSecret resources.                                                     | `false`                                                                                                                  |
+| `externalSecrets.refreshInterval`            | Default refresh interval.                                                            | `"1h"`                                                                                                                   |
+| `externalSecrets.items`                      | Complete ExternalSecret definitions with provider spec.                              | `[]`                                                                                                                     |
+| `smtp.enabled`                               | Enable SMTP configuration.                                                           | `false`                                                                                                                  |
+| `smtp.host`                                  | SMTP server hostname.                                                                | `""`                                                                                                                     |
+| `smtp.port`                                  | SMTP port.                                                                           | `587`                                                                                                                    |
+| `smtp.secure`                                | Transport security: tls for STARTTLS, ssl for implicit TLS, or empty.                | `"tls"`                                                                                                                  |
+| `smtp.fromAddress`                           | Sender local part.                                                                   | `"nextcloud"`                                                                                                            |
+| `smtp.domain`                                | Sender domain.                                                                       | `"example.com"`                                                                                                          |
+| `smtp.username`                              | Authentication login; empty disables SMTP authentication.                            | `""`                                                                                                                     |
+| `smtp.existingSecret`                        | Existing SMTP credential Secret.                                                     | `""`                                                                                                                     |
+| `smtp.existingSecretPasswordKey`             | SMTP password key.                                                                   | `"password"`                                                                                                             |
+| `networkPolicy.enabled`                      | Enable NetworkPolicy.                                                                | `false`                                                                                                                  |
+| `networkPolicy.extraIngress`                 | Additional inbound rules; default allows same-namespace clients.                     | `[]`                                                                                                                     |
+| `networkPolicy.extraEgress`                  | Additional outbound rules for external databases, SMTP and Internet integrations.    | `[]`                                                                                                                     |
+| `backup.enabled`                             | Enable scheduled integrated backups.                                                 | `false`                                                                                                                  |
+| `backup.schedule`                            | Cron schedule.                                                                       | `"0 2 * * *"`                                                                                                            |
+| `backup.suspend`                             | Suspend scheduling, retaining manual job support.                                    | `false`                                                                                                                  |
+| `backup.activeDeadlineSeconds`               | Maximum total job duration in seconds.                                               | `7200`                                                                                                                   |
+| `backup.quiesceTimeout`                      | Maximum time to wait for web and cron termination.                                   | `180`                                                                                                                    |
+| `backup.successfulJobsHistoryLimit`          | Successful job history.                                                              | `1`                                                                                                                      |
+| `backup.failedJobsHistoryLimit`              | Failed jobs retained for diagnostics.                                                | `3`                                                                                                                      |
+| `backup.databaseImage`                       | Official SQL client; must match the PostgreSQL server major.                         | `"docker.io/library/postgres:18.6-trixie"`                                                                               |
+| `backup.s3Image`                             | Official AWS CLI for S3-compatible object stores.                                    | `"public.ecr.aws/aws-cli/aws-cli:2.36.43"`                                                                               |
+| `backup.workspaceSize`                       | Maximum ephemeral staging storage; allow space for the complete archive and dump.    | `"20Gi"`                                                                                                                 |
+| `backup.resources.requests.cpu`              | requests cpu                                                                         | `"100m"`                                                                                                                 |
+| `backup.resources.requests.memory`           | requests memory                                                                      | `"256Mi"`                                                                                                                |
+| `backup.resources.limits.cpu`                | limits cpu                                                                           | `"2"`                                                                                                                    |
+| `backup.resources.limits.memory`             | limits memory                                                                        | `"1Gi"`                                                                                                                  |
+| `backup.s3.endpoint`                         | Optional endpoint URL for S3-compatible storage.                                     | `""`                                                                                                                     |
+| `backup.s3.allowInsecureHTTP`                | Explicitly permit HTTP only on a trusted isolated network; use HTTPS in production.  | `false`                                                                                                                  |
+| `backup.s3.bucket`                           | Existing private bucket.                                                             | `""`                                                                                                                     |
+| `backup.s3.prefix`                           | Backup object prefix, without leading or trailing slash.                             | `"nextcloud"`                                                                                                            |
+| `backup.s3.region`                           | AWS signing region.                                                                  | `"us-east-1"`                                                                                                            |
+| `backup.s3.existingSecret`                   | Secret containing S3 credentials.                                                    | `""`                                                                                                                     |
+| `backup.s3.existingSecretAccessKeyKey`       | Access key ID key.                                                                   | `"access-key"`                                                                                                           |
+| `backup.s3.existingSecretSecretKeyKey`       | Secret access key key.                                                               | `"secret-key"`                                                                                                           |
+| `restore.enabled`                            | Keep application stopped and create a restore Job. Disable after successful restore. | `false`                                                                                                                  |
+| `restore.backupPath`                         | Exact S3 prefix for a completed backup, including its unique backup ID.              | `""`                                                                                                                     |
