@@ -9044,7 +9044,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.12.0',
+          default: '1.12.1',
           description: 'Pinned Langflow image tag',
         },
         {

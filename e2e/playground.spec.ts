@@ -88,7 +88,7 @@ test.describe('Playground', () => {
   test('langflow keeps automatic login opt-in', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="langflow"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('1.12.0');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('1.12.1');
     const code = page.locator('#playground-code');
     await expect(code).not.toContainText('auth.autoLogin=true');
     await page.locator('button[data-field-key="auth.autoLogin"]').click();
