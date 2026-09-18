@@ -11,6 +11,7 @@ interface FieldConfig {
   toggleActivationValues?: Record<string, Record<string, string>>;
   activationExpandSections?: Record<string, string[]>;
   activationResetSections?: Record<string, string[]>;
+  conflictsWith?: string[];
   description: string;
 }
 
@@ -241,6 +242,15 @@ function setControlValue(key: string, value: string) {
     updateToggleVisual(control, value === 'true');
   } else if (control.value !== value) {
     control.value = value;
+  }
+}
+
+function enforceFieldConflicts(field: FieldConfig, value: string) {
+  const isActive = field.type === 'toggle' ? value === 'true' : value.trim() !== '';
+  if (!isActive) return;
+
+  for (const key of field.conflictsWith ?? []) {
+    setControlValue(key, getFieldDefault(key) ?? '');
   }
 }
 
@@ -597,6 +607,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     });
     select.addEventListener('change', () => {
       currentValues[field.key] = select.value;
+      enforceFieldConflicts(field, select.value);
       const activationValues = field.valueActivationValues?.[select.value];
       const expandSections = field.activationExpandSections?.[select.value];
       const resetSections = field.activationResetSections?.[select.value];
@@ -625,6 +636,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       const wasOn = currentValues[field.key] === 'true';
       const nextValue = wasOn ? 'false' : 'true';
       updateToggleField(field.key, nextValue === 'true', true);
+      enforceFieldConflicts(field, nextValue);
       const activationValues = field.toggleActivationValues?.[nextValue];
       const expandSections = field.activationExpandSections?.[nextValue];
       const resetSections = field.activationResetSections?.[nextValue];
@@ -654,6 +666,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
       setFieldValue(field.key, input.value);
+      enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);
       applyFieldSideEffects(field.key, input.value);
       updateOutput();
@@ -668,6 +681,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
       setFieldValue(field.key, input.value);
+      enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);
       updateOutput();
     });
@@ -1137,6 +1151,7 @@ function loadFromUrl() {
       const val = params.get(field.key);
       if (val !== null) {
         setFieldValue(field.key, val);
+        enforceFieldConflicts(field, val);
         hasChanges = true;
         // Auto-expand collapsible section if a child value is set
         if (group.collapsible) {
