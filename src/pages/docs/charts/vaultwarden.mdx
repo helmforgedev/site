@@ -440,23 +440,39 @@ The backup CronJob automatically selects the correct dump tool based on the acti
 - **PostgreSQL** — `pg_dump`
 - **MySQL** — `mysqldump`
 
-| Parameter                              | Type    | Default                                                            | Description                                     |
-| -------------------------------------- | ------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| `backup.enabled`                       | boolean | `false`                                                            | Enable scheduled S3 backup CronJob.             |
-| `backup.schedule`                      | string  | `"0 0 * * *"`                                                      | Cron schedule for backups.                      |
-| `backup.suspend`                       | boolean | `false`                                                            | Suspend the CronJob without deleting it.        |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                                                                | Successful job records to keep.                 |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                                                                | Failed job records to keep.                     |
-| `backup.resources`                     | object  | `{}`                                                               | Resources for backup containers.                |
-| `backup.s3.endpoint`                   | string  | `""`                                                               | S3-compatible endpoint URL.                     |
-| `backup.s3.bucket`                     | string  | `""`                                                               | Target bucket name.                             |
-| `backup.s3.prefix`                     | string  | `vaultwarden`                                                      | Key prefix within the bucket.                   |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                                             | Create the bucket if it does not exist.         |
-| `backup.s3.existingSecret`             | string  | `""`                                                               | Existing secret with S3 access and secret keys. |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                                                       | Key for the S3 access key.                      |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                                                       | Key for the S3 secret key.                      |
-| `backup.database.postgresDumpArgs`     | string  | `--clean --if-exists`                                              | Extra arguments passed to `pg_dump`.            |
-| `backup.database.mysqlDumpArgs`        | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra args for `mysqldump`.                     |
+For an HTTPS S3-compatible endpoint signed by a private or self-signed CA, set `backup.s3.caSecret` to a Secret containing the CA certificate and select its key with `backup.s3.caKey`. The certificate is mounted in the MinIO Client trust directory. Prefer this verified path over `backup.s3.insecureSkipVerify`, which disables certificate verification for every S3 operation. The two settings are mutually exclusive.
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.internal.example.com
+    bucket: vaultwarden-backups
+    existingSecret: vaultwarden-s3-credentials
+    caSecret: vaultwarden-s3-ca
+    caKey: ca.crt
+```
+
+| Parameter                              | Type    | Default                                                            | Description                                                         |
+| -------------------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`                                                            | Enable scheduled S3 backup CronJob.                                 |
+| `backup.schedule`                      | string  | `"0 0 * * *"`                                                      | Cron schedule for backups.                                          |
+| `backup.suspend`                       | boolean | `false`                                                            | Suspend the CronJob without deleting it.                            |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                                                | Successful job records to keep.                                     |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                                                | Failed job records to keep.                                         |
+| `backup.resources`                     | object  | `{}`                                                               | Resources for backup containers.                                    |
+| `backup.s3.endpoint`                   | string  | `""`                                                               | S3-compatible endpoint URL.                                         |
+| `backup.s3.bucket`                     | string  | `""`                                                               | Target bucket name.                                                 |
+| `backup.s3.prefix`                     | string  | `vaultwarden`                                                      | Key prefix within the bucket.                                       |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                                             | Create the bucket if it does not exist.                             |
+| `backup.s3.caSecret`                   | string  | `""`                                                               | Secret containing the private CA certificate.                       |
+| `backup.s3.caKey`                      | string  | `ca.crt`                                                           | Key containing the CA certificate.                                  |
+| `backup.s3.insecureSkipVerify`         | boolean | `false`                                                            | Disable S3 TLS verification; use only as an emergency escape hatch. |
+| `backup.s3.existingSecret`             | string  | `""`                                                               | Existing secret with S3 access and secret keys.                     |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                                                       | Key for the S3 access key.                                          |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                                                       | Key for the S3 secret key.                                          |
+| `backup.database.postgresDumpArgs`     | string  | `--clean --if-exists`                                              | Extra arguments passed to `pg_dump`.                                |
+| `backup.database.mysqlDumpArgs`        | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra args for `mysqldump`.                                         |
 
 ### Probes
 
