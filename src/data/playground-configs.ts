@@ -8018,14 +8018,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
       collapsible: true,
       fields: [
         {
-          label: 'Mode',
-          key: 'taskRunners.mode',
-          type: 'select',
-          default: 'external',
-          options: ['external', 'internal'],
-          description: 'External mode uses dedicated runner sidecars',
-        },
-        {
           label: 'Extra Environment Name',
           key: 'taskRunners.extraEnv[0].name',
           type: 'text',
