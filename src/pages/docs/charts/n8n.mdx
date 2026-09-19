@@ -230,12 +230,25 @@ backup:
 
 ### Task Runners
 
-| Parameter                      | Type   | Default                   | Description                                        |
-| ------------------------------ | ------ | ------------------------- | -------------------------------------------------- |
-| `taskRunners.mode`             | string | `external`                | Run the dedicated task-runner sidecar.             |
-| `taskRunners.image.repository` | string | `docker.io/n8nio/runners` | External task-runner image repository.             |
-| `taskRunners.image.tag`        | string | `""`                      | Runner tag; empty inherits `image.tag` (`2.39.5`). |
-| `taskRunners.image.pullPolicy` | string | `IfNotPresent`            | External task-runner image pull policy.            |
+| Parameter                          | Type   | Default                   | Description                                                              |
+| ---------------------------------- | ------ | ------------------------- | ------------------------------------------------------------------------ |
+| `taskRunners.mode`                 | string | `external`                | Run the dedicated task-runner sidecar.                                   |
+| `taskRunners.image.repository`     | string | `docker.io/n8nio/runners` | External task-runner image repository.                                   |
+| `taskRunners.image.tag`            | string | `""`                      | Runner tag; empty inherits `image.tag` (`2.39.5`).                       |
+| `taskRunners.image.pullPolicy`     | string | `IfNotPresent`            | External task-runner image pull policy.                                  |
+| `taskRunners.extraEnv`             | array  | `[]`                      | Extra environment variables for runner sidecars in main and worker pods. |
+| `taskRunners.nativePython.enabled` | bool   | `false`                   | Enable native Python support with a compatible external runner image.    |
+
+Use `taskRunners.extraEnv` for runner-container settings such as `GENERIC_TIMEZONE`, `NODE_OPTIONS`, or `N8N_RUNNERS_MAX_OLD_SPACE_SIZE`:
+
+```yaml
+taskRunners:
+  extraEnv:
+    - name: GENERIC_TIMEZONE
+      value: UTC
+```
+
+In external mode, Code node module allowlists such as `NODE_FUNCTION_ALLOW_BUILTIN` and `NODE_FUNCTION_ALLOW_EXTERNAL` must instead be configured as `env-overrides` in `/etc/n8n-task-runners.json` inside the runner image. Container environment variables do not configure the processes launched by the runner launcher. See the [upstream task runner configuration](https://docs.n8n.io/deploy/host-n8n/configure-n8n/set-up-task-runners/).
 
 ### n8n Configuration
 

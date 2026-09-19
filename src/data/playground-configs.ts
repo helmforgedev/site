@@ -8014,6 +8014,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Task Runners',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Extra Environment Name',
+          key: 'taskRunners.extraEnv[0].name',
+          type: 'text',
+          default: '',
+          description: 'Environment variable added to main and worker runner sidecars',
+        },
+        {
+          label: 'Extra Environment Value',
+          key: 'taskRunners.extraEnv[0].value',
+          type: 'text',
+          default: '',
+          description: 'Value for the runner sidecar environment variable',
+        },
+      ],
+    },
+    {
       name: 'Resources',
       collapsible: true,
       fields: [
