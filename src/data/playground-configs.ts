@@ -10,6 +10,25 @@
 export const chartConfigs: Record<string, ChartConfig> = {
   nextcloud: [
     {
+      name: 'Optional integrations',
+      fields: [
+        {
+          label: 'Imaginary previews',
+          key: 'imaginary.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Offload image previews to a private process in the application Pod',
+        },
+        {
+          label: 'Client Push daemon',
+          key: 'notifyPush.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires the compatible Client Push app and its setup test; routes WebSockets through /push',
+        },
+      ],
+    },
+    {
       name: 'Ingress',
       collapsible: true,
       gateField: 'ingress.enabled',
