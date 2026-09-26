@@ -18,7 +18,7 @@ production hardening controls that can be enabled without changing the developme
 ## Key Features
 
 - **Standalone and source-replica** - Single instance or source with read replicas.
-- **Official MySQL image** - Uses `docker.io/library/mysql:9.7.2` by default.
+- **Official MySQL image** - Uses `docker.io/library/mysql:26.7.0` by default.
 - **Deterministic credentials** - Inline values for development or existing Secrets/External Secrets for production.
 - **TLS** - Server TLS, optional secure transport requirement, internal client TLS, and private-key permission normalization.
 - **NetworkPolicy** - Optional ingress rules plus explicit egress for DNS, same-namespace MySQL, HTTPS, and custom targets.
@@ -335,7 +335,7 @@ platform integration inside the pod needs Kubernetes API credentials.
 | ------------------ | ------ | ------------------------- | ---------------------------------------------------------- |
 | `architecture`     | string | `standalone`              | Deployment architecture: `standalone` or `replication`.    |
 | `image.repository` | string | `docker.io/library/mysql` | MySQL runtime image repository.                            |
-| `image.tag`        | string | `"9.7.2"`                 | MySQL runtime image tag.                                   |
+| `image.tag`        | string | `"26.7.0"`                | MySQL runtime image tag.                                   |
 | `clusterDomain`    | string | `cluster.local`           | Kubernetes cluster DNS domain.                             |
 | `commonLabels`     | object | `{}`                      | Extra labels added to all resources.                       |
 | `extraManifests`   | array  | `[]`                      | Extra Kubernetes manifests rendered after chart resources. |
@@ -416,6 +416,12 @@ Use `PreferDualStack` for mixed environments. `RequireDualStack` should be reser
 IPv6 are guaranteed.
 
 ## Upgrade Notes
+
+MySQL 26.7.0 is the first calendar-versioned Innovation release after the 9.7
+LTS line. Both tracks are production-grade, but Innovation releases require a
+faster upgrade cadence. Back up and restore-test all databases, review removed
+or deprecated settings, and validate application/connector compatibility
+before upgrading existing PVCs.
 
 <Callout type="warning" title="Password persistence">
   MySQL stores credentials during initial setup. On upgrade, ensure the provided Secret values match the existing data
