@@ -11,7 +11,7 @@ as an authenticated HTTP embedding API with immutable model provenance and priva
 
 ## Features
 
-- Official TEI 1.9.3 CPU image pinned by digest; optional pinned CUDA example.
+- Official TEI 1.9.4 CPU image pinned by digest; optional pinned CUDA example.
 - BGE-small English model pinned to an immutable revision, with 384-dimensional embeddings.
 - Native `/embed` and OpenAI-compatible `/v1/embeddings` endpoints.
 - Generated API Secret retained across Helm upgrades, existing Secrets and External Secrets Operator.
@@ -319,6 +319,14 @@ authentication supplies shared access control, not tenancy, per-user audit ident
 
 ## Operations guide
 
+### Upgrade notes
+
+TEI 1.9.4 adds initial ARM64 and AMD ROCm work, new model support, and fixes for
+GKE CUDA paths, large DeBERTaV2 batches, NomicBert position handling and request
+metrics. The chart keeps its tested linux/amd64 CPU default and updates both CPU
+and optional CUDA examples to pinned 1.9.4 image indexes. Review the
+[upstream v1.9.4 release](https://github.com/huggingface/text-embeddings-inference/releases/tag/v1.9.4).
+
 ### Acceptance and capacity
 
 Verify `/info`, real `/embed` output and `/v1/embeddings` compatibility before routing production traffic.
@@ -387,7 +395,7 @@ image:
   # -- Official image repository or your trusted mirror.
   repository: ghcr.io/huggingface/text-embeddings-inference
   # -- Pinned version and immutable image digest.
-  tag: cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07
+  tag: cpu-1.9.4@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d
   # -- Kubernetes image pull policy.
   pullPolicy: IfNotPresent
 # -- Registry credential Secret references.
@@ -685,7 +693,7 @@ podDisruptionBudget:
   enabled: false
   # -- Replicas allowed to be unavailable during voluntary eviction.
   maxUnavailable: 1
-# -- Placement labels; pinned TEI 1.9.3 images support linux/amd64 only.
+# -- Placement labels; pinned TEI 1.9.4 images support linux/amd64 only.
 nodeSelector:
   # -- Required node architecture for the pinned CPU and CUDA images.
   kubernetes.io/arch: amd64
@@ -812,7 +820,7 @@ externalSecrets:
 # SPDX-License-Identifier: Apache-2.0
 # Requires a compatible NVIDIA GPU, driver and device plugin. Hardware execution is not covered by CPU CI.
 image:
-  tag: cuda-1.9.3@sha256:249a0bc87522bfe2f1012b4d194f0225878f47079115ada3aeb0b1ef257b402a
+  tag: cuda-1.9.4@sha256:c831a5cedb89d62f7b0fdb59e2d73e8c30e10c1d5006897640e2ce58a71cedba
 gpu:
   enabled: true
   count: 1
