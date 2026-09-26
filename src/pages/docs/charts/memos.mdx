@@ -106,10 +106,9 @@ networkPolicy:
           app.kubernetes.io/name: traefik
 ```
 
-Set `memos.instanceUrl` only when public-mode behavior is intended. A nonempty value enables anonymous access to public
-content and RSS; it is not merely reverse-proxy metadata. Leave it empty for private instances, even behind HTTPS
-Ingress. The production example above deliberately enables public mode; private memos remain subject to application
-authorization.
+Set `memos.instanceUrl` to the canonical external HTTP(S) URL, including for private instances behind an Ingress. In
+Memos 0.31, public access is controlled separately by the `ACCESS` instance setting. Select public or private access in
+the administrator instance settings, or manage it declaratively with `memos-instance-setting-access.json`.
 
 ## Deployment Configuration
 
@@ -239,7 +238,9 @@ Configure ingress-controller and external-service peers before applying network 
 
 Back up the data volume and external database before upgrading. Review these upstream compatibility changes:
 
-- an unset `memos.instanceUrl` now creates a private instance; set it to retain anonymous public access and RSS
+- the first 0.31 startup initializes the new `ACCESS` setting from the previous URL-based behavior; afterward, select
+  public or private access explicitly in the administrator instance settings or a deployment-managed access file
+- RSS support was removed; existing feed URLs no longer provide feeds
 - the shared-memo endpoint is now `GET /api/v1/shares/{share_token}/memo`
 - saved filters use CEL timestamp fields and `now` instead of `now()`; for example,
   `created_ts >= now - duration("24h")`
@@ -640,7 +641,7 @@ app:
 memos:
   # -- Bind address passed to MEMOS_ADDR. Empty means all interfaces, matching upstream defaults.
   addr: ''
-  # -- Explicit instance URL. Nonempty also enables anonymous access to public content; never infer from ingress.
+  # -- Canonical external HTTP(S) URL. Access policy is configured separately in Memos 0.31 and later.
   instanceUrl: ''
   # -- Enable upstream demo mode. Keep disabled for real instances.
   demo: false
