@@ -15,15 +15,15 @@ containers, Services, Ingress, storage, security resources, observability hooks,
 arbitrary extra manifests rendered through Helm `tpl`.
 
 <Callout type="warning" title="Breaking feature release">
-  The default image is now pinned to `docker.io/library/nginx:1.31.5`, image pull policy defaults to `IfNotPresent`, pod
+  The default image is now pinned to `docker.io/library/nginx:1.31.6`, image pull policy defaults to `IfNotPresent`, pod
   templates are deterministic, and stricter validation blocks invalid combinations such as HPA on DaemonSets. Review
   image, HPA, PDB, and rollout values before upgrading.
 </Callout>
 
-<Callout type="info" title="NGINX 1.31.5 update">
-  The default image fixes buffered HTTP/2 proxy responses, worker shutdown, and FastCGI/uWSGI parameter handling. New
-  control API, predicate location, JSON module, and early request-body features require explicit configuration. No
-  Generic chart configuration changes are required for this image update.
+<Callout type="info" title="NGINX 1.31.6 security update">
+  The default image fixes CVE-2026-90439, a buffer overflow in the HTTP/3 module. NGINX lists 1.31.6 and later as not
+  vulnerable. Review the [official advisory](https://nginx.org/en/security_advisories.html). No Generic chart
+  configuration changes are required for this image update.
 </Callout>
 
 <Callout type="info" title="Jobs and CronJobs are separate lists">
@@ -86,7 +86,7 @@ workload:
 
 image:
   repository: docker.io/library/nginx
-  tag: '1.31.5'
+  tag: '1.31.6'
   pullPolicy: IfNotPresent
 
 containers:
@@ -265,7 +265,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
 | `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
 | `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
-| `image.tag`            | `1.31.5`                  | Default image tag.                                            |
+| `image.tag`            | `1.31.6`                  | Default image tag.                                            |
 | `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
 | `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
 | `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |

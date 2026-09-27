@@ -10,7 +10,7 @@ Deploy [Kubernetes MCP Server](https://github.com/containers/kubernetes-mcp-serv
 
 ## Overview
 
-The HelmForge chart uses the official `ghcr.io/containers/kubernetes-mcp-server:v0.0.65` image and serves HTTP on port `8080`.
+The HelmForge chart uses the official `ghcr.io/containers/kubernetes-mcp-server:v0.0.67` image and serves HTTP on port `8080`.
 This workload is a control-plane bridge: its effective permissions are the Kubernetes RBAC permissions granted to its ServiceAccount.
 
 Defaults are inspection-oriented:
@@ -80,6 +80,15 @@ OCI install:
 ```bash
 helm install kubernetes-mcp-server oci://ghcr.io/helmforgedev/helm/kubernetes-mcp-server
 ```
+
+## Upgrade Notes
+
+Version `0.0.67` removes the legacy SSE MCP transport and migrates upstream
+token-exchange configuration from `sts_*` settings to an explicit block. The
+chart already uses HTTP mode and does not set the removed token-exchange options,
+but clients still using SSE must migrate to Streamable HTTP. The release also
+adds RBAC metadata and a separate metrics-port option. Review the
+[upstream v0.0.67 release](https://github.com/containers/kubernetes-mcp-server/releases/tag/v0.0.67).
 
 ## Safe Defaults
 
