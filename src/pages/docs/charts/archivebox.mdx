@@ -214,7 +214,7 @@ credentials.
 | Parameter          | Type   | Default                           | Description                          |
 | ------------------ | ------ | --------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/archivebox/archivebox` | ArchiveBox container image.          |
-| `image.tag`        | string | `"0.7.4"`                         | Image tag.                           |
+| `image.tag`        | string | `"0.9.70"`                        | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries. |
 
@@ -222,7 +222,7 @@ credentials.
 
 | Parameter                              | Type    | Default          | Description                                                           |
 | -------------------------------------- | ------- | ---------------- | --------------------------------------------------------------------- |
-| `archivebox.port`                      | integer | `8000`           | Internal HTTP port.                                                   |
+| `archivebox.port`                      | integer | `5797`           | Internal HTTP port.                                                   |
 | `archivebox.adminUsername`             | string  | `admin`          | Admin account username, created on first run.                         |
 | `archivebox.adminPassword`             | string  | `""`             | Admin account password. Auto-generated if empty.                      |
 | `archivebox.existingSecret`            | string  | `""`             | Existing Kubernetes Secret containing admin credentials.              |
@@ -264,9 +264,9 @@ media), and ArchiveBox configuration. Size it generously — archived pages with
 | `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                |
 
 <Callout type="warning" title="NFS storage may require fsGroup configuration">
-  ArchiveBox runs as UID/GID 911 by default (`podSecurityContext.fsGroup: 911`). Some NFS provisioners ignore `fsGroup`
-  and may cause permission errors on the `/data` directory. If using NFS, configure your provisioner to support fsGroup
-  or override `podSecurityContext` and `securityContext` accordingly.
+  ArchiveBox 0.9 requires `/data` to be owned by UID/GID 911. A narrowly scoped init container applies ownership to the
+  mount root, then the application starts and remains non-root as UID/GID 911. Some NFS provisioners ignore ownership
+  changes; if using NFS, configure the provisioner accordingly or override the security contexts deliberately.
 </Callout>
 
 ### Backup
