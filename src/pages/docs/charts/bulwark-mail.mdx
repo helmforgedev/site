@@ -1,0 +1,471 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Bulwark Mail Chart
+description: JMAP-native webmail for Stalwart with controlled bootstrap, persistent encrypted settings, hardened exposure and recoverable state.
+---
+
+# Bulwark Mail
+
+[Bulwark Mail](https://bulwarkmail.org/) is a self-hosted webmail suite for
+[Stalwart Mail Server](https://stalw.art/). It uses JMAP for mail, calendar,
+contacts, files, account security and message submission instead of connecting
+directly to IMAP or SMTP. This chart deploys the official
+`ghcr.io/bulwarkmail/webmail:1.11.2-always` image as a single hardened web
+application with persistent runtime state.
+
+## Requirements
+
+- Kubernetes 1.29 or newer and Helm 3.
+- A separately operated Stalwart Mail Server 0.16.6 or newer with JMAP enabled.
+- One canonical JMAP URL that is reachable by both browsers and the Bulwark Pod.
+- CORS allowed by Stalwart when Bulwark and JMAP use different origins, or
+  same-origin routing for the required JMAP and authentication paths.
+- Persistent storage writable by the official image UID/GID `1001`.
+- An Ingress or Gateway API controller only when its corresponding integration
+  is enabled.
+
+Stalwart is intentionally not bundled. It owns mailbox, calendar, contact and
+file data and has its own storage, listeners, DNS, certificates, backup and
+upgrade lifecycle. Bulwark's separate experimental legacy proxy for classic
+IMAP/SMTP stacks is not part of this chart.
+
+## Install
+
+Prepare a stable session secret and the public JMAP URL before installation:
+
+```yaml
+config:
+  mode: declarative
+  jmap:
+    serverUrl: https://mail.example.com
+
+secrets:
+  generate: false
+  existingSecret: bulwark-mail-secrets
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: webmail.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: webmail-tls
+      hosts:
+        - webmail.example.com
+```
+
+Create the Secret outside Helm values. Use at least 32 random characters and
+keep the value unchanged across upgrades and restores:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bulwark-mail-secrets
+type: Opaque
+stringData:
+  session-secret: replace-with-a-long-random-value
+```
+
+Install the release:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install bulwark-mail helmforge/bulwark-mail \
+  --namespace mail --create-namespace -f production-values.yaml
+```
+
+Read the rendered Helm NOTES for the exact Service and access commands. For a
+private trial without an HTTP controller, port-forward the application Service
+and open the printed URL.
+
+## Stalwart and JMAP connectivity
+
+`config.jmap.serverUrl` is not an internal-only backend address. The Bulwark
+server uses it to verify login, and the browser uses it directly for JMAP calls
+and EventSource updates. A value such as `http://stalwart.mail.svc` can work from
+the Pod while failing in every browser. Use a DNS name and certificate trusted
+from both network locations.
+
+For different Bulwark and Stalwart origins, allow the Bulwark origin in
+Stalwart's HTTP CORS policy. Same-origin deployment can keep permissive CORS off,
+but the proxy must route `/.well-known/jmap`, `/jmap/`, `/api/auth` and
+`/auth/token` to Stalwart without stealing Bulwark's application routes. Keep
+JMAP EventSource responses unbuffered and give them long idle timeouts.
+
+Private certificate authorities can be mounted and selected through
+`NODE_EXTRA_CA_CERTS`. Trust must be configured for both the server-side Bulwark
+request and the user's browser. A CA mounted only into the Pod does not make the
+certificate trusted by browsers.
+
+## Authentication and bootstrap
+
+The chart defaults to `config.mode: wizard` for an intentional interactive
+first launch. Production GitOps installations should select
+`config.mode: declarative` and set `config.jmap.serverUrl`; this skips Bulwark's
+first-launch wizard and avoids an unclaimed setup surface on a public route.
+Basic credentials are verified
+against Stalwart before Bulwark creates an encrypted session cookie. Optional
+OAuth2/OpenID Connect uses PKCE, and Stalwart TOTP and app-password management
+require Stalwart 0.16.6 or newer.
+
+`SESSION_SECRET` encrypts remembered sessions and synchronized user settings.
+Changing or losing it invalidates existing sessions and makes previously
+encrypted settings unreadable. Always use an existing Secret for production and
+include that Secret in the recovery plan.
+
+If the web setup wizard is enabled intentionally, restrict access until setup is
+complete and keep both `/app/data/admin` and `/app/data/admin-state` persistent.
+The wizard writes administrator configuration and a password hash to disk. An
+administrator-managed value in the persisted configuration can override a later
+environment default, so inspect restored configuration when a Helm value appears
+to be ignored.
+
+Keep `/admin` and `/api/admin` behind a management network, VPN or proxy
+allowlist. Do not rely on the application password as the only public boundary.
+
+## External Secrets
+
+The chart follows the canonical `externalSecrets.items[]` contract. Install
+[External Secrets Operator](https://external-secrets.io/latest/) separately,
+point `secrets.existingSecret` at the Secret that ESO will create, and disable
+the Helm-generated Secret:
+
+```yaml
+secrets:
+  generate: false
+  existingSecret: bulwark-mail-runtime
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: bulwark-mail-runtime
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+          template:
+            engineVersion: v2
+            data:
+              session-secret: '{{ `{{ .sessionSecret }}` }}'
+        data:
+          - secretKey: sessionSecret
+            remoteRef:
+              key: production/bulwark-mail
+              property: session-secret
+```
+
+The projected Secret must contain the keys configured under `secrets.keys`.
+Keep the session secret stable and back it up with `/app/data`; changing it
+invalidates encrypted settings and existing sessions.
+
+## Ingress and Gateway API
+
+Ingress and Gateway API HTTPRoutes expose the application Service on port 3000.
+Use the root path `/`; the published image cannot be moved under a subpath at
+runtime because Next.js bakes `NEXT_PUBLIC_BASE_PATH` into the build.
+The `1.11.2-always` image redirects `/` to the locale-prefixed `/en` route, so
+use `Prefix`/`PathPrefix` matching rather than an exact root-only rule. Hosting
+at `/webmail` requires a custom image built with `NEXT_PUBLIC_BASE_PATH` and is
+outside the stock chart contract.
+
+Forward `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`. Set the trusted proxy
+depth to the number of proxies that append to `X-Forwarded-For`; an incorrect
+value weakens audit addresses and per-IP login limiting. Production routes must
+terminate TLS because secure session cookies are the upstream default.
+
+Ingress and Gateway API exposure are mutually exclusive in one release. Gateway
+API routes require an installed controller, an existing Gateway and a listener
+that allows routes from the release namespace. Neither integration installs a
+controller or certificate issuer.
+
+## Persistence and availability
+
+The official image keeps runtime state below `/app/data`:
+
+| Directory                 | Contents                                                       |
+| ------------------------- | -------------------------------------------------------------- |
+| `/app/data/settings`      | Per-account settings encrypted with the session secret         |
+| `/app/data/admin`         | Admin configuration, password hash, policy, plugins and themes |
+| `/app/data/admin-state`   | Audit log, login timestamps and setup state                    |
+| `/app/data/telemetry`     | Telemetry consent and stable instance identity                 |
+| `/app/data/version-check` | Upstream version-check state                                   |
+
+One PVC mounted at `/app/data` keeps those files at one recovery point.
+Disabling persistence is suitable only for disposable, fully environment-driven
+trials where losing settings and administrator state is acceptable.
+
+The safe topology is one replica. Local JSON and encrypted files have atomic
+rename behavior but no distributed transaction or writer lock, and configuration
+is cached per process. RWX storage does not make concurrent admin or settings
+writes safe. Do not enable horizontal scaling unless the deployment is made
+stateless, all replicas share the same session secret, runtime writers are
+disabled and the resulting limitations are accepted.
+
+## Network policy and security
+
+The container runs as non-root UID/GID `1001`, drops Linux capabilities, blocks
+privilege escalation and uses RuntimeDefault seccomp. Its root filesystem is
+read-only; the data and temporary mounts remain writable. The application does
+not need a Kubernetes API token.
+
+NetworkPolicy enforcement requires a compatible CNI. Allow ingress from the
+chosen HTTP controller and allow egress to cluster DNS plus the Stalwart JMAP
+destination. OAuth discovery/token endpoints, extension marketplace, push
+relay, translation services, calendar subscriptions and other enabled features
+can require additional explicit egress. Telemetry and update checks can be
+disabled for isolated environments.
+
+The `/api/health` endpoint proves that the Bulwark process can answer HTTP. It
+does not probe Stalwart, CORS, browser DNS, OAuth or mail delivery. Keeping those
+dependencies out of liveness avoids restarting a healthy frontend during a mail
+server outage; validate them separately with an actual login and JMAP action.
+
+## Backup and restore
+
+Bulwark has no external SQL database. Back up the complete `/app/data` PVC and
+all independently managed Secrets, especially the stable session secret and any
+OAuth client secret. Back up Stalwart separately with its datastore-native
+procedure; the Bulwark PVC does not contain messages, calendars, contacts or
+files.
+
+For a consistent file backup, stop the writer before copying the volume:
+
+```bash
+kubectl -n mail scale deployment bulwark-mail --replicas=0
+# create a CSI snapshot or archive the complete mounted volume
+kubectl -n mail scale deployment bulwark-mail --replicas=1
+```
+
+Wait for the Pod to terminate before taking a file-level copy. If a CSI snapshot
+is taken while the application is running, follow the storage provider's
+crash-consistency guarantees. Four independently timed directory snapshots are
+not equivalent to one volume snapshot.
+
+Restore the PVC and Secrets before starting Bulwark. Then verify the health
+endpoint, administrator access, a remembered user setting and a real Stalwart
+login. A retained PVC is not a backup, and namespace deletion can remove it.
+
+## Upgrades
+
+Before changing the image tag:
+
+1. Read the Bulwark release notes and confirm compatibility with the installed
+   Stalwart release.
+2. Back up `/app/data` and the stable Secrets.
+3. Keep `SESSION_SECRET` unchanged.
+4. Upgrade one replica and wait beyond initial readiness.
+5. Check Pod restarts and logs, then verify login, Inbox refresh and message
+   submission.
+
+Do not switch from an environment-managed installation to wizard-managed
+configuration during an image upgrade. Persisted admin values can change the
+effective configuration independently of Helm values.
+
+## Troubleshooting
+
+### The login page reports CORS errors
+
+Confirm that the browser can open the configured JMAP hostname and that
+Stalwart allows the exact Bulwark origin. A successful request from inside the
+Pod does not prove browser reachability or CORS.
+
+### Login fails but the health probe is green
+
+This is expected when Stalwart, DNS, TLS or credentials fail. `/api/health`
+checks Bulwark itself. Test `/.well-known/jmap` from both the Pod and the client
+network, then inspect Bulwark and Stalwart logs.
+
+### Settings disappeared after restart
+
+Confirm that persistence is enabled, `/app/data/settings` is on the PVC,
+settings sync is enabled and the same session Secret is still mounted. Losing
+the Secret is not recoverable from encrypted settings files alone.
+
+### The admin password or configuration reset
+
+Verify that `/app/data/admin` and `/app/data/admin-state` are persistent and
+writable by UID/GID 1001. A read-only admin configuration volume still requires
+the runtime state directory to remain writable.
+
+### Login works over port-forward but fails through the public route
+
+Check TLS, secure cookies, forwarded headers and trusted proxy depth. For JMAP
+push failures, also disable response buffering and extend EventSource timeouts
+on the Stalwart-facing proxy.
+
+## Validation
+
+The chart's runtime validation should test more than the HTTP probe: wrong
+credentials must be rejected within a bounded interval, correct credentials
+must establish a Bulwark session, and a message submitted through JMAP must
+arrive in the mailbox. Browser validation is needed to catch CORS and
+client-reachability errors that an in-cluster smoke Pod cannot observe.
+
+```bash
+make validate-chart CHART=bulwark-mail CONTEXT=k3d-helmforge-tests-wsl
+```
+
+Run the command from the HelmForge ops repository. Cloud DNS, public certificate
+issuance, external identity providers and internet mail deliverability remain
+deployment-specific.
+
+## Values reference
+
+The values below are the chart's complete public configuration surface.
+
+| Parameter                                     | Default                         | Description                                                                                    |
+| --------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `nameOverride`                                | `""`                            | Override the chart name used in Kubernetes object names.                                       |
+| `fullnameOverride`                            | `""`                            | Override the complete release name.                                                            |
+| `commonLabels`                                | `{}`                            | Extra labels applied to every resource.                                                        |
+| `commonAnnotations`                           | `{}`                            | Extra annotations applied to the primary workload.                                             |
+| `image.repository`                            | `"ghcr.io/bulwarkmail/webmail"` | Official Bulwark image repository.                                                             |
+| `image.tag`                                   | `"1.11.2-always"`               | Deterministic Bulwark 1.11.2 tag with a clean multi-architecture index.                        |
+| `image.pullPolicy`                            | `"IfNotPresent"`                | Image pull policy.                                                                             |
+| `imagePullSecrets`                            | `[]`                            | Registry credentials for private mirrors.                                                      |
+| `replicaCount`                                | `1`                             | Single supported writer; other values are rejected.                                            |
+| `config.mode`                                 | `"wizard"`                      | `wizard` for interactive setup or `declarative` for operator-managed configuration.            |
+| `config.appName`                              | `"Bulwark Webmail"`             | Display name exposed by runtime configuration.                                                 |
+| `config.stalwartFeatures`                     | `true`                          | Enable Stalwart-specific JMAP features.                                                        |
+| `config.settingsSync`                         | `true`                          | Persist encrypted per-account settings.                                                        |
+| `config.telemetry`                            | `"off"`                         | Anonymous upstream telemetry mode: `on` or `off`.                                              |
+| `config.logFormat`                            | `"text"`                        | Log format: `text` or `json`.                                                                  |
+| `config.logLevel`                             | `"info"`                        | Log level: `error`, `warn`, `info` or `debug`.                                                 |
+| `config.trustedProxyDepth`                    | `1`                             | Number of trusted proxies appended to `X-Forwarded-For`.                                       |
+| `config.demoMode`                             | `false`                         | Use fixture data instead of a real mail server.                                                |
+| `config.updateCheck`                          | `true`                          | Enable the upstream release update check.                                                      |
+| `config.jmap.serverUrl`                       | `""`                            | Canonical JMAP URL reachable by browsers and the Pod.                                          |
+| `config.jmap.allowCustomEndpoint`             | `false`                         | Let users enter a JMAP endpoint on the login form.                                             |
+| `config.jmap.servers`                         | `[]`                            | Server definitions serialized to `JMAP_SERVERS`.                                               |
+| `config.jmap.autoPickByDomain`                | `false`                         | Select a configured server from the user's email domain.                                       |
+| `config.admin.readOnly`                       | `false`                         | Lock admin configuration only after bootstrap data has been persisted.                         |
+| `config.admin.sessionTtl`                     | `3600`                          | Admin dashboard session lifetime in seconds.                                                   |
+| `config.admin.stalwartAccess`                 | `"auto"`                        | Stalwart administrator behavior: `auto`, `password` or `off`.                                  |
+| `config.oauth.enabled`                        | `false`                         | Enable OAuth2/OpenID Connect login.                                                            |
+| `config.oauth.only`                           | `false`                         | Hide Basic authentication and require OAuth.                                                   |
+| `config.oauth.clientId`                       | `""`                            | Registered OAuth client ID.                                                                    |
+| `config.oauth.issuerUrl`                      | `""`                            | OpenID Connect issuer URL.                                                                     |
+| `config.oauth.authorizeUrl`                   | `""`                            | Optional user-facing authorization endpoint override.                                          |
+| `config.oauth.allowPrivateEndpoints`          | `false`                         | Permit discovered OAuth endpoints on other private hosts.                                      |
+| `config.oauth.endSession`                     | `false`                         | End the identity-provider session on Bulwark logout.                                           |
+| `config.oauth.postLogoutRedirectUri`          | `""`                            | Registered post-logout redirect URI.                                                           |
+| `config.oauth.scopes`                         | `""`                            | Replacement OAuth scope string.                                                                |
+| `config.oauth.extraScopes`                    | `""`                            | Scopes appended to Bulwark defaults.                                                           |
+| `config.oauth.autoSso`                        | `false`                         | Redirect directly to the identity provider.                                                    |
+| `config.jwtAuth.enabled`                      | `false`                         | Enable trusted-platform JWT impersonation.                                                     |
+| `config.jwtAuth.issuer`                       | `""`                            | JWT issuer; empty uses the upstream default.                                                   |
+| `branding.appShortName`                       | `""`                            | Short PWA application name.                                                                    |
+| `branding.appDescription`                     | `""`                            | PWA application description.                                                                   |
+| `branding.faviconUrl`                         | `""`                            | Favicon URL or public path.                                                                    |
+| `branding.pwaIconUrl`                         | `""`                            | PWA source icon URL or public path.                                                            |
+| `branding.pwaThemeColor`                      | `""`                            | Browser/PWA theme color.                                                                       |
+| `branding.pwaBackgroundColor`                 | `""`                            | PWA splash background color.                                                                   |
+| `branding.loginLogoLightUrl`                  | `""`                            | Login logo for light backgrounds.                                                              |
+| `branding.loginLogoDarkUrl`                   | `""`                            | Login logo for dark backgrounds.                                                               |
+| `branding.loginCompanyName`                   | `""`                            | Company name on the login page.                                                                |
+| `branding.loginWebsiteUrl`                    | `""`                            | Company website link.                                                                          |
+| `branding.loginPrivacyPolicyUrl`              | `""`                            | Privacy policy link.                                                                           |
+| `branding.loginImprintUrl`                    | `""`                            | Legal imprint link.                                                                            |
+| `branding.domains`                            | `[]`                            | Per-domain branding definitions serialized to JSON.                                            |
+| `secrets.generate`                            | `true`                          | Generate a stable Secret when no existing Secret is selected.                                  |
+| `secrets.existingSecret`                      | `""`                            | Existing Secret containing the configured keys.                                                |
+| `secrets.keys.sessionSecret`                  | `"session-secret"`              | Secret key containing `SESSION_SECRET`.                                                        |
+| `secrets.keys.adminPassword`                  | `"admin-password"`              | Secret key containing `ADMIN_PASSWORD`.                                                        |
+| `secrets.keys.oauthClientSecret`              | `"oauth-client-secret"`         | Secret key containing `OAUTH_CLIENT_SECRET`.                                                   |
+| `secrets.keys.jwtAuthSecret`                  | `"jwt-auth-secret"`             | Secret key containing the JWT signing secret.                                                  |
+| `secrets.keys.stalwartMasterUser`             | `"stalwart-master-user"`        | Secret key containing the Stalwart master user.                                                |
+| `secrets.keys.stalwartMasterPassword`         | `"stalwart-master-password"`    | Secret key containing the Stalwart master password.                                            |
+| `secrets.sessionSecret`                       | `""`                            | Inline session secret; empty generates 64 stable random characters.                            |
+| `secrets.adminPassword`                       | `""`                            | Optional initial Bulwark administrator password.                                               |
+| `secrets.oauthClientSecret`                   | `""`                            | OAuth client secret when not using an existing Secret.                                         |
+| `secrets.jwtAuthSecret`                       | `""`                            | JWT signing secret of at least 32 characters.                                                  |
+| `secrets.stalwartMasterUser`                  | `""`                            | Stalwart master account for JWT impersonation.                                                 |
+| `secrets.stalwartMasterPassword`              | `""`                            | Stalwart master account password for JWT impersonation.                                        |
+| `persistence.enabled`                         | `true`                          | Persist the complete `/app/data` tree.                                                         |
+| `persistence.existingClaim`                   | `""`                            | Existing PVC mounted instead of creating one.                                                  |
+| `persistence.storageClass`                    | `""`                            | StorageClass; empty uses the cluster default.                                                  |
+| `persistence.accessModes`                     | `["ReadWriteOnce"]`             | PVC access modes; RWX does not enable safe horizontal scaling.                                 |
+| `persistence.size`                            | `"5Gi"`                         | Requested PVC capacity.                                                                        |
+| `persistence.annotations`                     | `{}`                            | Additional PVC annotations.                                                                    |
+| `persistence.retain`                          | `true`                          | Retain a generated PVC after Helm uninstall.                                                   |
+| `serviceAccount.create`                       | `true`                          | Create a dedicated ServiceAccount.                                                             |
+| `serviceAccount.name`                         | `""`                            | Existing or custom ServiceAccount name.                                                        |
+| `serviceAccount.annotations`                  | `{}`                            | ServiceAccount annotations.                                                                    |
+| `serviceAccount.automountServiceAccountToken` | `false`                         | Mount a Kubernetes API token in the Pod.                                                       |
+| `service.type`                                | `"ClusterIP"`                   | Kubernetes Service type.                                                                       |
+| `service.port`                                | `3000`                          | HTTP Service port.                                                                             |
+| `service.annotations`                         | `{}`                            | Service annotations.                                                                           |
+| `service.ipFamilyPolicy`                      | `""`                            | Optional single- or dual-stack IP family policy.                                               |
+| `service.ipFamilies`                          | `[]`                            | Optional ordered `IPv4`/`IPv6` families.                                                       |
+| `ingress.enabled`                             | `false`                         | Render a Kubernetes Ingress.                                                                   |
+| `ingress.ingressClassName`                    | `""`                            | Controller class; empty omits `ingressClassName`.                                              |
+| `ingress.annotations`                         | `{}`                            | Ingress controller annotations.                                                                |
+| `ingress.hosts`                               | `[]`                            | Host/path definitions; use root `Prefix` paths.                                                |
+| `ingress.tls`                                 | `[]`                            | Standard Ingress TLS entries.                                                                  |
+| `gatewayAPI.enabled`                          | `false`                         | Render Gateway API HTTPRoutes.                                                                 |
+| `gatewayAPI.httpRoutes`                       | `[]`                            | HTTPRoute definitions; omitted backends target the Bulwark Service.                            |
+| `externalSecrets.enabled`                     | `false`                         | Render External Secrets Operator resources.                                                    |
+| `externalSecrets.apiVersion`                  | `"external-secrets.io/v1"`      | ExternalSecret API version.                                                                    |
+| `externalSecrets.refreshInterval`             | `"1h"`                          | Default reconciliation interval.                                                               |
+| `externalSecrets.items`                       | `[]`                            | Canonical complete ExternalSecret definitions.                                                 |
+| `probes.startup.enabled`                      | `true`                          | Enable startup probing on `/api/health`.                                                       |
+| `probes.startup.initialDelaySeconds`          | `5`                             | Startup initial delay.                                                                         |
+| `probes.startup.periodSeconds`                | `5`                             | Startup probe interval.                                                                        |
+| `probes.startup.timeoutSeconds`               | `3`                             | Startup request timeout.                                                                       |
+| `probes.startup.failureThreshold`             | `30`                            | Startup failures allowed before restart.                                                       |
+| `probes.liveness.enabled`                     | `true`                          | Enable liveness probing on `/api/health`.                                                      |
+| `probes.liveness.initialDelaySeconds`         | `0`                             | Liveness initial delay.                                                                        |
+| `probes.liveness.periodSeconds`               | `30`                            | Liveness probe interval.                                                                       |
+| `probes.liveness.timeoutSeconds`              | `5`                             | Liveness request timeout.                                                                      |
+| `probes.liveness.failureThreshold`            | `3`                             | Liveness failures allowed before restart.                                                      |
+| `probes.readiness.enabled`                    | `true`                          | Enable readiness probing on `/api/health`.                                                     |
+| `probes.readiness.initialDelaySeconds`        | `0`                             | Readiness initial delay.                                                                       |
+| `probes.readiness.periodSeconds`              | `10`                            | Readiness probe interval.                                                                      |
+| `probes.readiness.timeoutSeconds`             | `5`                             | Readiness request timeout.                                                                     |
+| `probes.readiness.failureThreshold`           | `6`                             | Failures before the Pod becomes unready.                                                       |
+| `resources.requests.cpu`                      | `"100m"`                        | Requested CPU.                                                                                 |
+| `resources.requests.memory`                   | `"256Mi"`                       | Requested memory.                                                                              |
+| `resources.limits.cpu`                        | `"500m"`                        | CPU limit.                                                                                     |
+| `resources.limits.memory`                     | `"512Mi"`                       | Memory limit.                                                                                  |
+| `podSecurityContext`                          | UID/GID `1001`                  | Pod identity, volume group, RuntimeDefault seccomp and `OnRootMismatch`.                       |
+| `securityContext`                             | hardened                        | Non-root identity, read-only root, no escalation, RuntimeDefault seccomp and all caps dropped. |
+| `pdb.enabled`                                 | `false`                         | Unsupported for the required single replica; setting it to `true` is rejected.                 |
+| `pdb.minAvailable`                            | `1`                             | Reserved for a future upstream-supported multi-replica deployment.                             |
+| `autoscaling.enabled`                         | `false`                         | Unsupported; `true` is rejected.                                                               |
+| `autoscaling.minReplicas`                     | `1`                             | Reserved future HA minimum.                                                                    |
+| `autoscaling.maxReplicas`                     | `1`                             | Reserved future HA maximum.                                                                    |
+| `autoscaling.targetCPUUtilizationPercentage`  | `80`                            | Reserved future CPU target.                                                                    |
+| `networkPolicy.enabled`                       | `false`                         | Render a Bulwark NetworkPolicy.                                                                |
+| `networkPolicy.ingressFrom`                   | `[]`                            | HTTP ingress peers; empty permits every namespace.                                             |
+| `networkPolicy.egress.enabled`                | `false`                         | Restrict egress to the configured rules.                                                       |
+| `networkPolicy.egress.allowDNS`               | `true`                          | Permit TCP/UDP DNS when egress isolation is active.                                            |
+| `networkPolicy.egress.jmapPorts`              | `[443]`                         | TCP ports allowed for JMAP.                                                                    |
+| `networkPolicy.egress.jmapTo`                 | `[]`                            | Peers restricting the JMAP egress rule.                                                        |
+| `networkPolicy.egress.extraTo`                | `[]`                            | Extra peers appended to JMAP destinations.                                                     |
+| `networkPolicy.egress.extraEgress`            | `[]`                            | Additional complete egress rules.                                                              |
+| `command`                                     | `[]`                            | Optional container command override.                                                           |
+| `args`                                        | `[]`                            | Optional container arguments.                                                                  |
+| `extraEnv`                                    | `[]`                            | Additional container environment variables.                                                    |
+| `extraEnvFrom`                                | `[]`                            | Additional `envFrom` sources.                                                                  |
+| `extraVolumes`                                | `[]`                            | Additional Pod volumes.                                                                        |
+| `extraVolumeMounts`                           | `[]`                            | Additional Bulwark volume mounts.                                                              |
+| `extraManifests`                              | `[]`                            | Additional Kubernetes manifests rendered verbatim.                                             |
+| `podLabels`                                   | `{}`                            | Additional Pod labels; selector labels remain reserved.                                        |
+| `podAnnotations`                              | `{}`                            | Additional Pod annotations.                                                                    |
+| `nodeSelector`                                | `{}`                            | Node selection labels.                                                                         |
+| `tolerations`                                 | `[]`                            | Pod tolerations.                                                                               |
+| `affinity`                                    | `{}`                            | Pod affinity rules.                                                                            |
+| `topologySpreadConstraints`                   | `[]`                            | Pod topology spread constraints; these do not increase replicas.                               |
+| `priorityClassName`                           | `""`                            | Optional PriorityClass.                                                                        |
+| `terminationGracePeriodSeconds`               | `30`                            | Pod shutdown grace period.                                                                     |

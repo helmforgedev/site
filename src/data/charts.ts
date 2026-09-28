@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Bulwark Mail',
+    slug: 'bulwark-mail',
+    description:
+      'JMAP-native webmail for Stalwart with persistent encrypted settings, controlled bootstrap and hardened HTTP exposure.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Nextcloud',
     slug: 'nextcloud',
     description: 'File collaboration with PostgreSQL, Redis, coordinated S3 backups and fresh-storage recovery.',
