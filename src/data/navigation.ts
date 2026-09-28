@@ -46,6 +46,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'ZooKeeper', href: '/docs/charts/zookeeper', maturity: 'stable' },
       { label: 'Mosquitto', href: '/docs/charts/mosquitto', maturity: 'stable' },
       { label: 'ntfy', href: '/docs/charts/ntfy', maturity: 'stable' },
+      { label: 'Bulwark Mail', href: '/docs/charts/bulwark-mail', maturity: 'stable' },
     ],
   },
   {
