@@ -34,6 +34,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Redis', href: '/docs/charts/redis', maturity: 'stable' },
       { label: 'Valkey', href: '/docs/charts/valkey', maturity: 'stable' },
       { label: 'Memcached', href: '/docs/charts/memcached', maturity: 'stable' },
+      { label: 'Attic', href: '/docs/charts/attic', maturity: 'beta' },
       { label: 'Qdrant', href: '/docs/charts/qdrant', maturity: 'stable' },
       { label: 'ClickHouse', href: '/docs/charts/clickhouse', maturity: 'stable' },
     ],

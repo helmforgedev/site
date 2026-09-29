@@ -1,0 +1,636 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Attic Chart
+description: Production-oriented Nix binary cache with safe standalone and distributed PostgreSQL/S3 topologies.
+---
+
+# Attic
+
+[Attic](https://github.com/zhaofengli/attic) is a self-hostable Nix binary
+cache with global content deduplication, managed signing, multi-tenant caches
+and garbage collection. The HelmForge chart deploys the official
+commit-addressed image and maps the upstream runtime modes into explicit
+Kubernetes topologies.
+
+The upstream project describes itself as an early prototype and does not
+publish semantic releases. This chart is therefore marked beta. Treat image
+updates as database migrations, read the upstream changes and keep a complete
+backup before every upgrade.
+
+## Requirements
+
+- Kubernetes 1.30 or newer and Helm 3 or 4.
+- A default StorageClass for standalone mode, or an existing PVC.
+- PostgreSQL and S3-compatible object storage for distributed mode.
+- A stable Kubernetes Secret containing JWT and database credentials.
+- A TLS-capable Ingress or Gateway controller for external production use.
+- An Attic CLI installation in an administrative or builder environment.
+
+Attic itself does not need access to the Kubernetes API. The ServiceAccount
+token is disabled by default.
+
+## Install a standalone cache
+
+Standalone mode combines API, migrations and garbage collection in one process
+and stores SQLite metadata plus local objects on one PVC.
+
+```yaml
+mode: standalone
+
+config:
+  apiEndpoint: https://cache.example.com/
+  allowedHosts:
+    - cache.example.com
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: '0'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '600'
+  hosts:
+    - host: cache.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: attic-tls
+      hosts:
+        - cache.example.com
+```
+
+Install the chart:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install attic helmforge/attic \
+  --namespace attic --create-namespace \
+  -f standalone-values.yaml
+```
+
+The chart creates and reuses an HS256 signing Secret when
+`auth.existingSecret` is empty. This is convenient for a private trial. Use an
+externally managed Secret for production so signing material is backed up and
+recoverable independently of Helm.
+
+## Install a distributed cache
+
+Distributed mode runs a stateless replicated API, one garbage collector and a
+database migration Job. It requires PostgreSQL and S3-compatible storage.
+
+Create a Secret before installing:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: attic-production
+  namespace: attic
+type: Opaque
+stringData:
+  database-url: postgresql://attic:YOUR_DATABASE_PASSWORD_HERE@postgresql.data.svc:5432/attic
+  token-hs256-secret-base64: BASE64_ENCODED_RANDOM_SECRET
+  aws-access-key-id: ACCESS_KEY
+  aws-secret-access-key: SECRET_KEY
+```
+
+Replace `YOUR_DATABASE_PASSWORD_HERE` with the distinct, strong password
+configured for the Attic PostgreSQL account before installation.
+
+Configure the topology:
+
+```yaml
+mode: distributed
+replicaCount: 3
+
+config:
+  apiEndpoint: https://cache.example.com/
+  allowedHosts:
+    - cache.example.com
+
+database:
+  type: postgresql
+
+storage:
+  type: s3
+  s3:
+    region: us-east-1
+    bucket: company-attic-cache
+    endpoint: https://objects.example.com
+
+auth:
+  generate: false
+  existingSecret: attic-production
+
+pdb:
+  enabled: true
+  minAvailable: 2
+```
+
+The migration Job runs before install and upgrade, so the Secret, PostgreSQL
+service and network path must already exist. The chart deliberately does not
+bundle a database or object store; use the HelmForge PostgreSQL chart, an
+operator or managed services with their own backup and upgrade lifecycle.
+
+## Runtime architecture
+
+### Standalone mode
+
+- `atticd --mode monolithic`
+- one API replica enforced by template validation;
+- SQLite at `database.sqlite.path`;
+- local objects at `storage.local.path`;
+- one PVC and Recreate rollout strategy;
+- garbage collection owned by the monolithic process.
+
+This mode is suitable for personal caches, build labs and small teams. It is
+not highly available.
+
+### Distributed mode
+
+- pre-install/pre-upgrade `atticd --mode db-migrations` Job;
+- `atticd --mode api-server` Deployment with configurable replicas;
+- exactly one `atticd --mode garbage-collector` Deployment;
+- PostgreSQL metadata and S3 objects;
+- optional PDB and topology scheduling controls.
+
+The API is stateless in this topology. The garbage collector is intentionally
+singleton because upstream states that it cannot be replicated.
+
+## Authentication and cache trust
+
+Attic tokens are signed JWTs containing cache-specific permissions. Do not
+share the root token with builders. Generate a short-lived token for each
+automation identity:
+
+```bash
+atticadm make-token \
+  --sub github-actions \
+  --validity '30 days' \
+  --pull 'ci-*' \
+  --push 'ci-*' \
+  --create-cache 'ci-*'
+```
+
+The chart supports HS256 and RS256 environment variables. RS256 lets API pods
+receive only a public verification key while an isolated administrative
+environment retains the private signing key.
+
+Changing a signing key, `config.jwt.tokenBoundIssuer` or accepted audiences
+invalidates tokens. Treat those settings as security lifecycle changes.
+
+Nix clients also trust a cache public key. Retrieve it with
+`attic cache info CACHE` and distribute it through authenticated configuration
+management. A cache signing key is part of the software supply-chain boundary.
+
+## External Secrets
+
+Install [External Secrets Operator](https://external-secrets.io/latest/)
+separately and use the canonical `externalSecrets.items` contract:
+
+```yaml
+auth:
+  generate: false
+  existingSecret: attic-credentials
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: attic-credentials
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        data:
+          - secretKey: token-hs256-secret-base64
+            remoteRef:
+              key: platform/attic
+              property: jwt-hs256
+          - secretKey: database-url
+            remoteRef:
+              key: platform/attic
+              property: database-url
+          - secretKey: aws-access-key-id
+            remoteRef:
+              key: platform/attic
+              property: s3-access-key-id
+          - secretKey: aws-secret-access-key
+            remoteRef:
+              key: platform/attic
+              property: s3-secret-access-key
+```
+
+This example supplies the JWT, PostgreSQL and S3 keys required by distributed
+mode in the same `attic-credentials` Secret.
+
+For distributed mode, reconcile the target Secret before Helm runs its
+migration hook. A same-release ExternalSecret is not available early enough for
+the pre-install hook.
+
+## Ingress
+
+Ingress is optional and uses `ingress.ingressClassName`. Empty class names are
+omitted so a cluster default can apply. The hostname must also appear in
+`config.allowedHosts`, and `config.apiEndpoint` must be the matching public URL.
+
+Nix uploads can be large. Configure body-size, buffering and read/write timeout
+settings for the selected controller. Test with the largest closure expected in
+real builds.
+
+Root-host routing is recommended. If you introduce a subpath rewrite, verify
+login, cache administration, `.narinfo`, NAR upload and NAR download because
+Attic publishes canonical API and substituter URLs.
+
+## Gateway API
+
+Gateway API creates one HTTPRoute per `gatewayAPI.httpRoutes` item:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      parentRefs:
+        - name: public-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - cache.example.com
+```
+
+The chart supplies the backend Service when a route omits custom rules. The
+Gateway, listener certificate and any ReferenceGrant remain platform-owned.
+
+After installation, require `Accepted=True` and `ResolvedRefs=True`:
+
+```bash
+kubectl -n attic get httproute -o yaml
+```
+
+## Dual-stack networking
+
+The Service inherits the cluster network by default. To prefer dual-stack
+without failing on single-stack clusters:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
+
+Use explicit `ipFamilies` only when the cluster advertises those families.
+See the [Kubernetes dual-stack documentation](https://kubernetes.io/docs/concepts/services-networking/dual-stack/).
+
+## NetworkPolicy
+
+`networkPolicy.enabled` limits inbound traffic to the HTTP port. Empty ingress
+peers allow namespaces by default so existing controllers continue to work.
+
+Egress isolation is a separate opt-in. When enabled, DNS is allowed and the
+operator must add PostgreSQL and S3 destinations through `extraTo` or complete
+`extraEgress` rules. NetworkPolicy requires a compatible CNI.
+
+## Storage
+
+### Local storage
+
+Standalone mode keeps `/data/server.db` and `/data/storage` on one PVC. The pod
+runs as UID/GID 10001 with fsGroup 10001. If a CSI driver does not honor
+fsGroup, fix ownership through the storage platform rather than weakening the
+container security context.
+
+The generated PVC has `helm.sh/resource-policy: keep` by default. Removing the
+Helm release does not remove cache data.
+
+### S3-compatible storage
+
+Distributed mode supports AWS S3 and compatible services such as MinIO,
+Garage, Ceph RGW and R2. `storage.s3.endpoint` is optional for AWS and required
+for custom services.
+
+Upstream can return presigned object URLs containing the configured endpoint.
+That endpoint must be reachable by Nix clients. An internal Service DNS name
+that only works from the Attic pod is not sufficient for external clients.
+
+Credential key names may be empty when workload identity supplies AWS
+credentials. Otherwise place both keys in the selected existing Secret.
+
+## Backup and restore
+
+### Standalone
+
+SQLite metadata and local objects are inseparable. To take a consistent backup:
+
+1. stop builders and uploads;
+2. scale the API Deployment to zero;
+3. snapshot or back up the PVC;
+4. restore into a test namespace;
+5. start Attic and pull a known store path.
+
+Do not copy only `server.db`: SQLite may have WAL files and the database points
+to objects stored beside it.
+
+### Distributed
+
+Coordinate PostgreSQL PITR or backup with S3 versioning and retention. Pause
+uploads and garbage collection when creating a recovery point. Restoring an old
+database after object versions were permanently deleted creates broken
+references.
+
+There is no native Attic backup command. A backup is complete only after a
+tested cache pull from the restored system.
+
+## Garbage collection
+
+Attic garbage collection removes cache mappings, then orphan NAR records, then
+orphan chunks. The default global retention is `"0"`, disabling time-based
+deletion until an operator configures retention deliberately.
+
+Configure per-cache retention with the Attic client:
+
+```bash
+attic cache configure ci --retention-period '90 days'
+```
+
+Changing chunk sizes affects deduplication for new uploads. Keep chunking
+parameters stable unless measured results justify a migration.
+
+## Health and observability
+
+The pinned upstream image has no `/healthz`, `/readyz` or `/metrics` endpoint.
+The chart uses TCP probes on port 8080. Those probes show that the listener is
+open; they do not verify PostgreSQL or S3.
+
+Attic writes Rust tracing logs to stdout and stderr. Change
+`config.logLevel` to tune `RUST_LOG`. The chart intentionally does not create a
+ServiceMonitor.
+
+Monitor these external signals:
+
+- API and Gateway availability, latency and 5xx rate;
+- PostgreSQL connections, errors and backup state;
+- S3 request failures, bytes and object count;
+- standalone PVC capacity;
+- pod restarts and migration/GC log failures;
+- a scheduled end-to-end cache push and pull.
+
+## Functional validation
+
+After installation, validate the complete data path:
+
+```bash
+attic login platform https://cache.example.com/ TOKEN
+attic cache create smoke
+attic push smoke ./result
+attic cache info smoke
+```
+
+Then restore the store path into an alternate empty Nix store, restart one API
+pod and pull again. This verifies JWT permissions, database metadata, object
+storage, signing and persistence; a successful TCP probe alone does not.
+
+## Pod security
+
+The official image defaults to root, but the chart runs it as UID/GID 10001.
+Defaults also provide:
+
+- `runAsNonRoot: true`;
+- RuntimeDefault seccomp;
+- all capabilities dropped;
+- privilege escalation disabled;
+- read-only root filesystem;
+- writable `/tmp` emptyDir;
+- no ServiceAccount token mount.
+
+Keep these controls unless a documented CSI or platform constraint requires a
+narrow exception.
+
+## Upgrade procedure
+
+Upstream image tags are commit SHAs, not releases. Before changing the tag:
+
+1. compare upstream commits and database migrations;
+2. verify the official multi-architecture manifest;
+3. back up metadata and objects together;
+4. validate the rendered TOML with `check-config`;
+5. upgrade a non-production environment;
+6. perform a real push and pull;
+7. monitor migration, API and GC logs after production rollout.
+
+Do not assume that changing the image tag back reverses a database migration.
+Restore the pre-upgrade backup when backward compatibility is unknown.
+
+## Configuration reference
+
+### Core and image
+
+| Value               | Default                    | Description                           |
+| ------------------- | -------------------------- | ------------------------------------- |
+| `nameOverride`      | `""`                       | Override chart resource names         |
+| `fullnameOverride`  | `""`                       | Override the complete release name    |
+| `commonLabels`      | `{}`                       | Labels on all resources               |
+| `commonAnnotations` | `{}`                       | Workload annotations                  |
+| `mode`              | `standalone`               | `standalone` or `distributed`         |
+| `image.repository`  | `ghcr.io/zhaofengli/attic` | Official upstream image               |
+| `image.tag`         | commit SHA                 | Immutable upstream image tag          |
+| `image.pullPolicy`  | `IfNotPresent`             | Kubernetes pull policy                |
+| `imagePullSecrets`  | `[]`                       | Registry credentials                  |
+| `replicaCount`      | `1`                        | API replicas; standalone requires one |
+
+### Attic configuration
+
+| Value                                             | Default               | Description                              |
+| ------------------------------------------------- | --------------------- | ---------------------------------------- |
+| `config.listen`                                   | `[::]:8080`           | Container listener                       |
+| `config.apiEndpoint`                              | `http://attic.local/` | Canonical public URL with trailing slash |
+| `config.substituterEndpoint`                      | `""`                  | Optional alternate substituter URL       |
+| `config.allowedHosts`                             | `[attic.local]`       | Accepted Host headers                    |
+| `config.requireProofOfPossession`                 | `true`                | Verify upload possession                 |
+| `config.softDeleteCaches`                         | `false`               | Preserve deleted cache records           |
+| `config.maxNarInfoSize`                           | `1048576`             | Maximum upload metadata bytes            |
+| `config.logLevel`                                 | `attic_server=info`   | Rust tracing filter                      |
+| `config.chunking.narSizeThreshold`                | `65536`               | Chunking threshold                       |
+| `config.chunking.minSize`                         | `16384`               | Minimum chunk size                       |
+| `config.chunking.avgSize`                         | `65536`               | Average chunk size                       |
+| `config.chunking.maxSize`                         | `262144`              | Maximum chunk size                       |
+| `config.compression.type`                         | `zstd`                | Compression algorithm                    |
+| `config.compression.level`                        | `null`                | Upstream default when null               |
+| `config.garbageCollection.enabled`                | `true`                | Distributed GC component                 |
+| `config.garbageCollection.interval`               | `12 hours`            | GC frequency                             |
+| `config.garbageCollection.defaultRetentionPeriod` | `"0"`                 | Global retention                         |
+| `config.jwt.tokenBoundIssuer`                     | `""`                  | Optional required issuer                 |
+| `config.jwt.tokenBoundAudiences`                  | `[]`                  | Optional accepted audiences              |
+
+### Database, storage and credentials
+
+| Value                           | Default                     | Description                        |
+| ------------------------------- | --------------------------- | ---------------------------------- |
+| `database.type`                 | `sqlite`                    | `sqlite` or `postgresql`           |
+| `database.sqlite.path`          | `/data/server.db`           | SQLite path                        |
+| `database.postgresql.secretKey` | `database-url`              | Secret key for database URL        |
+| `database.postgresql.heartbeat` | `true`                      | Periodic PostgreSQL heartbeat      |
+| `storage.type`                  | `local`                     | `local` or `s3`                    |
+| `storage.local.path`            | `/data/storage`             | Local object directory             |
+| `storage.s3.region`             | `us-east-1`                 | S3 region                          |
+| `storage.s3.bucket`             | `""`                        | Required distributed bucket        |
+| `storage.s3.endpoint`           | `""`                        | Custom S3 endpoint                 |
+| `storage.s3.accessKeyIdKey`     | `aws-access-key-id`         | Secret key for access ID           |
+| `storage.s3.secretAccessKeyKey` | `aws-secret-access-key`     | Secret key for access secret       |
+| `auth.generate`                 | `true`                      | Generate standalone HS256 Secret   |
+| `auth.existingSecret`           | `""`                        | Stable credentials Secret          |
+| `auth.hs256SecretKey`           | `token-hs256-secret-base64` | HS256 Secret key name              |
+| `auth.rs256SecretKey`           | `token-rs256-secret-base64` | RS256 private key name             |
+| `auth.rs256PublicKey`           | `token-rs256-pubkey-base64` | RS256 public key name              |
+| `auth.hs256Secret`              | `""`                        | Optional pre-generated HMAC secret |
+
+### Persistence and networking
+
+| Value                       | Default           | Description                       |
+| --------------------------- | ----------------- | --------------------------------- |
+| `persistence.enabled`       | `true`            | Create/use standalone data volume |
+| `persistence.existingClaim` | `""`              | Existing PVC                      |
+| `persistence.storageClass`  | `""`              | StorageClass or cluster default   |
+| `persistence.accessModes`   | `[ReadWriteOnce]` | PVC modes                         |
+| `persistence.size`          | `20Gi`            | PVC request                       |
+| `persistence.annotations`   | `{}`              | PVC annotations                   |
+| `persistence.retain`        | `true`            | Keep PVC after uninstall          |
+| `service.type`              | `ClusterIP`       | Kubernetes Service type           |
+| `service.port`              | `8080`            | Service port                      |
+| `service.annotations`       | `{}`              | Service annotations               |
+| `service.ipFamilyPolicy`    | `""`              | Optional IP family policy         |
+| `service.ipFamilies`        | `[]`              | Optional ordered IP families      |
+| `ingress.enabled`           | `false`           | Render Ingress                    |
+| `ingress.ingressClassName`  | `""`              | Ingress class                     |
+| `ingress.annotations`       | `{}`              | Controller settings               |
+| `ingress.hosts`             | `[]`              | Hosts and paths                   |
+| `ingress.tls`               | `[]`              | TLS definitions                   |
+| `gatewayAPI.enabled`        | `false`           | Render HTTPRoutes                 |
+| `gatewayAPI.httpRoutes`     | `[]`              | Route definitions                 |
+
+### Platform integration and scheduling
+
+| Value                              | Default    | Description                           |
+| ---------------------------------- | ---------- | ------------------------------------- |
+| `externalSecrets.enabled`          | `false`    | Render ExternalSecrets                |
+| `externalSecrets.refreshInterval`  | `1h`       | Default refresh interval              |
+| `externalSecrets.items`            | `[]`       | Complete ExternalSecret specs         |
+| `networkPolicy.enabled`            | `false`    | Render NetworkPolicy                  |
+| `networkPolicy.ingressFrom`        | `[]`       | Allowed ingress peers                 |
+| `networkPolicy.egress.enabled`     | `false`    | Restrict egress                       |
+| `networkPolicy.egress.allowDNS`    | `true`     | Allow DNS                             |
+| `networkPolicy.egress.extraTo`     | `[]`       | Additional peers                      |
+| `networkPolicy.egress.extraEgress` | `[]`       | Complete egress rules                 |
+| `pdb.enabled`                      | `false`    | Distributed API PDB                   |
+| `pdb.minAvailable`                 | `1`        | Minimum API pods                      |
+| `pdb.maxUnavailable`               | `""`       | Alternative maximum unavailable       |
+| `resources`                        | see values | API resources                         |
+| `garbageCollectorResources`        | see values | GC resources                          |
+| `podSecurityContext`               | hardened   | Pod identity and seccomp              |
+| `securityContext`                  | hardened   | Container capabilities and filesystem |
+| `podAnnotations`                   | `{}`       | Pod annotations                       |
+| `podLabels`                        | `{}`       | Additional non-selector labels        |
+| `terminationGracePeriodSeconds`    | `60`       | Graceful upload shutdown window       |
+| `nodeSelector`                     | `{}`       | Node selection                        |
+| `affinity`                         | `{}`       | Affinity rules                        |
+| `tolerations`                      | `[]`       | Tolerations                           |
+| `topologySpreadConstraints`        | `[]`       | Topology distribution                 |
+| `extraEnv`                         | `[]`       | Additional environment variables      |
+| `extraVolumes`                     | `[]`       | Additional pod volumes                |
+| `extraVolumeMounts`                | `[]`       | Additional application mounts         |
+| `extraManifests`                   | `[]`       | Additional Kubernetes resources       |
+
+## Troubleshooting
+
+### Requests return HTTP 400
+
+The request Host is not accepted. Add the exact hostname to
+`config.allowedHosts` and keep it aligned with the route and API endpoint.
+
+### Uploads fail or time out
+
+Increase proxy body-size and read/write timeouts. Check buffering and any cloud
+load-balancer idle timeout. Reproduce with a representative large closure.
+
+### The pod is Ready but cache operations fail
+
+TCP readiness only verifies the listener. Inspect PostgreSQL and S3
+connectivity, credentials and NetworkPolicy, then perform a real push/pull.
+
+### PostgreSQL migration fails
+
+Inspect the Helm hook Job logs. Confirm that `database-url` exists, the database
+is reachable, TLS parameters are correct and the account can migrate schema.
+
+### S3 uploads work but downloads fail externally
+
+Presigned URLs may contain `storage.s3.endpoint`. Replace an internal-only
+hostname with an endpoint reachable by clients.
+
+### Standalone data is lost after reinstall
+
+Check whether `persistence.enabled` was false or a different PVC name was used.
+The generated PVC is retained by default; list retained claims in the namespace.
+
+### Permission denied under `/data`
+
+The storage driver may not apply fsGroup. Inspect mount ownership and fix it at
+the CSI/storage layer. Avoid switching the main container back to root.
+
+### Existing tokens are rejected
+
+Compare signing keys, issuer and audience with the previous installation.
+Tokens are intentionally invalidated when any of those change.
+
+### Garbage collection does not remove data
+
+Verify per-cache retention, global retention and GC logs. In distributed mode,
+confirm exactly one GC pod is running.
+
+### Deduplication ratio changed
+
+Compare chunk threshold/minimum/average/maximum values with the previous
+release. New chunk boundaries reduce reuse of existing chunks.
+
+### HTTPRoute does not receive traffic
+
+Inspect route conditions, Gateway listener namespaces, hostname matching and
+ReferenceGrant requirements. Both Accepted and ResolvedRefs must be true.
+
+### NetworkPolicy blocks dependencies
+
+Add precise egress rules for PostgreSQL and the S3 endpoint. Keep DNS enabled
+and verify that the cluster CNI enforces the policy model you configured.
+
+## Migration from a hand-written deployment
+
+1. Record the exact upstream image SHA and `server.toml`.
+2. Inventory database, objects, signing keys and public cache keys.
+3. Back up and test recovery.
+4. Map credentials into the chart Secret contract.
+5. Choose standalone only for SQLite/local, distributed only for PostgreSQL/S3.
+6. Render the chart and compare the generated TOML.
+7. Deploy in a new namespace and validate a copy of the data.
+8. Cut DNS after a complete push/pull test.
+
+Do not point two Attic installations at the same SQLite/local data during the
+migration.
+
+## Version history
+
+- `1.0.0`: initial HelmForge chart with standalone and distributed topologies.
+
+## Additional resources
+
+- [Official Attic source](https://github.com/zhaofengli/attic)
+- [Official Attic documentation](https://docs.attic.rs/)
+- [Attic tutorial](https://docs.attic.rs/tutorial.html)
+- [External Secrets Operator](https://external-secrets.io/latest/)
+- [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/)
+- [Kubernetes dual-stack networking](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)
+- [HelmForge PostgreSQL chart](/docs/charts/postgresql)

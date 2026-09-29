@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Attic',
+    slug: 'attic',
+    description: 'Nix binary cache with standalone SQLite storage or distributed PostgreSQL and S3 operation.',
+    maturity: 'beta',
+    backup: true,
+  },
+  {
     name: 'Bulwark Mail',
     slug: 'bulwark-mail',
     description:

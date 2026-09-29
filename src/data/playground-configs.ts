@@ -8,6 +8,130 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  attic: [
+    {
+      name: 'Topology and storage',
+      fields: [
+        {
+          label: 'Runtime topology',
+          key: 'mode',
+          type: 'select',
+          default: 'standalone',
+          options: ['standalone', 'distributed'],
+          description: 'Standalone uses SQLite/local PVC; distributed requires PostgreSQL, S3 and an existing Secret',
+        },
+        {
+          label: 'API replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Must remain one in standalone mode; distributed API servers are stateless',
+        },
+        {
+          label: 'Persistent volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Stores SQLite metadata and local cache objects in standalone mode',
+        },
+        {
+          label: 'S3 bucket',
+          key: 'storage.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Required in distributed mode; use a client-reachable endpoint for presigned URLs',
+        },
+        {
+          label: 'Existing credentials Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Required in distributed mode for database, JWT and optional S3 credentials',
+        },
+      ],
+    },
+    {
+      name: 'Public endpoint',
+      fields: [
+        {
+          label: 'Canonical API endpoint',
+          key: 'config.apiEndpoint',
+          type: 'text',
+          default: 'http://attic.local/',
+          description: 'Public client URL; must end with a slash',
+        },
+        {
+          label: 'Allowed hostname',
+          key: 'config.allowedHosts[0]',
+          type: 'text',
+          default: 'attic.local',
+          description: 'HTTP Host accepted by Attic',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Attic through a Kubernetes Ingress controller',
+        },
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: '',
+          description: 'Empty omits ingressClassName and uses the cluster default',
+        },
+        {
+          label: 'Ingress hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'attic.local',
+          description: 'TLS hostname matching the canonical API endpoint',
+        },
+      ],
+    },
+    {
+      name: 'Cache behavior',
+      fields: [
+        {
+          label: 'Proof of possession',
+          key: 'config.requireProofOfPossession',
+          type: 'toggle',
+          default: 'true',
+          description: 'Require uploaders to prove they possess a NAR already present globally',
+        },
+        {
+          label: 'Compression',
+          key: 'config.compression.type',
+          type: 'select',
+          default: 'zstd',
+          options: ['none', 'brotli', 'zstd', 'xz'],
+          description: 'Compression applied to newly uploaded NAR contents',
+        },
+        {
+          label: 'Garbage collection',
+          key: 'config.garbageCollection.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Distributed mode creates one singleton garbage collector',
+        },
+        {
+          label: 'GC interval',
+          key: 'config.garbageCollection.interval',
+          type: 'text',
+          default: '12 hours',
+          description: 'Natural-language interval accepted by Attic',
+        },
+        {
+          label: 'Default retention',
+          key: 'config.garbageCollection.defaultRetentionPeriod',
+          type: 'text',
+          default: '0',
+          description: 'Zero disables global time-based retention until configured deliberately',
+        },
+      ],
+    },
+  ],
   'bulwark-mail': [
     {
       name: 'Runtime and storage',
