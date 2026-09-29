@@ -56,7 +56,7 @@ The bootstrap password does not reset existing account passwords.
 - Automated native installation and guarded sequential application upgrades.
 - Persistent native configuration, instance identity, custom apps, themes and data.
 - Non-root Apache, read-only root filesystem, dropped capabilities and seccomp.
-- Co-located cron coordinated with the native initialization lock.
+- Kubernetes CronJob with native Job logs, status history and overlap prevention.
 - Existing Secret and External Secrets Operator contracts.
 - Explicit trusted hosts/proxies, SMTP, Ingress, Gateway API and dualstack Service.
 - Coordinated SQL/files backup, checksummed S3 publication and fresh-storage restore.
@@ -78,6 +78,30 @@ disable the corresponding subchart and provide `externalDatabase` or
 `externalRedis` settings. These external services must already exist. The chart
 supports PostgreSQL and standalone Redis; it does not perform database-engine
 conversion or configure Redis Sentinel/Cluster discovery.
+
+## Background jobs
+
+Nextcloud background processing runs as a Kubernetes `CronJob` every five minutes,
+matching the upstream recommendation. Each one-shot Job uses the official
+application image and PHP CLI, records Kubernetes success/failure status, and
+retains logs for direct inspection. Scheduled executions use
+`concurrencyPolicy: Forbid`; `backoffLimit: 0` exposes the original failure rather
+than replacing it with an automatic retry. A PVC-backed lock also serializes
+manual Jobs with scheduled executions.
+
+The CronJob mounts the application PVC and is pinned to the application Pod's
+node by default so `ReadWriteOnce` volumes work. `ReadWriteOncePod` is incompatible
+while cron is enabled. Use `cron.schedule` to change the cadence or
+`cron.suspend: true` to retain manual Job support without scheduled executions.
+
+```bash
+kubectl -n nextcloud get jobs -l app.kubernetes.io/component=cron
+kubectl -n nextcloud logs job/<job-name> -c cron
+```
+
+When upgrading from chart 1.x, remove `cron.interval` and `cron.initialDelay` from
+retained values and configure `cron.schedule`. Confirm that `<fullname>-cron`
+exists and that the old `cron` sidecar is absent from the application Deployment.
 
 ## Optional integrations
 
@@ -157,7 +181,7 @@ See the [integration values example](https://github.com/helmforgedev/charts/blob
 
 ## Backup and restore
 
-Integrated backups stop the application and cron, capture PostgreSQL and the
+Integrated backups suspend cron, wait for active cron Jobs, stop the application, capture PostgreSQL and the
 complete PVC, resume service, and publish checksummed objects with a final
 completion marker. A failed snapshot retains a volume lock for explicit recovery.
 Restore requires a completed backup, matching application version, original
@@ -233,8 +257,14 @@ selected upstream release. Helm rollback cannot reverse database migrations.
 | `notifyPush.resources.limits.cpu`            | CPU limit.                                                                           | `"500m"`                                                                                                                 |
 | `notifyPush.resources.limits.memory`         | Memory limit.                                                                        | `"128Mi"`                                                                                                                |
 | `cron.enabled`                               | Enable Nextcloud cron processing.                                                    | `true`                                                                                                                   |
-| `cron.interval`                              | Seconds between invocations; upstream recommends five minutes.                       | `300`                                                                                                                    |
-| `cron.initialDelay`                          | Delay the first cron invocation after Pod startup, matching upstream timer guidance. | `300`                                                                                                                    |
+| `cron.schedule`                              | Cron schedule; upstream recommends every five minutes.                               | `"*/5 * * * *"`                                                                                                          |
+| `cron.suspend`                               | Suspend scheduling while retaining the CronJob for manual runs.                      | `false`                                                                                                                  |
+| `cron.startingDeadlineSeconds`               | Maximum delay for starting a missed execution.                                       | `300`                                                                                                                    |
+| `cron.activeDeadlineSeconds`                 | Maximum execution duration.                                                          | `900`                                                                                                                    |
+| `cron.successfulJobsHistoryLimit`            | Successful Jobs retained for inspection.                                             | `1`                                                                                                                      |
+| `cron.failedJobsHistoryLimit`                | Failed Jobs retained for diagnostics.                                                | `3`                                                                                                                      |
+| `cron.backoffLimit`                          | Pod retries before an execution is marked failed.                                    | `0`                                                                                                                      |
+| `cron.affinity`                              | Optional affinity override; default pins cron to the application node.               | `{}`                                                                                                                     |
 | `cron.resources.requests.cpu`                | requests cpu                                                                         | `"25m"`                                                                                                                  |
 | `cron.resources.requests.memory`             | requests memory                                                                      | `"128Mi"`                                                                                                                |
 | `cron.resources.limits.cpu`                  | limits cpu                                                                           | `"500m"`                                                                                                                 |
@@ -312,7 +342,7 @@ selected upstream release. Helm rollback cannot reverse database migrations.
 | `backup.schedule`                            | Cron schedule.                                                                       | `"0 2 * * *"`                                                                                                            |
 | `backup.suspend`                             | Suspend scheduling, retaining manual job support.                                    | `false`                                                                                                                  |
 | `backup.activeDeadlineSeconds`               | Maximum total job duration in seconds.                                               | `7200`                                                                                                                   |
-| `backup.quiesceTimeout`                      | Maximum time to wait for web and cron termination.                                   | `180`                                                                                                                    |
+| `backup.quiesceTimeout`                      | Maximum time to suspend cron and stop application writers.                           | `180`                                                                                                                    |
 | `backup.successfulJobsHistoryLimit`          | Successful job history.                                                              | `1`                                                                                                                      |
 | `backup.failedJobsHistoryLimit`              | Failed jobs retained for diagnostics.                                                | `3`                                                                                                                      |
 | `backup.databaseImage`                       | Official SQL client; must match the PostgreSQL server major.                         | `"docker.io/library/postgres:18.6-trixie"`                                                                               |
