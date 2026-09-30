@@ -160,6 +160,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Dev Tools',
     charts: [
+      { label: 'Atuin', href: '/docs/charts/atuin', maturity: 'beta' },
       { label: 'Gitea', href: '/docs/charts/gitea', maturity: 'stable' },
       { label: 'Guacamole', href: '/docs/charts/guacamole', maturity: 'stable' },
       { label: 'Answer', href: '/docs/charts/answer', maturity: 'stable' },

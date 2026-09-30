@@ -1,0 +1,512 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Atuin Chart
+description: Production-oriented Atuin shell history sync with safe SQLite defaults, PostgreSQL scaling, TLS-first exposure and native metrics.
+---
+
+# Atuin
+
+[Atuin](https://atuin.sh) replaces a shell's traditional history file with an
+encrypted database and synchronizes history between machines. The HelmForge
+chart deploys the official Atuin Server image with explicit database,
+persistence, exposure, secret and observability contracts.
+
+The chart is marked beta while the new HelmForge integration gains release
+history. It pins Atuin 18.23.0 and supports the two upstream tier-one database
+backends: SQLite for a simple singleton and PostgreSQL for production shared
+state.
+
+## What this chart provides
+
+- the official `ghcr.io/atuinsh/atuin:18.23.0` image;
+- a safe single-replica SQLite default with persistent storage;
+- the maintained HelmForge PostgreSQL dependency or an external database URI;
+- non-root execution, read-only root filesystem and no Kubernetes API token;
+- HTTP startup, readiness and liveness probes on the upstream health route;
+- optional Prometheus metrics on a separate private Service;
+- Ingress and Gateway API HTTPRoute exposure;
+- native External Secrets Operator resources;
+- NetworkPolicy, PodDisruptionBudget, HPA and scheduling controls;
+- template-time rejection of unsafe SQLite scaling combinations.
+
+Atuin Server 18.23.0 does not have an S3 object-storage backend. Synchronized
+records are stored in SQL. This chart deliberately does not expose unsupported
+S3 application settings.
+
+## Requirements
+
+- Kubernetes 1.30 or newer;
+- Helm 3 or Helm 4;
+- a default StorageClass or existing PVC for SQLite;
+- PostgreSQL 14 or newer when using PostgreSQL mode;
+- a TLS-capable Ingress or Gateway for public access;
+- an Atuin client for account creation, login and synchronization.
+
+Atuin does not require Kubernetes API access. The chart disables service
+account token mounting by default.
+
+## Install the default SQLite topology
+
+Add the HelmForge repository and install the chart:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install atuin helmforge/atuin \
+  --namespace atuin \
+  --create-namespace
+```
+
+The default release creates:
+
+- one Atuin Deployment;
+- one ClusterIP Service on port 8888;
+- one 5 GiB ReadWriteOnce PVC mounted at `/config`;
+- a Recreate rollout strategy;
+- closed registration;
+- no public route.
+
+SQLite is appropriate for personal servers and small installations. The chart
+enforces one replica and refuses HPA in this topology because a PVC does not
+turn SQLite into a shared multi-writer database.
+
+Customize storage explicitly when needed:
+
+```yaml
+database:
+  type: sqlite
+  sqlite:
+    path: /config/atuin.db
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: fast-ssd
+```
+
+Use `persistence.existingClaim` to retain a separately managed claim. The
+existing claim must be writable by UID/GID 1000.
+
+## Create the first account
+
+Registration is closed by default. Open it only for controlled onboarding:
+
+```bash
+helm upgrade atuin helmforge/atuin \
+  --namespace atuin \
+  --reuse-values \
+  --set atuin.openRegistration=true
+```
+
+Point an Atuin client at the HTTPS endpoint and register:
+
+```bash
+atuin register -u YOUR_USERNAME -e YOUR_EMAIL
+```
+
+After the intended accounts exist, close registration again:
+
+```bash
+helm upgrade atuin helmforge/atuin \
+  --namespace atuin \
+  --reuse-values \
+  --set atuin.openRegistration=false
+```
+
+Keep the encryption key returned by the client in a secure backup. The server
+stores encrypted records and cannot reconstruct a lost client key.
+
+## Use the bundled PostgreSQL chart
+
+For shared database state, select PostgreSQL and enable the maintained
+HelmForge dependency:
+
+```yaml
+database:
+  type: postgresql
+
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: atuin
+    username: atuin
+
+replicaCount: 2
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: atuin
+```
+
+The PostgreSQL subchart generates and retains authentication material. A
+short-lived helper init container URL-encodes the password and writes the
+complete URI into an in-memory volume. Credentials are not rendered into a
+ConfigMap or passed as a plain Helm value to the application.
+
+Atuin embeds SQL migrations and applies them before opening the HTTP listener.
+There is no upstream migration subcommand, so the chart does not create a
+fictional migration Job.
+
+Each Atuin replica can open up to 100 PostgreSQL connections. Before scaling,
+reserve approximately 100 connections per replica plus capacity for
+administration, backups and maintenance, or introduce a compatible pooler.
+
+## Connect to external PostgreSQL
+
+Atuin accepts a complete URI rather than separate host and password settings.
+Create an opaque Secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: atuin-database
+  namespace: atuin
+type: Opaque
+stringData:
+  db-uri: postgres://atuin:REPLACE_ME@postgresql.example.internal:5432/atuin?sslmode=require
+```
+
+Reference the Secret:
+
+```yaml
+database:
+  type: postgresql
+  existingSecret: atuin-database
+  existingSecretKey: db-uri
+
+postgresql:
+  enabled: false
+```
+
+Use `extraVolumes` and `extraVolumeMounts` for a private CA when the database
+requires one. Include every required TLS option in the URI.
+
+## Manage the URI with External Secrets
+
+Install External Secrets Operator separately. The chart renders native
+`ExternalSecret` specifications without adding provider-specific abstractions:
+
+```yaml
+database:
+  type: postgresql
+  existingSecret: atuin-database
+
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - fullnameOverride: atuin-database
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        data:
+          - secretKey: db-uri
+            remoteRef:
+              key: platform/atuin
+              property: database-uri
+```
+
+An item can override `refreshInterval`. If `target.name` is omitted, the chart
+uses the item name. Each item must declare a `secretStoreRef` or a per-source
+store or generator reference.
+
+## Expose Atuin with Ingress
+
+Public Atuin endpoints must use HTTPS. Upstream warns that login credentials
+are exposed when transported over plain HTTP, even though synchronized history
+records are end-to-end encrypted.
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: '0'
+  hosts:
+    - host: atuin.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: atuin-tls
+      hosts:
+        - atuin.example.com
+```
+
+Configure clients with the matching sync address:
+
+```toml
+sync_address = "https://atuin.example.com"
+```
+
+Large histories may require controller-specific request-body and timeout
+settings. Those options belong in Ingress annotations or controller policies,
+not in application environment variables.
+
+## Expose Atuin with Gateway API
+
+The chart creates HTTPRoutes and generates the backend reference itself:
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: atuin
+      parentRefs:
+        - name: public
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - atuin.example.com
+```
+
+The Gateway, listener, certificate and policy resources remain platform
+responsibilities. Metrics are not attached to these routes.
+
+## Use a path prefix
+
+Set `atuin.path` when the server must live below a prefix:
+
+```yaml
+atuin:
+  path: /atuin
+```
+
+This changes every application route, including health from `/healthz` to
+`/atuin/healthz`. The chart adjusts probes automatically. Ensure the proxy
+preserves the prefix instead of stripping it unexpectedly.
+
+## Metrics and monitoring
+
+Atuin provides a separate Prometheus listener. Enable it explicitly:
+
+```yaml
+metrics:
+  enabled: true
+  port: 9001
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
+```
+
+The chart sets the nested upstream variables
+`ATUIN_METRICS__ENABLE`, `ATUIN_METRICS__HOST` and
+`ATUIN_METRICS__PORT`. Metrics include HTTP request duration and counts,
+registered users, uploaded and downloaded records, oversized records, and
+store deletion outcomes.
+
+The metrics listener is a separate ClusterIP Service and is never routed by
+the generated Ingress or HTTPRoute.
+
+## Health semantics
+
+Startup, readiness and liveness probes call the upstream `/healthz` endpoint.
+The endpoint returns process health but does not query the database. Database
+connection and migrations complete before the server binds, so startup proves
+initial database access; ongoing database availability needs separate
+monitoring and a real client sync canary.
+
+The defaults give startup up to five minutes while keeping steady-state probes
+responsive. Tune timeouts only after measuring slow storage and database
+startup behavior.
+
+## Autoscaling and availability
+
+Autoscaling is available only with PostgreSQL:
+
+```yaml
+database:
+  type: postgresql
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+```
+
+Atuin is stateless with shared PostgreSQL state and does not require sticky
+sessions. Upstream does not formally guarantee zero-downtime mixed-version
+upgrades. Review each release, take a backup, and use a controlled rollout when
+database compatibility is uncertain.
+
+The HPA connection budget is important: four replicas may consume roughly 400
+connections. An HPA without matching PostgreSQL capacity is not high
+availability.
+
+## NetworkPolicy
+
+Enable the baseline policy when the cluster network plugin enforces it:
+
+```yaml
+networkPolicy:
+  enabled: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 10.30.0.0/24
+      ports:
+        - protocol: TCP
+          port: 5432
+```
+
+The policy permits the application and optional metrics ports, DNS egress and
+the bundled PostgreSQL Service. External databases and registration webhooks
+need cluster-specific `extraEgress` peers. Kubernetes NetworkPolicy cannot
+portably select arbitrary DNS names.
+
+## Registration webhooks
+
+The optional registration webhook URL is a secret. Store it in a Secret:
+
+```yaml
+atuin:
+  registerWebhook:
+    existingSecret: atuin-webhook
+    key: url
+    username: Atuin registration
+```
+
+When NetworkPolicy is active, add HTTPS egress for the webhook destination.
+Do not place the webhook URL directly in Git-managed values.
+
+## Runtime hardening
+
+The official image runs as the `atuin` user. The chart additionally enforces:
+
+- UID, GID and filesystem group 1000;
+- `runAsNonRoot: true`;
+- RuntimeDefault seccomp;
+- `allowPrivilegeEscalation: false`;
+- every Linux capability dropped;
+- a read-only root filesystem;
+- writable volumes only at `/config` and `/tmp`;
+- no automatically mounted service account token.
+
+Atuin creates `/config/server.toml` if it is absent. PostgreSQL mode therefore
+uses a writable `emptyDir` at `/config`, while SQLite mode uses the persistent
+claim because the database is stored there.
+
+## Back up SQLite
+
+SQLite runs in WAL mode. A raw copy of only `atuin.db` while the server writes
+can be inconsistent. Choose one of these approaches:
+
+1. scale the Deployment to zero, copy the whole PVC contents, then restore it;
+2. coordinate a CSI volume snapshot after quiescing writes;
+3. use SQLite's online backup facility from a controlled maintenance job.
+
+Test restore into a new namespace. Confirm the server starts, the account can
+log in and an existing client can synchronize.
+
+## Back up PostgreSQL
+
+Use a compatible PostgreSQL client and custom dump format:
+
+```bash
+pg_dump \
+  --format=custom \
+  --no-owner \
+  --no-acl \
+  --file=atuin.dump \
+  "$ATUIN_DB_URI"
+```
+
+Restore into a controlled empty database with `pg_restore`. Managed database
+snapshots are also suitable when their recovery point and retention meet your
+requirements. Take a backup before every Atuin image upgrade because migrations
+run automatically.
+
+Database backups preserve users, sessions and encrypted records. They do not
+replace the client-side encryption key backup.
+
+## Upgrade
+
+Review both the Atuin and chart release notes. Then upgrade:
+
+```bash
+helm repo update
+helm upgrade atuin helmforge/atuin \
+  --namespace atuin \
+  -f values.yaml
+```
+
+For SQLite, the chart uses Recreate to avoid concurrent writers. For
+PostgreSQL, the default is RollingUpdate, but you can set `strategy` explicitly
+when a release requires an outage or coordinated database change.
+
+## Troubleshooting
+
+### Pod waits for PostgreSQL
+
+Inspect the init container, PostgreSQL Secret and Service endpoints. Confirm
+the generated password Secret key matches
+`postgresql.auth.existingSecretUserPasswordKey`.
+
+### Pod is Ready but sync fails
+
+The health endpoint does not query SQL. Inspect application logs and database
+connections, then run a real client login or sync test.
+
+### Client receives 404
+
+Check `atuin.path`, proxy path rewriting and the client's `sync_address`. The
+same prefix must reach the server.
+
+### Client receives 413
+
+Increase the request-body limit on the Ingress controller or Gateway policy.
+This is a proxy response, not an Atuin database setting.
+
+### ServiceMonitor has no targets
+
+Confirm `metrics.enabled=true`, inspect the metrics Service endpoints and
+ensure Prometheus selects the ServiceMonitor labels.
+
+### SQLite chart refuses replicas
+
+This is an intentional safety check. Switch to PostgreSQL before increasing
+`replicaCount` or enabling HPA.
+
+## Values summary
+
+| Area         | Important values                                                       |
+| ------------ | ---------------------------------------------------------------------- |
+| Image        | `image.repository`, `image.tag`, `image.digest`                        |
+| Server       | `atuin.openRegistration`, `atuin.path`, `atuin.maxRecordSize`          |
+| Database     | `database.type`, `database.existingSecret`, `postgresql.enabled`       |
+| Persistence  | `persistence.enabled`, `persistence.existingClaim`, `persistence.size` |
+| Exposure     | `ingress`, `gatewayAPI`                                                |
+| Monitoring   | `metrics.enabled`, `metrics.serviceMonitor`                            |
+| Security     | `podSecurityContext`, `securityContext`, `networkPolicy`               |
+| Availability | `replicaCount`, `podDisruptionBudget`, `autoscaling`                   |
+| Extensions   | `externalSecrets`, `extraVolumes`, `extraManifests`                    |
+
+Use the [playground](/playground/) to generate a starting values
+file and consult the chart's `values.yaml` and JSON schema for the complete
+contract.
+
+## References
+
+- [Atuin documentation](https://docs.atuin.sh/)
+- [Atuin self-hosted server setup](https://docs.atuin.sh/latest/self-hosting/server-setup/)
+- [Atuin source](https://github.com/atuinsh/atuin)
+- [HelmForge charts source](https://github.com/helmforgedev/charts/tree/main/charts/atuin)
+- [HelmForge support](https://github.com/helmforgedev/charts/issues)

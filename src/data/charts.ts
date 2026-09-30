@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Atuin',
+    slug: 'atuin',
+    description: 'Encrypted shell history sync with persistent SQLite or scalable PostgreSQL operation.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Attic',
     slug: 'attic',
     description: 'Nix binary cache with standalone SQLite storage or distributed PostgreSQL and S3 operation.',

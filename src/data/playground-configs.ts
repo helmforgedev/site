@@ -8,6 +8,107 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  atuin: [
+    {
+      name: 'Runtime and database',
+      fields: [
+        {
+          label: 'Database type',
+          key: 'database.type',
+          type: 'select',
+          default: 'sqlite',
+          options: ['sqlite', 'postgresql'],
+          valueActivationValues: {
+            sqlite: { 'postgresql.enabled': 'false' },
+          },
+          description: 'SQLite is a singleton default; PostgreSQL enables shared-state replicas',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Must remain one with SQLite; each PostgreSQL replica can open 100 connections',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          toggleActivationValues: {
+            true: { 'database.type': 'postgresql' },
+          },
+          description: 'Deploy the maintained HelmForge PostgreSQL dependency',
+        },
+        {
+          label: 'SQLite volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '5Gi',
+          description: 'Persistent /config storage used by the SQLite topology',
+        },
+      ],
+    },
+    {
+      name: 'Server behavior',
+      fields: [
+        {
+          label: 'Open registration',
+          key: 'atuin.openRegistration',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable only during controlled account onboarding',
+        },
+        {
+          label: 'Path prefix',
+          key: 'atuin.path',
+          type: 'text',
+          default: '',
+          description: 'Optional prefix applied to API and health routes',
+        },
+        {
+          label: 'Maximum record size',
+          key: 'atuin.maxRecordSize',
+          type: 'text',
+          default: '1GiB',
+          description: 'Maximum accepted encrypted sync record size',
+        },
+        {
+          label: 'Prometheus metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose the private metrics listener on a separate Service',
+        },
+      ],
+    },
+    {
+      name: 'Public endpoint',
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Atuin through an Ingress controller; configure TLS for credentials',
+        },
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: 'traefik',
+          description: 'IngressClass handling the public HTTPS endpoint',
+        },
+        {
+          label: 'Ingress hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'atuin.example.com',
+          description: 'DNS hostname clients use as sync_address',
+        },
+      ],
+    },
+  ],
   attic: [
     {
       name: 'Topology and storage',
