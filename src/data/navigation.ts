@@ -184,6 +184,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Analytics',
     charts: [
+      { label: 'WebODM', href: '/docs/charts/webodm', maturity: 'beta' },
       { label: 'Umami', href: '/docs/charts/umami', maturity: 'stable' },
       { label: 'Metabase', href: '/docs/charts/metabase', maturity: 'stable' },
       { label: 'Liwan', href: '/docs/charts/liwan', maturity: 'stable' },

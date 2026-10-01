@@ -1,0 +1,410 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: WebODM Helm Chart for Kubernetes
+description: Deploy WebODM drone mapping on Kubernetes with PostGIS, Redis, Celery, authenticated NodeODM, NVIDIA GPU processing and OIDC.
+---
+
+# WebODM
+
+[WebODM](https://www.webodm.org/) turns aerial images into orthophotos,
+elevation models, point clouds and textured 3D models. The HelmForge chart
+deploys WebODM 3.3.0 with persistent media, PostgreSQL/PostGIS, Redis, Celery
+workers and an authenticated NodeODM 3.6.2 processing engine.
+
+The chart is beta while it gains release history. CPU processing is the
+portable default. NVIDIA GPU processing is opt-in and requires an amd64 GPU
+node, compatible drivers and the NVIDIA device plugin.
+
+## What this chart provides
+
+- official WebODM and NodeODM images pinned by tag and digest;
+- one WebODM web pod with safe Recreate upgrades;
+- independently scalable Celery workers with explicit RWX requirements;
+- maintained HelmForge PostgreSQL and Redis dependencies;
+- the official PostGIS image with PostGIS and raster extensions initialized;
+- private NodeODM registration with a generated bearer token;
+- persistent WebODM media and NodeODM task state;
+- optional NVIDIA GPU processing with RuntimeClass and scheduling controls;
+- native WebODM OIDC login configuration;
+- Ingress and Gateway API HTTPRoute exposure;
+- External Secrets Operator, NetworkPolicy and worker PDB support;
+- a Helm smoke test for WebODM and authenticated NodeODM health.
+
+## Requirements
+
+- Kubernetes 1.26 or newer;
+- Helm 3 or Helm 4;
+- a default StorageClass for the evaluation topology;
+- an RWX-capable StorageClass before using multiple Celery workers;
+- substantial CPU, memory and storage for production photogrammetry;
+- amd64 when using the bundled PostGIS image or GPU NodeODM image;
+- NVIDIA drivers and device plugin when GPU mode is enabled.
+
+WebODM and CPU NodeODM support amd64 and arm64. On arm64, use an external
+PostGIS database because the bundled official PostGIS image is amd64-only.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install webodm helmforge/webodm \
+  --namespace webodm \
+  --create-namespace
+```
+
+Port-forward the private Service:
+
+```bash
+kubectl -n webodm port-forward svc/webodm 8000:80
+```
+
+Open `http://127.0.0.1:8000`, create the first administrator account, and
+submit a small representative project before sizing production resources.
+
+The default release creates a 20 GiB media claim, a 20 GiB processing claim,
+PostgreSQL/PostGIS, Redis, one web pod, one Celery worker and one CPU NodeODM
+processor. These defaults prove functionality; they are not a production size
+recommendation.
+
+## Size processing resources
+
+Photogrammetry resource use varies with image count, resolution, selected
+options and output products. Start with measured limits:
+
+```yaml
+processing:
+  resources:
+    requests:
+      cpu: '8'
+      memory: 32Gi
+      ephemeral-storage: 20Gi
+    limits:
+      cpu: '32'
+      memory: 128Gi
+      ephemeral-storage: 100Gi
+  persistence:
+    size: 500Gi
+  tmpSizeLimit: 100Gi
+```
+
+`processing.persistence` stores task state at `/var/www/data`.
+`processing.tmpSizeLimit` bounds the ephemeral `/var/www/tmp` workspace.
+Monitor memory, ephemeral storage, task duration and PVC growth with real data.
+
+## Enable NVIDIA GPU processing
+
+```yaml
+processing:
+  gpu:
+    enabled: true
+    count: 1
+    runtimeClassName: nvidia
+    nodeSelector:
+      accelerator: nvidia
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+```
+
+GPU mode selects the pinned official `3.6.2-gpu` image and adds the
+`nvidia.com/gpu` limit. It accelerates the processing engine only; the WebODM
+web and Celery containers remain on the normal workload placement rules.
+
+## Scale Celery workers safely
+
+The web pod remains a singleton because the upstream startup script performs
+migrations and runs periodic schedulers. Celery workers can scale when all
+pods can mount the same media:
+
+```yaml
+persistence:
+  storageClass: rwx-storage
+  accessModes: [ReadWriteMany]
+  size: 500Gi
+
+worker:
+  replicaCount: 2
+  concurrency: 4
+
+pdb:
+  enabled: true
+  minAvailable: 1
+```
+
+The chart rejects multiple workers with a ReadWriteOnce media claim. Worker
+concurrency also increases database, Redis, CPU and memory demand.
+
+## Configure OpenID Connect
+
+Register `https://webodm.example.com/oidc/callback/` as the callback at the
+identity provider. Store the client secret separately:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webodm-oidc
+  namespace: webodm
+type: Opaque
+stringData:
+  client-secret: REPLACE_ME
+```
+
+Configure the provider:
+
+```yaml
+webodm:
+  host: webodm.example.com
+
+oidc:
+  enabled: true
+  name: Corporate Login
+  clientId: webodm
+  existingSecret: webodm-oidc
+  authEndpoint: https://idp.example.com/authorize
+  tokenEndpoint: https://idp.example.com/token
+  userinfoEndpoint: https://idp.example.com/userinfo
+  allowedEmails: ['@example.com']
+  updateProfile: true
+  customScopes: [groups]
+  groupClaims: [groups]
+  createGroups: true
+```
+
+WebODM always requests `openid email`. The chart writes non-secret provider
+settings to `settings_override.py` and injects the client secret from the
+Secret. `allowedEmails` accepts exact addresses and `@domain` suffixes.
+
+## Expose WebODM with Ingress
+
+Only the WebODM Service should be public. NodeODM stays private and requires a
+bearer token.
+
+```yaml
+webodm:
+  host: webodm.example.com
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: '0'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+  hosts:
+    - host: webodm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: webodm-tls
+      hosts: [webodm.example.com]
+```
+
+Large uploads, downloads and processing-related requests need controller
+timeouts sized beyond normal web traffic.
+
+## Expose WebODM with Gateway API
+
+```yaml
+webodm:
+  host: webodm.example.com
+
+gatewayAPI:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway-system
+  hostnames: [webodm.example.com]
+```
+
+The Gateway, HTTPS listener, certificate and implementation-specific timeout
+policies remain platform responsibilities.
+
+## Use external PostgreSQL/PostGIS and Redis
+
+Disable a bundled dependency only after creating its credential Secret:
+
+```yaml
+postgresql:
+  enabled: false
+
+externalDatabase:
+  host: postgis.database.svc
+  port: 5432
+  database: webodm
+  username: webodm
+  existingSecret: webodm-database
+  existingSecretPasswordKey: password
+
+redis:
+  enabled: false
+
+externalRedis:
+  host: redis.cache.svc
+  port: 6379
+  database: 0
+  existingSecret: webodm-redis
+  existingSecretPasswordKey: password
+```
+
+The external database must already have the PostGIS and PostGIS raster
+extensions plus the GDAL raster settings required by WebODM.
+
+## Manage credentials with External Secrets
+
+Install [External Secrets Operator](https://external-secrets.io/latest/)
+separately. Project the application Secret and point `webodm.existingSecret`
+at its target:
+
+```yaml
+webodm:
+  existingSecret: webodm-auth
+
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - fullnameOverride: webodm-auth
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        data:
+          - secretKey: secret-key
+            remoteRef:
+              key: platform/webodm
+              property: secret-key
+          - secretKey: processor-token
+            remoteRef:
+              key: platform/webodm
+              property: processor-token
+```
+
+Use additional items for OIDC, external database or external Redis Secrets.
+Every item needs a store or generator reference.
+
+## Storage, backup and recovery
+
+Treat PostgreSQL and the WebODM media claim as one consistency domain:
+
+1. stop new uploads and task creation;
+2. wait for or deliberately stop in-flight tasks;
+3. record a PostgreSQL recovery point;
+4. snapshot or copy the media claim at that recovery point;
+5. retain the database dump and media snapshot together;
+6. test restore into a separate namespace.
+
+NodeODM task storage helps recover in-flight processing but is not a substitute
+for the media backup. Generated credentials and chart-created claims use the
+Helm keep policy and survive uninstall.
+
+## NetworkPolicy
+
+`networkPolicy.enabled` isolates WebODM application pods, permits same-release
+traffic and DNS, and allows HTTPS egress needed for package and identity
+provider access. Use `ingressFrom` for controller namespaces and `extraEgress`
+for external database, Redis or identity-provider paths. Kubernetes
+NetworkPolicy cannot portably select arbitrary DNS names.
+
+## Runtime security
+
+The official upstream images initialize cron, NGINX and processing components
+as root. The chart documents this exception and applies RuntimeDefault seccomp,
+disables privilege escalation, drops capabilities before adding only the small
+upstream-required set, and disables service account token mounting. The root
+filesystem remains writable because the upstream startup scripts generate
+runtime configuration and plugin state.
+
+## Validate the release
+
+```bash
+kubectl -n webodm get deploy,statefulset,pod,svc,pvc
+helm -n webodm test webodm --logs
+```
+
+The test requests the WebODM HTTP endpoint and the authenticated NodeODM
+`/info` endpoint. Confirm a real processing task separately; endpoint health
+does not prove adequate resources for production imagery.
+
+## Upgrade
+
+Before changing WebODM or NodeODM versions, read upstream migrations, take a
+coordinated database and media backup, and process a representative project in
+a staging namespace. Do not roll an application image back across incompatible
+database migrations without restoring the matching database recovery point.
+
+## Troubleshooting
+
+### Web pod waits for PostgreSQL
+
+Verify the database Service, password Secret and PostGIS initialization logs.
+The application user key defaults to `user-password` with the bundled chart.
+
+### Worker stays unready
+
+Check Redis credentials, WebODM Service readiness and Celery logs. A worker can
+start only after PostgreSQL, Redis and the web endpoint are available.
+
+### Processor is offline
+
+Inspect the processor Deployment and registration Job. The processor token in
+the WebODM Secret must match the token passed to NodeODM.
+
+### Upload returns 413 or times out
+
+Increase request-body, read and send timeouts at the Ingress or Gateway. This
+is normally a proxy policy, not a WebODM application setting.
+
+### Processing pod is evicted
+
+Increase memory, ephemeral-storage or PVC capacity after measuring usage. GPU
+availability does not reduce every CPU or memory requirement.
+
+### OIDC login button is absent
+
+Check the mounted ConfigMap, client Secret key and all three provider endpoints.
+WebODM hides incomplete provider definitions.
+
+## Complete values reference
+
+| Area               | Values and defaults                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Naming             | `nameOverride=""`, `fullnameOverride=""`, `commonLabels={}`                                                                              |
+| WebODM image       | `image.repository=docker.io/webodm/webodm_webapp`, `tag=3.3.0`, immutable `digest`, `pullPolicy=IfNotPresent`, `imagePullSecrets=[]`     |
+| Application        | `webodm.host=localhost`, `debug=false`, generated or existing Secret keys, `extraEnv=[]`, `extraEnvFrom=[]`                              |
+| Web process        | `web.concurrency=2`, resources, startup timing and 120-second termination grace                                                          |
+| Celery             | `worker.replicaCount=1`, `concurrency=2`, resources and 300-second termination grace                                                     |
+| CPU processing     | `processing.enabled=true`, official NodeODM 3.6.2 image and digest, label, queue concurrency, image/runtime/cleanup limits and resources |
+| GPU processing     | `processing.gpu.enabled=false`, pinned `3.6.2-gpu` image, `count=1`, RuntimeClass, node selector and tolerations                         |
+| Processing storage | `processing.persistence` 20 GiB retained RWO claim, `tmpSizeLimit=10Gi`                                                                  |
+| Media storage      | `persistence` 20 GiB retained RWO claim or existing claim                                                                                |
+| Services           | `service.type=ClusterIP`, ports 80 and 3000, annotations and dual-stack fields                                                           |
+| OIDC               | Disabled; provider label, client ID and Secret, three endpoints, icon, email allowlist, profile, scope and group controls                |
+| Ingress            | Disabled; `ingressClassName`, annotations, hosts, paths and TLS                                                                          |
+| Gateway API        | Disabled; `parentRefs`, `hostnames`, annotations and HTTP path rules                                                                     |
+| External database  | Host, port 5432, database/user `webodm`, existing Secret and password key                                                                |
+| External Redis     | Host, port 6379, database 0, existing Secret and password key                                                                            |
+| Bundled PostgreSQL | Enabled standalone HelmForge chart, official PostGIS image, initialized extensions and 10 GiB persistence                                |
+| Bundled Redis      | Enabled standalone authenticated HelmForge chart with 2 GiB persistence                                                                  |
+| NetworkPolicy      | Disabled; ingress peers and extra egress rules                                                                                           |
+| Availability       | Disabled worker `pdb`, `minAvailable=1`                                                                                                  |
+| External Secrets   | Disabled; `refreshInterval=1h`, canonical `items=[]`                                                                                     |
+| Pod controls       | Labels, annotations, security contexts, node selector, tolerations, affinity, topology spread and priority class                         |
+| ServiceAccount     | Created, unnamed override, annotations and API token automount disabled                                                                  |
+
+The [playground](/playground/) generates a starting values file. The chart's
+`values.yaml` and JSON schema remain the authoritative complete contract.
+
+## References
+
+- [WebODM documentation](https://docs.webodm.org/)
+- [WebODM source](https://github.com/WebODM/WebODM)
+- [NodeODM source](https://github.com/OpenDroneMap/NodeODM)
+- [HelmForge charts source](https://github.com/helmforgedev/charts/tree/main/charts/webodm)
+- [HelmForge support](https://github.com/helmforgedev/charts/issues)
