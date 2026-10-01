@@ -8,6 +8,107 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  webodm: [
+    {
+      name: 'Application and workers',
+      fields: [
+        {
+          label: 'Public hostname',
+          key: 'webodm.host',
+          type: 'text',
+          default: 'localhost',
+          description: 'Hostname WebODM uses for links and OIDC callback construction',
+        },
+        {
+          label: 'Celery worker replicas',
+          key: 'worker.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Values above one require ReadWriteMany media storage',
+        },
+        {
+          label: 'Celery concurrency',
+          key: 'worker.concurrency',
+          type: 'number',
+          default: '2',
+          description: 'Maximum upstream worker concurrency per pod',
+        },
+        {
+          label: 'Media volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Shared uploads and generated WebODM assets',
+        },
+      ],
+    },
+    {
+      name: 'Processing',
+      fields: [
+        {
+          label: 'Bundled NodeODM',
+          key: 'processing.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy and register a private authenticated processing engine',
+        },
+        {
+          label: 'NVIDIA GPU',
+          key: 'processing.gpu.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use the official CUDA image and request nvidia.com/gpu',
+        },
+        {
+          label: 'Processing volume size',
+          key: 'processing.persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Persistent NodeODM task state at /var/www/data',
+        },
+        {
+          label: 'Scratch size limit',
+          key: 'processing.tmpSizeLimit',
+          type: 'text',
+          default: '10Gi',
+          description: 'Ephemeral upload and scratch capacity at /var/www/tmp',
+        },
+      ],
+    },
+    {
+      name: 'Identity and exposure',
+      fields: [
+        {
+          label: 'OpenID Connect',
+          key: 'oidc.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires client details and an existing Secret containing client-secret',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose only the WebODM Service through an Ingress controller',
+        },
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: '',
+          description: 'IngressClass handling large WebODM uploads and downloads',
+        },
+        {
+          label: 'Ingress hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'webodm.local',
+          description: 'Public DNS name; keep webodm.host aligned',
+        },
+      ],
+    },
+  ],
   atuin: [
     {
       name: 'Runtime and database',

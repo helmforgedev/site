@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'WebODM',
+    slug: 'webodm',
+    description: 'Drone mapping with PostGIS, Redis, scalable Celery workers and CPU or NVIDIA GPU processing.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Atuin',
     slug: 'atuin',
     description: 'Encrypted shell history sync with persistent SQLite or scalable PostgreSQL operation.',
