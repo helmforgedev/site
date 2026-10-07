@@ -7976,6 +7976,35 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Sentinel Failover',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Graceful Failover',
+          key: 'sentinel.gracefulFailover.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Fail over before voluntary master shutdown',
+        },
+        {
+          label: 'Confirmation Attempts',
+          key: 'sentinel.gracefulFailover.maxAttempts',
+          type: 'number',
+          default: '12',
+          enables: 'sentinel.gracefulFailover.enabled',
+          description: 'Attempts to confirm the Sentinel failover',
+        },
+        {
+          label: 'Replica Sync Timeout',
+          key: 'sentinel.gracefulFailover.replicaSyncTimeoutSeconds',
+          type: 'number',
+          default: '15',
+          enables: 'sentinel.gracefulFailover.enabled',
+          description: 'Seconds to wait for an in-sync replica before handoff',
+        },
+      ],
+    },
+    {
       name: 'Memory and Security',
       collapsible: true,
       fields: [
