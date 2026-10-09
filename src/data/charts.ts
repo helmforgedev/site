@@ -36,6 +36,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Ghostfolio',
+    slug: 'ghostfolio',
+    description:
+      'Private wealth management with PostgreSQL, Redis, immutable upstream images, OIDC and hardened networking.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Attic',
     slug: 'attic',
     description: 'Nix binary cache with standalone SQLite storage or distributed PostgreSQL and S3 operation.',

@@ -8,6 +8,123 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  ghostfolio: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'ghostfolio.rootUrl',
+          type: 'text',
+          default: '',
+          description: 'Canonical HTTPS origin used for links and OIDC callbacks',
+        },
+        {
+          label: 'Trust proxy',
+          key: 'ghostfolio.trustProxy',
+          type: 'text',
+          default: '',
+          description: 'Express proxy trust policy, such as 1 for one trusted ingress hop',
+        },
+        {
+          label: 'Read-only mode',
+          key: 'ghostfolio.readOnlyModeEnabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Prevent changes through the application',
+        },
+      ],
+    },
+    {
+      name: 'Identity',
+      fields: [
+        {
+          label: 'OIDC',
+          key: 'oidc.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable the experimental upstream OpenID Connect integration',
+        },
+        {
+          label: 'Issuer',
+          key: 'oidc.issuer',
+          type: 'text',
+          default: '',
+          description: 'OIDC issuer URL used for discovery',
+        },
+        {
+          label: 'Client ID',
+          key: 'oidc.clientId',
+          type: 'text',
+          default: '',
+          description: 'Registered OIDC client identifier',
+        },
+      ],
+    },
+    {
+      name: 'Data services',
+      fields: [
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the maintained PostgreSQL dependency',
+        },
+        {
+          label: 'External PostgreSQL',
+          key: 'database.external.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['postgresql.enabled'],
+          conflictResetValues: { 'postgresql.enabled': 'false' },
+          description: 'Use complete database URLs from an existing Secret',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the maintained Redis dependency',
+        },
+        {
+          label: 'External Redis',
+          key: 'redis.external.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['redis.enabled'],
+          conflictResetValues: { 'redis.enabled': 'false' },
+          description: 'Use an externally managed Redis service and password Secret',
+        },
+      ],
+    },
+    {
+      name: 'Exposure',
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Ghostfolio through Kubernetes Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Ghostfolio through HTTPRoute resources',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Apply product-aware ingress and egress isolation',
+        },
+      ],
+    },
+  ],
   'nautilus-trader': [
     {
       name: 'Runtime',

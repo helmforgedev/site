@@ -12,6 +12,7 @@ interface FieldConfig {
   activationExpandSections?: Record<string, string[]>;
   activationResetSections?: Record<string, string[]>;
   conflictsWith?: string[];
+  conflictResetValues?: Record<string, string>;
   description: string;
 }
 
@@ -250,7 +251,7 @@ function enforceFieldConflicts(field: FieldConfig, value: string) {
   if (!isActive) return;
 
   for (const key of field.conflictsWith ?? []) {
-    setControlValue(key, getFieldDefault(key) ?? '');
+    setControlValue(key, field.conflictResetValues?.[key] ?? getFieldDefault(key) ?? '');
   }
 }
 

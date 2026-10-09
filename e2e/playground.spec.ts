@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('ghostfolio external services disable their bundled dependencies', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="ghostfolio"]').click();
+    const code = page.locator('#playground-code');
+
+    await page.locator('button[data-field-key="database.external.enabled"]').click();
+    await expect(code).toContainText('database.external.enabled=true');
+    await expect(code).toContainText('postgresql.enabled=false');
+
+    await page.locator('button[data-field-key="redis.external.enabled"]').click();
+    await expect(code).toContainText('redis.external.enabled=true');
+    await expect(code).toContainText('redis.enabled=false');
+  });
+
   test('affine clears conflicting external settings and keeps native monitoring consistent', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="affine"]').click();
