@@ -28,6 +28,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'NautilusTrader',
+    slug: 'nautilus-trader',
+    description:
+      'Algorithmic trading runtime with immutable upstream image, singleton live nodes, backtests and secret integrations.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Attic',
     slug: 'attic',
     description: 'Nix binary cache with standalone SQLite storage or distributed PostgreSQL and S3 operation.',
