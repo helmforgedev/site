@@ -1,0 +1,174 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: NautilusTrader Chart
+description: Immutable NautilusTrader runtime for singleton live nodes, backtest Jobs, scheduled research, External Secrets, PostgreSQL and Redis.
+---
+
+# NautilusTrader
+
+[NautilusTrader](https://nautilustrader.io) is a high-performance Python platform for algorithmic trading and
+event-driven backtesting. The HelmForge chart deploys the official upstream image as a singleton live runtime, a
+one-shot backtest Job, or a scheduled CronJob.
+
+The chart is beta and safe by default. Its initial configuration imports NautilusTrader and waits; it cannot connect to
+a venue or submit an order until an operator supplies strategy code and explicitly switches to live mode.
+
+## What this chart provides
+
+- official `ghcr.io/nautechsystems/nautilus_trader` image pinned by immutable multi-architecture digest;
+- singleton Deployment with `Recreate` upgrades and graceful `stop` and `dispose` handling;
+- chart-managed process health, readiness, and Prometheus metrics;
+- one-shot and scheduled backtesting workloads;
+- optional PostgreSQL and Redis dependencies or external service coordinates;
+- native External Secrets Operator resources;
+- optional PVCs for catalogs, event stores, and backtest results;
+- non-root execution, read-only root filesystem, dropped capabilities, and no API token;
+- NetworkPolicy, dual-stack Service, scheduling controls, ServiceMonitor, and PrometheusRule.
+
+NautilusTrader is not an HTTP application. The Service is private and exists only for runner health and metrics, so the
+chart does not create Ingress or Gateway API resources.
+
+## Install the safe runtime
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install nautilus-trader helmforge/nautilus-trader \
+  --namespace nautilus-trader \
+  --create-namespace
+```
+
+The default `live.mode=validate` imports the Python package, becomes Ready, and performs no trading activity.
+
+## Supply a live strategy
+
+Create a Python callable that accepts the `live.nodeConfig` dictionary and returns an object implementing `run()`.
+Implement `stop()` and `dispose()` for orderly pod termination. Put the module in a reviewed derived image or mount it
+with `extraVolumes` and `extraVolumeMounts`.
+
+For a simple sandbox, create the referenced ConfigMap from the strategy module before applying the values:
+
+```bash
+kubectl create configmap nautilus-strategy \
+  --namespace nautilus-trader \
+  --from-file=my_strategy.py
+```
+
+Use a derived image instead when the strategy has Python dependencies or needs an immutable production artifact.
+
+```yaml
+live:
+  mode: live
+  factory: my_strategy:create_node
+  nodeConfig:
+    environment: sandbox
+    traderId: TRADER-001
+  extraEnv:
+    - name: PYTHONPATH
+      value: /opt/strategy
+
+extraVolumes:
+  - name: strategy
+    configMap:
+      name: nautilus-strategy
+extraVolumeMounts:
+  - name: strategy
+    mountPath: /opt/strategy
+    readOnly: true
+```
+
+Use a separate Helm release for each independent live node. Validate venue sessions, reconciliation, order controls,
+and shutdown behavior in a sandbox before production trading.
+
+## Understand the image pin
+
+Upstream publishes `latest` and `nightly`, but no release-numbered OCI image tags. HelmForge resolved official `latest`
+on 2026-10-09 and pinned its multi-architecture digest, corresponding to upstream revision `7b766f`. This makes every
+deployment reproducible even if upstream moves `latest`.
+
+To select a reviewed replacement, use the standard image contract. A digest takes precedence; clear it when using a
+tag:
+
+```yaml
+image:
+  repository: registry.example.com/nautilus-trader
+  digest: ''
+  tag: reviewed-version
+```
+
+## Run backtests
+
+```yaml
+live:
+  enabled: false
+backtest:
+  enabled: true
+  factory: my_backtest:run
+persistence:
+  results:
+    enabled: true
+    size: 50Gi
+```
+
+For recurring research, enable `scheduledBacktest` and set its cron schedule. The default `Forbid` concurrency policy
+prevents overlapping runs. Without a factory, the Job only validates the runtime import and exits successfully.
+
+## Configure PostgreSQL and Redis
+
+Set `database.mode=postgresql` with `postgresql.enabled=true` for the bundled dependency. Set
+`messageBus.mode=redis` with `redis.enabled=true` for bundled Redis. These topologies are useful for evaluation.
+
+For production, use `database.mode=external` or `messageBus.mode=external`, configure host and TLS values, and reference
+password Secrets. The chart exposes connection metadata to strategy code; it does not silently enable an upstream
+adapter or claim all adapters are available in every pinned build.
+
+## Manage credentials
+
+Reference an existing Secret with `secrets.existingSecret`, or render one or more native ExternalSecret resources:
+
+```yaml
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - name: venue
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: nautilus-venue
+        data:
+          - secretKey: api-key
+            remoteRef:
+              key: platform/nautilus
+              property: api-key
+secrets:
+  existingSecret: nautilus-venue
+```
+
+Never put venue, database, or Redis credentials directly in Helm values.
+
+## Observe the runner
+
+The internal Service exposes `/healthz`, `/readyz`, and `/metrics`. Enable `monitoring.serviceMonitor.enabled` and
+`monitoring.prometheusRule.enabled` for Prometheus Operator integration.
+
+These signals cover only runner process and factory lifecycle. They do not prove market-data freshness, venue
+connectivity, portfolio reconciliation, risk enforcement, or order execution. Strategy code must publish and alert on
+those domain-specific signals separately.
+
+## Back up and recover
+
+Back up enabled catalog, event-store, and results PVCs consistently with the workload. Back up external PostgreSQL and
+Redis using their service-specific procedures. Test restoration into an isolated namespace before relying on backups.
+The chart is marked `backup: false` in the catalog because it does not ship an automated end-to-end backup controller.
+
+## Uninstall
+
+```bash
+helm uninstall nautilus-trader --namespace nautilus-trader
+```
+
+Confirm PVC retention and external backups before uninstalling. Generated PVC lifecycle follows Kubernetes and storage
+provisioner behavior.

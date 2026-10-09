@@ -8,6 +8,101 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'nautilus-trader': [
+    {
+      name: 'Runtime',
+      fields: [
+        {
+          label: 'Live workload',
+          key: 'live.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the singleton long-running runtime',
+        },
+        {
+          label: 'Runner mode',
+          key: 'live.mode',
+          type: 'select',
+          default: 'validate',
+          options: ['validate', 'live'],
+          description: 'Live mode requires a user strategy factory',
+        },
+        {
+          label: 'Python factory',
+          key: 'live.factory',
+          type: 'text',
+          default: '',
+          description: 'Python module:callable used to create a live node',
+        },
+      ],
+    },
+    {
+      name: 'Research jobs',
+      fields: [
+        {
+          label: 'Backtest Job',
+          key: 'backtest.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create one immutable one-shot research Job',
+        },
+        {
+          label: 'Scheduled backtest',
+          key: 'scheduledBacktest.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create a CronJob with overlap prevention',
+        },
+        {
+          label: 'Schedule',
+          key: 'scheduledBacktest.schedule',
+          type: 'text',
+          default: '0 2 * * *',
+          description: 'Cron schedule for recurring research',
+        },
+      ],
+    },
+    {
+      name: 'State services',
+      fields: [
+        {
+          label: 'PostgreSQL mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'none',
+          options: ['none', 'postgresql', 'external'],
+          description: 'Select no database, bundled PostgreSQL, or an external service',
+        },
+        {
+          label: 'Redis mode',
+          key: 'messageBus.mode',
+          type: 'select',
+          default: 'none',
+          options: ['none', 'redis', 'external'],
+          description: 'Select no message bus, bundled Redis, or an external service',
+        },
+      ],
+    },
+    {
+      name: 'Persistence',
+      fields: [
+        {
+          label: 'Catalog PVC',
+          key: 'persistence.catalog.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Persist Parquet market-data catalogs',
+        },
+        {
+          label: 'Results PVC',
+          key: 'persistence.results.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Persist backtest results',
+        },
+      ],
+    },
+  ],
   webodm: [
     {
       name: 'Application and workers',
