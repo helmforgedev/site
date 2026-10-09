@@ -1,0 +1,362 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Ghostfolio Chart
+description: Private wealth management with immutable upstream images, PostgreSQL, Redis, OIDC, External Secrets and hardened networking.
+---
+
+# Ghostfolio
+
+[Ghostfolio](https://ghostfol.io) is an open-source wealth-management application for tracking portfolios, holdings,
+activities and net worth. The HelmForge chart deploys the official Ghostfolio image with PostgreSQL, Redis and
+security-oriented Kubernetes defaults.
+
+The chart is beta. Ghostfolio performs database migrations, seed work and scheduled portfolio jobs in the application
+process, so this release deliberately runs one replica with a `Recreate` rollout.
+
+## What this chart provides
+
+- official `docker.io/ghostfolio/ghostfolio` image pinned to an immutable multi-architecture digest;
+- maintained PostgreSQL and Redis dependencies, with contracts for externally managed services;
+- upstream-native startup, liveness and dependency-aware readiness probes;
+- retained application identity, existing Secret support and native External Secrets Operator resources;
+- optional experimental OIDC authentication;
+- opt-in Ingress or Gateway API exposure;
+- non-root execution, read-only root filesystem, dropped capabilities and no mounted API token;
+- product-aware NetworkPolicy, dual-stack Service and standard scheduling controls.
+
+The chart does not claim application-level horizontal scaling, Prometheus metrics or automated backups because those
+contracts are not documented by upstream.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install ghostfolio helmforge/ghostfolio \
+  --namespace ghostfolio \
+  --create-namespace
+```
+
+The default installation deploys PostgreSQL and Redis with persistent volumes. The first account registered in a new
+Ghostfolio instance becomes its administrator. Keep external exposure private until that registration is complete.
+
+## Understand the immutable image
+
+The default image is official Ghostfolio `3.82.0`, pinned to OCI index digest
+`sha256:3b87436abfe7daae20a8bd5862bda230d327a5af49a837f888c007863ecb94fb`. The manifest was verified for Linux
+`amd64`, `arm/v7` and `arm64`. Changing `image.tag` remains available for a reviewed upgrade or private mirror.
+
+## Expose the application
+
+Ingress and Gateway API support are opt-in and mutually exclusive. Set the canonical public origin explicitly in
+production so generated links and OIDC callbacks are stable:
+
+```yaml
+ghostfolio:
+  rootUrl: https://portfolio.example.com
+  trustProxy: '1'
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: portfolio.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: portfolio-tls
+      hosts:
+        - portfolio.example.com
+```
+
+The chart can derive `ROOT_URL` from the first Ingress host or HTTPRoute hostname, but an explicit HTTPS value avoids
+ambiguity. Set `ghostfolio.trustProxy` only to the trust policy required by the selected ingress path.
+
+## Use managed PostgreSQL and Redis
+
+For production, disable the bundled services and reference credentials held in Kubernetes Secrets. Database URLs must
+be complete and URL-encoded because this avoids exposing passwords in Helm values or assembling unsafe connection
+strings in templates.
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  external:
+    enabled: true
+    existingSecret: ghostfolio-database
+    urlKey: database-url
+    directUrlEnabled: true
+    directUrlKey: direct-url
+    host: postgres.database.svc.cluster.local
+    networkPolicyPeers:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: database
+
+redis:
+  enabled: false
+  external:
+    enabled: true
+    host: redis.cache.svc.cluster.local
+    existingSecret: ghostfolio-redis
+    passwordKey: redis-password
+    networkPolicyPeers:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: cache
+```
+
+Use `DIRECT_URL` when migrations must bypass a transaction pooler. Both service hosts are also used by the dependency
+wait containers. Configure matching NetworkPolicy peers for private destinations.
+
+## Preserve application identity
+
+The chart creates and retains random values for `ACCESS_TOKEN_SALT` and `JWT_SECRET_KEY` by default. For deterministic
+GitOps or recovery, create a Secret containing `access-token-salt` and `jwt-secret-key`, then set
+`ghostfolio.existingSecret`. Rotating either value invalidates authentication material.
+
+Market-data provider credentials can be supplied with `ghostfolio.extraEnv` using `valueFrom.secretKeyRef`, or through
+`ghostfolio.extraEnvFrom`. Do not store credentials directly in values files.
+
+## Configure OIDC
+
+Ghostfolio marks OIDC as experimental. Register the callback
+`https://portfolio.example.com/api/auth/oidc/callback`, store the client secret separately, and configure:
+
+```yaml
+ghostfolio:
+  rootUrl: https://portfolio.example.com
+oidc:
+  enabled: true
+  issuer: https://identity.example.com/realms/portfolio
+  clientId: ghostfolio
+  existingSecret: ghostfolio-oidc
+  clientSecretKey: client-secret
+  scopes:
+    - openid
+    - profile
+    - email
+```
+
+Test login, logout, callback routing and account mapping with the pinned Ghostfolio version before depending on OIDC in
+production.
+
+## Materialize Secrets with External Secrets Operator
+
+`externalSecrets.items` accepts native ExternalSecret specifications. The operator and a SecretStore or
+ClusterSecretStore must already exist. This example supplies application identity:
+
+```yaml
+externalSecrets:
+  enabled: true
+  items:
+    - name: application
+      fullnameOverride: ghostfolio-application
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: ghostfolio-application
+        data:
+          - secretKey: access-token-salt
+            remoteRef:
+              key: ghostfolio/application
+              property: access-token-salt
+          - secretKey: jwt-secret-key
+            remoteRef:
+              key: ghostfolio/application
+              property: jwt-secret-key
+ghostfolio:
+  existingSecret: ghostfolio-application
+```
+
+Use the same contract for OIDC, database, Redis and provider credentials.
+
+## Health and operations
+
+Startup and liveness use `/api/v1/health/liveness`, which does not couple process restarts to PostgreSQL or Redis
+outages. Readiness uses `/api/v1/health` and withdraws traffic when either dependency is unavailable. Keep the readiness
+timeout at five seconds or longer because the upstream Redis check can consume that interval.
+
+The application waits for both TCP listeners, then its official entrypoint runs Prisma migrations and seed work before
+starting the NestJS server. Keep `replicaCount=1`; use one Helm release per independent Ghostfolio instance.
+
+## Network policy
+
+The default policy allows namespace-local HTTP ingress, DNS, the bundled PostgreSQL and Redis workloads, and public
+HTTP/HTTPS egress for market-data providers. Public egress excludes private and special-use ranges. External private
+services require `database.external.networkPolicyPeers`, `redis.external.networkPolicyPeers` or explicit
+`networkPolicy.extraEgress` rules.
+
+If an ingress controller runs in another namespace, add its namespace and pod selectors to `networkPolicy.ingressFrom`.
+
+## Back up and recover
+
+PostgreSQL is the system of record. Redis persistence helps cache continuity but is not a substitute for a PostgreSQL
+backup. The chart is marked `backup: false` because it does not ship an automated end-to-end backup controller.
+
+Before an upgrade, create a transactionally consistent PostgreSQL backup, preserve the application Secret and record
+the chart and image versions. Restore into an isolated namespace and verify login, holdings, account history and a
+provider refresh before declaring the recovery procedure successful.
+
+## Configuration reference
+
+### Image, identity and application
+
+| Value                               | Default                           | Purpose                                               |
+| ----------------------------------- | --------------------------------- | ----------------------------------------------------- |
+| `nameOverride`                      | `""`                              | Override the chart name in resource names             |
+| `fullnameOverride`                  | `""`                              | Override the complete release resource name           |
+| `commonLabels`                      | `{}`                              | Labels added to every chart-owned resource            |
+| `replicaCount`                      | `1`                               | Enforced singleton migration and cron owner           |
+| `image.repository`                  | `docker.io/ghostfolio/ghostfolio` | Official application repository                       |
+| `image.tag`                         | `3.82.0@sha256:...`               | Released tag pinned to the verified OCI digest        |
+| `image.pullPolicy`                  | `IfNotPresent`                    | Kubernetes image pull policy                          |
+| `imagePullSecrets`                  | `[]`                              | Registry credential references                        |
+| `ghostfolio.rootUrl`                | `""`                              | Canonical origin; empty derives it from HTTP exposure |
+| `ghostfolio.trustProxy`             | `""`                              | Express trusted-proxy setting                         |
+| `ghostfolio.authTokenEnabled`       | `true`                            | Enable token authentication                           |
+| `ghostfolio.cronEnabled`            | `true`                            | Enable scheduled gathering and snapshots              |
+| `ghostfolio.securityHeadersEnabled` | `false`                           | Enable experimental upstream security headers         |
+| `ghostfolio.mcpEnabled`             | `false`                           | Enable the experimental `/mcp` endpoint               |
+| `ghostfolio.rateLimitingEnabled`    | `false`                           | Enable upstream rate limiting                         |
+| `ghostfolio.readOnlyModeEnabled`    | `false`                           | Prevent application changes                           |
+| `ghostfolio.logLevels`              | `[]`                              | NestJS log levels; empty keeps the upstream default   |
+| `ghostfolio.existingSecret`         | `""`                              | Secret containing stable application identity         |
+| `ghostfolio.accessTokenSaltKey`     | `access-token-salt`               | Secret key for `ACCESS_TOKEN_SALT`                    |
+| `ghostfolio.jwtSecretKey`           | `jwt-secret-key`                  | Secret key for `JWT_SECRET_KEY`                       |
+| `ghostfolio.extraEnv`               | `[]`                              | Additional advanced environment entries               |
+| `ghostfolio.extraEnvFrom`           | `[]`                              | Additional Secret or ConfigMap environment sources    |
+
+### OIDC and data services
+
+| Value                                       | Default             | Purpose                                             |
+| ------------------------------------------- | ------------------- | --------------------------------------------------- |
+| `oidc.enabled`                              | `false`             | Enable experimental OpenID Connect                  |
+| `oidc.issuer`                               | `""`                | HTTPS discovery issuer                              |
+| `oidc.clientId`                             | `""`                | Registered client identifier                        |
+| `oidc.existingSecret`                       | `""`                | Secret containing the client secret                 |
+| `oidc.clientSecretKey`                      | `client-secret`     | OIDC client-secret key                              |
+| `oidc.scopes`                               | `[openid]`          | Requested OIDC scopes                               |
+| `oidc.callbackUrl`                          | `""`                | Explicit callback URL override                      |
+| `oidc.authorizationUrl`                     | `""`                | Manual authorization endpoint override              |
+| `oidc.tokenUrl`                             | `""`                | Manual token endpoint override                      |
+| `oidc.userInfoUrl`                          | `""`                | Manual user-info endpoint override                  |
+| `database.external.enabled`                 | `false`             | Use externally managed PostgreSQL                   |
+| `database.external.existingSecret`          | `""`                | Secret containing complete database URLs            |
+| `database.external.urlKey`                  | `database-url`      | `DATABASE_URL` Secret key                           |
+| `database.external.directUrlKey`            | `direct-url`        | `DIRECT_URL` Secret key                             |
+| `database.external.directUrlEnabled`        | `false`             | Consume the direct migration URL                    |
+| `database.external.host`                    | `""`                | Host used for dependency waiting and policy context |
+| `database.external.port`                    | `5432`              | External PostgreSQL port                            |
+| `database.external.networkPolicyPeers`      | `[]`                | Allowed private PostgreSQL peers                    |
+| `postgresql.enabled`                        | `true`              | Deploy bundled PostgreSQL                           |
+| `postgresql.architecture`                   | `standalone`        | PostgreSQL topology                                 |
+| `postgresql.auth.database`                  | `ghostfolio`        | Initial application database                        |
+| `postgresql.auth.username`                  | `ghostfolio`        | Application database user                           |
+| `postgresql.auth.password`                  | `""`                | Application password; empty generates one           |
+| `postgresql.auth.postgresPassword`          | `""`                | Administrator password; empty generates one         |
+| `postgresql.standalone.persistence.enabled` | `true`              | Persist PostgreSQL data                             |
+| `postgresql.standalone.persistence.size`    | `8Gi`               | PostgreSQL PVC request                              |
+| `postgresql.standalone.resources`           | requests and limits | PostgreSQL compute allocation                       |
+| `redis.enabled`                             | `true`              | Deploy bundled Redis                                |
+| `redis.architecture`                        | `standalone`        | Redis topology                                      |
+| `redis.auth.enabled`                        | `true`              | Require Redis authentication                        |
+| `redis.auth.password`                       | `""`                | Redis password; empty generates one                 |
+| `redis.standalone.persistence.enabled`      | `true`              | Persist Redis state                                 |
+| `redis.standalone.persistence.size`         | `1Gi`               | Redis PVC request                                   |
+| `redis.standalone.resources`                | requests and limits | Redis compute allocation                            |
+| `redis.external.enabled`                    | `false`             | Use externally managed Redis                        |
+| `redis.external.host`                       | `""`                | External Redis hostname                             |
+| `redis.external.port`                       | `6379`              | External Redis port                                 |
+| `redis.external.database`                   | `0`                 | Redis logical database                              |
+| `redis.external.existingSecret`             | `""`                | Secret containing the Redis password                |
+| `redis.external.passwordKey`                | `redis-password`    | Redis password key                                  |
+| `redis.external.networkPolicyPeers`         | `[]`                | Allowed private Redis peers                         |
+
+The dependency objects accept the additional values documented by the maintained HelmForge PostgreSQL and Redis
+charts. The defaults above are the values this parent chart sets explicitly.
+
+### Secrets, service and exposure
+
+| Value                                         | Default     | Purpose                                    |
+| --------------------------------------------- | ----------- | ------------------------------------------ |
+| `externalSecrets.enabled`                     | `false`     | Render native ExternalSecret resources     |
+| `externalSecrets.refreshInterval`             | `1h`        | Default synchronization interval           |
+| `externalSecrets.items`                       | `[]`        | Complete ExternalSecret definitions        |
+| `serviceAccount.create`                       | `true`      | Create a dedicated ServiceAccount          |
+| `serviceAccount.name`                         | `""`        | Existing or explicit ServiceAccount name   |
+| `serviceAccount.annotations`                  | `{}`        | ServiceAccount annotations                 |
+| `serviceAccount.automountServiceAccountToken` | `false`     | Keep the Kubernetes API token unmounted    |
+| `service.type`                                | `ClusterIP` | Kubernetes Service type                    |
+| `service.port`                                | `3333`      | Application Service port                   |
+| `service.annotations`                         | `{}`        | Service annotations                        |
+| `service.ipFamilyPolicy`                      | `""`        | Cluster default or explicit family policy  |
+| `service.ipFamilies`                          | `[]`        | Ordered Service address families           |
+| `ingress.enabled`                             | `false`     | Render an Ingress                          |
+| `ingress.ingressClassName`                    | `""`        | Explicit ingress class                     |
+| `ingress.annotations`                         | `{}`        | Ingress annotations                        |
+| `ingress.hosts`                               | `[]`        | Ingress hosts and paths                    |
+| `ingress.tls`                                 | `[]`        | Ingress TLS definitions                    |
+| `gatewayAPI.enabled`                          | `false`     | Render HTTPRoutes                          |
+| `gatewayAPI.rootUrlScheme`                    | `https`     | Scheme for an HTTPRoute-derived public URL |
+| `gatewayAPI.httpRoutes`                       | `[]`        | HTTPRoute definitions and parents          |
+
+### Health, security and scheduling
+
+| Value                                  | Default                     | Purpose                                           |
+| -------------------------------------- | --------------------------- | ------------------------------------------------- |
+| `probes.startup.enabled`               | `true`                      | Probe dependency-free startup health              |
+| `probes.startup.initialDelaySeconds`   | `5`                         | Initial startup delay                             |
+| `probes.startup.periodSeconds`         | `5`                         | Startup probe period                              |
+| `probes.startup.timeoutSeconds`        | `5`                         | Startup probe timeout                             |
+| `probes.startup.failureThreshold`      | `60`                        | Migration and seed startup budget                 |
+| `probes.liveness.enabled`              | `true`                      | Probe dependency-free process health              |
+| `probes.liveness.initialDelaySeconds`  | `0`                         | Initial liveness delay                            |
+| `probes.liveness.periodSeconds`        | `20`                        | Liveness probe period                             |
+| `probes.liveness.timeoutSeconds`       | `5`                         | Liveness probe timeout                            |
+| `probes.liveness.failureThreshold`     | `3`                         | Failures before restart                           |
+| `probes.readiness.enabled`             | `true`                      | Probe PostgreSQL and Redis readiness              |
+| `probes.readiness.initialDelaySeconds` | `0`                         | Initial readiness delay                           |
+| `probes.readiness.periodSeconds`       | `10`                        | Readiness probe period                            |
+| `probes.readiness.timeoutSeconds`      | `5`                         | Dependency health timeout                         |
+| `probes.readiness.failureThreshold`    | `3`                         | Failures before traffic withdrawal                |
+| `waitForServices.image.repository`     | `docker.io/library/busybox` | Official dependency-wait image                    |
+| `waitForServices.image.tag`            | `1.37.0@sha256:...`         | Immutable multi-architecture wait image           |
+| `waitForServices.image.pullPolicy`     | `IfNotPresent`              | Wait-image pull policy                            |
+| `waitForServices.timeoutSeconds`       | `180`                       | Per-dependency TCP wait budget                    |
+| `waitForServices.resources`            | requests and limits         | Wait-container compute allocation                 |
+| `resources`                            | requests and limits         | Ghostfolio compute allocation                     |
+| `podSecurityContext`                   | non-root UID/GID 1000       | Pod identity, filesystem group and seccomp        |
+| `securityContext`                      | hardened                    | Read-only root, no escalation and no capabilities |
+| `runtimeStorage.sizeLimit`             | `256Mi`                     | Size limit for `/tmp` and npm cache emptyDirs     |
+| `terminationGracePeriodSeconds`        | `60`                        | Graceful shutdown budget                          |
+| `networkPolicy.enabled`                | `true`                      | Apply ingress and egress isolation                |
+| `networkPolicy.egressIsolation`        | `true`                      | Enforce egress rules                              |
+| `networkPolicy.ingressFrom`            | `[]`                        | Allowed ingress peers; empty means same namespace |
+| `networkPolicy.dnsEgress`              | `[]`                        | DNS peers; empty allows port 53 generally         |
+| `networkPolicy.allowPublicInternet`    | `true`                      | Permit public HTTP/HTTPS market-data access       |
+| `networkPolicy.extraEgress`            | `[]`                        | Additional native egress rules                    |
+| `podLabels`                            | `{}`                        | Additional pod labels                             |
+| `podAnnotations`                       | `{}`                        | Additional pod annotations                        |
+| `nodeSelector`                         | `{}`                        | Required node labels                              |
+| `tolerations`                          | `[]`                        | Pod tolerations                                   |
+| `affinity`                             | `{}`                        | Pod affinity rules                                |
+| `topologySpreadConstraints`            | `[]`                        | Topology spreading rules                          |
+| `priorityClassName`                    | `""`                        | Optional PriorityClass                            |
+| `extraVolumes`                         | `[]`                        | Additional pod volumes                            |
+| `extraVolumeMounts`                    | `[]`                        | Additional Ghostfolio volume mounts               |
+
+Every value is type-checked by the chart's `values.schema.json`.
+
+## Uninstall
+
+```bash
+helm uninstall ghostfolio --namespace ghostfolio
+```
+
+Confirm the retention and backup state of PostgreSQL and Redis PVCs before uninstalling. Kubernetes and the storage
+provisioner control PVC lifecycle after removal.
