@@ -39,7 +39,7 @@ export const charts: Chart[] = [
     name: 'Ghostfolio',
     slug: 'ghostfolio',
     description:
-      'Private wealth management with PostgreSQL, Redis, immutable upstream images, OIDC and hardened networking.',
+      'Private wealth management with PostgreSQL, Redis, a pinned upstream release, OIDC and hardened networking.',
     maturity: 'beta',
     backup: false,
   },
