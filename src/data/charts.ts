@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'OpenHuman',
+    slug: 'openhuman',
+    description: 'Persistent AI agent Core with authenticated RPC, retained memory and hardened Kubernetes operation.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'IB Gateway',
     slug: 'ib-gateway',
     description:

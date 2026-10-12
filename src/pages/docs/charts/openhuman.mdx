@@ -1,0 +1,190 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OpenHuman Chart
+description: Persistent OpenHuman Core with authenticated RPC, retained agent memory, External Secrets and hardened Kubernetes operation.
+---
+
+# OpenHuman
+
+[OpenHuman](https://github.com/tinyhumansai/openhuman) is an open-source personal AI system. Its headless Core exposes a JSON-RPC endpoint used by local desktop clients while retaining memory, sessions, skills and project files. The HelmForge chart deploys that Core as a secure Kubernetes singleton.
+
+## What this chart provides
+
+- official `ghcr.io/tinyhumansai/openhuman-core:v0.64.15` image pinned by immutable digest;
+- one Recreate Deployment, matching the upstream single-writer state model;
+- retained workspace and projects PVCs;
+- generated, existing or External Secrets Operator-managed RPC bearer token;
+- optional encrypted-keyring master key through a private file;
+- non-root UID/GID 10001, read-only root filesystem, dropped capabilities and no Kubernetes API token;
+- private ClusterIP, NetworkPolicy, TLS Ingress and Gateway API options;
+- real `/health` startup, readiness and liveness probes;
+- explicit amd64 scheduling because upstream does not publish an arm64 container image.
+
+The container is the headless Core. It does not serve the complete Tauri desktop UI.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install openhuman helmforge/openhuman \
+  --version 1.0.0 \
+  --namespace openhuman \
+  --create-namespace
+```
+
+Wait for the Core:
+
+```bash
+kubectl -n openhuman rollout status deployment/openhuman
+kubectl -n openhuman get pod,svc,pvc
+```
+
+## Retrieve the generated token
+
+The default installation creates a random 64-character bearer and retains its Secret across uninstall:
+
+```bash
+kubectl -n openhuman get secret openhuman \
+  -o jsonpath='{.data.core-token}' | base64 -d
+```
+
+Treat this bearer as an administrative credential. It grants control of an agent capable of calling tools and producing side effects.
+
+For production, create the token without putting it in shell history:
+
+```bash
+openssl rand -hex 32 > /secure/path/openhuman-token
+kubectl -n openhuman create secret generic openhuman-auth \
+  --from-file=core-token=/secure/path/openhuman-token
+helm upgrade openhuman helmforge/openhuman \
+  --version 1.0.0 \
+  --namespace openhuman \
+  --set auth.existingSecret=openhuman-auth
+```
+
+## Connect a desktop client
+
+Keep the Service private and forward it temporarily:
+
+```bash
+kubectl -n openhuman port-forward service/openhuman 7788:7788
+curl --fail http://127.0.0.1:7788/health
+```
+
+Configure OpenHuman Desktop with `http://127.0.0.1:7788/rpc` and the bearer. The `/rpc` endpoint requires `Authorization: Bearer`; `/health` is intentionally public upstream.
+
+## Store encrypted provider credentials
+
+OpenHuman needs a stable 64-character hexadecimal master key before it stores provider secrets in the encrypted-file keyring. Create it as a file-backed Secret:
+
+```bash
+openssl rand -hex 32 > /secure/path/openhuman-master-key
+kubectl -n openhuman create secret generic openhuman-keyring \
+  --from-file=master-key=/secure/path/openhuman-master-key
+helm upgrade openhuman helmforge/openhuman \
+  --version 1.0.0 \
+  --namespace openhuman \
+  --set keyring.existingSecret=openhuman-keyring
+```
+
+The chart copies the projected Secret into a memory-backed volume with mode `0400` and ownership `10001:10001`, then mounts it read-only. Losing or replacing this key without an application migration makes existing encrypted credentials unrecoverable.
+
+## External Secrets Operator
+
+```yaml
+auth:
+  existingSecret: openhuman-auth
+
+externalSecrets:
+  enabled: true
+  items:
+    - name: openhuman-auth
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: openhuman-auth
+        data:
+          - secretKey: core-token
+            remoteRef:
+              key: openhuman/core-token
+```
+
+`items[].spec` is passed to the ExternalSecret API. Rotation updates the Secret; restart the singleton deliberately after coordinating token changes with clients.
+
+## Persistence and backups
+
+| Claim     | Mount                        | Contents                                                     |
+| --------- | ---------------------------- | ------------------------------------------------------------ |
+| Workspace | `/home/openhuman/.openhuman` | Config, SQLite databases, memory, sessions, skills and cache |
+| Projects  | `/home/openhuman/OpenHuman`  | Agent projects and file-action output                        |
+
+Both claims are retained by default. Back up both before upgrades. OpenHuman performs ordered workspace migrations, but upstream does not document automatic downgrade of migrated state.
+
+If a restored backup contains files owned by root with mode `0600`, repair them to UID/GID `10001:10001` through an audited administrative workflow before starting the Pod. Do not grant capabilities to the long-running container.
+
+## Network exposure
+
+ClusterIP is the default. NetworkPolicy permits same-namespace callers and public HTTPS egress for the configured backend, model, search and OAuth providers. Add explicit `networkPolicy.ingressFrom` peers and `extraEgress` rules for other namespaces or private endpoints.
+
+Ingress requires an explicit class and TLS:
+
+```yaml
+openhuman:
+  allowedOrigins: https://openhuman.example.com
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: openhuman.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: openhuman-tls
+      hosts:
+        - openhuman.example.com
+```
+
+Never send the bearer over unencrypted public HTTP. Gateway API users must select a parent Gateway that terminates TLS.
+
+## Important defaults
+
+| Value                        | Default                     | Purpose                                                                 |
+| ---------------------------- | --------------------------- | ----------------------------------------------------------------------- |
+| `auth.existingSecret`        | `""`                        | Use an operator-managed bearer instead of the retained generated Secret |
+| `keyring.existingSecret`     | `""`                        | Select the encrypted-keyring master-key Secret                          |
+| `openhuman.backendUrl`       | `https://api.tinyhumans.ai` | Upstream backend endpoint                                               |
+| `openhuman.allowedOrigins`   | `""`                        | Extra browser origins allowed to call RPC                               |
+| `openhuman.analyticsEnabled` | `false`                     | Anonymous analytics opt-in                                              |
+| `persistence.size`           | `10Gi`                      | Workspace claim capacity                                                |
+| `projectsPersistence.size`   | `10Gi`                      | Projects claim capacity                                                 |
+| `networkPolicy.enabled`      | `true`                      | Restrict ingress and outbound destinations                              |
+| `ingress.enabled`            | `false`                     | Public endpoint remains disabled                                        |
+
+See the complete contract in the chart's `values.yaml` and `values.schema.json`.
+
+## Security boundaries
+
+OpenHuman is an agent harness that can execute tools and send data to configured providers. This chart keeps browser allow-all disabled, disables application-managed self-update, disables anonymous analytics, drops every Linux capability and does not mount the Kubernetes service-account token. Those controls do not replace review of enabled tools, provider policies or operator approvals.
+
+The upstream image has BuildKit provenance but does not publish a complete SBOM or independently verifiable GitHub artifact attestation for this release. HelmForge pins the official image digest and scans the rendered Kubernetes workload.
+
+## Limitations
+
+- only `linux/amd64` is available in the official OCI image;
+- no horizontal scaling or shared-state mode is documented;
+- no native Prometheus metrics endpoint is documented;
+- the desktop/Tauri UI is not served by the container;
+- local model, browser and search services are external integrations, not chart dependencies.
+
+## Uninstall
+
+```bash
+helm uninstall openhuman --namespace openhuman
+```
+
+The chart-created token Secret and both PVCs are retained. Remove them only after confirming that backups and credentials are no longer needed.

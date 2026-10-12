@@ -8,6 +8,72 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  openhuman: [
+    {
+      name: 'Core',
+      fields: [
+        {
+          label: 'Backend URL',
+          key: 'openhuman.backendUrl',
+          type: 'text',
+          default: 'https://api.tinyhumans.ai',
+          description: 'TinyHumans API endpoint used by the Core',
+        },
+        {
+          label: 'Allowed browser origins',
+          key: 'openhuman.allowedOrigins',
+          type: 'text',
+          default: '',
+          description: 'Exact comma-separated origins permitted to call RPC',
+        },
+        {
+          label: 'Anonymous analytics',
+          key: 'openhuman.analyticsEnabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable upstream anonymous analytics deliberately',
+        },
+      ],
+    },
+    {
+      name: 'State',
+      fields: [
+        {
+          label: 'Workspace size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Capacity for config, memory, sessions and SQLite state',
+        },
+        {
+          label: 'Projects size',
+          key: 'projectsPersistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Capacity for agent projects and file actions',
+        },
+      ],
+    },
+    {
+      name: 'Platform controls',
+      fields: [
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict RPC clients and provider egress',
+        },
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Materialize the RPC token through External Secrets Operator',
+        },
+      ],
+    },
+  ],
   'ib-gateway': [
     {
       name: 'Trading safety',
