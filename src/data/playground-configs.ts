@@ -8,6 +8,141 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  openreplay: [
+    {
+      name: 'Public endpoint',
+      fields: [
+        {
+          label: 'Domain',
+          key: 'openreplay.domain',
+          type: 'text',
+          default: 'openreplay.example.com',
+          description: 'Public hostname used by the UI, tracker and ingestion endpoints',
+        },
+        {
+          label: 'URL scheme',
+          key: 'openreplay.scheme',
+          type: 'select',
+          default: 'https',
+          options: ['https', 'http'],
+          description: 'Use HTTPS outside isolated local testing',
+        },
+      ],
+    },
+    {
+      name: 'Storage',
+      fields: [
+        {
+          label: 'Scratch size',
+          key: 'scratch.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Shared ingestion scratch capacity',
+        },
+        {
+          label: 'Scratch storage class',
+          key: 'scratch.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Use an RWX-capable class for multi-node scheduling',
+        },
+        {
+          label: 'RustFS data size',
+          key: 'rustfs.persistence.size',
+          type: 'text',
+          default: '50Gi',
+          description: 'Bundled object-storage capacity',
+        },
+        {
+          label: 'ClickHouse data size',
+          key: 'clickhouse.persistence.size',
+          type: 'text',
+          default: '100Gi',
+          description: 'Bundled event-store capacity',
+        },
+      ],
+    },
+    {
+      name: 'Bundled services',
+      fields: [
+        {
+          label: 'PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Deploy the HelmForge PostgreSQL dependency',
+        },
+        {
+          label: 'Redis',
+          key: 'redis.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Deploy the HelmForge Redis dependency',
+        },
+        {
+          label: 'ClickHouse',
+          key: 'clickhouse.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Deploy the HelmForge ClickHouse dependency',
+        },
+        {
+          label: 'RustFS',
+          key: 'rustfs.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Deploy bundled S3-compatible object storage',
+        },
+      ],
+    },
+    {
+      name: 'Ingress',
+      collapsible: true,
+      gateField: 'ingress.enabled',
+      fields: [
+        {
+          label: 'Ingress class',
+          key: 'ingress.ingressClassName',
+          type: 'text',
+          default: 'nginx',
+          description: 'Existing controller class; the chart does not install one',
+        },
+        {
+          label: 'Hostname',
+          key: 'ingress.hosts[0].host',
+          type: 'text',
+          default: 'openreplay.example.com',
+          description: 'Hostname routed to the internal OpenReplay router',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      fields: [
+        {
+          label: 'Schema migration',
+          key: 'migration.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Run the revision-scoped upstream migration workflow',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Create an application NetworkPolicy after configuring required peers',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'monitoring.serviceMonitor.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Requires Prometheus Operator CRDs in the cluster',
+        },
+      ],
+    },
+  ],
   questdb: [
     {
       name: 'Database',

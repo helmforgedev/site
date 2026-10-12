@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'OpenReplay',
+    slug: 'openreplay',
+    description: 'Session replay stack with fifteen OSS services, managed migrations and portable Kubernetes exposure.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'QuestDB',
     slug: 'questdb',
     description: 'Real-time time-series analytics with secure credentials, persistent storage and Prometheus metrics.',

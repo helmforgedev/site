@@ -1,0 +1,228 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OpenReplay Helm Chart
+description: Deploy OpenReplay session replay on Kubernetes with pinned official images, managed migrations, bundled data services, Ingress, Gateway API, and External Secrets.
+---
+
+# OpenReplay
+
+[OpenReplay](https://openreplay.com/) is an open-source session replay platform for understanding user behavior and debugging web applications. The HelmForge chart models its complete OSS data plane rather than treating it as a single container.
+
+The default installation includes:
+
+- fifteen official OpenReplay application services pinned by immutable digest;
+- an internal Caddy router for OpenReplay-specific paths and WebSockets;
+- HelmForge PostgreSQL, Redis, and ClickHouse dependencies;
+- RustFS S3-compatible object storage;
+- a revision-scoped schema migration Job with downgrade protection;
+- persistent recording scratch space, generated credentials, and operational probes.
+
+OpenReplay application images are published for `linux/amd64`. Kubernetes 1.31 or newer and an amd64 node pool are required.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev/charts
+helm repo update
+
+helm install openreplay helmforge/openreplay \
+  --namespace openreplay \
+  --create-namespace \
+  --set openreplay.domain=replay.example.com
+```
+
+Watch the migration and workloads:
+
+```bash
+kubectl -n openreplay get jobs,pods
+kubectl -n openreplay wait deployment/openreplay-router \
+  --for=condition=Available --timeout=10m
+```
+
+HTTPS is required for tracker recording and replay outside isolated local testing. The chart does not install an Ingress controller, Gateway, GatewayClass, certificate controller, Prometheus stack, CSI driver, or External Secrets Operator.
+
+## Architecture
+
+Public traffic reaches one controller-neutral router Service. The router sends UI traffic to `frontend`, API traffic to `api`, ingestion to `http`, replay objects to S3-compatible storage, and collaboration traffic to `assist` and `spot`. PostgreSQL stores relational state, ClickHouse stores event data, Redis coordinates transient state, and RustFS stores recordings and assets.
+
+Enterprise-only connector, Kafka, and Vault workloads are intentionally excluded from this OSS chart.
+
+## Expose OpenReplay
+
+Enable either Ingress or Gateway API, never both. Both target the internal router.
+
+### Ingress
+
+```yaml
+openreplay:
+  domain: replay.example.com
+  scheme: https
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: replay.example.com
+  tls:
+    - secretName: openreplay-tls
+      hosts:
+        - replay.example.com
+```
+
+### Gateway API
+
+```yaml
+openreplay:
+  domain: replay.example.com
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: web
+      parentRefs:
+        - name: platform-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - replay.example.com
+```
+
+The referenced Gateway and HTTPS listener must already exist.
+
+## Credentials
+
+The default installation creates `openreplay-credentials` and preserves generated values across Helm upgrades. For production, set `credentials.existingSecret` to a Secret containing:
+
+- `postgres-password`, `redis-password`, and `clickhouse-password`;
+- `access-key` and `secret-key` for object storage;
+- `assist-key`, `assist-jwt-secret`, and `jwt-secret`;
+- `jwt-spot-secret`, `token-secret`, `jwt-refresh-secret`, `jwt-spot-refresh-secret`, and `jwt-mcp-secret`.
+
+The bundled data-service charts consume the same Secret by default.
+
+### External Secrets Operator
+
+```yaml
+credentials:
+  existingSecret: openreplay-credentials
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - name: credentials
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: openreplay-credentials
+          creationPolicy: Owner
+        dataFrom:
+          - extract:
+              key: platform/openreplay/credentials
+```
+
+The operator and referenced SecretStore must already exist.
+
+## Storage
+
+| Store       | Default                  | Purpose                                            |
+| ----------- | ------------------------ | -------------------------------------------------- |
+| Scratch PVC | `20Gi`, `ReadWriteOnce`  | In-flight recording pipeline data                  |
+| PostgreSQL  | `8Gi` dependency default | Users, projects, sessions, and relational metadata |
+| Redis       | `8Gi` dependency default | Queueing and transient coordination                |
+| ClickHouse  | `100Gi`                  | Session event analytics                            |
+| RustFS      | `50Gi`                   | Recordings, assets, sourcemaps, and spots          |
+
+The scratch claim must use `ReadWriteMany` storage for multi-node scheduling. `scratch.ephemeral=true` is only for isolated validation and loses in-flight data on restart.
+
+## External data services
+
+Disable bundled dependencies independently and set the matching endpoint:
+
+```yaml
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+clickhouse:
+  enabled: false
+rustfs:
+  enabled: false
+
+database:
+  postgresql:
+    host: postgres.database.svc
+    database: openreplay
+    username: openreplay
+  redis:
+    host: redis.database.svc
+  clickhouse:
+    host: clickhouse.database.svc
+    database: default
+    username: default
+objectStorage:
+  endpoint: s3.storage.example.com
+  secure: true
+  region: us-east-1
+```
+
+Keep `credentials.existingSecret` aligned with all external service credentials.
+
+## Migrations and upgrades
+
+The migration Job fetches the exact schema tag matching the chart AppVersion and runs the official PostgreSQL, ClickHouse, and object-storage migration scripts using pinned client images. Application pods wait for the PostgreSQL schema before starting. A version ConfigMap blocks downgrades unless `migration.allowDowngrade=true` is explicitly set.
+
+Before every upgrade:
+
+1. Back up PostgreSQL, ClickHouse, object storage, credentials, and relevant scratch or Redis state.
+2. Confirm the OpenReplay backend, tracker, and Assist compatibility matrix. Backend 1.28 requires tracker 19.x and Assist 11.x.
+3. Upgrade the chart and watch the migration Job before application rollouts.
+4. Test recording, replay, ingestion, and collaboration flows.
+
+Helm `--atomic` cannot reverse data migrations.
+
+## Network policy and observability
+
+`networkPolicy.enabled=true` creates policy for the application workloads. Configure precise peers for external databases and object storage before enabling restricted egress.
+
+Set `monitoring.serviceMonitor.enabled=true` only when Prometheus Operator CRDs are installed. Monitor ingestion errors, queue delay, component restarts, database health, and storage capacity.
+
+## Key values
+
+| Value                               | Default                  | Description                                  |
+| ----------------------------------- | ------------------------ | -------------------------------------------- |
+| `openreplay.domain`                 | `openreplay.example.com` | Public hostname                              |
+| `openreplay.scheme`                 | `https`                  | Public URL scheme                            |
+| `credentials.existingSecret`        | `""`                     | Existing application and data-service Secret |
+| `externalSecrets.enabled`           | `false`                  | Render ExternalSecret resources              |
+| `scratch.accessModes`               | `[ReadWriteOnce]`        | Shared scratch access modes                  |
+| `migration.enabled`                 | `true`                   | Run revision-scoped schema migration         |
+| `router.replicaCount`               | `1`                      | Internal router replicas                     |
+| `postgresql.enabled`                | `true`                   | Deploy bundled PostgreSQL                    |
+| `redis.enabled`                     | `true`                   | Deploy bundled Redis                         |
+| `clickhouse.enabled`                | `true`                   | Deploy bundled ClickHouse                    |
+| `rustfs.enabled`                    | `true`                   | Deploy bundled object storage                |
+| `ingress.enabled`                   | `false`                  | Create an Ingress                            |
+| `gatewayAPI.enabled`                | `false`                  | Create HTTPRoutes                            |
+| `networkPolicy.enabled`             | `false`                  | Create application NetworkPolicy             |
+| `monitoring.serviceMonitor.enabled` | `false`                  | Create ServiceMonitors                       |
+
+Each entry under `components` controls one official application image, replica count, service port, and metrics port. Use the full chart `values.yaml` as the authoritative reference for image pins, scheduling, resources, persistence, probes, and advanced migration settings.
+
+## Backup and restore
+
+A volume snapshot of only one store is not a consistent OpenReplay backup. Quiesce ingestion or coordinate snapshots across PostgreSQL, ClickHouse, object storage, and relevant transient state. Restore data services and credentials first, verify connectivity, then allow the migration and application workloads to start.
+
+## Uninstall
+
+```bash
+helm uninstall openreplay --namespace openreplay
+```
+
+Review retained PVCs before deleting them. Removing PVCs permanently deletes session data.
+
+## Resources
+
+- [OpenReplay documentation](https://docs.openreplay.com/)
+- [OpenReplay Kubernetes guide](https://docs.openreplay.com/en/deployment/deploy-kubernetes/)
+- [OpenReplay upgrade guide](https://docs.openreplay.com/en/deployment/upgrade/)
+- [OpenReplay source](https://github.com/openreplay/openreplay)
