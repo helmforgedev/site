@@ -54,6 +54,7 @@ Treat this bearer as an administrative credential. It grants control of an agent
 For production, create the token without putting it in shell history:
 
 ```bash
+umask 077
 openssl rand -hex 32 > /secure/path/openhuman-token
 kubectl -n openhuman create secret generic openhuman-auth \
   --from-file=core-token=/secure/path/openhuman-token
@@ -79,12 +80,14 @@ Configure OpenHuman Desktop with `http://127.0.0.1:7788/rpc` and the bearer. The
 OpenHuman needs a stable 64-character hexadecimal master key before it stores provider secrets in the encrypted-file keyring. Create it as a file-backed Secret:
 
 ```bash
+umask 077
 openssl rand -hex 32 > /secure/path/openhuman-master-key
 kubectl -n openhuman create secret generic openhuman-keyring \
   --from-file=master-key=/secure/path/openhuman-master-key
 helm upgrade openhuman helmforge/openhuman \
   --version 1.0.0 \
   --namespace openhuman \
+  --reuse-values \
   --set keyring.existingSecret=openhuman-keyring
 ```
 

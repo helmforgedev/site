@@ -73,6 +73,63 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'External Secrets',
+      collapsible: true,
+      gateField: 'externalSecrets.enabled',
+      fields: [
+        {
+          label: 'Authentication Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: 'openhuman-auth',
+          description: 'Target Secret consumed by the RPC bearer environment variable',
+        },
+        {
+          label: 'ExternalSecret name',
+          key: 'externalSecrets.items[0].name',
+          type: 'text',
+          default: 'openhuman-auth',
+          description: 'Name of the ExternalSecret and its default target Secret',
+        },
+        {
+          label: 'Store kind',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.kind',
+          type: 'select',
+          default: 'ClusterSecretStore',
+          options: ['ClusterSecretStore', 'SecretStore'],
+          description: 'External Secrets store scope',
+        },
+        {
+          label: 'Store name',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.name',
+          type: 'text',
+          default: 'production',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+        {
+          label: 'Target Secret',
+          key: 'externalSecrets.items[0].spec.target.name',
+          type: 'text',
+          default: 'openhuman-auth',
+          description: 'Kubernetes Secret materialized by the operator',
+        },
+        {
+          label: 'Remote key',
+          key: 'externalSecrets.items[0].spec.data[0].remoteRef.key',
+          type: 'text',
+          default: 'openhuman/core-token',
+          description: 'Provider key containing the RPC bearer',
+        },
+        {
+          label: 'Secret key',
+          key: 'externalSecrets.items[0].spec.data[0].secretKey',
+          type: 'text',
+          default: 'core-token',
+          description: 'Key written into the target Kubernetes Secret',
+        },
+      ],
+    },
   ],
   'ib-gateway': [
     {
