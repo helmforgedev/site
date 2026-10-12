@@ -14,6 +14,13 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'QuestDB',
+    slug: 'questdb',
+    description: 'Real-time time-series analytics with secure credentials, persistent storage and Prometheus metrics.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'OpenHuman',
     slug: 'openhuman',
     description: 'Persistent AI agent Core with authenticated RPC, retained memory and hardened Kubernetes operation.',

@@ -8,6 +8,170 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  questdb: [
+    {
+      name: 'Database',
+      fields: [
+        {
+          label: 'PostgreSQL user',
+          key: 'questdb.pgUser',
+          type: 'text',
+          default: 'admin',
+          description: 'Username for PostgreSQL wire connections',
+        },
+        {
+          label: 'HTTP user',
+          key: 'questdb.httpUser',
+          type: 'text',
+          default: 'admin',
+          description: 'Basic-auth username for the Web Console and HTTP API',
+        },
+        {
+          label: 'Storage size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Capacity for the complete QuestDB root directory',
+        },
+      ],
+    },
+    {
+      name: 'Protocols and observability',
+      fields: [
+        {
+          label: 'PostgreSQL wire',
+          key: 'service.pgWireEnabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Publish PostgreSQL wire protocol on port 8812',
+        },
+        {
+          label: 'Legacy ILP TCP',
+          key: 'service.ilpTcpEnabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Publish legacy ILP TCP on port 9009; ILP over HTTP is preferred',
+        },
+        {
+          label: 'Metrics',
+          key: 'metrics.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose QuestDB metrics on the minimal HTTP server',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create a Prometheus Operator ServiceMonitor',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict clients separately for each protocol',
+        },
+      ],
+    },
+    {
+      name: 'Prometheus access',
+      collapsible: true,
+      gateField: 'metrics.serviceMonitor.enabled',
+      activationValues: {
+        'metrics.enabled': 'true',
+        'networkPolicy.metricsFrom[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name': 'monitoring',
+      },
+      fields: [
+        {
+          label: 'Prometheus namespace',
+          key: 'networkPolicy.metricsFrom[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name',
+          type: 'text',
+          default: 'monitoring',
+          description: 'Namespace permitted to scrape the metrics Service through NetworkPolicy',
+        },
+      ],
+    },
+    {
+      name: 'External Secrets',
+      collapsible: true,
+      gateField: 'externalSecrets.enabled',
+      fields: [
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Materialize protocol passwords through External Secrets Operator',
+        },
+        {
+          label: 'Authentication Secret',
+          key: 'questdb.existingSecret',
+          type: 'text',
+          default: 'questdb-auth',
+          description: 'Secret consumed by the StatefulSet',
+        },
+        {
+          label: 'ExternalSecret name',
+          key: 'externalSecrets.items[0].name',
+          type: 'text',
+          default: 'questdb-auth',
+          description: 'ExternalSecret resource name',
+        },
+        {
+          label: 'Store kind',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.kind',
+          type: 'select',
+          default: 'ClusterSecretStore',
+          options: ['ClusterSecretStore', 'SecretStore'],
+          description: 'External Secrets store scope',
+        },
+        {
+          label: 'Store name',
+          key: 'externalSecrets.items[0].spec.secretStoreRef.name',
+          type: 'text',
+          default: 'production',
+          description: 'SecretStore or ClusterSecretStore name',
+        },
+        {
+          label: 'Target Secret',
+          key: 'externalSecrets.items[0].spec.target.name',
+          type: 'text',
+          default: 'questdb-auth',
+          description: 'Kubernetes Secret materialized by the operator',
+        },
+        {
+          label: 'PostgreSQL remote key',
+          key: 'externalSecrets.items[0].spec.data[0].remoteRef.key',
+          type: 'text',
+          default: 'questdb/pg-password',
+          description: 'Provider key containing the PostgreSQL password',
+        },
+        {
+          label: 'PostgreSQL Secret key',
+          key: 'externalSecrets.items[0].spec.data[0].secretKey',
+          type: 'text',
+          default: 'pg-password',
+          description: 'Key written into the target Secret',
+        },
+        {
+          label: 'HTTP remote key',
+          key: 'externalSecrets.items[0].spec.data[1].remoteRef.key',
+          type: 'text',
+          default: 'questdb/http-password',
+          description: 'Provider key containing the HTTP password',
+        },
+        {
+          label: 'HTTP Secret key',
+          key: 'externalSecrets.items[0].spec.data[1].secretKey',
+          type: 'text',
+          default: 'http-password',
+          description: 'Key written into the target Secret',
+        },
+      ],
+    },
+  ],
   openhuman: [
     {
       name: 'Core',

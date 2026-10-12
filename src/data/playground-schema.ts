@@ -53,8 +53,9 @@ function chartsRoot(): string {
   const envRoot = process.env.HELMFORGE_CHARTS_ROOT;
   if (envRoot && fs.existsSync(envRoot)) return envRoot;
 
+  const candidates = [ciCandidate, localCandidate, ...(envRoot ? [envRoot] : [])];
   throw new Error(
-    `Cannot find charts directory. Tried ${candidate}. Set HELMFORGE_CHARTS_ROOT if the charts repo is elsewhere.`,
+    `Cannot find charts directory. Tried ${candidates.join(', ')}. Set HELMFORGE_CHARTS_ROOT if the charts repo is elsewhere.`,
   );
 }
 

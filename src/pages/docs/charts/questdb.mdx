@@ -1,0 +1,179 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: QuestDB Chart
+description: Production-ready standalone QuestDB with secure credentials, persistent storage, network isolation and Prometheus metrics.
+---
+
+# QuestDB
+
+[QuestDB](https://github.com/questdb/questdb) is an Apache-2.0 database built
+for real-time time-series analytics. The HelmForge chart deploys one hardened
+QuestDB OSS instance with retained storage and secure generated credentials.
+
+## What the chart provides
+
+- official QuestDB 10.0.1 image for amd64 and arm64, pinned by OCI digest;
+- a fixed one-replica StatefulSet matching the QuestDB OSS architecture;
+- retained persistence for the complete `/var/lib/questdb` root;
+- generated or externally managed PostgreSQL and HTTP passwords;
+- External Secrets Operator, Ingress and Gateway API support;
+- per-protocol NetworkPolicy, health probes and optional ServiceMonitor;
+- non-root UID/GID 10001 with a read-only root filesystem.
+
+QuestDB OSS does not provide replication, automated failover, native TLS or
+advanced authorization. Those are not simulated by this chart.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install questdb helmforge/questdb \
+  --namespace questdb \
+  --create-namespace
+```
+
+Check the singleton:
+
+```bash
+kubectl -n questdb rollout status statefulset/questdb-questdb
+kubectl -n questdb get pod,service,pvc
+```
+
+## Open the Web Console
+
+Read the retained HTTP password:
+
+```bash
+kubectl get secret -n questdb questdb-questdb \
+  -o jsonpath='{.data.http-password}' | base64 -d
+```
+
+Forward the authenticated HTTP interface:
+
+```bash
+kubectl -n questdb port-forward service/questdb-questdb 9000:9000
+```
+
+Open `http://localhost:9000` and authenticate as `admin`.
+
+## Existing Secret
+
+Supply keys `pg-password` and `http-password`:
+
+```yaml
+questdb:
+  existingSecret: questdb-auth
+```
+
+Passwords are mounted as files and consumed through QuestDB's `_FILE`
+configuration convention. The chart does not copy secret values into ordinary
+environment values.
+
+## External Secrets Operator
+
+```yaml
+questdb:
+  existingSecret: questdb-auth
+externalSecrets:
+  enabled: true
+  items:
+    - name: questdb-auth
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          name: questdb-auth
+        data:
+          - secretKey: pg-password
+            remoteRef:
+              key: questdb/pg-password
+          - secretKey: http-password
+            remoteRef:
+              key: questdb/http-password
+```
+
+## Protocols
+
+| Interface                              | Port | Default  | Guidance                             |
+| -------------------------------------- | ---: | -------- | ------------------------------------ |
+| HTTP, REST, Web Console, ILP HTTP, QWP | 9000 | enabled  | Preferred ingestion interface        |
+| PostgreSQL wire                        | 8812 | enabled  | Keep internal without a service mesh |
+| Legacy ILP TCP                         | 9009 | disabled | Enable with `service.ilpTcpEnabled`  |
+| Health and metrics                     | 9003 | internal | `/status`; `/metrics` when enabled   |
+
+QuestDB OSS protocols do not provide native TLS. Public HTTP exposure must use a
+TLS-terminating Ingress or Gateway. Use an encrypted trusted network or service
+mesh for PostgreSQL, ILP TCP and QWP.
+
+## Metrics
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+networkPolicy:
+  metricsFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+```
+
+The ServiceMonitor scrapes `/metrics` on the separate port 9003 Service. The
+Prometheus namespace selector is required when NetworkPolicy is enabled so the
+scraper is not blocked.
+
+## Persistence and production sizing
+
+```yaml
+persistence:
+  storageClass: fast-block
+  size: 100Gi
+resources:
+  requests:
+    cpu: '4'
+    memory: 8Gi
+  limits:
+    cpu: '8'
+    memory: 16Gi
+```
+
+QuestDB relies heavily on memory-mapped files. Do not use NFS or distributed
+filesystems for database storage. Follow upstream guidance for fast local block
+storage, `vm.max_map_count=1048576` and high open-file limits.
+
+## Backup and restore
+
+For a consistent OSS backup:
+
+1. Execute `CHECKPOINT CREATE` and wait for success.
+2. Copy the retained volume or create the block-storage snapshot.
+3. Execute `CHECKPOINT RELEASE`, including after copy failures.
+4. Restore the complete `/var/lib/questdb` root into an isolated environment.
+5. Create an empty `/var/lib/questdb/_restore` file to trigger recovery.
+6. Start QuestDB and verify queries before using the restored instance.
+
+An uncoordinated snapshot of a live QuestDB volume is not claimed to be a
+consistent backup. Restore into the same major version before upgrading.
+
+## Upgrades and availability
+
+Read the upstream release notes and verify a backup before upgrading. Startup
+can migrate on-disk metadata, so rollback may require the pre-upgrade volume.
+
+The chart is deliberately a singleton. Enabling its PodDisruptionBudget with
+`minAvailable: 1` blocks voluntary node drains. Leave it disabled when planned
+downtime during a drain is preferable. Use QuestDB Enterprise and its supported
+operator when replication and automated failover are required.
+
+## Uninstall
+
+```bash
+helm uninstall questdb --namespace questdb
+```
+
+The chart-created PVC and generated Secret remain by default because they hold
+database and recovery material. Delete them only after verifying the backup and
+confirming that data loss is intended.
