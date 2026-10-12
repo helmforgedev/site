@@ -163,6 +163,7 @@ export const chartCategories: ChartCategory[] = [
     charts: [
       { label: 'Atuin', href: '/docs/charts/atuin', maturity: 'beta' },
       { label: 'NautilusTrader', href: '/docs/charts/nautilus-trader', maturity: 'beta' },
+      { label: 'IB Gateway', href: '/docs/charts/ib-gateway', maturity: 'beta' },
       { label: 'Gitea', href: '/docs/charts/gitea', maturity: 'stable' },
       { label: 'Guacamole', href: '/docs/charts/guacamole', maturity: 'stable' },
       { label: 'Answer', href: '/docs/charts/answer', maturity: 'stable' },

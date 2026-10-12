@@ -8,6 +8,80 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'ib-gateway': [
+    {
+      name: 'Trading safety',
+      fields: [
+        {
+          label: 'Trading mode',
+          key: 'gateway.tradingMode',
+          type: 'select',
+          default: 'paper',
+          options: ['paper', 'live', 'both'],
+          description: 'Choose paper, live, or simultaneous account sessions',
+        },
+        {
+          label: 'Read-only API',
+          key: 'gateway.readOnlyApi',
+          type: 'toggle',
+          default: 'true',
+          description: 'Keep API operations read-only until live trading is deliberately approved',
+        },
+        {
+          label: 'Allow blind trading',
+          key: 'gateway.allowBlindTrading',
+          type: 'toggle',
+          default: 'false',
+          description: 'Permit order transmission without the upstream precaution dialog',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      fields: [
+        {
+          label: 'Persist settings',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Keep TWS settings across Pod replacements',
+        },
+        {
+          label: 'Settings volume size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '2Gi',
+          description: 'Requested capacity for the TWS settings PVC',
+        },
+        {
+          label: 'VNC maintenance',
+          key: 'vnc.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable the private VNC maintenance Service',
+        },
+      ],
+    },
+    {
+      name: 'Platform controls',
+      fields: [
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict raw TCP API and VNC clients',
+        },
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Materialize credential Secrets through External Secrets Operator',
+        },
+      ],
+    },
+  ],
   ghostfolio: [
     {
       name: 'Application',

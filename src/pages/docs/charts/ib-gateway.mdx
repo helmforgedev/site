@@ -1,0 +1,315 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: IB Gateway Chart
+description: Private Interactive Brokers Gateway runtime with paper-trading defaults, Secret-file credentials, persistent settings and External Secrets.
+---
+
+# IB Gateway
+
+[IB Gateway Docker](https://github.com/gnzsnz/ib-gateway-docker) packages Interactive Brokers Gateway with IBC, Xvfb,
+and TCP proxies. The HelmForge chart deploys that community-maintained runtime as a private singleton with safe paper
+defaults, immutable image pinning, Secret-backed credentials, persistent settings, and product-aware probes.
+
+The image is not published by Interactive Brokers. HelmForge and the image project are not affiliated with or endorsed
+by Interactive Brokers. The image includes proprietary IB Gateway software, and operators remain responsible for all
+IBKR agreements, permissions, subscriptions, and trading controls.
+
+## What this chart provides
+
+- `ghcr.io/gnzsnz/ib-gateway:10.50.1f` pinned by immutable amd64 and arm64 manifest digest;
+- paper trading, read-only API, blind trading disabled, VNC disabled, and ClusterIP exposure by default;
+- exactly one Deployment replica with `Recreate` upgrades to prevent overlapping account sessions;
+- managed Secret, existing Secret key mapping, and External Secrets Operator resources;
+- password-file projection through upstream `_FILE` variables;
+- persistent TWS settings with retained PVC support;
+- live, paper, or simultaneous Service port mapping;
+- internal-listener readiness checks and conservative process liveness;
+- NetworkPolicy, dual-stack Services, scheduling controls, and baseline Pod hardening.
+
+The IBKR API is raw TCP without chart-provided authentication or encryption. The chart intentionally does not create
+Ingress or Gateway API resources.
+
+## Install for paper trading
+
+Create a mode-`0600` password file outside the repository, then create the credential Secret without putting the
+password in shell history:
+
+```bash
+kubectl create namespace ib-gateway
+kubectl -n ib-gateway create secret generic ib-gateway-credentials \
+  --from-literal=username='your-paper-username' \
+  --from-file=password=/secure/path/ibkr-password
+```
+
+Protect that temporary file and remove it securely after confirming the Secret exists.
+
+Install the chart:
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install ib-gateway helmforge/ib-gateway \
+  --version 1.0.0 \
+  --namespace ib-gateway \
+  --set auth.existingSecret=ib-gateway-credentials
+```
+
+Watch the logs and approve the expected mobile two-factor request:
+
+```bash
+kubectl -n ib-gateway logs deployment/ib-gateway --follow
+kubectl -n ib-gateway rollout status deployment/ib-gateway
+```
+
+## Connect a paper client
+
+Keep the Service internal. For temporary workstation access:
+
+```bash
+kubectl -n ib-gateway port-forward service/ib-gateway 4002:4002
+```
+
+Connect the client to `127.0.0.1:4002`. The live API uses Service port 4001. The container internally proxies those
+ports through 4004 and 4003 respectively, matching the upstream image contract.
+
+Set `networkPolicy.apiIngressFrom` to explicit namespace or Pod selectors when clients run elsewhere in the cluster.
+Use a private encrypted network for any path outside the cluster. Never expose the Service directly to the internet.
+
+## Manage credentials
+
+The existing Secret defaults to these keys:
+
+| Mode                                    | Username key     | Password key     |
+| --------------------------------------- | ---------------- | ---------------- |
+| Live or paper                           | `username`       | `password`       |
+| Additional paper session in `both` mode | `paper-username` | `paper-password` |
+
+Override the `auth.*Key` values when your secret manager uses different names. Passwords are mounted as files;
+usernames use `secretKeyRef` because upstream does not expose username-file variables. Inline credential values exist
+only for evaluation and are stored in Helm release history.
+
+External Secrets can materialize the exact Secret consumed by the Deployment:
+
+```yaml
+auth:
+  existingSecret: ib-gateway-credentials
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: ib-gateway-credentials
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        data:
+          - secretKey: username
+            remoteRef:
+              key: trading/ibkr/username
+          - secretKey: password
+            remoteRef:
+              key: trading/ibkr/password
+```
+
+Credential rotation ends the current session and usually requires fresh two-factor approval. Coordinate rotation with
+trading operations and restart the singleton Deployment after the target Secret synchronizes.
+
+## Understand readiness
+
+The public container listeners belong to `socat` and can start before authentication finishes. With credentials
+configured, startup and readiness inspect the active internal Gateway listener instead. An empty evaluation install
+only checks that the credential-waiting process runs; its Service is not usable.
+
+Readiness does not prove that an account can place orders, that market data is subscribed, or that IBKR services are
+healthy. Monitor those domain conditions from the trading client.
+
+## Enable live trading deliberately
+
+Use paper trading first. Before changing `gateway.tradingMode` to `live`:
+
+1. Verify the intended account Secret and two-factor device.
+2. Prove client behavior and reconnect handling against paper trading.
+3. Keep `gateway.readOnlyApi: true` until write access is separately approved.
+4. Review `gateway.allowBlindTrading`; the safe default is false.
+5. Confirm NetworkPolicy and private transport restrict every API client.
+
+The chart does not implement order limits, reconciliation, or trading-risk policy.
+
+## Persist and recover settings
+
+The default PVC stores `/home/ibgateway/tws_settings`. It does not store credentials, account state, or generated IBC
+configuration. Back up customized settings with your storage platform and test recovery in an isolated paper-trading
+release.
+
+A persisted `jts.ini` can retain the initial timezone. Changing `gateway.timeZone` may therefore require a deliberate
+backup and cleanup of that setting so upstream can regenerate it.
+
+## Use VNC for maintenance
+
+VNC is disabled by default. When visual diagnostics are necessary, enable `vnc.enabled`, supply a Secret-backed
+password, and use `kubectl port-forward` to the separate VNC Service. Keep it private and disable it after maintenance.
+
+## Complete configuration reference
+
+Use the [playground](/playground) and select IB Gateway to generate a non-secret starting values file. The tables below cover
+the complete public values contract.
+
+### Naming and image
+
+| Value              | Default                     | Purpose                                   |
+| ------------------ | --------------------------- | ----------------------------------------- |
+| `nameOverride`     | `""`                        | Override the chart name in resource names |
+| `fullnameOverride` | `""`                        | Override the complete resource name       |
+| `replicaCount`     | `1`                         | Enforced singleton account session        |
+| `commonLabels`     | `{}`                        | Labels on chart resources                 |
+| `podLabels`        | `{}`                        | Additional non-selector Pod labels        |
+| `podAnnotations`   | `{}`                        | Additional Pod annotations                |
+| `imagePullSecrets` | `[]`                        | Registry credential references            |
+| `image.repository` | `ghcr.io/gnzsnz/ib-gateway` | Community upstream image repository       |
+| `image.tag`        | `10.50.1f`                  | Exact upstream release                    |
+| `image.digest`     | pinned SHA-256              | Immutable multi-architecture manifest     |
+| `image.pullPolicy` | `IfNotPresent`              | Kubernetes pull policy                    |
+
+### Credentials and External Secrets
+
+| Value                             | Default          | Purpose                                   |
+| --------------------------------- | ---------------- | ----------------------------------------- |
+| `auth.existingSecret`             | `""`             | Existing credential Secret                |
+| `auth.username`                   | `""`             | Evaluation live or paper username         |
+| `auth.password`                   | `""`             | Evaluation live or paper password         |
+| `auth.paperUsername`              | `""`             | Additional paper username for `both` mode |
+| `auth.paperPassword`              | `""`             | Additional paper password for `both` mode |
+| `auth.usernameKey`                | `username`       | Live or paper username Secret key         |
+| `auth.passwordKey`                | `password`       | Live or paper password Secret key         |
+| `auth.paperUsernameKey`           | `paper-username` | Additional paper username key             |
+| `auth.paperPasswordKey`           | `paper-password` | Additional paper password key             |
+| `externalSecrets.enabled`         | `false`          | Render ExternalSecret resources           |
+| `externalSecrets.refreshInterval` | `1h`             | Default ESO synchronization interval      |
+| `externalSecrets.items`           | `[]`             | Complete ExternalSecret item definitions  |
+
+### Gateway behavior
+
+| Value                                   | Default    | Purpose                                     |
+| --------------------------------------- | ---------- | ------------------------------------------- |
+| `gateway.tradingMode`                   | `paper`    | `paper`, `live`, or `both`                  |
+| `gateway.readOnlyApi`                   | `true`     | Restrict API actions to reads               |
+| `gateway.acceptIncoming`                | `manual`   | Incoming API connection handling            |
+| `gateway.masterClientId`                | `""`       | Optional TWS master client identifier       |
+| `gateway.allowBlindTrading`             | `false`    | Preserve upstream order precaution          |
+| `gateway.timeZone`                      | `Etc/UTC`  | Initial TWS IANA timezone                   |
+| `gateway.javaHeapSize`                  | `1024`     | Java heap in MiB                            |
+| `gateway.twoFactorTimeoutAction`        | `restart`  | Action after approval timeout               |
+| `gateway.twoFactorExitInterval`         | `60`       | Seconds after mobile approval               |
+| `gateway.twoFactorDevice`               | `""`       | Optional approval-device selector           |
+| `gateway.reloginAfterTwoFactorTimeout`  | `true`     | Retry login after timeout                   |
+| `gateway.existingSessionDetectedAction` | `primary`  | Concurrent-session handling                 |
+| `gateway.autoRestartTime`               | `11:59 PM` | Daily IBC restart schedule                  |
+| `gateway.autoLogoffTime`                | `""`       | Optional daily logoff schedule              |
+| `gateway.coldRestartTime`               | `""`       | Optional cold restart in `HH:MM`            |
+| `gateway.saveSettingsAt`                | `""`       | Optional IBC settings-save schedule         |
+| `gateway.customConfig`                  | `false`    | Use operator-mounted upstream configuration |
+
+### Workload extensions and state
+
+| Value                        | Default           | Purpose                                     |
+| ---------------------------- | ----------------- | ------------------------------------------- |
+| `workload.command`           | `[]`              | Container command override                  |
+| `workload.args`              | `[]`              | Container argument override                 |
+| `workload.extraEnv`          | `[]`              | Additional non-secret environment entries   |
+| `workload.envFrom`           | `[]`              | Additional Secret or ConfigMap sources      |
+| `workload.extraVolumeMounts` | `[]`              | Additional container mounts                 |
+| `workload.extraVolumes`      | `[]`              | Additional Pod volumes                      |
+| `workload.initContainers`    | `[]`              | Additional init containers                  |
+| `workload.sidecars`          | `[]`              | Additional sidecars                         |
+| `persistence.enabled`        | `true`            | Persist TWS settings                        |
+| `persistence.existingClaim`  | `""`              | Existing settings PVC                       |
+| `persistence.storageClass`   | `""`              | StorageClass or `-` for static provisioning |
+| `persistence.size`           | `2Gi`             | Settings PVC capacity                       |
+| `persistence.accessModes`    | `[ReadWriteOnce]` | PVC access modes                            |
+| `persistence.retain`         | `true`            | Retain generated PVC after uninstall        |
+| `persistence.annotations`    | `{}`              | Additional PVC annotations                  |
+
+### Services and VNC
+
+| Value                              | Default        | Purpose                                     |
+| ---------------------------------- | -------------- | ------------------------------------------- |
+| `service.type`                     | `ClusterIP`    | Private raw-TCP Service                     |
+| `service.annotations`              | `{}`           | API Service annotations                     |
+| `service.livePort`                 | `4001`         | Client-facing live API port                 |
+| `service.paperPort`                | `4002`         | Client-facing paper API port                |
+| `service.ipFamilyPolicy`           | `""`           | Optional Service family policy              |
+| `service.ipFamilies`               | `[]`           | Ordered Service IP families                 |
+| `service.loadBalancerSourceRanges` | `[]`           | Source ranges for explicit LoadBalancer use |
+| `vnc.enabled`                      | `false`        | Private visual maintenance listener         |
+| `vnc.existingSecret`               | `""`           | Existing VNC password Secret                |
+| `vnc.password`                     | `""`           | Evaluation VNC password                     |
+| `vnc.passwordKey`                  | `vnc-password` | VNC password Secret key                     |
+| `vnc.service.type`                 | `ClusterIP`    | VNC Service type                            |
+| `vnc.service.port`                 | `5900`         | VNC Service port                            |
+| `vnc.service.annotations`          | `{}`           | VNC Service annotations                     |
+| `vnc.service.ipFamilyPolicy`       | `""`           | Optional VNC family policy                  |
+| `vnc.service.ipFamilies`           | `[]`           | Ordered VNC IP families                     |
+
+### Network policy and probes
+
+| Value                               | Default            | Purpose                                |
+| ----------------------------------- | ------------------ | -------------------------------------- |
+| `networkPolicy.enabled`             | `true`             | Restrict API and VNC clients           |
+| `networkPolicy.apiIngressFrom`      | `[]`               | Explicit API client peers              |
+| `networkPolicy.vncIngressFrom`      | `[]`               | Explicit VNC client peers              |
+| `networkPolicy.egressIsolation`     | `false`            | Opt-in maintained egress allowlist     |
+| `networkPolicy.dnsEgress`           | namespace selector | DNS destinations for isolated egress   |
+| `networkPolicy.extraEgress`         | `[]`               | Complete IBKR or tunnel egress rules   |
+| `probes.startup.enabled`            | `true`             | Enable startup validation              |
+| `probes.startup.command`            | `[]`               | Startup command override               |
+| `probes.startup.periodSeconds`      | `10`               | Startup check interval                 |
+| `probes.startup.timeoutSeconds`     | `3`                | Startup check timeout                  |
+| `probes.startup.failureThreshold`   | `90`               | 2FA-aware startup budget               |
+| `probes.readiness.enabled`          | `true`             | Enable readiness validation            |
+| `probes.readiness.command`          | `[]`               | Readiness command override             |
+| `probes.readiness.periodSeconds`    | `10`               | Readiness check interval               |
+| `probes.readiness.timeoutSeconds`   | `3`                | Readiness check timeout                |
+| `probes.readiness.failureThreshold` | `3`                | Failures before removal from endpoints |
+| `probes.liveness.enabled`           | `true`             | Enable conservative process liveness   |
+| `probes.liveness.command`           | `[]`               | Liveness command override              |
+| `probes.liveness.periodSeconds`     | `30`               | Liveness check interval                |
+| `probes.liveness.timeoutSeconds`    | `3`                | Liveness check timeout                 |
+| `probes.liveness.failureThreshold`  | `5`                | Failures before restart                |
+
+### Platform and security controls
+
+| Value                                         | Default                   | Purpose                                   |
+| --------------------------------------------- | ------------------------- | ----------------------------------------- |
+| `serviceAccount.create`                       | `true`                    | Create a dedicated ServiceAccount         |
+| `serviceAccount.name`                         | `""`                      | Existing or custom ServiceAccount name    |
+| `serviceAccount.annotations`                  | `{}`                      | ServiceAccount annotations                |
+| `serviceAccount.automountServiceAccountToken` | `false`                   | Mount Kubernetes API credentials          |
+| `terminationGracePeriodSeconds`               | `90`                      | Allow IBC and Gateway shutdown            |
+| `resources.requests.cpu`                      | `250m`                    | Requested CPU                             |
+| `resources.requests.memory`                   | `1Gi`                     | Requested memory                          |
+| `resources.limits.cpu`                        | `2`                       | CPU limit                                 |
+| `resources.limits.memory`                     | `2Gi`                     | Memory limit                              |
+| `podSecurityContext`                          | UID/GID `1000`, seccomp   | Pod-level upstream identity and hardening |
+| `securityContext`                             | no escalation, drop `ALL` | Container-level hardening                 |
+| `nodeSelector`                                | `{}`                      | Node label selection                      |
+| `tolerations`                                 | `[]`                      | Pod tolerations                           |
+| `affinity`                                    | `{}`                      | Pod affinity rules                        |
+| `priorityClassName`                           | `""`                      | Workload priority class                   |
+| `topologySpreadConstraints`                   | `[]`                      | Singleton placement constraints           |
+| `extraManifests`                              | `[]`                      | Additional arbitrary Kubernetes resources |
+
+## Operational limitations
+
+- IBC was retired by its maintainers on 2026-09-01 and receives limited maintenance.
+- Concurrent sessions do not provide safe horizontal availability; the chart rejects multiple replicas.
+- A `Recreate` upgrade intentionally introduces downtime and can require two-factor approval.
+- No documented Prometheus endpoint exists, so the chart does not publish a misleading ServiceMonitor.
+- IBKR endpoints can change, so egress isolation requires an operator-maintained gateway or allowlist.
+
+## Uninstall
+
+```bash
+helm uninstall ib-gateway --namespace ib-gateway
+```
+
+The generated settings PVC is retained by default. Confirm backup and remove it separately only when the settings are
+no longer required.

@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'IB Gateway',
+    slug: 'ib-gateway',
+    description:
+      'Interactive Brokers Gateway runtime with safe paper defaults, Secret-file credentials and private TCP access.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'WebODM',
     slug: 'webodm',
     description: 'Drone mapping with PostGIS, Redis, scalable Celery workers and CPU or NVIDIA GPU processing.',
