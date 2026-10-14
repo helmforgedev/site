@@ -8,6 +8,134 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  temporal: [
+    {
+      name: 'Server topology',
+      fields: [
+        {
+          label: 'Frontend replicas',
+          key: 'server.components.frontend.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'SDK and API request capacity',
+        },
+        {
+          label: 'History replicas',
+          key: 'server.components.history.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Workflow state, timers, and transfer task capacity',
+        },
+        {
+          label: 'Matching replicas',
+          key: 'server.components.matching.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Task queue and dispatch capacity',
+        },
+        {
+          label: 'Worker replicas',
+          key: 'server.components.worker.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Temporal system workflow capacity',
+        },
+      ],
+    },
+    {
+      name: 'Database',
+      fields: [
+        {
+          label: 'Database mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'postgresql',
+          options: ['postgresql', 'external'],
+          description: 'Use bundled HelmForge PostgreSQL or an existing service',
+        },
+        {
+          label: 'External host',
+          key: 'database.host',
+          type: 'text',
+          default: '',
+          description: 'Required when database mode is external',
+        },
+        {
+          label: 'Database Secret',
+          key: 'credentials.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret containing the user-password key',
+        },
+        {
+          label: 'PostgreSQL storage',
+          key: 'postgresql.standalone.persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Persistent volume size for bundled PostgreSQL',
+        },
+      ],
+    },
+    {
+      name: 'Exposure',
+      fields: [
+        {
+          label: 'Web UI',
+          key: 'web.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the official Temporal Web UI',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose the Web UI through a conventional Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Render HTTPRoute and GRPCRoute resources',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      fields: [
+        {
+          label: 'PodDisruptionBudgets',
+          key: 'pdb.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable only after increasing component replica counts',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create the Temporal workload policy',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'monitoring.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Requires Prometheus Operator CRDs',
+        },
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Reconcile database credentials with ESO',
+        },
+      ],
+    },
+  ],
   openreplay: [
     {
       name: 'Public endpoint',

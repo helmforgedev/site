@@ -1,0 +1,408 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Temporal Helm Chart for Kubernetes
+description: Production-oriented Temporal Helm chart with separate server roles, PostgreSQL schema automation, External Secrets, observability, and native HTTPRoute and GRPCRoute support.
+---
+
+import DocsTabs from '../../../components/DocsTabs.astro';
+import Callout from '../../../components/Callout.astro';
+
+# Temporal
+
+[Temporal](https://temporal.io/) is a durable execution platform for building
+reliable applications as workflows. The HelmForge chart deploys the Temporal
+control plane, Web UI, schema lifecycle, and either bundled or external
+PostgreSQL using official upstream images.
+
+## Architecture
+
+The chart keeps the four Temporal Server roles separate so each can scale and
+fail independently:
+
+- **Frontend** accepts SDK gRPC requests and is the only server role exposed to clients.
+- **History** owns workflow state, histories, timers, and transfer tasks. It uses an ordered StatefulSet so cluster metadata is established before additional replicas join.
+- **Matching** owns task queues and dispatches work to application Workers.
+- **Worker** executes Temporal's internal workflows. It is not an application Worker.
+- **Web UI** is a separate optional Deployment served over HTTP.
+- **Admin tools** provide the official Temporal CLI for operations and health checks.
+
+The `default` PostgreSQL store contains workflow state. The `visibility` store
+supports workflow listing and search. A schema Job creates or updates both
+stores, and every server workload waits for the exact expected schema versions
+before starting.
+
+<Callout type="warning" title="History shard count is immutable">
+  `server.numHistoryShards` is fixed at 512. Temporal persists this value during initial bootstrap; changing it later is
+  not a supported scaling operation.
+</Callout>
+
+## Key Features
+
+- Temporal Server 1.32.1, admin tools 1.32.1, and Web UI 2.56.0 official images
+- Independently configurable frontend, history, matching, and worker roles
+- HelmForge PostgreSQL dependency with automatic default and visibility database creation
+- External PostgreSQL mode with existing Secret support
+- Native HTTPRoute for the Web UI and GRPCRoute for SDK traffic
+- Conventional Web UI Ingress for compatibility
+- External Secrets Operator resources using the HelmForge items contract
+- Per-role PodDisruptionBudgets, placement, resources, and metrics endpoints
+- Optional NetworkPolicy, ServiceMonitor, and dual-stack Services
+- Native `temporal operator cluster health` Helm and runtime tests
+
+## Installation
+
+**HTTPS repository:**
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm upgrade --install temporal helmforge/temporal \
+  --namespace temporal \
+  --create-namespace
+```
+
+**OCI registry:**
+
+```bash
+helm upgrade --install temporal oci://ghcr.io/helmforgedev/helm/temporal \
+  --namespace temporal \
+  --create-namespace
+```
+
+Verify schema bootstrap and native application health:
+
+```bash
+kubectl -n temporal get pods,jobs
+helm test temporal -n temporal --logs
+kubectl -n temporal exec deployment/temporal-temporal-admin-tools -- \
+  temporal operator cluster health --address temporal-temporal-frontend:7233
+```
+
+## Deployment Patterns
+
+<DocsTabs
+  tabs={[
+    { id: 'simple', label: 'Simple' },
+    { id: 'ha', label: 'Production HA' },
+    { id: 'external', label: 'External PostgreSQL' },
+    { id: 'gateway', label: 'Gateway API' },
+    { id: 'eso', label: 'External Secrets' },
+  ]}
+>
+
+<div data-tab-panel="simple">
+
+The defaults create a single replica of every server role and Web UI with a
+standalone PostgreSQL instance.
+
+```yaml
+web:
+  enabled: true
+
+postgresql:
+  standalone:
+    persistence:
+      size: 20Gi
+```
+
+</div>
+
+<div data-tab-panel="ha">
+
+Size each role from observed traffic. This example enables disruption budgets
+only after increasing replica counts and uses PostgreSQL replication.
+
+```yaml
+server:
+  components:
+    frontend:
+      replicaCount: 3
+    history:
+      replicaCount: 3
+    matching:
+      replicaCount: 3
+    worker:
+      replicaCount: 3
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: temporal
+
+web:
+  replicaCount: 2
+
+pdb:
+  enabled: true
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+
+postgresql:
+  architecture: replication
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+Both databases must already exist. The configured role must be able to create
+and update Temporal tables, and the Secret must contain `user-password`.
+
+```yaml
+database:
+  mode: external
+  host: temporal-postgresql.database.svc
+  port: 5432
+  database: temporal
+  visibilityDatabase: temporal_visibility
+  username: temporal
+
+credentials:
+  existingSecret: temporal-external-database
+
+postgresql:
+  enabled: false
+```
+
+For an already reachable external database, `schema.useHelmHooks: true` can run
+schema updates before the release is installed or upgraded. Do not enable that
+mode with bundled PostgreSQL.
+
+</div>
+
+<div data-tab-panel="gateway">
+
+The chart creates routes, not a shared Gateway. Platform owners retain control
+of listeners, certificates, addresses, policies, and ReferenceGrants.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: ui
+      parentRefs:
+        - name: platform-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - temporal.example.com
+  grpcRoutes:
+    - name: frontend
+      parentRefs:
+        - name: platform-gateway
+          namespace: gateway-system
+          sectionName: temporal-grpc
+      hostnames:
+        - api.temporal.example.com
+```
+
+HTTPRoute defaults to the Web UI on port 8080. GRPCRoute defaults to the
+frontend gRPC service on port 7233, whose backend protocol is declared as h2c.
+
+</div>
+
+<div data-tab-panel="eso">
+
+The ESO controller, store, and remote value remain platform responsibilities.
+The target Secret is shared by Temporal and bundled PostgreSQL.
+
+```yaml
+credentials:
+  existingSecret: temporal-database
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: temporal-database
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        data:
+          - secretKey: user-password
+            remoteRef:
+              key: temporal/database
+              property: password
+          - secretKey: postgres-password
+            remoteRef:
+              key: temporal/database
+              property: password
+```
+
+</div>
+
+</DocsTabs>
+
+## Gateway API and Ingress
+
+The Web UI and SDK endpoint use different protocols and therefore different
+Gateway API kinds. Do not route Temporal SDK traffic through an HTTPRoute.
+Confirm `Accepted=True` and `ResolvedRefs=True` for both route types, then test
+the UI and a real SDK or CLI call through the public listeners.
+
+TLS normally terminates at the Gateway and the controller opens h2c to the
+frontend Service. If individual SDK client certificate identity must reach
+Temporal, design TLSRoute passthrough outside the chart. BackendTLSPolicy and
+controller-specific policy resources can be supplied through `extraManifests`.
+
+Conventional `ingress` values expose only the Web UI. Gateway API and Ingress
+are disabled by default.
+
+## Configuration Reference
+
+### Server and schema
+
+| Value                                            | Default                       | Purpose                                  |
+| ------------------------------------------------ | ----------------------------- | ---------------------------------------- |
+| `server.image.repository`                        | `docker.io/temporalio/server` | Official server image                    |
+| `server.image.tag`                               | `1.32.1`                      | Pinned server release                    |
+| `server.components.<role>.replicaCount`          | `1`                           | Independent role scaling                 |
+| `server.numHistoryShards`                        | `512`                         | Immutable history shard count            |
+| `server.dynamicConfig`                           | `{}`                          | Temporal dynamic configuration           |
+| `server.extraEnv`, `server.extraEnvFrom`         | `[]`                          | Shared server environment additions      |
+| `server.nodeSelector`, `tolerations`, `affinity` | empty                         | Shared scheduling controls               |
+| `server.topologySpreadConstraints`               | `[]`                          | Failure-domain distribution              |
+| `schema.enabled`                                 | `true`                        | Manage both PostgreSQL schemas           |
+| `schema.useHelmHooks`                            | `false`                       | Hook mode for external databases only    |
+| `schema.initialDelaySeconds`                     | `25`                          | Delay before authenticated schema checks |
+
+Each component also exposes `enabled`, `resources`, RPC and membership ports.
+Frontend additionally owns HTTP port 7243. Component ports should normally
+remain at their defaults because the generated configuration, Services, and
+smoke checks are coordinated around them.
+
+### Persistence and credentials
+
+| Value                                    | Default               | Purpose                        |
+| ---------------------------------------- | --------------------- | ------------------------------ |
+| `database.mode`                          | `postgresql`          | Bundled or external PostgreSQL |
+| `database.host`                          | derived               | External database DNS name     |
+| `database.database`                      | `temporal`            | Default store database         |
+| `database.visibilityDatabase`            | `temporal_visibility` | Visibility store database      |
+| `database.username`                      | `temporal`            | Database role                  |
+| `database.maxConns`, `maxIdleConns`      | `20`                  | Per-process pool limits        |
+| `credentials.existingSecret`             | empty                 | Existing credential Secret     |
+| `credentials.passwordKey`                | `user-password`       | Password key in the Secret     |
+| `postgresql.enabled`                     | `true`                | Install HelmForge PostgreSQL   |
+| `postgresql.standalone.persistence.size` | `20Gi`                | Bundled database storage       |
+
+The chart preserves a randomly generated credential Secret when no existing
+Secret is supplied. Back up the databases and credential Secret together.
+
+<Callout type="info" title="PostgreSQL compatibility">
+  The bundled HelmForge dependency currently uses PostgreSQL 18.6, newer than Temporal's published active test matrix
+  through PostgreSQL 16.6. HelmForge validates schema bootstrap and runtime behavior. Use an upstream-tested external
+  PostgreSQL version when formal vendor compatibility is required.
+</Callout>
+
+### Exposure, security, and operations
+
+| Value                                         | Default     | Purpose                                   |
+| --------------------------------------------- | ----------- | ----------------------------------------- |
+| `web.enabled`                                 | `true`      | Deploy the official Web UI                |
+| `adminTools.enabled`                          | `true`      | Deploy CLI tools for operations and tests |
+| `frontendService.type`                        | `ClusterIP` | SDK/API Service type                      |
+| `webService.type`                             | `ClusterIP` | Web UI Service type                       |
+| `ingress.enabled`                             | `false`     | Web UI Ingress                            |
+| `gatewayAPI.enabled`                          | `false`     | HTTPRoute and GRPCRoute gate              |
+| `externalSecrets.enabled`                     | `false`     | ESO resource gate                         |
+| `pdb.enabled`                                 | `false`     | Per-component disruption budgets          |
+| `networkPolicy.enabled`                       | `false`     | Workload NetworkPolicy                    |
+| `networkPolicy.egress.enabled`                | `false`     | Restrictive egress rules                  |
+| `monitoring.serviceMonitor.enabled`           | `false`     | Per-role ServiceMonitor resources         |
+| `serviceAccount.automountServiceAccountToken` | `false`     | Disable token mounting                    |
+| `extraManifests`                              | `[]`        | Additional Kubernetes objects             |
+
+The complete, machine-validated contract is available in the chart's
+[`values.yaml`](https://github.com/helmforgedev/charts/blob/main/charts/temporal/values.yaml)
+and
+[`values.schema.json`](https://github.com/helmforgedev/charts/blob/main/charts/temporal/values.schema.json).
+Use the [playground](/playground) to generate a focused starting values file.
+
+## Observability
+
+Each server role publishes Prometheus metrics on port 9090 through its headless
+Service. Enable ServiceMonitor only after installing the Prometheus Operator
+CRDs. Alert on service and persistence errors, request latency, unavailable
+hosts, task queue latency, and database saturation. Retain the component label
+so frontend, history, matching, and worker can be diagnosed independently.
+
+## Network Policy
+
+The optional NetworkPolicy allows same-namespace Temporal control-plane
+traffic. Restrictive egress can allow DNS and accepts complete additional
+destination and port rules. Add explicit peers for Gateway controllers,
+Prometheus, and external PostgreSQL before enforcement; those topologies are
+cluster-specific and are not guessed by the chart.
+
+## Backup and Upgrade
+
+Back up the default and visibility databases consistently, preserve the
+credential Secret, and record the Temporal version and history shard count.
+Test restoration in an isolated cluster and require native cluster health
+before declaring the backup usable.
+
+For upgrades:
+
+1. Review every skipped Temporal minor release.
+2. Confirm database compatibility and capture a restorable backup.
+3. Apply schema changes before rolling newer server binaries.
+4. Keep server and admin-tools versions aligned.
+5. Confirm effective image tags and digests after rollout.
+6. Run cluster health, UI health, and a representative workflow.
+7. Inspect restarts, events, logs, latency, and persistence failures.
+
+## Security Scan
+
+Security Scan: Kubescape on rendered default manifests.
+
+| Framework |   Score |
+| --------- | ------: |
+| MITRE     | 100.00% |
+| NSA       |  86.25% |
+| SOC 2     |  85.45% |
+| Aggregate |  89.46% |
+
+Kubescape reported no critical failures. The server and Web UI run non-root
+with dropped capabilities and read-only root filesystems. Remaining findings
+primarily concern CPU limits, opt-in NetworkPolicy defaults, and writable
+filesystems required by PostgreSQL and operational images.
+
+## Troubleshooting
+
+### Server workloads remain in init
+
+Inspect the schema Job and query `schema_version` in both databases. Check DNS,
+credentials, ownership, and the expected default and visibility schema
+versions. Do not remove the init gate to make pods appear Ready.
+
+### Frontend is Ready but SDK calls fail
+
+Run native cluster health inside the namespace, inspect EndpointSlices, and
+then debug the Gateway listener and GRPCRoute. TCP readiness alone does not
+prove gRPC acceptance.
+
+### Web UI is healthy but cannot reach Temporal
+
+Inspect the UI `TEMPORAL_ADDRESS`, frontend Service DNS, frontend logs, and
+authorization or TLS settings. `/healthz` proves only that the HTTP process is
+alive.
+
+### Voluntary disruption is blocked
+
+Check PDBs against replica counts. A single-replica component with
+`minAvailable: 1` correctly blocks eviction; add replicas before enabling its
+PDB.
+
+## Additional Resources
+
+- [Temporal self-hosted deployment guide](https://docs.temporal.io/self-hosted-guide/deployment)
+- [Temporal documentation](https://docs.temporal.io/)
+- [Chart source and examples](https://github.com/helmforgedev/charts/tree/main/charts/temporal)
+- [HelmForge charts repository](https://github.com/helmforgedev/charts)

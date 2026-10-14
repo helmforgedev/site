@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Temporal',
+    slug: 'temporal',
+    description:
+      'Durable workflow orchestration with separate server roles, managed PostgreSQL schemas, and native HTTP and gRPC Gateway API routes.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'OpenReplay',
     slug: 'openreplay',
     description: 'Session replay stack with fifteen OSS services, managed migrations and portable Kubernetes exposure.',

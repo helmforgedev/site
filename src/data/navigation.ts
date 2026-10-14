@@ -104,6 +104,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Automation & AI',
     charts: [
+      { label: 'Temporal', href: '/docs/charts/temporal', maturity: 'beta' },
       { label: 'OpenHuman', href: '/docs/charts/openhuman', maturity: 'beta' },
       { label: 'OpenClaw', href: '/docs/charts/openclaw', maturity: 'stable' },
       { label: 'Hermes Agent', href: '/docs/charts/hermes-agent', maturity: 'stable' },
