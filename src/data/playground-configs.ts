@@ -8741,6 +8741,40 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Replica Clone Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'replication.readReplicas.clone.resources.requests.cpu',
+          type: 'text',
+          default: '',
+          description: 'CPU requested while cloning a read replica',
+        },
+        {
+          label: 'Memory Request',
+          key: 'replication.readReplicas.clone.resources.requests.memory',
+          type: 'text',
+          default: '',
+          description: 'Memory requested while cloning a read replica',
+        },
+        {
+          label: 'CPU Limit',
+          key: 'replication.readReplicas.clone.resources.limits.cpu',
+          type: 'text',
+          default: '',
+          description: 'CPU limit for replica cloning',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'replication.readReplicas.clone.resources.limits.memory',
+          type: 'text',
+          default: '',
+          description: 'Memory limit for replica cloning',
+        },
+      ],
+    },
+    {
       name: 'S3 Backup',
       collapsible: true,
       gateField: 'backup.enabled',
