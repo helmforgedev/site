@@ -90,11 +90,19 @@ postgresql:
     database: superset
     username: superset
     password: 'strong-db-password'
+  standalone:
+    persistence:
+      storageClass: fast-storage
+      size: 20Gi
 
 redis:
   enabled: true
   auth:
     password: 'strong-redis-password'
+  standalone:
+    persistence:
+      storageClass: fast-storage
+      size: 8Gi
 
 ingress:
   enabled: true
@@ -315,24 +323,38 @@ ingress:
 
 ### Database
 
-| Parameter                                     | Type    | Default    | Description                                  |
-| --------------------------------------------- | ------- | ---------- | -------------------------------------------- |
-| `database.mode`                               | string  | `subchart` | Mode: `subchart` or `external`.              |
-| `database.external.host`                      | string  | `""`       | External database hostname.                  |
-| `database.external.existingSecret`            | string  | `""`       | Existing secret with database password.      |
-| `database.external.existingSecretPasswordKey` | string  | `password` | Key for the password in the existing secret. |
-| `postgresql.enabled`                          | boolean | `true`     | Deploy the bundled PostgreSQL subchart.      |
-| `postgresql.auth.password`                    | string  | `""`       | Password. Auto-generated if empty.           |
+The bundled PostgreSQL runs in standalone mode. Its PVC is configured under
+`postgresql.standalone.persistence`; leave `storageClass` empty to use the cluster's default StorageClass.
+
+| Parameter                                        | Type    | Default           | Description                                        |
+| ------------------------------------------------ | ------- | ----------------- | -------------------------------------------------- |
+| `database.mode`                                  | string  | `subchart`        | Mode: `subchart` or `external`.                    |
+| `database.external.host`                         | string  | `""`              | External database hostname.                        |
+| `database.external.existingSecret`               | string  | `""`              | Existing secret with database password.            |
+| `database.external.existingSecretPasswordKey`    | string  | `password`        | Key for the password in the existing secret.       |
+| `postgresql.enabled`                             | boolean | `true`            | Deploy the bundled PostgreSQL subchart.            |
+| `postgresql.auth.password`                       | string  | `""`              | Password. Auto-generated if empty.                 |
+| `postgresql.standalone.persistence.enabled`      | boolean | `true`            | Enable the bundled PostgreSQL PVC.                 |
+| `postgresql.standalone.persistence.storageClass` | string  | `""`              | StorageClass name. Empty uses the cluster default. |
+| `postgresql.standalone.persistence.accessModes`  | array   | `[ReadWriteOnce]` | Access modes for the bundled PostgreSQL PVC.       |
+| `postgresql.standalone.persistence.size`         | string  | `8Gi`             | Size of the bundled PostgreSQL PVC.                |
 
 ### Redis
 
-| Parameter                             | Type    | Default    | Description                          |
-| ------------------------------------- | ------- | ---------- | ------------------------------------ |
-| `redisConfig.mode`                    | string  | `subchart` | Mode: `subchart` or `external`.      |
-| `redisConfig.external.host`           | string  | `""`       | External Redis hostname.             |
-| `redisConfig.external.existingSecret` | string  | `""`       | Existing secret with Redis password. |
-| `redis.enabled`                       | boolean | `true`     | Deploy the bundled Redis subchart.   |
-| `redis.auth.password`                 | string  | `""`       | Password. Auto-generated if empty.   |
+The bundled Redis also runs in standalone mode. Its PVC is configured under
+`redis.standalone.persistence`; leave `storageClass` empty to use the cluster's default StorageClass.
+
+| Parameter                                   | Type    | Default           | Description                                        |
+| ------------------------------------------- | ------- | ----------------- | -------------------------------------------------- |
+| `redisConfig.mode`                          | string  | `subchart`        | Mode: `subchart` or `external`.                    |
+| `redisConfig.external.host`                 | string  | `""`              | External Redis hostname.                           |
+| `redisConfig.external.existingSecret`       | string  | `""`              | Existing secret with Redis password.               |
+| `redis.enabled`                             | boolean | `true`            | Deploy the bundled Redis subchart.                 |
+| `redis.auth.password`                       | string  | `""`              | Password. Auto-generated if empty.                 |
+| `redis.standalone.persistence.enabled`      | boolean | `true`            | Enable the bundled Redis PVC.                      |
+| `redis.standalone.persistence.storageClass` | string  | `""`              | StorageClass name. Empty uses the cluster default. |
+| `redis.standalone.persistence.accessModes`  | array   | `[ReadWriteOnce]` | Access modes for the bundled Redis PVC.            |
+| `redis.standalone.persistence.size`         | string  | `8Gi`             | Size of the bundled Redis PVC.                     |
 
 ### Service and Ingress
 

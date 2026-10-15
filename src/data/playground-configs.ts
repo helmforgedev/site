@@ -16662,6 +16662,40 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Bundled Storage',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PostgreSQL Storage Class',
+          key: 'postgresql.standalone.persistence.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Empty selects the cluster default storage class',
+        },
+        {
+          label: 'PostgreSQL Storage Size',
+          key: 'postgresql.standalone.persistence.size',
+          type: 'text',
+          default: '8Gi',
+          description: 'Persistent volume size for bundled PostgreSQL',
+        },
+        {
+          label: 'Redis Storage Class',
+          key: 'redis.standalone.persistence.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Empty selects the cluster default storage class',
+        },
+        {
+          label: 'Redis Storage Size',
+          key: 'redis.standalone.persistence.size',
+          type: 'text',
+          default: '8Gi',
+          description: 'Persistent volume size for bundled Redis',
+        },
+      ],
+    },
+    {
       name: 'Resources',
       collapsible: true,
       fields: [
