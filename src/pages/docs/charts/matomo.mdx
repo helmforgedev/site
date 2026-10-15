@@ -14,6 +14,7 @@ Matomo is a privacy-first web analytics platform. The HelmForge chart deploys th
 - HelmForge MySQL dependency for self-contained deployments
 - External MySQL or MariaDB mode for production databases
 - Persistent `/var/www/html` storage for application files and plugins
+- Automatic synchronization of image code into the persistent application volume
 - CronJob-based Matomo report archiving
 - Ingress, Gateway API HTTPRoute, dual-stack Service fields, NetworkPolicy, PDB, and Helm tests
 - External Secrets Operator support for database credentials
@@ -77,6 +78,18 @@ The chart runs the Apache variant of the official Matomo container as a Deployme
 - `database.mode=external` uses an external MySQL or MariaDB endpoint
 
 For production, prefer a managed or platform-operated MySQL or MariaDB service and keep Matomo application files persistent. The bundled MySQL path is useful for self-contained environments and local validation.
+
+## Upgrades
+
+The official image stores release code under `/usr/src/matomo` and only initializes `/var/www/html` when no installation exists. Because the chart persists `/var/www/html`, the chart enables `persistence.codeSync` by default. A `sync-matomo-code` init container copies image-managed files into the PVC before the web container starts, while retaining PVC-only configuration, marketplace plugins, and user content.
+
+Back up the database and application PVC before changing `image.tag`. After the new web pod starts, apply required database migrations during a maintenance window:
+
+```bash
+kubectl exec deploy/matomo -- php /var/www/html/console core:update --yes --no-interaction
+```
+
+Set `persistence.codeSync.enabled=false` only when another process manages the application code in the PVC.
 
 ## Production Values
 
@@ -142,6 +155,10 @@ archiver:
 ```
 
 Set `matomo.siteUrl` to the public URL used by visitors. When it is empty, the chart derives an in-cluster service URL for the archiver.
+
+Before the web installer creates `config/config.ini.php`, scheduled archive runs exit successfully without doing work. Normal `core:archive` execution begins after Matomo is configured.
+
+The CronJob mounts the same application volume as the web pod. For the default ReadWriteOnce PVC, `archiver.sameNodeAsMatomo=true` applies required pod affinity so the archiver runs on a node that already hosts a Matomo web pod. Disable it for storage that can be mounted across nodes, or use `archiver.affinity`, `archiver.nodeSelector`, and `archiver.tolerations` for custom scheduling.
 
 ## Backups
 
@@ -258,25 +275,31 @@ Also validate the Matomo installer, tracking endpoint, archive job completion, d
 
 ## Values
 
-| Parameter                 | Default                    | Description                                                |
-| ------------------------- | -------------------------- | ---------------------------------------------------------- |
-| `image.repository`        | `docker.io/library/matomo` | Official Matomo image repository.                          |
-| `image.tag`               | `5.14.0-apache`            | Official Apache image tag.                                 |
-| `replicaCount`            | `1`                        | Matomo web replica count.                                  |
-| `matomo.siteUrl`          | `""`                       | Public URL used by archiver jobs.                          |
-| `matomo.trustedHost`      | `""`                       | Trusted host used for redirects behind a reverse proxy.    |
-| `database.mode`           | `auto`                     | Database mode: `auto`, `external`, or `mysql`.             |
-| `mysql.enabled`           | `true`                     | Deploy HelmForge MySQL dependency.                         |
-| `persistence.enabled`     | `true`                     | Persist `/var/www/html`.                                   |
-| `persistence.size`        | `10Gi`                     | Matomo PVC size.                                           |
-| `archiver.enabled`        | `true`                     | Render the `core:archive` CronJob.                         |
-| `archiver.schedule`       | `5 * * * *`                | Archive CronJob schedule.                                  |
-| `ingress.enabled`         | `false`                    | Render Ingress.                                            |
-| `gatewayAPI.enabled`      | `false`                    | Render Gateway API HTTPRoute resources.                    |
-| `externalSecrets.enabled` | `false`                    | Render ExternalSecret resources.                           |
-| `networkPolicy.enabled`   | `false`                    | Render NetworkPolicy.                                      |
-| `service.ipFamilyPolicy`  | `""`                       | Kubernetes Service IP family policy.                       |
-| `extraManifests`          | `[]`                       | Additional Kubernetes manifests rendered with the release. |
+| Parameter                        | Default                    | Description                                                 |
+| -------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `image.repository`               | `docker.io/library/matomo` | Official Matomo image repository.                           |
+| `image.tag`                      | `5.14.0-apache`            | Official Apache image tag.                                  |
+| `replicaCount`                   | `1`                        | Matomo web replica count.                                   |
+| `matomo.siteUrl`                 | `""`                       | Public URL used by archiver jobs.                           |
+| `matomo.trustedHost`             | `""`                       | Trusted host used for redirects behind a reverse proxy.     |
+| `database.mode`                  | `auto`                     | Database mode: `auto`, `external`, or `mysql`.              |
+| `mysql.enabled`                  | `true`                     | Deploy HelmForge MySQL dependency.                          |
+| `persistence.enabled`            | `true`                     | Persist `/var/www/html`.                                    |
+| `persistence.size`               | `10Gi`                     | Matomo PVC size.                                            |
+| `persistence.codeSync.enabled`   | `true`                     | Synchronize image code into the application PVC on startup. |
+| `persistence.codeSync.resources` | `{}`                       | Resources for the code synchronization init container.      |
+| `archiver.enabled`               | `true`                     | Render the `core:archive` CronJob.                          |
+| `archiver.schedule`              | `5 * * * *`                | Archive CronJob schedule.                                   |
+| `archiver.sameNodeAsMatomo`      | `true`                     | Co-locate archiver and web pods for ReadWriteOnce storage.  |
+| `archiver.nodeSelector`          | `{}`                       | Node selector for archiver pods.                            |
+| `archiver.tolerations`           | `[]`                       | Tolerations for archiver pods.                              |
+| `archiver.affinity`              | `{}`                       | Custom affinity that replaces generated same-node affinity. |
+| `ingress.enabled`                | `false`                    | Render Ingress.                                             |
+| `gatewayAPI.enabled`             | `false`                    | Render Gateway API HTTPRoute resources.                     |
+| `externalSecrets.enabled`        | `false`                    | Render ExternalSecret resources.                            |
+| `networkPolicy.enabled`          | `false`                    | Render NetworkPolicy.                                       |
+| `service.ipFamilyPolicy`         | `""`                       | Kubernetes Service IP family policy.                        |
+| `extraManifests`                 | `[]`                       | Additional Kubernetes manifests rendered with the release.  |
 
 ## Links
 
