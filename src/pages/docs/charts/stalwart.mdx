@@ -1,0 +1,157 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Stalwart Helm Chart for Kubernetes
+description: Production-oriented Stalwart mail server chart with external secrets, guarded HA, declarative configuration, and Gateway API support.
+---
+
+import Callout from '../../../components/Callout.astro';
+
+# Stalwart
+
+[Stalwart](https://stalw.art/) is a mail and collaboration server supporting
+SMTP, IMAP, POP3, JMAP, WebDAV, CalDAV, and CardDAV. The HelmForge chart uses
+the official image and the current Stalwart 0.16 configuration model.
+
+## Key features
+
+- Existing Secret/ConfigMap bootstrap configuration and full env `valueFrom`
+- External Secrets Operator integration without literal credentials
+- Single-node RocksDB/PVC default and fail-fast external-store HA mode
+- StatefulSet identity, automatic HA PDB, anti-affinity, and topology spread
+- Split HTTP and mail Services with custom listener ports and dual stack
+- HTTPRoute, TCPRoute, and TLSRoute behind one disabled-by-default switch
+- Optional official `stalwart-cli apply` Job for an NDJSON management plan
+- Prometheus annotations, optional ServiceMonitor, and extra manifests for VictoriaMetrics
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm upgrade --install stalwart helmforge/stalwart \
+  --namespace stalwart --create-namespace
+```
+
+The chart does not create a default password. Supply the recovery credential
+from an existing Secret and remove it after permanent administration is ready:
+
+```yaml
+extraEnv:
+  - name: STALWART_RECOVERY_ADMIN
+    valueFrom:
+      secretKeyRef:
+        name: stalwart-recovery
+        key: credential
+```
+
+## Configuration model
+
+<Callout type="info" title="DataStore-only bootstrap">
+  In Stalwart 0.16, `config.json` contains exactly one DataStore object. Blob, search and in-memory stores, the
+  Coordinator, listeners, telemetry, domains, and accounts are objects in that DataStore and are managed through the Web
+  UI or `stalwart-cli`.
+</Callout>
+
+Choose a generated DataStore or mount an existing ConfigMap/Secret. Credentials
+inside upstream objects should use their EnvironmentVariable or File variants;
+inject the referenced value through `extraEnv`, `extraEnvFrom`, or a Secret
+mount. Secret values never need to enter the Helm release object.
+
+## HA and external stores
+
+Multiple replicas require `persistence.enabled=false` and an external shared
+DataStore. The chart rejects local RocksDB/SQLite and a local data PVC in that
+mode. Use the CLI plan for shared BlobStore, SearchStore, InMemoryStore,
+Coordinator, roles, and listeners.
+
+| Concern       | Common production choices                           |
+| ------------- | --------------------------------------------------- |
+| DataStore     | PostgreSQL, MySQL/MariaDB, FoundationDB             |
+| BlobStore     | S3-compatible, Azure, shared database               |
+| SearchStore   | Meilisearch, Elasticsearch, shared database         |
+| InMemoryStore | Redis/Valkey, Redis Cluster or Sentinel             |
+| Coordinator   | NATS, Redis, Redis Cluster/Sentinel, Kafka/Redpanda |
+
+The coordinator topic is fixed to `stwt.agora` and must be dedicated to one
+Stalwart cluster. Zenoh peer-to-peer needs a custom build and is not available
+in the standard image. The current S3 object supports a custom endpoint and
+region but does not expose a `pathStyle` property.
+
+## Declarative apply
+
+The optional Job mounts an NDJSON plan from an existing ConfigMap or Secret,
+runs `apply --dry-run`, then applies it with the pinned official CLI image.
+Authentication comes from environment Secret refs. Changes can be activated
+cluster-wide with Stalwart's `Action/ReloadSettings`; a pod restart is normally
+unnecessary. A generic `rolloutTrigger` remains available for exceptional use.
+
+## Gateway API
+
+HTTPRoute targets HTTP/JMAP. TCPRoute exposes plaintext and STARTTLS mail
+protocols. TLSRoute passes implicit TLS through to Stalwart. STARTTLS cannot be
+SNI-routed as TLS because it begins in plaintext. The chart creates routes, not
+a shared Gateway, certificate, or DNS record. Controller support for TCPRoute
+and Experimental CRDs must be confirmed on the target cluster.
+
+Ingress remains available for HTTP only and can coexist with Gateway API.
+
+## Health and graceful shutdown
+
+The official `/healthz/live` and `/healthz/ready` endpoints run on the
+management listener. Readiness proves DataStore initialization, not coordinator
+membership, so HA acceptance must inspect coordinator behavior separately.
+Stalwart drains on SIGTERM; tune `terminationGracePeriodSeconds` for long-lived
+sessions.
+
+## Observability
+
+Enable metrics in Stalwart's database-backed settings, then scrape
+`/metrics/prometheus` on the management port. Use service annotations,
+ServiceMonitor, or `extraManifests` for VMServiceScrape/VMPodScrape without
+coupling the chart to one monitoring operator.
+
+## Backup and upgrade
+
+Back up each external backend with its native consistency and point-in-time
+recovery features. `stalwart-cli snapshot` exports database-backed settings but
+removes secrets by default; it is not a replacement for store backups.
+
+Before upgrades, review upstream changes, capture a restorable backup, keep the
+CLI plan and credentials recoverable, and verify health, SMTP behavior, events,
+logs, and effective image digests after the StatefulSet rolls. StatefulSet
+updates have no Deployment-style surge.
+
+## Security scan
+
+The chart runs as UID/GID 2000 with a read-only root filesystem, RuntimeDefault
+seccomp, and all capabilities dropped except `NET_BIND_SERVICE`. The exception
+is required because the official binary carries a file capability for standard
+mail ports below 1024. Kubescape results are published in the chart README.
+
+## Values overview
+
+| Value                               | Default     | Purpose                                           |
+| ----------------------------------- | ----------- | ------------------------------------------------- |
+| `replicaCount`                      | `1`         | StatefulSet replicas                              |
+| `config.source`                     | `generated` | Generated, existing ConfigMap, or existing Secret |
+| `persistence.enabled`               | `true`      | Per-pod local DataStore PVC                       |
+| `extraEnv`, `extraEnvFrom`          | `[]`        | Plain and Secret/ConfigMap-referenced environment |
+| `extraPorts`                        | `[]`        | Additional named listeners                        |
+| `service.http.type`                 | `ClusterIP` | HTTP/JMAP Service exposure                        |
+| `service.mail.type`                 | `ClusterIP` | Mail protocol Service exposure                    |
+| `gatewayAPI.enabled`                | `false`     | Route master switch                               |
+| `externalSecrets.enabled`           | `false`     | ExternalSecret rendering                          |
+| `applyJob.enabled`                  | `false`     | Declarative CLI plan Job                          |
+| `monitoring.serviceMonitor.enabled` | `false`     | Prometheus Operator integration                   |
+| `networkPolicy.enabled`             | `false`     | NetworkPolicy rendering                           |
+
+The complete validated contract is in
+[`values.yaml`](https://github.com/helmforgedev/charts/blob/main/charts/stalwart/values.yaml)
+and
+[`values.schema.json`](https://github.com/helmforgedev/charts/blob/main/charts/stalwart/values.schema.json).
+
+## Resources
+
+- [Stalwart documentation](https://stalw.art/docs/)
+- [Stalwart clustering](https://stalw.art/docs/cluster/)
+- [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/stalwart)

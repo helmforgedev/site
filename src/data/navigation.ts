@@ -43,6 +43,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Messaging & Streaming',
     charts: [
+      { label: 'Stalwart', href: '/docs/charts/stalwart', maturity: 'beta' },
       { label: 'RabbitMQ', href: '/docs/charts/rabbitmq', maturity: 'stable' },
       { label: 'Kafka', href: '/docs/charts/kafka', maturity: 'stable' },
       { label: 'ZooKeeper', href: '/docs/charts/zookeeper', maturity: 'stable' },

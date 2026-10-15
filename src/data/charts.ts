@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Stalwart',
+    slug: 'stalwart',
+    description:
+      'Mail and collaboration server with external-secret-native configuration, guarded HA and HTTP/TCP/TLS Gateway API routes.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Temporal',
     slug: 'temporal',
     description:

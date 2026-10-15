@@ -8,6 +8,87 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  stalwart: [
+    {
+      name: 'Server',
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'HA requires external shared stores and no local PVC',
+        },
+        {
+          label: 'Stalwart role',
+          key: 'role',
+          type: 'text',
+          default: '',
+          description: 'Database-defined role shared by replicas in this release',
+        },
+        {
+          label: 'Persistent data',
+          key: 'persistence.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Per-pod PVC for the default single-node DataStore',
+        },
+      ],
+    },
+    {
+      name: 'Exposure',
+      fields: [
+        {
+          label: 'Mail Service type',
+          key: 'service.mail.type',
+          type: 'select',
+          default: 'ClusterIP',
+          options: ['ClusterIP', 'LoadBalancer', 'NodePort'],
+          description: 'Kubernetes exposure for SMTP, IMAP, POP3 and ManageSieve',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Expose HTTP/JMAP through a conventional Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Enable configured HTTPRoute, TCPRoute and TLSRoute resources',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      fields: [
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Render ExternalSecret resources from configured items',
+        },
+        {
+          label: 'CLI apply Job',
+          key: 'applyJob.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Apply a mounted declarative Stalwart NDJSON plan',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'monitoring.serviceMonitor.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Requires Prometheus Operator CRDs',
+        },
+      ],
+    },
+  ],
   temporal: [
     {
       name: 'Server topology',
