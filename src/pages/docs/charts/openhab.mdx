@@ -804,13 +804,22 @@ gateway:
 
 ## Upgrade Notes
 
-openHAB `5.2.0` is a stable feature release for the 5.x line. The upstream
-release notes list new add-ons, runtime/UI enhancements, and several breaking
-changes that may require manual action after upgrade. Back up the `userdata`,
-`conf`, and `addons` PVCs before upgrading. Review any affected rules, UI
-layouts, persistence queries, voice IDs, and add-ons before rolling production
-deployments. openHAB 5.x still requires Java 21, which is provided by the
-official container image used by this chart.
+openHAB `5.2.3` includes the security fixes introduced in `5.2.2`, plus fixes
+for authentication through openHAB Cloud and reverse proxies and the Main UI
+map tile provider. Back up the `userdata`, `conf`, and `addons` PVCs before
+upgrading. openHAB 5.x still requires Java 21, which is provided by the official
+container image used by this chart.
+
+This upgrade changes security-sensitive behavior:
+
+- Configure the Sitemap `allowedHosts` setting for every host used through the
+  `/proxy` endpoint; the new allowlist is empty by default.
+- Reassess `trustedNetworks` behind a reverse proxy. It now evaluates the
+  actual client address and no longer trusts `X-Forwarded-For`.
+- Third-party OAuth2 clients using `/auth` must use a same-origin redirect URI
+  and PKCE `S256`.
+- IP Camera binding users whose ONVIF events arrive through NAT or a proxy must
+  add those source addresses to `ipWhitelist`.
 
 ## Troubleshooting
 
