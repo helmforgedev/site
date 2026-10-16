@@ -9,7 +9,7 @@ import Callout from '../../../components/Callout.astro';
 
 # Hoppscotch
 
-Hoppscotch is an open-source API development platform supporting REST, GraphQL, and WebSocket APIs. The HelmForge chart deploys the Community Edition All-in-One image (`2026.8.2`) with subpath-based routing, automatic Prisma migrations, optional OAuth providers, SMTP, ExternalSecrets Operator support, and a bundled HelmForge PostgreSQL subchart.
+Hoppscotch is an open-source API development platform supporting REST, GraphQL, and WebSocket APIs. The HelmForge chart deploys the Community Edition All-in-One image (`2026.9.0`) with subpath-based routing, automatic Prisma migrations, optional OAuth providers, SMTP, ExternalSecrets Operator support, and a bundled HelmForge PostgreSQL subchart.
 
 ## Key Features
 
@@ -35,10 +35,12 @@ Hoppscotch AIO uses subpath-based routing (`ENABLE_SUBPATH_BASED_ACCESS=true`):
 | `/backend` | REST API + GraphQL + WebSocket |
 | `/admin`   | Admin Dashboard                |
 
-All traffic goes through a single Ingress on port 80. Two init containers run before the main container:
+All traffic goes through a single Ingress on port 80 and is forwarded to the non-root AIO listener on port `8081`, configured with upstream's current `HOPP_ALTERNATE_PORT` variable. Four init containers run before the main container:
 
 1. **`wait-for-db`** — polls until PostgreSQL is reachable
 2. **`migrate`** — runs `pnpm exec prisma migrate deploy` to apply schema migrations
+3. **`bootstrap-infra-config`** — initializes the server configuration when needed
+4. **`prepare-runtime-files`** — copies the writable AIO runtime files
 
 ## Prerequisites
 
@@ -155,6 +157,13 @@ Migrations run automatically on each deploy via the `migrate` init container. Fo
 kubectl exec -n hoppscotch deploy/hoppscotch-hoppscotch -- \
   sh -c "pnpm exec prisma migrate deploy"
 ```
+
+### Upgrade to 2026.9.0
+
+Release `2026.9.0` adds the Enterprise Self-Host AI assistant and provider connections, introduces Enterprise Cloud features,
+and updates backend dependencies and Caddy for high-severity vulnerability fixes. Community Edition keeps the same database,
+ports, health endpoint, and migration procedure used by `2026.8.2`. Back up PostgreSQL and keep `DATA_ENCRYPTION_KEY` stable
+before upgrading.
 
 ### Namespace Override
 
@@ -392,7 +401,7 @@ helm test hoppscotch -n hoppscotch
 | -------------------------------- | -------------------------------------------------------- | ---------- |
 | `mode`                           | Chart mode: `dev` or `production`                        | `dev`      |
 | `namespaceOverride`              | Override namespace for chart-managed resources           | `""`       |
-| `image.tag`                      | Hoppscotch image tag                                     | `2026.8.2` |
+| `image.tag`                      | Hoppscotch image tag                                     | `2026.9.0` |
 | `replicaCount`                   | Number of replicas                                       | `1`        |
 | `ingress.enabled`                | Enable Ingress                                           | `false`    |
 | `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs)                | `""`       |
