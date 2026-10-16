@@ -10,7 +10,7 @@ Deploy [Qdrant](https://github.com/qdrant/qdrant) on Kubernetes for semantic sea
 
 ## Overview
 
-The HelmForge Qdrant chart uses the official `docker.io/qdrant/qdrant:v1.19.1` image and deploys a StatefulSet.
+The HelmForge Qdrant chart uses the official `docker.io/qdrant/qdrant:v1.19.2` image and deploys a StatefulSet.
 It exposes HTTP on `6333`, gRPC on `6334`, and the cluster peer port on `6335`.
 
 The default topology is a single persistent pod. Distributed mode is available, but it is guarded because Qdrant clustering requires
@@ -147,6 +147,14 @@ Enable `metrics.serviceMonitor` only when the Prometheus Operator CRDs exist in 
 
 Back up the Qdrant PVC and snapshot directory. For distributed clusters, capture snapshots for all relevant shards and validate restore
 procedures before relying on the backup policy.
+
+## Upgrade Notes
+
+Qdrant `1.19.2` improves sparse-vector upserts, proxy-segment persistence and
+recovery, Raft snapshot concurrency, and several search paths. It also fixes
+possible Gridstore write tearing, unfinished-operation flush consistency, and
+payload-index crash recovery. Internal gRPC now accepts only read-write API
+keys; verify peer credentials before upgrading a distributed deployment.
 
 ## Additional Resources
 
