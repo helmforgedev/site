@@ -12,8 +12,8 @@ Deploy [NetBird](https://github.com/netbirdio/netbird) on Kubernetes as a self-h
 
 The HelmForge NetBird chart follows the current upstream combined self-hosted architecture:
 
-- `netbirdio/netbird-server:0.79.0` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
-- `netbirdio/dashboard:v2.90.3` for the web dashboard
+- `netbirdio/netbird-server:0.80.0` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
+- `netbirdio/dashboard:v2.90.10` for the web dashboard
 - Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
 - HelmForge PostgreSQL subchart as the default production store
 - persistent server data under `/var/lib/netbird`
@@ -34,7 +34,7 @@ Server:
 - `server.config.existingSecret`, `server.config.existingSecretKey`, `server.config.extraYaml`: generated or externally supplied `config.yaml`.
 - `server.auth.issuer`, `server.auth.localAuthDisabled`, `server.auth.signKeyRefreshEnabled`: embedded or external OIDC settings.
 - `server.auth.owner.email`, `server.auth.owner.password`: optional local owner bootstrap.
-- `server.store.engine`, `server.store.dsn`, `server.store.encryptionKey`: legacy direct sqlite, postgres, or mysql store settings.
+- `server.store.engine`, `server.store.dsn`, `server.store.encryptionKey`: legacy direct sqlite, postgres, or mysql store settings. An empty encryption key is generated and preserved in the chart-managed config Secret.
 - `server.service.type`, `server.service.httpPort`, `server.service.stunPort`, `server.service.metricsPort`, `server.service.healthPort`.
 - `server.probes.enabled`: opt-in health probes for environments where first boot completes within the configured timeout.
 
@@ -186,10 +186,18 @@ network. The chart's existing TCP probe policy is unchanged.
 
 ## Upgrade Notes
 
-NetBird `0.79.0` hardens OIDC issuer validation, forwarded-IP trust and reverse
-proxy access control. It also fixes SQLite network-map restoration, relay races
-and expired peer disconnection. Review the
-[0.79.0 release](https://github.com/netbirdio/netbird/releases/tag/v0.79.0).
+NetBird `0.80.0` strengthens account boundaries for agent-network gateways and
+proxy clusters, rejects IdP redirects, revokes embedded IdP sessions after
+password changes, and adds upload and reverse-proxy rate limiting. Management
+also splits its store by table and includes fixes for group-resource validation,
+relay disconnect notifications and forwarded client addresses. Review the
+[0.80.0 release](https://github.com/netbirdio/netbird/releases/tag/v0.80.0).
+
+The chart now generates and preserves `server.store.encryptionKey` in the
+chart-managed config Secret when the value is empty. This base64-encoded 32-byte
+key protects encrypted identity data and must remain stable across pod restarts
+and upgrades. Existing installations that already set an explicit key keep using
+it. Back up the config Secret together with the database and data volume.
 
 An empty `reverseProxy.trustedPeers` trusts forwarded client-IP headers from
 all IPv4 and IPv6 sources. Restrict it to the proxy source CIDR as seen by
@@ -211,9 +219,9 @@ NetBird Reverse Proxy; `server.env` configures the combined server. Configure
 `NB_PROXY_ROSENPASS=false` on that separate proxy if opting out. Test real peers,
 routes and reverse-proxy services in staging before upgrading production.
 
-No chart value migration is introduced by the image update from `0.77.1`. Back up the
-configured database and `/var/lib/netbird`, then apply the new chart defaults
-while preserving your explicit overrides:
+No chart value migration is introduced by the server image update. Back up the
+configured database, config Secret and `/var/lib/netbird`, then apply the new
+chart defaults while preserving your explicit overrides:
 
 ```bash
 helm repo update helmforge
@@ -223,7 +231,7 @@ helm upgrade netbird helmforge/netbird \
 ```
 
 Using `--reuse-values` alone retains the previous image tag and does not deploy
-NetBird `0.79.0`.
+NetBird `0.80.0`.
 
 This v1 hardening release changes the default store from sqlite to PostgreSQL
 subchart mode. Existing sqlite installs that want to keep sqlite must preserve
