@@ -5767,7 +5767,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.568.3-lts-jdk21',
+          default: '2.580.1-lts-jdk21',
           description: 'Pinned Jenkins LTS image tag',
         },
         {

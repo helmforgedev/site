@@ -204,12 +204,16 @@ For Kubernetes agents, keep `rbac.create=true` only in namespaces where Jenkins 
 
 ## Backup And Upgrade Notes
 
-This chart pins Jenkins `2.568.3-lts-jdk21`. Back up `JENKINS_HOME` before plugin, Java, or Jenkins LTS upgrades. Treat plugin upgrades as application changes:
+This chart pins Jenkins `2.580.1-lts-jdk21`. Back up `JENKINS_HOME` before plugin, Java, or Jenkins LTS upgrades. Treat plugin upgrades as application changes:
 review plugin changelogs, test JCasC reloads, and validate representative pipelines before promotion.
 
-Jenkins 2.568.3 fixes core deserialization, request binding, CSRF, session, and
-permission issues covered by the [September 2 security advisory](https://www.jenkins.io/security/advisory/2026-09-02/).
-This image update retains JDK 21 and the existing plugin configuration.
+Jenkins 2.580.1 is the next LTS line after 2.568.3, retains JDK 21, and includes
+the core fixes covered by the [September 2 security advisory](https://www.jenkins.io/security/advisory/2026-09-02/).
+Upgrade installed plugins before the core upgrade. The 2.580.x line removes
+several detached plugins from the WAR; offline controllers may need those
+plugins staged in `JENKINS_HOME/plugins` before startup. Review the official
+[2.580.x upgrade guide](https://www.jenkins.io/doc/upgrade-guide/2.580/) for
+compatibility details.
 
 Avoid changing the controller image and a large plugin set in the same release unless you have a rollback plan for both
 the image and persistent home contents.
@@ -244,7 +248,7 @@ Also validate a real pipeline run if Kubernetes agents, credentials, or network 
 | ---------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
 | `replicaCount`                     | `1`                         | Controller replicas. Keep one unless shared storage and HA behavior are planned. |
 | `image.repository`                 | `docker.io/jenkins/jenkins` | Jenkins controller image.                                                        |
-| `image.tag`                        | `2.568.3-lts-jdk21`         | Pinned Jenkins LTS controller image tag.                                         |
+| `image.tag`                        | `2.580.1-lts-jdk21`         | Pinned Jenkins LTS controller image tag.                                         |
 | `admin.create`                     | `true`                      | Create initial admin credentials.                                                |
 | `admin.existingSecret`             | `""`                        | Existing Secret for initial admin credentials.                                   |
 | `controller.jenkinsUrl`            | `""`                        | Optional Jenkins root URL for JCasC/plugin use.                                  |
