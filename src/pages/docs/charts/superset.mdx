@@ -32,6 +32,7 @@ and a Celery Beat scheduler for cache warming and alerts.
 - **Init Job** — runs `superset db upgrade` and admin creation on every install/upgrade
 - **Bundled PostgreSQL and Redis** — both enabled by default
 - **`superset_config.py` override** — arbitrary Python config via `superset.extraConfig`
+- **Additional Python packages** — optional database drivers shared by web, worker, beat, and init
 - **pg_dump backup** — scheduled PostgreSQL S3 backup CronJob
 
 ## Installation
@@ -61,6 +62,52 @@ helm install superset oci://ghcr.io/helmforgedev/helm/superset -f values.yaml
 
 Review the upstream [Superset 5 update notes](https://github.com/apache/superset/blob/5.0.0/UPDATING.md) and
 [Superset 6 update notes](https://github.com/apache/superset/blob/6.1.0/UPDATING.md) before upgrading production.
+
+## Additional Database Drivers
+
+Use `superset.extraPythonPackages` for development and simpler deployments that need optional Python database drivers.
+Entries accept package names with optional version constraints and are installed consistently in the web, worker, beat,
+and init processes. Pin a version that you have tested:
+
+```yaml
+superset:
+  extraPythonPackages:
+    - clickhouse-connect==0.13.0
+```
+
+For Superset 6.1.0, `clickhouse-connect>=0.13.0` is the recommended ClickHouse driver. Configure the database with a
+`clickhousedb://user:password@host:port/database` SQLAlchemy URI.
+
+<Callout type="warning" title="Runtime package installation depends on the package index">
+  Packages configured through `extraPythonPackages` are downloaded whenever a Superset container starts. For production,
+  build an immutable image with the tested drivers preinstalled, publish it under an immutable tag, and configure that
+  tag through `image.repository` and `image.tag`. Set `superset.installPythonPackages: false` so startup does not access
+  the package index.
+</Callout>
+
+```dockerfile
+FROM apache/superset:6.1.0
+
+USER root
+
+RUN . /app/.venv/bin/activate && \
+    uv pip install psycopg2-binary redis "clickhouse-connect==0.13.0"
+
+USER superset
+```
+
+After publishing the image under an immutable tag, disable runtime package installation:
+
+```yaml
+image:
+  repository: registry.example.com/superset
+  tag: 6.1.0-clickhouse-0.13.0
+
+superset:
+  installPythonPackages: false
+```
+
+The custom image must contain `psycopg2-binary`, `redis`, and every configured extra package.
 
 ## Deployment Examples
 
@@ -288,6 +335,8 @@ ingress:
 | `superset.loadExamples`               | boolean | `false`          | Load example dashboards during init (use for demos only).               |
 | `superset.extraConfig`                | string  | `""`             | Extra Python appended to `superset_config.py` (OAuth, cache, features). |
 | `superset.extraEnv`                   | array   | `[]`             | Extra environment variables for all Superset containers.                |
+| `superset.installPythonPackages`      | boolean | `true`           | Install Python dependencies when each Superset process starts.          |
+| `superset.extraPythonPackages`        | array   | `[]`             | Additional Python packages installed in every Superset process.         |
 
 ### Web Server
 
