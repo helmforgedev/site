@@ -10,7 +10,7 @@ Apache ZooKeeper provides distributed coordination for cloud applications. The H
 
 ## Key Features
 
-- Official `docker.io/library/zookeeper` image pinned to `3.9.5`
+- Official `docker.io/library/zookeeper` image pinned to `3.9.6`
 - Three-node replicated ensemble by default
 - Validation against accidental even replica counts
 - Client, headless, secure client, and metrics Services
@@ -61,6 +61,17 @@ metrics:
 ## Operations
 
 Keep production replica counts odd. Use `allowEvenReplicas=true` only for a deliberate platform-specific reason. Enable NetworkPolicy and explicitly allow client, quorum, DNS, and metrics flows.
+
+### Upgrading to 3.9.6
+
+ZooKeeper 3.9.6 is a bug-fix and security release. It updates Netty dependencies, prevents keystore and truststore
+passwords from being written to INFO logs, and includes fixes for TLS/FIPS startup, Kerberos and C client resource
+leaks, Netty shutdown, and CLI exit behavior. Review the upstream release notes before upgrading security-sensitive
+or TLS-enabled ensembles.
+
+Use Helm's normal rolling StatefulSet upgrade and verify quorum health before and after the rollout. The chart's
+stateful upgrade validation preserved a native znode across a three-member 3.9.5 to 3.9.6 upgrade with zero container
+restarts.
 
 ## Architecture
 
@@ -244,6 +255,7 @@ with the PDB enabled.
 | `replicaCount`                | `3`                           | ZooKeeper ensemble size.                              |
 | `allowEvenReplicas`           | `false`                       | Allow even replica counts.                            |
 | `image.repository`            | `docker.io/library/zookeeper` | Official ZooKeeper image.                             |
+| `image.tag`                   | `3.9.6`                       | Pinned ZooKeeper image tag.                           |
 | `zookeeper.clientPort`        | `2181`                        | Plain client port.                                    |
 | `auth.client.enabled`         | `false`                       | Enable SASL/Digest client authentication.             |
 | `tls.client.enabled`          | `false`                       | Enable secure client port with existing JKS material. |
@@ -257,5 +269,6 @@ with the PDB enabled.
 ## Links
 
 - [Apache ZooKeeper](https://zookeeper.apache.org)
+- [ZooKeeper 3.9.6 release notes](https://zookeeper.apache.org/doc/r3.9.6/releasenotes.html)
 - [Official image](https://hub.docker.com/_/zookeeper)
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/zookeeper)
