@@ -40,7 +40,7 @@ horizontal scalability.
 - **WiredTiger tuning** — custom `mongod.conf` via `config` block
 - **Prometheus exporter** — `percona/mongodb_exporter` sidecar with ServiceMonitor
 - **`mongodump` backup** — scheduled S3 backup CronJob
-- **Pinned upstream image** — official MongoDB `8.3.11` patch release
+- **Pinned upstream image** — official MongoDB `9.0.2` patch release
 
 ## Installation
 
@@ -228,7 +228,7 @@ config:
 | Parameter          | Type   | Default                   | Description    |
 | ------------------ | ------ | ------------------------- | -------------- |
 | `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
-| `image.tag`        | string | `"8.3.11"`                | Image tag.     |
+| `image.tag`        | string | `"9.0.2"`                 | Image tag.     |
 
 ### Authentication
 
@@ -331,12 +331,14 @@ Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
 
 ## Upgrade Notes
 
-MongoDB `8.3.11` is a patch within the `8.3` release line. Review the
-[MongoDB 8.3 release notes](https://www.mongodb.com/docs/manual/release-notes/8.3/)
-before upgrading production clusters, take a backup, and verify existing PVC
-data files are compatible with the target `mongod` version. Keep replica set
-keyFiles and root credentials stable across `helm upgrade`; rotate them with
-MongoDB administrative commands instead of changing chart values.
+MongoDB `9.0.2` is a patch in the `9.0` rapid-release line. Before upgrading
+from `8.3`, take a tested backup and confirm every member reports
+`featureCompatibilityVersion: "8.3"`. Follow the topology-specific upstream
+procedure, then raise FCV to `9.0` only after all members are healthy and
+rollback is no longer required. Review the
+[MongoDB 9.0 release notes](https://www.mongodb.com/docs/manual/release-notes/9.0/).
+Keep replica set keyFiles and root credentials stable across `helm upgrade`;
+rotate them with MongoDB administrative commands instead of changing chart values.
 
 <Callout type="warning" title="Switching from standalone to replicaset requires a full dump and restore">
   MongoDB cannot automatically convert a standalone instance to a replica set with data. You must:
