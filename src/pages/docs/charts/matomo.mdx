@@ -83,6 +83,8 @@ For production, prefer a managed or platform-operated MySQL or MariaDB service a
 
 The official image stores release code under `/usr/src/matomo` and only initializes `/var/www/html` when no installation exists. Because the chart persists `/var/www/html`, the chart enables `persistence.codeSync` by default. A `sync-matomo-code` init container copies image-managed files into the PVC before the web container starts, while retaining PVC-only configuration, marketplace plugins, and user content.
 
+The sync preserves metadata on directories that already exist in the volume and does not archive the source directory entry itself. Images running as a non-root UID can therefore synchronize code when `podSecurityContext.fsGroup` makes the volume writable, without needing permission to change the mode or timestamps of the volume root.
+
 The Deployment defaults to `updateStrategy.type=Recreate`, stopping the old web pod before the new init container changes files on the shared volume. Plan a brief maintenance window for image upgrades. Override this only when no serving pod shares application files with the synchronizing pod.
 
 Back up the database and application PVC before changing `image.tag`. After the new web pod starts, apply required database migrations during a maintenance window:
