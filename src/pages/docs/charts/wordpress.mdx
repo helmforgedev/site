@@ -12,18 +12,28 @@ import WordPressDiagram from '../../../components/diagrams/WordPressDiagram.astr
 # WordPress
 
 Deploy [WordPress](https://wordpress.org/) on Kubernetes with the official
-`docker.io/library/wordpress:7.1.2-apache` image. The chart keeps the default install useful for
+`docker.io/library/wordpress:7.1.3-apache` image. The chart keeps the default install useful for
 development while exposing explicit production controls for database selection, secrets, routing,
 storage, backup, network policy, metrics, WordPress cron, WP-CLI bootstrap, plugin installation, and object cache.
 
-The chart pins WordPress `7.1.2`, a security release that fixes a critical
-vulnerability. Review the
-[official WordPress 7.1.2 release](https://wordpress.org/news/2026/09/wordpress-7-1-2-release/)
-before upgrading production installations.
+The chart pins WordPress `7.1.3`, a maintenance and security release with seven
+security fixes and four bug fixes. The addressed issues include stored XSS,
+denial of service, second-order SQL injection, authorization weaknesses, private
+comment disclosure, unsafe embeds, and hook action-name collisions. Review the
+[official WordPress 7.1.3 release](https://wordpress.org/news/2026/10/wordpress-7-1-3-maintenance-and-security-release/)
+and upgrade production installations promptly.
 
 <Callout type="warning" title="Test plugins and themes before upgrading to WordPress 7.1">
   WordPress 7.1 is a major feature release with editor, media workflow, REST API, and developer-facing changes. Back up
   the database and `wp-content`, then verify plugin and theme compatibility in a non-production environment first.
+</Callout>
+
+<Callout type="info" title="Persistent core files are synchronized during image upgrades">
+  The official image only seeds an empty `/var/www/html`; changing the image tag alone does not replace core files on an
+  existing PVC. The chart's `sync-wordpress-core` init container updates `wp-admin`, `wp-includes`, and core root files
+  while preserving `wp-content`, `wp-config.php`, `.htaccess`, and custom root files. Custom repositories skip
+  synchronization unless `coreSync.allowCustomImage=true`; opt in only if the image retains the official
+  `/usr/src/wordpress` layout and standard shell utilities.
 </Callout>
 
 <Callout type="info" title="Defaults are for fast development, not a full production baseline">
@@ -35,6 +45,7 @@ before upgrading production installations.
 ## Key Features
 
 - **Official image alignment** - uses the upstream WordPress Apache image, with PHP configuration exposed through values.
+- **Persistent core upgrades** - synchronizes image core files into an existing PVC without replacing site content.
 - **Database choices** - HelmForge MySQL subchart by default, or external MySQL/MariaDB through structured values.
 - **Secrets paths** - generated Kubernetes Secrets, existing Secrets, or optional External Secrets Operator resources.
 - **Routing** - classic Ingress and native Gateway API `HTTPRoute`.
@@ -527,16 +538,18 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 
 ### Core and Image
 
-| Parameter          | Type    | Default                       | Description                              |
-| ------------------ | ------- | ----------------------------- | ---------------------------------------- |
-| `nameOverride`     | string  | `""`                          | Override chart name.                     |
-| `fullnameOverride` | string  | `""`                          | Override full release name.              |
-| `commonLabels`     | object  | `{}`                          | Labels added to every rendered resource. |
-| `replicaCount`     | integer | `1`                           | WordPress replicas when HPA is disabled. |
-| `image.repository` | string  | `docker.io/library/wordpress` | WordPress image repository.              |
-| `image.tag`        | string  | `7.1.2-apache`                | Image tag.                               |
-| `image.pullPolicy` | string  | `IfNotPresent`                | Image pull policy.                       |
-| `imagePullSecrets` | array   | `[]`                          | Pull secrets for private registries.     |
+| Parameter                   | Type    | Default                       | Description                                                     |
+| --------------------------- | ------- | ----------------------------- | --------------------------------------------------------------- |
+| `nameOverride`              | string  | `""`                          | Override chart name.                                            |
+| `fullnameOverride`          | string  | `""`                          | Override full release name.                                     |
+| `commonLabels`              | object  | `{}`                          | Labels added to every rendered resource.                        |
+| `replicaCount`              | integer | `1`                           | WordPress replicas when HPA is disabled.                        |
+| `image.repository`          | string  | `docker.io/library/wordpress` | WordPress image repository.                                     |
+| `image.tag`                 | string  | `7.1.3-apache`                | Image tag.                                                      |
+| `image.pullPolicy`          | string  | `IfNotPresent`                | Image pull policy.                                              |
+| `imagePullSecrets`          | array   | `[]`                          | Pull secrets for private registries.                            |
+| `coreSync.enabled`          | boolean | `true`                        | Synchronize image core files into an existing WordPress volume. |
+| `coreSync.allowCustomImage` | boolean | `false`                       | Opt a compatible custom repository into core synchronization.   |
 
 ### WordPress
 
@@ -719,6 +732,7 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 ## More Information
 
 - [WordPress official documentation](https://wordpress.org/documentation/)
+- [WordPress 7.1.3 maintenance and security release](https://wordpress.org/news/2026/10/wordpress-7-1-3-maintenance-and-security-release/)
 - [WordPress Docker image](https://hub.docker.com/_/wordpress)
 - [Redis Object Cache plugin](https://wordpress.org/plugins/redis-cache/)
 - [HelmForge WordPress chart source](https://github.com/helmforgedev/charts/tree/main/charts/wordpress)
