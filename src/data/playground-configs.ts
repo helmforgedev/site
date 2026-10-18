@@ -8,6 +8,108 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  'paperless-ngx': [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'paperless.url',
+          type: 'text',
+          default: '',
+          description: 'Required for CSRF; derived from ingress host when empty',
+        },
+        {
+          label: 'Time zone',
+          key: 'paperless.timeZone',
+          type: 'text',
+          default: 'UTC',
+          description: 'Container time zone',
+        },
+        {
+          label: 'OCR language',
+          key: 'paperless.ocrLanguage',
+          type: 'text',
+          default: 'eng',
+          description: 'For example deu+eng',
+        },
+        {
+          label: 'Create superuser',
+          key: 'paperless.admin.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'Generated password stored in a Secret',
+        },
+      ],
+    },
+    {
+      name: 'Data services',
+      fields: [
+        {
+          label: 'Database mode',
+          key: 'database.mode',
+          type: 'select',
+          default: 'auto',
+          options: ['auto', 'postgresql', 'external', 'sqlite'],
+          description: 'auto picks external, bundled PostgreSQL, or SQLite',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'HelmForge PostgreSQL subchart',
+        },
+        {
+          label: 'Bundled Valkey',
+          key: 'valkey.enabled',
+          type: 'boolean',
+          default: true,
+          description: 'HelmForge Valkey subchart for the task queue',
+        },
+        {
+          label: 'Media volume size',
+          key: 'persistence.media.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Original and archived documents',
+        },
+      ],
+    },
+    {
+      name: 'Extras',
+      fields: [
+        {
+          label: 'Apache Tika',
+          key: 'tika.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Enable together with Gotenberg for Office files and emails',
+        },
+        {
+          label: 'Gotenberg',
+          key: 'gotenberg.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Enable together with Tika',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Expose the web UI through an Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gateway.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Render an HTTPRoute',
+        },
+      ],
+    },
+  ],
   stalwart: [
     {
       name: 'Server',

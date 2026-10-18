@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Paperless-ngx',
+    slug: 'paperless-ngx',
+    description:
+      'Document management with OCR, bundled PostgreSQL and Valkey, persistent media volumes and optional Tika/Gotenberg.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Stalwart',
     slug: 'stalwart',
     description:
