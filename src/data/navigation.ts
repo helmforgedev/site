@@ -208,6 +208,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Archiving & Fitness',
     charts: [
+      { label: 'Paperless-ngx', href: '/docs/charts/paperless-ngx', maturity: 'alpha' },
       { label: 'Wallabag', href: '/docs/charts/wallabag', maturity: 'stable' },
       { label: 'Statistics for Strava', href: '/docs/charts/strava-statistics', maturity: 'stable' },
       { label: 'ArchiveBox', href: '/docs/charts/archivebox', maturity: 'stable' },
