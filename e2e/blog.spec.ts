@@ -11,7 +11,7 @@ test.describe('Blog', () => {
   test('blog index has newsletter and rss subscribe ctas', async ({ page }) => {
     await page.goto('/blog');
 
-    const newsletter = page.locator('a[aria-label="Open newsletter page"]').first();
+    const newsletter = page.getByRole('link', { name: 'Subscribe to Newsletter' }).first();
     await expect(newsletter).toBeVisible();
     await expect(newsletter).toHaveAttribute('href', '/newsletter');
     await expect(newsletter).not.toHaveAttribute('target', '_blank');
@@ -26,8 +26,8 @@ test.describe('Blog', () => {
 
     const actions = page.locator('[aria-label="Blog subscription actions"]');
     await expect(actions).toBeVisible();
-    await expect(actions.locator('a[aria-label="Open newsletter page"]')).toBeVisible();
-    await expect(actions.locator('a[aria-label="Subscribe via RSS"]')).toBeVisible();
+    await expect(actions.getByRole('link', { name: 'Subscribe to Newsletter' })).toBeVisible();
+    await expect(actions.getByRole('link', { name: 'Subscribe via RSS' })).toBeVisible();
   });
 
   test('blog index exposes editorial sections, tags, and calendar', async ({ page }) => {
@@ -133,15 +133,15 @@ test.describe('Blog', () => {
 
     const subscribeSection = page.locator('aside section').filter({ hasText: 'Newsletter and RSS' }).first();
     await expect(subscribeSection).toBeVisible();
-    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute(
+    await expect(subscribeSection.getByRole('link', { name: 'Subscribe to Newsletter' })).toHaveAttribute(
       'href',
       '/newsletter',
     );
-    await expect(subscribeSection.locator('a[aria-label="Open newsletter page"]')).not.toHaveAttribute(
+    await expect(subscribeSection.getByRole('link', { name: 'Subscribe to Newsletter' })).not.toHaveAttribute(
       'target',
       '_blank',
     );
-    await expect(subscribeSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute(
+    await expect(subscribeSection.getByRole('link', { name: 'Subscribe via RSS' })).toHaveAttribute(
       'href',
       '/blog/rss.xml',
     );
@@ -152,9 +152,18 @@ test.describe('Blog', () => {
 
     const ctaSection = page.locator('article section').filter({ hasText: 'Get the next post in your inbox' }).first();
     await expect(ctaSection).toBeVisible();
-    await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).toHaveAttribute('href', '/newsletter');
-    await expect(ctaSection.locator('a[aria-label="Open newsletter page"]')).not.toHaveAttribute('target', '_blank');
-    await expect(ctaSection.locator('a[aria-label="Subscribe via RSS"]')).toHaveAttribute('href', '/blog/rss.xml');
+    await expect(ctaSection.getByRole('link', { name: 'Subscribe to Newsletter' })).toHaveAttribute(
+      'href',
+      '/newsletter',
+    );
+    await expect(ctaSection.getByRole('link', { name: 'Subscribe to Newsletter' })).not.toHaveAttribute(
+      'target',
+      '_blank',
+    );
+    await expect(ctaSection.getByRole('link', { name: 'Subscribe via RSS' })).toHaveAttribute(
+      'href',
+      '/blog/rss.xml',
+    );
   });
 
   test('blog post includes discovery links to charts, related posts, latest posts, and read next', async ({ page }) => {
