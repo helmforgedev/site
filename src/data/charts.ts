@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'Transmute',
+    slug: 'transmute',
+    description:
+      'Self-hosted media converter and queue transcoding with OIDC, External Secrets, and Gateway API support.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Paperless-ngx',
     slug: 'paperless-ngx',
     description:

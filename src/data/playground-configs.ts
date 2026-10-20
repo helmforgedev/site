@@ -8,6 +8,27 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  transmute: [
+    {
+      name: 'Transmute Settings',
+      fields: [
+        {
+          label: 'Queue Concurrency',
+          key: 'config.queueConcurrency',
+          type: 'number',
+          default: 1,
+          description: 'Number of concurrent transcoding jobs',
+        },
+        {
+          label: 'Enable OIDC',
+          key: 'oidc.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Enable Single Sign-On authentication',
+        },
+      ],
+    },
+  ],
   'paperless-ngx': [
     {
       name: 'Application',
