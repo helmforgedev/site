@@ -836,6 +836,130 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  documenso: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'documenso.publicUrl',
+          type: 'text',
+          default: '',
+          description: 'Canonical HTTPS origin used for links and callbacks',
+        },
+        {
+          label: 'Job provider',
+          key: 'documenso.jobsProvider',
+          type: 'select',
+          default: 'local',
+          options: ['local', 'bullmq', 'inngest'],
+          description: 'Use BullMQ and Redis for self-hosted production queues',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Multiple replicas require BullMQ and shared S3 storage',
+        },
+      ],
+    },
+    {
+      name: 'Data services',
+      fields: [
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Deploy the maintained HelmForge PostgreSQL dependency',
+        },
+        {
+          label: 'External PostgreSQL',
+          key: 'database.external.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['postgresql.enabled'],
+          conflictResetValues: { 'postgresql.enabled': 'false' },
+          description: 'Read complete database URLs from an existing Secret',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy Redis for the BullMQ job provider',
+        },
+        {
+          label: 'Document storage',
+          key: 'objectStorage.provider',
+          type: 'select',
+          default: 'database',
+          options: ['database', 's3'],
+          description: 'Store documents in PostgreSQL or S3-compatible storage',
+        },
+      ],
+    },
+    {
+      name: 'Signing and mail',
+      fields: [
+        {
+          label: 'Signing certificate',
+          key: 'certificate.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Mount a PKCS#12 signing certificate from a Secret',
+        },
+        {
+          label: 'SMTP',
+          key: 'smtp.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Configure authenticated transactional email',
+        },
+        {
+          label: 'Gotenberg',
+          key: 'gotenberg.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable external DOCX-to-PDF conversion',
+        },
+      ],
+    },
+    {
+      name: 'Exposure and security',
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Documenso through Kubernetes Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Documenso through HTTPRoute resources',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict ingress and egress to the declared service contract',
+        },
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Materialize application and provider Secrets through ESO',
+        },
+      ],
+    },
+  ],
   ghostfolio: [
     {
       name: 'Application',

@@ -1,0 +1,369 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Documenso Chart
+description: Production-ready electronic signatures with PostgreSQL, BullMQ, S3-compatible storage, immutable identity, External Secrets and hardened networking.
+---
+
+# Documenso
+
+[Documenso](https://documenso.com) is an open-source electronic-signature
+platform. The HelmForge chart deploys the official Documenso v2.21.0 image with
+a maintained PostgreSQL dependency, optional BullMQ/Redis, immutable identity
+keys, signing-certificate support, and production-oriented Kubernetes defaults.
+
+The chart is beta. The official entrypoint applies Prisma migrations during
+startup, and the chart deliberately preserves that supported behavior.
+
+## What this chart provides
+
+- immutable official Linux amd64/arm64 image pinned by manifest digest;
+- HelmForge PostgreSQL and optional HelmForge Redis subcharts;
+- external PostgreSQL, Redis, SMTP, S3, signing, and Gotenberg Secret contracts;
+- local, BullMQ, and Inngest background-job modes;
+- native External Secrets Operator resources;
+- Ingress and Gateway API HTTPRoute exposure;
+- non-root UID/GID 1001, read-only root filesystem, dropped capabilities,
+  runtime-default seccomp, and no mounted API token;
+- product-aware NetworkPolicy, dual-stack Service, and scale-out invariants;
+- application health and certificate-status probes.
+
+The application has no chart-owned PVC. Documents live in PostgreSQL by default
+or in configured S3-compatible object storage.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install documenso helmforge/documenso \
+  --version 1.0.0 \
+  --namespace documenso \
+  --create-namespace
+```
+
+The default is a complete single-replica installation with persistent
+PostgreSQL and database-backed local jobs. Keep public registration protected
+until administration and email delivery have been verified.
+
+## Image provenance and health
+
+The chart pins the official v2.21.0 multi-platform manifest:
+
+```text
+ghcr.io/documenso/documenso@sha256:d9985f66c19c59128f64b1439f057683da0110deb0e518655b97f06e3141f173
+```
+
+Startup and readiness call `/api/health`. TCP liveness deliberately remains
+independent of PostgreSQL so a database outage does not trigger a restart
+storm. `/api/certificate-status` provides signing diagnostics.
+
+## Protect application identity
+
+Documenso requires stable NextAuth and encryption keys. The default Secret is
+generated once and retained with Helm cluster lookup. GitOps deployments should
+supply an existing Secret because offline renderers cannot perform that lookup:
+
+```yaml
+documenso:
+  existingSecret: documenso-identity
+  nextAuthSecretKey: nextauth-secret
+  encryptionKeyKey: encryption-key
+  encryptionSecondaryKeyKey: encryption-secondary-key
+```
+
+Back up this Secret. Rotating encryption keys without an application migration
+can make stored values unreadable.
+
+## Configure production signing and email
+
+Store a PKCS#12 certificate and passphrase in a Secret:
+
+```yaml
+certificate:
+  enabled: true
+  existingSecret: documenso-signing
+  fileKey: signing-certificate.p12
+  passphraseKey: passphrase
+
+smtp:
+  enabled: true
+  host: smtp.example.com
+  port: 587
+  existingSecret: documenso-smtp
+```
+
+The certificate mounts read-only. SMTP username and password are read from the
+configured Secret keys and never copied into a ConfigMap.
+
+## Scale with BullMQ and S3
+
+Multiple replicas require a shared job queue and document store. The chart
+rejects unsafe combinations:
+
+```yaml
+replicaCount: 2
+
+documenso:
+  jobsProvider: bullmq
+
+redis:
+  enabled: true
+
+objectStorage:
+  provider: s3
+  s3:
+    bucket: signed-documents
+    region: us-east-1
+    endpoint: https://s3.example.com
+    forcePathStyle: true
+    existingSecret: documenso-s3
+```
+
+For production, managed PostgreSQL, Redis, and object storage provide stronger
+availability and recovery guarantees than in-cluster standalone dependencies.
+
+## Use external PostgreSQL and Redis
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  external:
+    enabled: true
+    host: postgres.database.svc
+    port: 5432
+    existingSecret: documenso-database
+    urlKey: database-url
+    directUrlEnabled: true
+    directUrlKey: direct-database-url
+
+documenso:
+  jobsProvider: bullmq
+redis:
+  enabled: false
+  external:
+    enabled: true
+    host: redis.cache.svc
+    port: 6379
+    existingSecret: documenso-redis
+```
+
+The database Secret contains complete URL-encoded connection URLs. The direct
+URL lets Prisma migrations bypass a pooler. Host and port remain separate for
+dependency waiting and NetworkPolicy.
+
+## External Secrets
+
+The canonical `items[]` contract can materialize every Secret used by the
+chart:
+
+```yaml
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - fullnameOverride: documenso-identity
+      spec:
+        secretStoreRef:
+          name: production
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        dataFrom:
+          - extract:
+              key: documenso/identity
+
+documenso:
+  existingSecret: documenso-identity
+```
+
+Each item accepts a complete native ExternalSecret `spec`. A default target
+name and refresh interval are injected when omitted.
+
+## Expose the application
+
+Ingress and Gateway API are opt-in and mutually exclusive. Set
+`documenso.publicUrl` explicitly in production:
+
+```yaml
+documenso:
+  publicUrl: https://sign.example.com
+
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: web
+      parentRefs:
+        - name: public
+          namespace: gateway-system
+      hostnames:
+        - sign.example.com
+```
+
+NetworkPolicy allows namespace-local HTTP ingress, DNS, declared state
+services, and public HTTP/HTTPS while excluding private address ranges. Add
+explicit egress rules for private SMTP, S3, Gotenberg, OAuth, or webhook
+destinations.
+
+## Backup and restore
+
+Protect PostgreSQL, the S3 bucket when enabled, application identity, signing
+certificate, and integration Secrets as one recovery set. Preserve Redis too
+when in-flight BullMQ jobs must survive.
+
+Before upgrades, restore the backup into an isolated namespace with the same
+application image, then verify health, login, document access, and signing. The
+upstream entrypoint runs Prisma migrations, so an image-only rollback cannot
+reverse database schema changes.
+
+## Values
+
+### Application and image
+
+| Value                                 | Default                       | Purpose                                 |
+| ------------------------------------- | ----------------------------- | --------------------------------------- |
+| `nameOverride`                        | `""`                          | Override chart resource names           |
+| `fullnameOverride`                    | `""`                          | Override the full release name          |
+| `commonLabels`                        | `{}`                          | Labels applied to chart-owned resources |
+| `replicaCount`                        | `1`                           | Application replicas                    |
+| `image.repository`                    | `ghcr.io/documenso/documenso` | Official repository                     |
+| `image.tag`                           | `v2.21.0`                     | Reviewed upstream release               |
+| `image.digest`                        | pinned SHA-256                | Immutable manifest                      |
+| `image.pullPolicy`                    | `IfNotPresent`                | Image pull behavior                     |
+| `imagePullSecrets`                    | `[]`                          | Private registry credentials            |
+| `documenso.publicUrl`                 | derived                       | Canonical public origin                 |
+| `documenso.mailFromAddress`           | `noreply@example.com`         | Transactional sender address            |
+| `documenso.mailFromName`              | `Documenso`                   | Transactional sender name               |
+| `documenso.jobsProvider`              | `local`                       | `local`, `bullmq`, or `inngest`         |
+| `documenso.existingSecret`            | `""`                          | Stable application identity             |
+| `documenso.nextAuthSecretKey`         | `nextauth-secret`             | NextAuth Secret key                     |
+| `documenso.encryptionKeyKey`          | `encryption-key`              | Primary encryption key                  |
+| `documenso.encryptionSecondaryKeyKey` | `encryption-secondary-key`    | Secondary encryption key                |
+| `documenso.extraEnv`                  | `[]`                          | Advanced environment entries            |
+| `documenso.extraEnvFrom`              | `[]`                          | Additional environment sources          |
+
+### Data services
+
+| Value                                       | Default               | Purpose                           |
+| ------------------------------------------- | --------------------- | --------------------------------- |
+| `database.external.enabled`                 | `false`               | Use managed PostgreSQL            |
+| `database.external.existingSecret`          | `""`                  | Complete database URLs            |
+| `database.external.urlKey`                  | `database-url`        | Pooled URL key                    |
+| `database.external.directUrlKey`            | `direct-database-url` | Direct migration URL key          |
+| `database.external.directUrlEnabled`        | `false`               | Consume direct URL                |
+| `database.external.host`                    | `""`                  | Wait and policy host              |
+| `database.external.port`                    | `5432`                | PostgreSQL port                   |
+| `database.external.networkPolicyPeers`      | `[]`                  | Private PostgreSQL peers          |
+| `postgresql.enabled`                        | `true`                | Deploy HelmForge PostgreSQL       |
+| `postgresql.architecture`                   | `standalone`          | PostgreSQL topology               |
+| `postgresql.auth.database`                  | `documenso`           | Application database              |
+| `postgresql.auth.username`                  | `documenso`           | Application user                  |
+| `postgresql.auth.password`                  | `""`                  | Generated application password    |
+| `postgresql.auth.postgresPassword`          | `""`                  | Generated administrator password  |
+| `postgresql.standalone.persistence.enabled` | `true`                | Persist database state            |
+| `postgresql.standalone.persistence.size`    | `8Gi`                 | Database PVC size                 |
+| `postgresql.standalone.resources`           | requests and limits   | Database compute                  |
+| `redis.enabled`                             | `false`               | Deploy HelmForge Redis for BullMQ |
+| `redis.architecture`                        | `standalone`          | Redis topology                    |
+| `redis.auth.enabled`                        | `true`                | Require Redis password            |
+| `redis.auth.password`                       | `""`                  | Generated Redis password          |
+| `redis.standalone.persistence.enabled`      | `true`                | Persist queued jobs               |
+| `redis.standalone.persistence.size`         | `1Gi`                 | Redis PVC size                    |
+| `redis.standalone.resources`                | requests and limits   | Redis compute                     |
+| `redis.external.enabled`                    | `false`               | Use managed Redis                 |
+| `redis.external.host`                       | `""`                  | Redis host                        |
+| `redis.external.port`                       | `6379`                | Redis port                        |
+| `redis.external.database`                   | `0`                   | Redis logical database            |
+| `redis.external.existingSecret`             | `""`                  | Redis password Secret             |
+| `redis.external.passwordKey`                | `redis-password`      | Redis password key                |
+| `redis.external.networkPolicyPeers`         | `[]`                  | Private Redis peers               |
+
+### Integrations
+
+| Value                             | Default                                                  | Purpose                      |
+| --------------------------------- | -------------------------------------------------------- | ---------------------------- |
+| `smtp.enabled`                    | `false`                                                  | Configure authenticated SMTP |
+| `smtp.host`                       | `""`                                                     | SMTP host                    |
+| `smtp.port`                       | `587`                                                    | SMTP port                    |
+| `smtp.secure`                     | `false`                                                  | Implicit TLS                 |
+| `smtp.existingSecret`             | `""`                                                     | SMTP credentials             |
+| `smtp.usernameKey`                | `username`                                               | Username key                 |
+| `smtp.passwordKey`                | `password`                                               | Password key                 |
+| `objectStorage.provider`          | `database`                                               | `database` or `s3`           |
+| `objectStorage.s3.bucket`         | `""`                                                     | S3 bucket                    |
+| `objectStorage.s3.region`         | `us-east-1`                                              | S3 region                    |
+| `objectStorage.s3.endpoint`       | `""`                                                     | S3-compatible endpoint       |
+| `objectStorage.s3.forcePathStyle` | `false`                                                  | Path-style requests          |
+| `objectStorage.s3.existingSecret` | `""`                                                     | S3 credentials               |
+| `objectStorage.s3.accessKeyKey`   | `access-key`                                             | Access-key field             |
+| `objectStorage.s3.secretKeyKey`   | `secret-key`                                             | Secret-key field             |
+| `certificate.enabled`             | `false`                                                  | Mount local PKCS#12 signing  |
+| `certificate.existingSecret`      | `""`                                                     | Signing Secret               |
+| `certificate.fileKey`             | `signing-certificate.p12`                                | Certificate field            |
+| `certificate.passphraseKey`       | `passphrase`                                             | Passphrase field             |
+| `certificate.mountPath`           | `/var/run/documenso/certificate/signing-certificate.p12` | Certificate mount            |
+| `gotenberg.enabled`               | `false`                                                  | Enable document conversion   |
+| `gotenberg.url`                   | `""`                                                     | Conversion service URL       |
+| `gotenberg.existingSecret`        | `""`                                                     | Basic Auth Secret            |
+| `gotenberg.usernameKey`           | `username`                                               | Username key                 |
+| `gotenberg.passwordKey`           | `password`                                               | Password key                 |
+
+### Exposure, secrets, and operations
+
+| Value                                         | Default             | Purpose                                 |
+| --------------------------------------------- | ------------------- | --------------------------------------- |
+| `externalSecrets.enabled`                     | `false`             | Render ExternalSecrets                  |
+| `externalSecrets.refreshInterval`             | `1h`                | Default synchronization interval        |
+| `externalSecrets.items`                       | `[]`                | Native ExternalSecret definitions       |
+| `serviceAccount.create`                       | `true`              | Create a dedicated account              |
+| `serviceAccount.name`                         | `""`                | Explicit account name                   |
+| `serviceAccount.annotations`                  | `{}`                | Account annotations                     |
+| `serviceAccount.automountServiceAccountToken` | `false`             | Keep API token unmounted                |
+| `service.type`                                | `ClusterIP`         | Service type                            |
+| `service.port`                                | `3000`              | Service port                            |
+| `service.annotations`                         | `{}`                | Service annotations                     |
+| `service.ipFamilyPolicy`                      | `""`                | IP family policy                        |
+| `service.ipFamilies`                          | `[]`                | Ordered IP families                     |
+| `ingress.enabled`                             | `false`             | Render Ingress                          |
+| `ingress.ingressClassName`                    | `""`                | Explicit ingress class                  |
+| `ingress.annotations`                         | `{}`                | Ingress annotations                     |
+| `ingress.hosts`                               | `[]`                | Hosts and paths                         |
+| `ingress.tls`                                 | `[]`                | TLS entries                             |
+| `gatewayAPI.enabled`                          | `false`             | Render HTTPRoutes                       |
+| `gatewayAPI.publicUrlScheme`                  | `https`             | Derived URL scheme                      |
+| `gatewayAPI.httpRoutes`                       | `[]`                | Complete route definitions              |
+| `probes.startup`                              | enabled, 5/5/5/60   | Migration startup budget                |
+| `probes.liveness`                             | enabled, 0/20/5/3   | TCP process health                      |
+| `probes.readiness`                            | enabled, 0/10/5/3   | Application readiness                   |
+| `waitForServices.image`                       | pinned BusyBox      | Dependency waiting image                |
+| `waitForServices.timeoutSeconds`              | `180`               | PostgreSQL/Redis wait budget            |
+| `waitForServices.resources`                   | requests and limits | Init-container compute                  |
+| `resources`                                   | 250m/512Mi request  | Application compute                     |
+| `podSecurityContext`                          | UID/GID 1001        | Pod identity and seccomp                |
+| `securityContext`                             | hardened            | Read-only root and dropped capabilities |
+| `runtimeStorage.sizeLimit`                    | `512Mi`             | Temporary and npm cache limit           |
+| `terminationGracePeriodSeconds`               | `60`                | Graceful shutdown budget                |
+| `networkPolicy.enabled`                       | `true`              | Isolate traffic                         |
+| `networkPolicy.egressIsolation`               | `true`              | Enforce egress rules                    |
+| `networkPolicy.ingressFrom`                   | `[]`                | Allowed ingress peers                   |
+| `networkPolicy.dnsEgress`                     | `[]`                | DNS peers                               |
+| `networkPolicy.allowPublicInternet`           | `true`              | Public HTTP/HTTPS egress                |
+| `networkPolicy.extraEgress`                   | `[]`                | Additional egress rules                 |
+| `podLabels`                                   | `{}`                | Additional pod labels                   |
+| `podAnnotations`                              | `{}`                | Additional pod annotations              |
+| `nodeSelector`                                | `{}`                | Node selection                          |
+| `tolerations`                                 | `[]`                | Pod tolerations                         |
+| `affinity`                                    | `{}`                | Affinity rules                          |
+| `topologySpreadConstraints`                   | `[]`                | Topology spreading                      |
+| `priorityClassName`                           | `""`                | PriorityClass                           |
+| `extraVolumes`                                | `[]`                | Additional volumes                      |
+| `extraVolumeMounts`                           | `[]`                | Additional mounts                       |
+
+## Uninstall
+
+```bash
+helm uninstall documenso --namespace documenso
+```
+
+Confirm that PostgreSQL PVCs and any external object storage are backed up
+before uninstalling.

@@ -97,6 +97,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'Documenso',
+    slug: 'documenso',
+    description:
+      'Electronic signatures with PostgreSQL, BullMQ, S3-compatible storage, immutable identity and hardened networking.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'Ghostfolio',
     slug: 'ghostfolio',
     description:

@@ -161,6 +161,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'phpMyAdmin', href: '/docs/charts/phpmyadmin', maturity: 'stable' },
       { label: 'Discount Bandit', href: '/docs/charts/discount-bandit', maturity: 'stable' },
       { label: 'Ghostfolio', href: '/docs/charts/ghostfolio', maturity: 'beta' },
+      { label: 'Documenso', href: '/docs/charts/documenso', maturity: 'beta' },
     ],
   },
   {
