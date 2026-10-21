@@ -24,7 +24,8 @@ startup, and the chart deliberately preserves that supported behavior.
 - Ingress and Gateway API HTTPRoute exposure;
 - non-root UID/GID 1001, read-only root filesystem, dropped capabilities,
   runtime-default seccomp, and no mounted API token;
-- product-aware NetworkPolicy, dual-stack Service, and scale-out invariants;
+- product-aware NetworkPolicy, dual-stack Service, PodDisruptionBudget, optional
+  autoscaling, and scale-out invariants;
 - application health and certificate-status probes.
 
 The application has no chart-owned PVC. Documents live in PostgreSQL by default
@@ -41,9 +42,10 @@ helm install documenso helmforge/documenso \
   --create-namespace
 ```
 
-The default is a complete single-replica installation with persistent
-PostgreSQL and database-backed local jobs. Keep public registration protected
-until administration and email delivery have been verified.
+The default is a basic single-replica installation with persistent PostgreSQL
+and database-backed local jobs. Configure a PKCS#12 signing certificate before
+using document signatures. Keep public registration protected until
+administration and email delivery have been verified.
 
 ## Image provenance and health
 
@@ -136,6 +138,10 @@ database:
     urlKey: database-url
     directUrlEnabled: true
     directUrlKey: direct-database-url
+    networkPolicyPeers:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: database
 
 documenso:
   jobsProvider: bullmq
@@ -146,6 +152,10 @@ redis:
     host: redis.cache.svc
     port: 6379
     existingSecret: documenso-redis
+    networkPolicyPeers:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: cache
 ```
 
 The database Secret contains complete URL-encoded connection URLs. The direct
@@ -201,9 +211,9 @@ gatewayAPI:
 ```
 
 NetworkPolicy allows namespace-local HTTP ingress, DNS, declared state
-services, and public HTTP/HTTPS while excluding private address ranges. Add
-explicit egress rules for private SMTP, S3, Gotenberg, OAuth, or webhook
-destinations.
+services, public HTTP/HTTPS, and the configured public SMTP port while excluding
+private address ranges. Add explicit egress rules for private SMTP, S3,
+Gotenberg, OAuth, or webhook destinations.
 
 ## Backup and restore
 

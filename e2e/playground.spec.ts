@@ -1,6 +1,30 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Playground', () => {
+  test('documenso keeps generated values inside the chart contract', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="documenso"]').click();
+    const code = page.locator('#playground-code');
+
+    await expect(page.locator('input[data-field-key="replicaCount"]')).toHaveAttribute('max', '1');
+
+    await page.locator('button[data-field-key="database.external.enabled"]').click();
+    await page.locator('input[data-field-key="database.external.host"]').fill('postgres.database.svc');
+    await page.locator('input[data-field-key="database.external.existingSecret"]').fill('documenso-database');
+    await expect(code).toContainText('postgresql.enabled=false');
+    await expect(code).toContainText('database.external.host=postgres.database.svc');
+    await expect(code).toContainText('database.external.existingSecret=documenso-database');
+
+    await page.locator('button[data-field-key="ingress.enabled"]').click();
+    await expect(code).toContainText('ingress.enabled=true');
+    await page.locator('button[data-field-key="gatewayAPI.enabled"]').click();
+    await expect(code).toContainText('gatewayAPI.enabled=true');
+    await expect(code).not.toContainText('ingress.enabled=true');
+    await page.locator('button[data-field-key="ingress.enabled"]').click();
+    await expect(code).toContainText('ingress.enabled=true');
+    await expect(code).not.toContainText('gatewayAPI.enabled=true');
+  });
+
   test('ghostfolio external services disable their bundled dependencies', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="ghostfolio"]').click();
