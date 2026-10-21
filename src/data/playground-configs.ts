@@ -8,6 +8,148 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  docuseal: [
+    {
+      name: 'Application',
+      fields: [
+        {
+          label: 'Public URL',
+          key: 'docuseal.appUrl',
+          type: 'text',
+          default: 'http://docuseal.local',
+          description: 'Canonical browser-visible DocuSeal URL',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          min: 1,
+          max: 10,
+          description: 'Multiple replicas require fully shared state',
+        },
+        {
+          label: 'Existing application Secret',
+          key: 'docuseal.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Stable identity plus optional SMTP and S3 credentials',
+        },
+      ],
+    },
+    {
+      name: 'Database and queue',
+      fields: [
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'true',
+          conflictsWith: ['database.external.enabled'],
+          conflictResetValues: { 'database.external.enabled': 'false' },
+          description: 'Deploy the maintained HelmForge PostgreSQL subchart',
+        },
+        {
+          label: 'External PostgreSQL',
+          key: 'database.external.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['postgresql.enabled'],
+          conflictResetValues: { 'postgresql.enabled': 'false' },
+          description: 'Use a managed PostgreSQL service',
+        },
+        {
+          label: 'PostgreSQL host',
+          key: 'database.external.host',
+          type: 'text',
+          default: '',
+          description: 'External PostgreSQL hostname',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'true',
+          conflictsWith: ['redisExternal.enabled'],
+          conflictResetValues: { 'redisExternal.enabled': 'false' },
+          description: 'Deploy the maintained HelmForge Redis subchart',
+        },
+        {
+          label: 'External Redis',
+          key: 'redisExternal.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['redis.enabled'],
+          conflictResetValues: { 'redis.enabled': 'false' },
+          description: 'Use a managed Redis service',
+        },
+      ],
+    },
+    {
+      name: 'Attachments',
+      fields: [
+        {
+          label: 'Storage backend',
+          key: 'storage.type',
+          type: 'select',
+          default: 'local',
+          options: ['local', 's3'],
+          description: 'Retained local PVC or S3-compatible object storage',
+        },
+        {
+          label: 'PVC size',
+          key: 'storage.persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Capacity for locally stored attachments',
+        },
+        {
+          label: 'S3 bucket',
+          key: 'storage.s3.bucket',
+          type: 'text',
+          default: '',
+          description: 'Bucket used when the S3 backend is selected',
+        },
+      ],
+    },
+    {
+      name: 'Exposure and security',
+      fields: [
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['gatewayAPI.enabled'],
+          conflictResetValues: { 'gatewayAPI.enabled': 'false' },
+          description: 'Expose DocuSeal through Kubernetes Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          conflictsWith: ['ingress.enabled'],
+          conflictResetValues: { 'ingress.enabled': 'false' },
+          description: 'Expose DocuSeal through an HTTPRoute',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict application ingress and dependency egress',
+        },
+        {
+          label: 'External Secrets',
+          key: 'externalSecrets.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Materialize application credentials through ESO',
+        },
+      ],
+    },
+  ],
   transmute: [
     {
       name: 'Transmute Settings',

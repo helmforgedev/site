@@ -1,0 +1,247 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: DocuSeal Chart
+description: Production-ready electronic signatures with PostgreSQL, Redis, durable attachments, External Secrets and hardened networking.
+---
+
+# DocuSeal
+
+[DocuSeal](https://www.docuseal.com) is an open-source electronic-signature
+platform. The HelmForge chart deploys the official DocuSeal 3.3.3 image with
+HelmForge PostgreSQL and Redis, durable attachments, stable application
+identity, and production-oriented Kubernetes defaults.
+
+The chart is stable. Its default topology is a durable single-replica
+installation. Multiple replicas are supported only with external PostgreSQL,
+external Redis, S3-compatible storage, and a stable existing Secret.
+
+## What this chart provides
+
+- official multi-platform image pinned by immutable manifest digest;
+- HelmForge PostgreSQL 2.1.1 and Redis 3.0.3 subcharts;
+- database preparation init container tracked by Pod readiness;
+- retained local attachment PVC or S3-compatible object storage;
+- generated retained identity, existing Secret, and External Secrets modes;
+- Ingress or Gateway API exposure and dual-stack Service support;
+- PodDisruptionBudget for validated multi-replica deployments;
+- UID/GID 2000, read-only root, dropped capabilities, seccomp, and no mounted
+  API token;
+- dependency-aware NetworkPolicy.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install docuseal helmforge/docuseal \
+  --version 1.0.0 \
+  --namespace docuseal \
+  --create-namespace
+```
+
+The default deploys one DocuSeal replica, authenticated PostgreSQL and Redis,
+a retained 10 GiB attachment PVC, and automatically generated identity keys.
+
+## Image provenance
+
+The chart pins the official image manifest verified on 2026-10-21:
+
+```text
+docker.io/docuseal/docuseal@sha256:28d0ca583860e2c73e5b068756023a93a325799a22da1f788355d566865dd051
+```
+
+Review the [upstream project](https://github.com/docusealco/docuseal) and its
+release notes before changing the tag and digest together.
+
+## Configure the public URL
+
+Set the canonical external URL before exposing the service:
+
+```yaml
+docuseal:
+  appUrl: https://signatures.example.com
+  forceSsl: true
+```
+
+Ingress and Gateway API are opt-in and mutually exclusive.
+
+## Preserve application identity
+
+The default chart generates `SECRET_KEY_BASE` and `ENCRYPTION_SECRET`, retains
+their Secret after uninstall, and reuses its existing data during upgrades. A
+production GitOps installation should provide a managed Secret instead:
+
+```yaml
+docuseal:
+  existingSecret: docuseal-production
+  secretKeyBaseKey: secret-key-base
+  encryptionSecretKey: encryption-secret
+```
+
+Back up this Secret separately from Helm. Rotating the encryption value without
+an upstream-supported migration can make stored values unreadable.
+
+## Use external PostgreSQL and Redis
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  external:
+    enabled: true
+    host: postgres.database.svc.cluster.local
+    database: docuseal
+    username: docuseal
+    existingSecret: docuseal-database
+    networkPolicyPeers:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: database
+
+redis:
+  enabled: false
+redisExternal:
+  enabled: true
+  host: redis.cache.svc.cluster.local
+  existingSecret: docuseal-redis
+  networkPolicyPeers:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cache
+```
+
+The database Secret key defaults to `password`; the Redis Secret key defaults
+to `redis-password`. NetworkPolicy requires explicit peers for private external
+services, preventing configurations that render successfully but cannot reach
+their dependencies.
+
+## Scale safely with S3
+
+Shared attachment storage is mandatory when `replicaCount` exceeds one:
+
+```yaml
+replicaCount: 2
+
+storage:
+  type: s3
+  s3:
+    bucket: company-signatures
+    endpoint: https://s3.example.com
+    region: us-east-1
+
+docuseal:
+  existingSecret: docuseal-production
+```
+
+The application Secret must contain `aws-access-key-id` and
+`aws-secret-access-key`. Combine this with external PostgreSQL and Redis. The
+chart rejects partial scale-out because it would create divergent or
+unavailable state.
+
+## Configure External Secrets
+
+```yaml
+docuseal:
+  existingSecret: docuseal-production
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: production-secrets
+    kind: ClusterSecretStore
+  items:
+    - secretKey: secret-key-base
+      remoteRef:
+        key: docuseal
+        property: secret-key-base
+    - secretKey: encryption-secret
+      remoteRef:
+        key: docuseal
+        property: encryption-secret
+```
+
+The chart creates a native ExternalSecret and waits for the normal Kubernetes
+Secret contract used by the application.
+
+## Expose with Ingress
+
+```yaml
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  hosts:
+    - host: signatures.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: signatures-tls
+      hosts:
+        - signatures.example.com
+```
+
+## Expose with Gateway API
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      parentRefs:
+        - name: shared-gateway
+      hostnames:
+        - signatures.example.com
+```
+
+## Health and migrations
+
+Startup, readiness, and liveness probes use the upstream `/up` endpoint on port 3000. Before the application starts, its init container runs `bundle exec rails
+db:prepare` from `/app`; migration success is therefore part of Pod readiness.
+
+## Backup and restore
+
+Treat these as one recovery set:
+
+1. PostgreSQL.
+2. The attachment PVC or S3 bucket.
+3. The application identity Secret.
+4. SMTP, S3, database, and Redis credential Secrets.
+5. Redis where queued work must survive a service loss.
+
+Restore the same chart and image version in an isolated namespace. Verify
+login, existing documents, upload, signing, email, and background processing
+before upgrading.
+
+## Important values
+
+| Value                               | Default | Purpose                                     |
+| ----------------------------------- | ------: | ------------------------------------------- |
+| `image.tag`                         | `3.3.3` | Human-readable upstream release             |
+| `image.digest`                      |  pinned | Immutable official image manifest           |
+| `replicaCount`                      |     `1` | Application replicas                        |
+| `docuseal.existingSecret`           |    `""` | Stable identity and integration credentials |
+| `postgresql.enabled`                |  `true` | HelmForge PostgreSQL subchart               |
+| `redis.enabled`                     |  `true` | HelmForge Redis subchart                    |
+| `storage.type`                      | `local` | Local PVC or S3 attachments                 |
+| `storage.persistence.size`          |  `10Gi` | Attachment PVC capacity                     |
+| `migrations.enabled`                |  `true` | Database preparation init container         |
+| `networkPolicy.enabled`             |  `true` | Restrictive ingress and egress policy       |
+| `networkPolicy.allowPublicInternet` |  `true` | Public web egress excluding private ranges  |
+
+## Validation
+
+The release gate includes strict linting, JSON Schema validation, Helm unit
+tests, kubeconform with real CRD schemas, Artifact Hub lint, Kubescape, and k3d
+installations for default, dual-stack, External Secrets, Ingress, and Gateway
+API scenarios. The runtime smoke checks `/up`, UID 2000, stable identity,
+successful workloads, clean logs, and clean events.
+
+## Known limitations
+
+- Multiple replicas require fully shared state and an existing identity Secret.
+- There is no native Prometheus endpoint documented by upstream, so the chart
+  does not create a misleading ServiceMonitor.
+- Private SMTP and S3 endpoints need installation-specific egress rules.
+
+Use the [interactive playground](/playground) and select DocuSeal to generate a
+starting command, then keep production values under version control.
