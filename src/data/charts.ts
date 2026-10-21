@@ -30,6 +30,13 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'DocuSeal',
+    slug: 'docuseal',
+    description: 'Electronic signatures with PostgreSQL, Redis, durable attachments and production-safe scale-out.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Stalwart',
     slug: 'stalwart',
     description:
