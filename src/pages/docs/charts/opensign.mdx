@@ -1,0 +1,315 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: OpenSign Chart
+description: Production-ready electronic signatures with separate frontend and API workloads, MongoDB, S3-compatible storage, External Secrets and hardened networking.
+---
+
+# OpenSign
+
+[OpenSign](https://www.opensignlabs.com) is an open-source electronic-signature
+platform. The HelmForge chart deploys the official OpenSign v2.41.3 frontend
+and backend with HelmForge MongoDB, durable document storage, stable identity,
+and production-oriented Kubernetes defaults.
+
+The chart is stable. The backend remains a singleton because upstream performs
+migrations during startup; the stateless frontend starts with two replicas and
+can scale independently.
+
+## What this chart provides
+
+- official frontend and backend images pinned by immutable manifest digest;
+- separate frontend and Parse API Deployments, Services, Ingresses, and routes;
+- HelmForge MongoDB 1.8.6 or an external MongoDB URI;
+- retained local document PVC or S3-compatible object storage;
+- generated retained master key, existing Secret, and External Secrets modes;
+- PKCS#12 signing, SMTP, and object-storage credential contracts;
+- frontend HPA and PodDisruptionBudget with a migration-safe singleton backend;
+- non-root UID/GID 1000, read-only roots, dropped capabilities, seccomp, and no
+  mounted API token;
+- component-aware NetworkPolicy and dual-stack Services.
+
+## Install
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install opensign helmforge/opensign \
+  --version 1.0.0 \
+  --namespace opensign \
+  --create-namespace
+```
+
+The default deploys two frontend replicas, one backend, authenticated MongoDB,
+a retained document PVC, and an automatically generated Parse master key.
+
+## Image provenance
+
+Upstream deployment channels are mutable. The chart records the v2.41.3 source
+commit `e5f2c5c0a9f65ec01d8a53e4bf3a390c7ade7bcd` and pins the manifests resolved
+on 2026-10-21:
+
+```text
+docker.io/opensign/opensign@sha256:0ebc230eed21ced0d321a0df887c1a48e9f4bd423c2454fe865a262aec49f99a
+docker.io/opensign/opensignserver@sha256:cadfcaaa20bf40272aed43c91314362c1dac034b2a4651f50e5288d01c2b434d
+```
+
+Review the [official v2.41.3 release](https://github.com/OpenSignLabs/OpenSign/releases/tag/v2.41.3)
+before changing both digests together.
+
+## Configure public URLs
+
+OpenSign needs a browser-visible frontend origin and Parse API URL. The API URL
+must end in `/app`:
+
+```yaml
+config:
+  publicUrl: https://sign.example.com
+  apiUrl: https://sign-api.example.com/app
+```
+
+Use distinct hosts because the backend exposes root-level Parse routes in
+addition to `/app`. Ingress and Gateway API are mutually exclusive.
+
+## Protect identity and signing keys
+
+Production GitOps installations should provide a stable Secret:
+
+```yaml
+secrets:
+  existingSecret: opensign-production
+  masterKeyKey: master-key
+  pfxBase64Key: pfx-base64
+  pfxPassphraseKey: pfx-passphrase
+  smtpPasswordKey: smtp-password
+```
+
+The PFX value contains a base64-encoded PKCS#12 certificate. Configure it and
+its passphrase together. Back up the master key, certificate, and integration
+credentials independently of the Helm release.
+
+## Use S3-compatible storage
+
+```yaml
+storage:
+  type: s3
+  s3:
+    bucket: opensign-documents
+    endpoint: https://s3.example.com
+    baseUrl: https://documents.example.com
+    region: us-east-1
+
+secrets:
+  existingSecret: opensign-production
+```
+
+The public base URL must be reachable by browsers retrieving documents. Grant
+the credentials only the object operations required for the selected bucket.
+
+## Use external MongoDB
+
+```yaml
+mongodb:
+  enabled: false
+externalMongodb:
+  enabled: true
+  existingSecret: opensign-mongodb
+  existingSecretUriKey: mongodb-uri
+  networkPolicyPeers:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: database
+```
+
+The URI should include TLS, replica-set, authentication database, and other
+provider-specific parameters. With NetworkPolicy enabled, declare a precise
+`networkPolicy.extraEgress` rule for private MongoDB endpoints.
+
+## External Secrets
+
+```yaml
+secrets:
+  existingSecret: opensign-production
+
+externalSecrets:
+  enabled: true
+  secretStoreRef:
+    name: production
+    kind: ClusterSecretStore
+  items:
+    - secretKey: master-key
+      remoteRef:
+        key: opensign/production
+        property: master-key
+    - secretKey: pfx-base64
+      remoteRef:
+        key: opensign/production
+        property: pfx-base64
+    - secretKey: pfx-passphrase
+      remoteRef:
+        key: opensign/production
+        property: pfx-passphrase
+```
+
+The required master-key mapping is validated before installation. Add SMTP and
+S3 mappings when those integrations are enabled.
+
+## Availability and upgrades
+
+The frontend defaults to two replicas with a PodDisruptionBudget. Enable HPA
+only when Kubernetes resource metrics are available:
+
+```yaml
+frontend:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+```
+
+The backend deliberately uses one replica and `Recreate` updates. Schedule a
+brief API interruption, back up state first, and do not override this topology
+without upstream evidence that migrations are concurrency-safe.
+
+## Backup and restore
+
+Protect MongoDB, the local PVC or S3 bucket, the master key, signing
+certificate, and integration credentials as one recovery set. Restore the same
+image digests into an isolated namespace and verify login, an existing
+template, upload, signing, download, and email before upgrading production.
+
+## Values
+
+### Application workloads
+
+| Value                                                    | Default                             | Purpose                         |
+| -------------------------------------------------------- | ----------------------------------- | ------------------------------- |
+| `nameOverride`                                           | `""`                                | Override chart resource names   |
+| `fullnameOverride`                                       | `""`                                | Override the full release name  |
+| `commonLabels`                                           | `{}`                                | Labels on chart-owned resources |
+| `frontend.replicaCount`                                  | `2`                                 | Stateless frontend replicas     |
+| `frontend.autoscaling.enabled`                           | `false`                             | Enable frontend HPA             |
+| `frontend.autoscaling.minReplicas`                       | `2`                                 | HPA minimum                     |
+| `frontend.autoscaling.maxReplicas`                       | `5`                                 | HPA maximum                     |
+| `frontend.autoscaling.targetCPUUtilizationPercentage`    | `70`                                | CPU target                      |
+| `frontend.autoscaling.targetMemoryUtilizationPercentage` | `null`                              | Optional memory target          |
+| `frontend.podDisruptionBudget.enabled`                   | `true`                              | Protect voluntary disruptions   |
+| `frontend.podDisruptionBudget.minAvailable`              | `1`                                 | Minimum available frontend pods |
+| `frontend.podDisruptionBudget.maxUnavailable`            | `null`                              | Alternative disruption limit    |
+| `frontend.image.repository`                              | `docker.io/opensign/opensign`       | Official frontend repository    |
+| `frontend.image.digest`                                  | pinned SHA-256                      | Immutable frontend manifest     |
+| `frontend.image.pullPolicy`                              | `IfNotPresent`                      | Frontend pull behavior          |
+| `frontend.resources`                                     | requests and limits                 | Frontend compute                |
+| `frontend.extraEnv`                                      | `[]`                                | Additional frontend environment |
+| `backend.image.repository`                               | `docker.io/opensign/opensignserver` | Official backend repository     |
+| `backend.image.digest`                                   | pinned SHA-256                      | Immutable backend manifest      |
+| `backend.image.pullPolicy`                               | `IfNotPresent`                      | Backend pull behavior           |
+| `backend.resources`                                      | requests and limits                 | Backend compute                 |
+| `backend.extraEnv`                                       | `[]`                                | Additional backend environment  |
+| `imagePullSecrets`                                       | `[]`                                | Registry credentials            |
+| `config.publicUrl`                                       | `http://opensign.local`             | Browser frontend URL            |
+| `config.apiUrl`                                          | `http://api.opensign.local/app`     | Browser Parse URL               |
+| `config.appId`                                           | `opensign`                          | Stable Parse application ID     |
+| `config.appName`                                         | `OpenSign`                          | Email template application name |
+
+### Secrets, mail, and documents
+
+| Value                                     | Default                            | Purpose                       |
+| ----------------------------------------- | ---------------------------------- | ----------------------------- |
+| `secrets.existingSecret`                  | `""`                               | Stable application Secret     |
+| `secrets.masterKeyKey`                    | `master-key`                       | Parse master-key field        |
+| `secrets.masterKey`                       | `""`                               | Generated when empty          |
+| `secrets.pfxBase64Key`                    | `pfx-base64`                       | PKCS#12 field                 |
+| `secrets.pfxBase64`                       | `""`                               | Bootstrap signing certificate |
+| `secrets.pfxPassphraseKey`                | `pfx-passphrase`                   | Certificate passphrase field  |
+| `secrets.pfxPassphrase`                   | `""`                               | Bootstrap passphrase          |
+| `secrets.smtpPasswordKey`                 | `smtp-password`                    | SMTP password field           |
+| `secrets.smtpPassword`                    | `""`                               | Bootstrap SMTP password       |
+| `secrets.objectStorageAccessKeyIdKey`     | `object-storage-access-key-id`     | S3 access-key field           |
+| `secrets.objectStorageAccessKeyId`        | `""`                               | Bootstrap S3 access key       |
+| `secrets.objectStorageSecretAccessKeyKey` | `object-storage-secret-access-key` | S3 secret-key field           |
+| `secrets.objectStorageSecretAccessKey`    | `""`                               | Bootstrap S3 secret key       |
+| `smtp.enabled`                            | `false`                            | Enable SMTP                   |
+| `smtp.host`                               | `""`                               | SMTP host                     |
+| `smtp.port`                               | `587`                              | SMTP port                     |
+| `smtp.username`                           | `""`                               | SMTP user                     |
+| `smtp.fromAddress`                        | `""`                               | Sender address                |
+| `storage.type`                            | `local`                            | `local` or `s3`               |
+| `storage.persistence.enabled`             | `true`                             | Persist local documents       |
+| `storage.persistence.existingClaim`       | `""`                               | Existing document PVC         |
+| `storage.persistence.storageClass`        | `""`                               | StorageClass                  |
+| `storage.persistence.accessModes`         | `[ReadWriteOnce]`                  | PVC access modes              |
+| `storage.persistence.size`                | `10Gi`                             | Document capacity             |
+| `storage.persistence.retain`              | `true`                             | Keep chart-created PVC        |
+| `storage.s3.bucket`                       | `""`                               | Bucket name                   |
+| `storage.s3.endpoint`                     | `""`                               | S3-compatible endpoint        |
+| `storage.s3.baseUrl`                      | `""`                               | Browser document base URL     |
+| `storage.s3.region`                       | `us-east-1`                        | S3 region                     |
+
+### Database, exposure, and operations
+
+| Value                                         | Default                    | Purpose                                 |
+| --------------------------------------------- | -------------------------- | --------------------------------------- |
+| `mongodb.enabled`                             | `true`                     | Deploy HelmForge MongoDB                |
+| `mongodb.architecture`                        | `standalone`               | MongoDB topology                        |
+| `mongodb.auth.enabled`                        | `true`                     | Require authentication                  |
+| `mongodb.auth.rootUser`                       | `root`                     | Administrative user                     |
+| `mongodb.auth.rootPassword`                   | `""`                       | Generated by dependency                 |
+| `mongodb.resources`                           | requests and limits        | Database compute                        |
+| `externalMongodb.enabled`                     | `false`                    | Use external MongoDB                    |
+| `externalMongodb.uri`                         | `""`                       | Bootstrap complete URI                  |
+| `externalMongodb.existingSecret`              | `""`                       | URI Secret                              |
+| `externalMongodb.existingSecretUriKey`        | `mongodb-uri`              | URI Secret field                        |
+| `externalMongodb.port`                        | `27017`                    | External MongoDB policy port            |
+| `externalMongodb.networkPolicyPeers`          | `[]`                       | Allowed private MongoDB peers           |
+| `serviceAccount.create`                       | `true`                     | Create dedicated account                |
+| `serviceAccount.name`                         | `""`                       | Explicit account name                   |
+| `serviceAccount.annotations`                  | `{}`                       | ServiceAccount annotations              |
+| `serviceAccount.automountServiceAccountToken` | `false`                    | Keep API token unmounted                |
+| `service.type`                                | `ClusterIP`                | Service type                            |
+| `service.frontendPort`                        | `80`                       | Frontend Service port                   |
+| `service.backendPort`                         | `8080`                     | API Service port                        |
+| `service.annotations`                         | `{}`                       | Service annotations                     |
+| `service.ipFamilyPolicy`                      | `""`                       | IP family policy                        |
+| `service.ipFamilies`                          | `[]`                       | Ordered IP families                     |
+| `ingress.enabled`                             | `false`                    | Render two Ingresses                    |
+| `ingress.ingressClassName`                    | `traefik`                  | Ingress class                           |
+| `ingress.annotations`                         | `{}`                       | Shared Ingress annotations              |
+| `ingress.frontendHost`                        | `opensign.example.com`     | Frontend host                           |
+| `ingress.apiHost`                             | `api.opensign.example.com` | API host                                |
+| `ingress.tls`                                 | `[]`                       | TLS entries                             |
+| `gateway.enabled`                             | `false`                    | Render two HTTPRoutes                   |
+| `gateway.parentRefs`                          | `[]`                       | Parent Gateway references               |
+| `gateway.frontendHostnames`                   | `[]`                       | Frontend route hosts                    |
+| `gateway.apiHostnames`                        | `[]`                       | API route hosts                         |
+| `probes.frontend`                             | enabled HTTP probes        | Frontend startup/readiness/liveness     |
+| `probes.backend`                              | enabled HTTP probes        | Backend startup/readiness/liveness      |
+| `networkPolicy.enabled`                       | `true`                     | Isolate both components                 |
+| `networkPolicy.extraIngress`                  | `[]`                       | Additional ingress rules                |
+| `networkPolicy.extraEgress`                   | `[]`                       | Additional egress rules                 |
+| `podSecurityContext`                          | UID/GID 1000               | Pod identity and seccomp                |
+| `securityContext`                             | hardened                   | Read-only root and dropped capabilities |
+| `runtimeStorage.sizeLimit`                    | `2Gi`                      | Writable copy-up and temporary capacity |
+| `podLabels`                                   | `{}`                       | Additional pod labels                   |
+| `podAnnotations`                              | `{}`                       | Pod annotations                         |
+| `nodeSelector`                                | `{}`                       | Node selection                          |
+| `tolerations`                                 | `[]`                       | Pod tolerations                         |
+| `affinity`                                    | `{}`                       | Pod affinity                            |
+| `topologySpreadConstraints`                   | `[]`                       | Topology spreading                      |
+| `priorityClassName`                           | `""`                       | PriorityClass                           |
+| `terminationGracePeriodSeconds`               | `60`                       | Graceful shutdown budget                |
+| `externalSecrets.enabled`                     | `false`                    | Render ExternalSecret                   |
+| `externalSecrets.apiVersion`                  | `external-secrets.io/v1`   | ESO API version                         |
+| `externalSecrets.refreshInterval`             | `0`                        | One-time retrieval by default           |
+| `externalSecrets.secretStoreRef`              | empty                      | Secret store name and kind              |
+| `externalSecrets.target.creationPolicy`       | `Owner`                    | Target lifecycle                        |
+| `externalSecrets.items`                       | `[]`                       | Secret-key mappings                     |
+
+## Uninstall
+
+```bash
+helm uninstall opensign --namespace opensign
+```
+
+The chart-created document PVC is retained by default. Confirm MongoDB and
+documents are backed up before removing any retained volume or external bucket.

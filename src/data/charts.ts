@@ -112,6 +112,14 @@ export const charts: Chart[] = [
     backup: false,
   },
   {
+    name: 'OpenSign',
+    slug: 'opensign',
+    description:
+      'Electronic signatures with separate web and API workloads, MongoDB, S3-compatible storage and retained identity.',
+    maturity: 'stable',
+    backup: false,
+  },
+  {
     name: 'Ghostfolio',
     slug: 'ghostfolio',
     description:

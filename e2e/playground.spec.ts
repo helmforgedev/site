@@ -41,6 +41,45 @@ test.describe('Playground', () => {
     await expect(code).not.toContainText('ingress.enabled=true');
   });
 
+  test('opensign keeps database and exposure choices mutually exclusive', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="opensign"]').click();
+    const code = page.locator('#playground-code');
+
+    await expect(page.locator('input[data-field-key="frontend.replicaCount"]')).toHaveAttribute('min', '2');
+
+    await page.locator('button[data-field-key="externalMongodb.enabled"]').click();
+    await page.locator('input[data-field-key="externalMongodb.existingSecret"]').fill('opensign-mongodb');
+    await expect(code).toContainText('mongodb.enabled=false');
+    await expect(code).toContainText('externalMongodb.enabled=true');
+    await expect(code).toContainText('externalMongodb.existingSecret=opensign-mongodb');
+    await expect(code).toContainText('externalMongodb.networkPolicyPeers[0].ipBlock.cidr=192.0.2.10/32');
+
+    await page.locator('button[data-field-key="ingress.enabled"]').click();
+    await expect(code).toContainText('ingress.enabled=true');
+    await page.locator('button[data-field-key="gateway.enabled"]').click();
+    await expect(code).toContainText('gateway.enabled=true');
+    await expect(code).not.toContainText('ingress.enabled=true');
+    await expect(code).toContainText('gateway.parentRefs[0].name=public');
+    await expect(code).toContainText('gateway.frontendHostnames[0]=opensign.example.com');
+    await expect(code).toContainText('gateway.apiHostnames[0]=api.opensign.example.com');
+
+    await page.locator('select[data-field-key="storage.type"]').selectOption('s3');
+    await expect(code).toContainText('storage.s3.bucket=opensign-documents');
+    await expect(code).toContainText('storage.s3.endpoint=https://s3.example.com');
+    await expect(code).toContainText('storage.s3.baseUrl=https://documents.example.com');
+
+    await page.locator('button[data-field-key="smtp.enabled"]').click();
+    await expect(code).toContainText('smtp.host=smtp.example.com');
+    await expect(code).toContainText('smtp.fromAddress=noreply@example.com');
+
+    await page.locator('button[data-field-key="externalSecrets.enabled"]').click();
+    await expect(code).toContainText('secrets.existingSecret=opensign-production');
+    await expect(code).toContainText('externalSecrets.secretStoreRef.name=production');
+    await expect(code).toContainText('externalSecrets.items[0].secretKey=master-key');
+    await expect(code).toContainText('externalSecrets.items[0].remoteRef.key=opensign/master-key');
+  });
+
   test('ghostfolio external services disable their bundled dependencies', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="ghostfolio"]').click();
