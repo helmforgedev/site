@@ -11,19 +11,21 @@ Deploy production-ready Elasticsearch clusters on Kubernetes with a single `clus
 ## Key Features
 
 - **Three cluster profiles** — `dev` (single node), `staging` (1m+2d), `production-ha` (3m+3d+2c) with tuned defaults
-- **Multi-role architecture** — dedicated StatefulSets per role: master, data, coordinating, and optional ingest
+- **Multi-role architecture** — dedicated StatefulSets for master, data, coordinating, and optional hot/warm tiers
 - **Auto heap sizing** — 50% rule applied automatically from container memory limit (max 31 GB)
-- **Split-brain prevention** — validates odd master count, auto-calculates quorum (`minimum_master_nodes`)
+- **Split-brain prevention** — validates an odd master count for multi-node clusters
 - **Data tiers** — optional hot/warm StatefulSets with separate storage classes and ILM routing via `node.attr.data`
 - **Automated S3 backups** — scheduled CronJob with configurable retention and one-click restore
 - **ILM policy templates** — pre-built policies for logs, metrics, and traces with configurable hot→warm→cold→delete phases
-- **Security by default** — X-Pack enabled, auto-generated passwords, cert-manager TLS integration
+- **Profile-aware security** — X-Pack is disabled for dev/staging and enabled for production HA, with generated or external credentials and three TLS sources
 - **Monitoring** — Prometheus exporter sidecar, ServiceMonitor, PrometheusRule (5 alerts), and Grafana dashboards
 - **Optional Kibana** — auto-connected with shared TLS, Ingress support
 - **Namespace override** — place chart-managed namespaced resources in a target namespace when the namespace already exists
 - **Dual-stack Services** — apply IP family policy and families consistently to HTTP and headless Services
 - **Restricted service account defaults** — service account creation is opt-in and token automount stays disabled by default
 - **PodDisruptionBudgets** — node maintenance safety for HA deployments
+- **Authoritative configuration** — one generated `elasticsearch.yml` is mounted in every Elasticsearch node role
+- **Independent ports** — application listeners, client Services, Kibana, and metrics ports can be changed independently
 
 ## Installation
 
@@ -131,7 +133,7 @@ helm install es helmforge/elasticsearch -f production-values.yaml
 | Master heap          | 1 g                    | 2 g       | 2 g                       |
 | Data heap            | —                      | 4 g       | 8 g                       |
 | Master PVC           | 10 Gi                  | 10 Gi     | 20 Gi                     |
-| Data PVC             | — (emptyDir)           | 50 Gi     | 200 Gi                    |
+| Data PVC             | —                      | 50 Gi     | 200 Gi                    |
 | Security (TLS)       | disabled               | disabled  | auto-enabled              |
 | Anti-affinity        | disabled               | disabled  | preferredDuringScheduling |
 | PodDisruptionBudgets | —                      | —         | maxUnavailable: 1         |
@@ -156,6 +158,34 @@ dataTiers:
 ```
 
 When tiers are enabled, the `data` StatefulSet uses `data_content` role (mixed), while hot nodes get `data_hot` and warm nodes get `data_warm`. ILM `allocate` action routes indices automatically based on `node.attr.data`.
+
+## Configuration and port architecture
+
+Version 2 mounts the generated ConfigMap at
+`/usr/share/elasticsearch/config/elasticsearch.yml` in master, data,
+coordinating, hot, and warm nodes. `extraConfig` now changes the running
+Elasticsearch process. Cluster, discovery, security, and listener keys are
+chart-managed and take precedence to keep every role consistent.
+
+```yaml
+containerPorts:
+  http: 19200
+  transport: 19300
+
+service:
+  port: 9200
+
+extraConfig:
+  cluster.routing.allocation.disk.watermark.low: '82%'
+```
+
+`containerPorts.http` and `containerPorts.transport` configure the real
+Elasticsearch listeners. `service.port` is independent and targets the named
+HTTP port. The client Service no longer exposes the inter-node transport port.
+
+Client traffic is sent to coordinating nodes when available, then regular data
+nodes, then a configured hot/warm tier, and finally the all-in-one master node
+in the dev profile. Kibana never matches the Elasticsearch Service selector.
 
 ## Automated Backups (S3)
 
@@ -270,6 +300,9 @@ security:
 ```yaml
 monitoring:
   enabled: true
+  containerPort: 9114
+  service:
+    port: 9114
   serviceMonitor:
     enabled: true # Prometheus Operator ServiceMonitor
     interval: '30s'
@@ -278,6 +311,57 @@ monitoring:
   grafana:
     dashboards: true # 3 Grafana dashboards via ConfigMap
 ```
+
+The metrics Service selects only Elasticsearch node pods. The exporter is
+included consistently on master, data, coordinating, hot, and warm roles.
+
+## External Secrets
+
+```yaml
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  items:
+    - name: credentials
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: Owner
+        data:
+          - secretKey: elastic-password
+            remoteRef:
+              key: elasticsearch
+              property: elastic-password
+          - secretKey: kibana-system-password
+            remoteRef:
+              key: elasticsearch
+              property: kibana-system-password
+```
+
+An item named `credentials` defaults its target to the Secret consumed by
+Elasticsearch and Kibana. External Secrets Operator and its store must already
+exist in the cluster. See the
+[External Secrets Operator documentation](https://external-secrets.io/latest/).
+
+## Gateway API
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      hostnames:
+        - elasticsearch.example.com
+      parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+```
+
+Ingress and HTTPRoute may coexist during migration. The referenced Gateway and
+[Gateway API](https://gateway-api.sigs.k8s.io/) CRDs/controller must already
+exist; this chart creates only the HTTPRoute resources.
 
 **Available alerts:**
 
@@ -301,7 +385,10 @@ monitoring:
 | `namespaceOverride`                           | `""`                        | Override namespace for chart-managed resources           |
 | `clusterProfile`                              | `dev`                       | Cluster preset: `dev`, `staging`, `production-ha`        |
 | `clusterName`                                 | `helmforge-cluster`         | Elasticsearch cluster name                               |
-| `image.tag`                                   | `9.5.3`                     | Elasticsearch version                                    |
+| `image.tag`                                   | `9.5.5`                     | Elasticsearch version                                    |
+| `containerPorts.http`                         | `9200`                      | Elasticsearch HTTP process listener                      |
+| `containerPorts.transport`                    | `9300`                      | Elasticsearch inter-node process listener                |
+| `service.port`                                | `9200`                      | Client-facing HTTP Service port                          |
 | `master.replicaCount`                         | profile-driven              | Number of master-eligible nodes (must be odd)            |
 | `master.heapSize`                             | auto (50% mem)              | JVM heap for master nodes                                |
 | `data.replicaCount`                           | profile-driven              | Number of data nodes                                     |
@@ -316,8 +403,12 @@ monitoring:
 | `dataTiers.hot.enabled`                       | `false`                     | Enable dedicated hot tier nodes                          |
 | `dataTiers.warm.enabled`                      | `false`                     | Enable dedicated warm tier nodes                         |
 | `monitoring.enabled`                          | `false`                     | Enable Prometheus exporter sidecar                       |
+| `monitoring.containerPort`                    | `9114`                      | Prometheus exporter process listener                     |
+| `monitoring.service.port`                     | `9114`                      | Metrics Service port                                     |
 | `kibana.enabled`                              | `false`                     | Deploy optional Kibana                                   |
-| `kibana.image.tag`                            | `9.5.3`                     | Kibana version aligned with Elasticsearch                |
+| `kibana.image.tag`                            | `9.5.5`                     | Kibana version aligned with Elasticsearch                |
+| `kibana.containerPort`                        | `5601`                      | Kibana process listener                                  |
+| `kibana.service.port`                         | `5601`                      | Kibana Service port                                      |
 | `service.ipFamilyPolicy`                      | `null`                      | Service dual-stack policy for HTTP and headless Services |
 | `service.ipFamilies`                          | `[]`                        | Service IP families for HTTP and headless Services       |
 | `serviceAccount.create`                       | `false`                     | Create a dedicated ServiceAccount                        |
@@ -334,7 +425,33 @@ namespaceOverride: search-runtime
 
 ## Upgrade Notes
 
-The chart pins Elasticsearch and Kibana to `9.5.3`. Review the
+### Version 2 migration
+
+Version 2 intentionally removes ambiguous version 1 values:
+
+| Version 1                  | Version 2                  |
+| -------------------------- | -------------------------- |
+| `service.httpPort`         | `service.port`             |
+| `service.transportPort`    | `containerPorts.transport` |
+| fixed HTTP listener `9200` | `containerPorts.http`      |
+| fixed Kibana port `5601`   | `kibana.containerPort`     |
+| fixed exporter port `9114` | `monitoring.containerPort` |
+| `gateway.*`                | `gatewayAPI.httpRoutes[]`  |
+| flat `externalSecrets.*`   | `externalSecrets.items[]`  |
+
+Remove any manual `extraVolumes`/`extraVolumeMounts` workaround that mounts
+`elasticsearch.yml`. The chart now owns that exact file mount. Review all
+`extraConfig` entries before upgrading because they now take effect and trigger
+a rolling restart. The client Service now exposes HTTP only and selects one
+intentional Elasticsearch node role instead of all release pods.
+
+The privileged sysctl init container is disabled by default. Configure
+`vm.max_map_count=262144` on Kubernetes nodes, or explicitly opt in with
+`sysctlInit.enabled=true` where the cluster security policy permits it.
+
+### Elasticsearch 9.5.5
+
+The chart pins Elasticsearch and Kibana to `9.5.5`. Review the
 [upstream Elasticsearch release notes](https://www.elastic.co/docs/release-notes/elasticsearch)
 before upgrading production clusters, take a snapshot backup, and verify
 plugins, ILM policies, and index templates in a staging environment before
@@ -350,10 +467,9 @@ the mounted PEM key, certificate and CA files.
 **Pods stuck in Init — vm.max_map_count:**
 
 ```bash
-# The sysctl init container requires privileged mode
+# Configure vm.max_map_count=262144 on every Kubernetes node
 kubectl describe pod <es-pod> -n <namespace>
-# Check: sysctl -w vm.max_map_count=262144 must succeed
-# Alternative: set on nodes: sysctl -w vm.max_map_count=262144
+# Optional compatibility fallback: --set sysctlInit.enabled=true
 ```
 
 **Cluster health RED after startup:**
