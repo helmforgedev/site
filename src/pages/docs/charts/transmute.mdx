@@ -1,39 +1,279 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Transmute Helm Chart
-description: Production audio and video transcoding and media conversion service with queue management, OIDC and hardware acceleration.
+description: Production Helm chart for the self-hosted Transmute file conversion platform with persistent SQLite storage, OIDC, ESO, Ingress and Gateway API.
 ---
 
 # Transmute
 
-[Official upstream repository](https://github.com/transmute-app/transmute).
-
-Production-ready Helm chart for Transmute, a self-hosted audio and video transcoding and compression service utilizing FFmpeg, Libvips, and hardware acceleration.
+Deploy [Transmute](https://transmute.sh/), a self-hosted file conversion
+platform, with the official pinned image and a production-safe single-writer
+topology. Upstream source and release history are available in the
+[Transmute repository](https://github.com/transmute-app/transmute).
 
 ## Features
 
-- Upstream official image .
-- Non-root UID/GID 1000, read-only root options, dropped capabilities, RuntimeDefault seccomp.
-- External Secrets Operator (ESO) integration with inline credential fallback.
-- Gateway API () and standard Kubernetes Ingress support.
-- Native OpenID Connect (OIDC) Single Sign-On parameters.
-- Persistent queue and storage volume management.
+- Persistent users, jobs, uploads and outputs under `/app/data`.
+- Stable JWT signing key across pod restarts and chart upgrades.
+- Native OIDC with public and optional cluster-internal issuer URLs.
+- Ingress, Gateway API v1 HTTPRoute and IPv4/IPv6 dual-stack Service support.
+- External Secrets Operator resources using complete `items[].spec` definitions.
+- Non-root execution, read-only root filesystem, no Linux capabilities and no
+  mounted ServiceAccount token.
+- Helm connection test using the upstream readiness endpoint.
 
 ## Install
 
-### HTTPS Repository
+### Helm repository
 
-"helmforge" already exists with the same configuration, skipping
-Hang tight while we grab the latest from your chart repositories...
-...Successfully got an update from the "helmforge" chart repository
-Update Complete. ⎈Happy Helming!⎈
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install transmute helmforge/transmute \
+  --namespace transmute --create-namespace
+```
 
-### OCI Registry
+### OCI registry
 
-## Configuration Example
+```bash
+helm install transmute oci://ghcr.io/helmforgedev/helm/transmute \
+  --namespace transmute --create-namespace
+```
 
-## Upstream Resources
+Before enabling Ingress or Gateway API, port-forward the Service privately, open
+`http://127.0.0.1:8080`, and register the first account. On a new volume, that
+first account becomes administrator.
 
-- [GitHub Repository](https://github.com/transmute-app/transmute)
-- [Documentation](https://transmute.sh)
-- [Container Images](https://github.com/transmute-app/transmute/pkgs/container/transmute)
+```bash
+kubectl port-forward service/transmute-transmute 8080:8080 --namespace transmute
+```
+
+## Single-writer design
+
+Transmute stores its database and conversion state locally. For data integrity,
+the chart requires `replicaCount: 1`, requires persistence and uses a `Recreate`
+Deployment strategy. Horizontal replicas are not supported by upstream's SQLite
+architecture. `config.dataDir` must equal `persistence.mountPath` so application
+state cannot be redirected to ephemeral storage.
+
+## OIDC
+
+Register this callback URI with Keycloak, Authentik, Authelia or another
+OpenID Connect provider:
+
+```text
+https://transmute.example.com/api/oidc/callback
+```
+
+```yaml
+config:
+  appUrl: https://transmute.example.com
+
+oidc:
+  enabled: true
+  issuerUrl: https://id.example.com/realms/main
+  internalUrl: http://keycloak.identity.svc/realms/main
+  clientId: transmute
+  clientSecret: replace-me
+  displayName: Company SSO
+  usernameClaim: preferred_username
+  autoCreateUsers: true
+  autoLaunch: false
+```
+
+`internalUrl` is optional and is useful when pods cannot reach the public
+issuer. Transmute derives the callback from `config.appUrl` and requests the
+fixed scopes `openid email profile`.
+
+## External Secrets
+
+Use `auth.existingSecret` to point the Deployment to the Secret produced by ESO:
+
+```yaml
+auth:
+  existingSecret: transmute-auth
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: transmute-auth
+      spec:
+        secretStoreRef:
+          name: platform-secrets
+          kind: ClusterSecretStore
+        target:
+          name: transmute-auth
+          creationPolicy: Owner
+        data:
+          - secretKey: AUTH_SECRET_KEY
+            remoteRef:
+              key: applications/transmute
+              property: auth-secret-key
+          - secretKey: OIDC_CLIENT_SECRET
+            remoteRef:
+              key: applications/transmute
+              property: oidc-client-secret
+```
+
+## Gateway API
+
+The Gateway API controller and parent Gateway must already exist. A route rule
+without `backendRefs` targets the chart Service automatically. Gateway API and
+Ingress may be enabled together.
+
+```yaml
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - transmute.example.com
+```
+
+See the [Gateway API documentation](https://gateway-api.sigs.k8s.io/) for
+controller and Gateway setup.
+
+## Dual-stack networking
+
+Leave the Service IP family values unset to inherit the cluster default, or
+request dual-stack without forcing an unavailable address family:
+
+```yaml
+service:
+  ipFamilyPolicy: PreferDualStack
+```
+
+Explicit `ipFamilies: [IPv4, IPv6]` is intended for clusters configured for
+[IPv4/IPv6 dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/).
+
+## Backup
+
+All durable data is stored on the single PVC. Quiesce application writes and use
+a CSI snapshot or file-level volume backup. Back up the authentication Secret as
+well. The chart does not provide an application-aware online backup job.
+
+## Upgrade to chart v2
+
+Version 2 is a breaking correction of the chart's public contract. Before
+upgrading:
+
+- replace `config.queueConcurrency` with conversion and compression worker
+  concurrency values;
+- replace `config.jobTimeout` with `config.conversionJobStaleAfterMinutes`;
+- replace `auth.enabled` with `config.allowUnauthenticated`;
+- remove `config.storageDir`, `auth.allowRegistration` and `auth.initialAdmin`;
+- replace `oidc.providerUrl` with `oidc.issuerUrl`;
+- set `config.appUrl` instead of `oidc.redirectUri`;
+- replace `oidc.autoRegister` with `oidc.autoCreateUsers`;
+- migrate the legacy ESO fields to `externalSecrets.items[].spec`;
+- ensure the authentication Secret uses `AUTH_SECRET_KEY`;
+- keep one replica and persistent storage enabled.
+
+The old initial administrator, registration, redirect URI, OIDC scope and local
+authentication switches did not correspond to upstream Transmute settings and
+have been removed.
+
+## Configuration reference
+
+### Image, naming and identity
+
+| Value                                         | Default                           | Purpose                           |
+| --------------------------------------------- | --------------------------------- | --------------------------------- |
+| `replicaCount`                                | `1`                               | Fixed single-writer replica count |
+| `image.repository`                            | `ghcr.io/transmute-app/transmute` | Official image                    |
+| `image.tag`                                   | `v2.1.1`                          | Pinned application release        |
+| `image.pullPolicy`                            | `IfNotPresent`                    | Image pull policy                 |
+| `imagePullSecrets`                            | `[]`                              | Private registry credentials      |
+| `nameOverride`, `fullnameOverride`            | `""`                              | Resource naming overrides         |
+| `commonLabels`                                | `{}`                              | Labels on chart resources         |
+| `serviceAccount.create`                       | `true`                            | Create the ServiceAccount         |
+| `serviceAccount.name`                         | `""`                              | Existing or generated name        |
+| `serviceAccount.annotations`                  | `{}`                              | ServiceAccount annotations        |
+| `serviceAccount.automountServiceAccountToken` | `false`                           | API token mount                   |
+
+### Application and authentication
+
+| Value                                   | Default           | Purpose                                        |
+| --------------------------------------- | ----------------- | ---------------------------------------------- |
+| `config.appUrl`                         | `""`              | Public URL, required for OIDC                  |
+| `config.dataDir`                        | `/app/data`       | Durable application data                       |
+| `config.conversionWorkerConcurrency`    | `5`               | Conversion worker count                        |
+| `config.conversionJobStaleAfterMinutes` | `60`              | Stale job threshold                            |
+| `config.compressionWorkerConcurrency`   | `5`               | Compression worker count                       |
+| `config.invalidatePdfDigitalSignatures` | `false`           | Permit signature-invalidating PDF changes      |
+| `config.maxChunkSize`                   | `0`               | Upload chunk size; zero uses upstream behavior |
+| `config.allowUnauthenticated`           | `false`           | Permit unauthenticated use                     |
+| `config.domainAuthConfigPath`           | `""`              | Optional domain-auth configuration file        |
+| `auth.secretKey`                        | generated         | Inline JWT signing key                         |
+| `auth.existingSecret`                   | `""`              | Existing JWT/OIDC Secret                       |
+| `auth.secretKeyKey`                     | `AUTH_SECRET_KEY` | JWT field in the Secret                        |
+| `auth.algorithm`                        | `HS256`           | JWT signing algorithm                          |
+| `auth.accessTokenExpireMinutes`         | `60`              | Access-token lifetime                          |
+
+### OIDC
+
+| Value                  | Default              | Purpose                             |
+| ---------------------- | -------------------- | ----------------------------------- |
+| `oidc.enabled`         | `false`              | Enable upstream OIDC                |
+| `oidc.issuerUrl`       | `""`                 | Public issuer URL                   |
+| `oidc.internalUrl`     | `""`                 | Optional pod-facing issuer URL      |
+| `oidc.clientId`        | `""`                 | OIDC client ID                      |
+| `oidc.clientSecret`    | `""`                 | Inline client secret                |
+| `oidc.clientSecretKey` | `OIDC_CLIENT_SECRET` | Client secret field                 |
+| `oidc.displayName`     | `SSO`                | Login button label                  |
+| `oidc.usernameClaim`   | `preferred_username` | Local username claim                |
+| `oidc.autoCreateUsers` | `true`               | Create users at first OIDC login    |
+| `oidc.autoLaunch`      | `false`              | Start OIDC automatically from login |
+
+### Network and routes
+
+| Value                           | Default     | Purpose                                |
+| ------------------------------- | ----------- | -------------------------------------- |
+| `service.type`                  | `ClusterIP` | Service type                           |
+| `containerPorts.http`           | `8080`      | Transmute process HTTP port            |
+| `service.port`                  | `8080`      | Service port                           |
+| `service.annotations`           | `{}`        | Service annotations                    |
+| `service.ipFamilyPolicy`        | omitted     | Single or dual-stack policy            |
+| `service.ipFamilies`            | omitted     | Ordered IP families                    |
+| `ingress.*`                     | disabled    | Class, annotations, hosts and TLS      |
+| `gatewayAPI.enabled`            | `false`     | Render HTTPRoutes                      |
+| `gatewayAPI.httpRoutes`         | `[]`        | Canonical route definitions            |
+| `networkPolicy.enabled`         | `false`     | Render ingress policy                  |
+| `networkPolicy.ingressFrom`     | `[]`        | Allowed ingress peers                  |
+| `networkPolicy.egressIsolation` | `false`     | Enable explicit egress isolation       |
+| `networkPolicy.extraEgress`     | `[]`        | DNS, OIDC and integration egress rules |
+
+### Storage, runtime and scheduling
+
+| Value                                             | Default                    | Purpose                                          |
+| ------------------------------------------------- | -------------------------- | ------------------------------------------------ |
+| `persistence.enabled`                             | `true`                     | Required persistent storage                      |
+| `persistence.size`                                | `20Gi`                     | PVC capacity                                     |
+| `persistence.storageClass`                        | `""`                       | Storage class; `-` disables dynamic provisioning |
+| `persistence.accessModes`                         | `[ReadWriteOnce]`          | PVC access modes                                 |
+| `persistence.mountPath`                           | `/app/data`                | Container mount path                             |
+| `persistence.existingClaim`                       | `""`                       | Existing PVC                                     |
+| `resources`                                       | CPU 200m, memory 256Mi/2Gi | Container resources                              |
+| `podSecurityContext`, `securityContext`           | hardened                   | Pod and container security                       |
+| `livenessProbe`, `readinessProbe`, `startupProbe` | upstream health endpoints  | Probes                                           |
+| `externalSecrets.enabled`                         | `false`                    | Render ExternalSecrets                           |
+| `externalSecrets.apiVersion`                      | `external-secrets.io/v1`   | ESO API version                                  |
+| `externalSecrets.refreshInterval`                 | `1h`                       | Default refresh interval                         |
+| `externalSecrets.items`                           | `[]`                       | Full ExternalSecret specs                        |
+| `env`, `envFrom`                                  | `[]`                       | Extra environment configuration                  |
+| `volumeMounts`, `volumes`                         | `[]`                       | Extra pod storage                                |
+| `nodeSelector`, `tolerations`, `affinity`         | empty                      | Scheduling constraints                           |
+| `topologySpreadConstraints`                       | `[]`                       | Topology spreading                               |
+| `priorityClassName`                               | `""`                       | Pod priority class                               |
+| `terminationGracePeriodSeconds`                   | `30`                       | Shutdown grace period                            |
+
+## Upstream resources
+
+- [Documentation](https://transmute.sh/docs/)
+- [Environment variables](https://transmute.sh/docs/environment-variables/)
+- [OIDC integration](https://transmute.sh/docs/oidc/)
+- [Container image](https://github.com/transmute-app/transmute/pkgs/container/transmute)

@@ -210,6 +210,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Archiving & Fitness',
     charts: [
+      { label: 'Transmute', href: '/docs/charts/transmute', maturity: 'stable' },
       { label: 'Paperless-ngx', href: '/docs/charts/paperless-ngx', maturity: 'alpha' },
       { label: 'DocuSeal', href: '/docs/charts/docuseal', maturity: 'stable' },
       { label: 'Wallabag', href: '/docs/charts/wallabag', maturity: 'stable' },

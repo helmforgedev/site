@@ -152,21 +152,111 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   transmute: [
     {
-      name: 'Transmute Settings',
+      name: 'Application',
       fields: [
         {
-          label: 'Queue Concurrency',
-          key: 'config.queueConcurrency',
+          label: 'Public URL',
+          key: 'config.appUrl',
+          type: 'text',
+          default: '',
+          description: 'Required for OIDC callbacks and generated links',
+        },
+        {
+          label: 'Conversion Workers',
+          key: 'config.conversionWorkerConcurrency',
           type: 'number',
-          default: 1,
-          description: 'Number of concurrent transcoding jobs',
+          default: 5,
+          description: 'Concurrent file conversion workers',
+        },
+        {
+          label: 'Compression Workers',
+          key: 'config.compressionWorkerConcurrency',
+          type: 'number',
+          default: 5,
+          description: 'Concurrent archive compression workers',
+        },
+        {
+          label: 'PVC Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '20Gi',
+          description: 'Capacity for users, jobs, uploads and outputs',
+        },
+      ],
+    },
+    {
+      name: 'Authentication and Exposure',
+      fields: [
+        {
+          label: 'Allow Unauthenticated',
+          key: 'config.allowUnauthenticated',
+          type: 'toggle',
+          default: 'false',
+          description: 'Permit requests without a signed-in user',
         },
         {
           label: 'Enable OIDC',
           key: 'oidc.enabled',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Enable Single Sign-On authentication',
+        },
+        {
+          label: 'OIDC Issuer URL',
+          key: 'oidc.issuerUrl',
+          type: 'text',
+          default: '',
+          description: 'Public OpenID Connect issuer URL',
+        },
+        {
+          label: 'OIDC Client ID',
+          key: 'oidc.clientId',
+          type: 'text',
+          default: '',
+          description: 'Client identifier registered with the OIDC provider',
+        },
+        {
+          label: 'Authentication Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret containing AUTH_SECRET_KEY and OIDC_CLIENT_SECRET',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Transmute through Kubernetes Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          toggleActivationValues: {
+            true: {
+              'gatewayAPI.httpRoutes[0].name': 'public',
+              'gatewayAPI.httpRoutes[0].parentRefs[0].name': 'shared-gateway',
+              'gatewayAPI.httpRoutes[0].parentRefs[0].namespace': 'gateway-system',
+              'gatewayAPI.httpRoutes[0].hostnames[0]': 'transmute.example.com',
+            },
+          },
+          description: 'Render canonical HTTPRoute resources',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          toggleActivationValues: {
+            true: {
+              'networkPolicy.ingressFrom[0].namespaceSelector.matchLabels.kubernetes\\.io/metadata\\.name':
+                'ingress-nginx',
+              'networkPolicy.ingressFrom[0].podSelector.matchLabels.app\\.kubernetes\\.io/name': 'ingress-nginx',
+            },
+          },
+          description: 'Restrict inbound traffic; defaults to the ingress-nginx controller peer in the playground',
         },
       ],
     },
