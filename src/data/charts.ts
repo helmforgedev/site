@@ -17,7 +17,7 @@ export const charts: Chart[] = [
     name: 'Transmute',
     slug: 'transmute',
     description:
-      'Self-hosted media converter and queue transcoding with OIDC, External Secrets, and Gateway API support.',
+      'Self-hosted file conversion with persistent SQLite storage, OIDC, External Secrets, and Gateway API support.',
     maturity: 'stable',
     backup: false,
   },
