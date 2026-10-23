@@ -7649,6 +7649,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'helmforge-cluster',
           description: 'Elasticsearch cluster name',
         },
+        {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '9200',
+          description: 'Port opened by the Elasticsearch HTTP process',
+        },
+        {
+          label: 'Transport Listener Port',
+          key: 'containerPorts.transport',
+          type: 'number',
+          default: '9300',
+          description: 'Port used for Elasticsearch inter-node transport',
+        },
+        {
+          label: 'HTTP Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '9200',
+          description: 'Client-facing Kubernetes Service port',
+        },
       ],
     },
     {
