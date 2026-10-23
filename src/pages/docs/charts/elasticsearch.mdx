@@ -351,13 +351,20 @@ exist in the cluster. See the
 gatewayAPI:
   enabled: true
   httpRoutes:
-    - name: public
+    - name: private
       hostnames:
-        - elasticsearch.example.com
+        - elasticsearch.internal.example.com
       parentRefs:
-        - name: shared-gateway
+        - name: private-authenticated-gateway
           namespace: gateway-system
 ```
+
+This example assumes that `private-authenticated-gateway` is reachable only
+from trusted networks and enforces authentication before forwarding requests.
+Never expose the Elasticsearch API through a public Gateway while X-Pack
+security is disabled. Public exposure requires an authenticated, TLS-protected
+Elasticsearch deployment and compatible encrypted backend connectivity from the
+Gateway.
 
 Ingress and HTTPRoute may coexist during migration. The referenced Gateway and
 [Gateway API](https://gateway-api.sigs.k8s.io/) CRDs/controller must already
@@ -429,21 +436,27 @@ namespaceOverride: search-runtime
 
 Version 2 intentionally removes ambiguous version 1 values:
 
-| Version 1                  | Version 2                  |
-| -------------------------- | -------------------------- |
-| `service.httpPort`         | `service.port`             |
-| `service.transportPort`    | `containerPorts.transport` |
-| fixed HTTP listener `9200` | `containerPorts.http`      |
-| fixed Kibana port `5601`   | `kibana.containerPort`     |
-| fixed exporter port `9114` | `monitoring.containerPort` |
-| `gateway.*`                | `gatewayAPI.httpRoutes[]`  |
-| flat `externalSecrets.*`   | `externalSecrets.items[]`  |
+| Version 1                  | Version 2                      |
+| -------------------------- | ------------------------------ |
+| `service.httpPort`         | `service.port`                 |
+| `service.transportPort`    | removed; no direct replacement |
+| fixed HTTP listener `9200` | `containerPorts.http`          |
+| fixed Kibana port `5601`   | `kibana.containerPort`         |
+| fixed exporter port `9114` | `monitoring.containerPort`     |
+| `gateway.*`                | `gatewayAPI.httpRoutes[]`      |
+| flat `externalSecrets.*`   | `externalSecrets.items[]`      |
 
 Remove any manual `extraVolumes`/`extraVolumeMounts` workaround that mounts
 `elasticsearch.yml`. The chart now owns that exact file mount. Review all
 `extraConfig` entries before upgrading because they now take effect and trigger
 a rolling restart. The client Service now exposes HTTP only and selects one
 intentional Elasticsearch node role instead of all release pods.
+
+Version 1 `service.transportPort` changed only Service metadata while the
+Elasticsearch transport listener remained on `9300`; do not copy a customized
+value into `containerPorts.transport`. Set `containerPorts.transport` only when
+you intentionally want to change the real inter-node listener, and coordinate
+that change across every node during the upgrade.
 
 The privileged sysctl init container is disabled by default. Configure
 `vm.max_map_count=262144` on Kubernetes nodes, or explicitly opt in with
