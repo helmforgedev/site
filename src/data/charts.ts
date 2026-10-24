@@ -509,7 +509,7 @@ export const charts: Chart[] = [
     slug: 'automatisch',
     description: 'Open-source workflow automation with dedicated web and worker processes, PostgreSQL, and Redis.',
     maturity: 'stable',
-    backup: true,
+    backup: false,
   },
   {
     name: 'Authelia',
