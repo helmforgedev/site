@@ -16663,10 +16663,25 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'countly.example.com',
           description: 'Ingress hostname',
+        },
+        {
+          label: 'Path',
+          key: 'ingress.hosts[0].paths[0].path',
+          type: 'text',
+          default: '/',
+          description: 'Dashboard path',
+        },
+        {
+          label: 'Path Type',
+          key: 'ingress.hosts[0].paths[0].pathType',
+          type: 'select',
+          default: 'Prefix',
+          options: ['Prefix', 'Exact', 'ImplementationSpecific'],
+          description: 'Kubernetes Ingress path type',
         },
         {
           label: 'Ingress Class',
@@ -16675,6 +16690,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'traefik',
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'MongoDB Egress Port',
+          key: 'networkPolicy.egress[0].ports[0].port',
+          type: 'number',
+          default: '27017',
+          description: 'Example restricted MongoDB egress port',
         },
       ],
     },
