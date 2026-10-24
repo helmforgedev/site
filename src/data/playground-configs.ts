@@ -10717,7 +10717,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '7.0.4-apache',
+          default: '7.1.3-apache',
           description: 'Pinned WordPress image tag',
         },
         {
@@ -10762,6 +10762,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'ReadWriteOnce',
           options: ['ReadWriteOnce', 'ReadWriteMany'],
           description: 'Use RWX before enabling multiple replicas',
+        },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Apache listener port; Service targeting remains name-based',
         },
       ],
     },
