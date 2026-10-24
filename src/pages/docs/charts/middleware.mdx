@@ -37,11 +37,11 @@ The upstream image supervises a Next.js frontend, analytics API, sync server,
 cron, and optional embedded datastores. This chart disables embedded PostgreSQL
 and enables the upstream embedded Redis process on loopback.
 
-| Process | Default port | Exposure |
-|---|---:|---|
-| Frontend | `3333` | Service and optional Ingress |
-| Analytics API | `9696` | Pod-internal |
-| Sync server | `9697` | Pod-internal |
+| Process       | Default port | Exposure                     |
+| ------------- | -----------: | ---------------------------- |
+| Frontend      |       `3333` | Service and optional Ingress |
+| Analytics API |       `9696` | Pod-internal                 |
+| Sync server   |       `9697` | Pod-internal                 |
 
 An init container runs the migrations included in the same official image and
 writes the startup signal expected by the analytics process. The application
@@ -49,8 +49,8 @@ Deployment remains single-replica and uses `Recreate` because the key volume is
 stateful and upstream does not define a multi-replica coordination model.
 
 <Callout type="info" title="Why there is no Redis subchart">
-  Middleware 0.3.1 does not expose a remote Redis password and forces TLS whenever the Redis host is not `localhost`.
-  A normal authenticated Redis Service is therefore incompatible. The chart uses the upstream-supported loopback Redis
+  Middleware 0.3.1 does not expose a remote Redis password and forces TLS whenever the Redis host is not `localhost`. A
+  normal authenticated Redis Service is therefore incompatible. The chart uses the upstream-supported loopback Redis
   runtime and rejects legacy `redis.enabled` or `externalRedis.enabled` overrides.
 </Callout>
 
@@ -201,31 +201,31 @@ ingress:
 
 ### Application
 
-| Parameter | Default | Description |
-|---|---|---|
-| `middleware.frontendPort` | `3333` | Frontend process and container port. |
-| `middleware.analyticsPort` | `9696` | Analytics process and container port. |
-| `middleware.syncPort` | `9697` | Sync process and container port. |
-| `middleware.environment` | `prod` | Backend and frontend environment. |
-| `middleware.timezone` | `UTC` | IANA timezone for metric windows. |
-| `middleware.extraEnv` | `[]` | Additional environment entries. |
+| Parameter                  | Default | Description                           |
+| -------------------------- | ------- | ------------------------------------- |
+| `middleware.frontendPort`  | `3333`  | Frontend process and container port.  |
+| `middleware.analyticsPort` | `9696`  | Analytics process and container port. |
+| `middleware.syncPort`      | `9697`  | Sync process and container port.      |
+| `middleware.environment`   | `prod`  | Backend and frontend environment.     |
+| `middleware.timezone`      | `UTC`   | IANA timezone for metric windows.     |
+| `middleware.extraEnv`      | `[]`    | Additional environment entries.       |
 
 The internal database flag must remain `"false"`, and the internal Redis flag
 must remain `"true"`. The chart validates both constraints.
 
 ### PostgreSQL
 
-| Parameter | Default | Description |
-|---|---|---|
-| `postgresql.enabled` | `true` | Deploy bundled PostgreSQL. |
-| `postgresql.auth.database` | `mhq-oss` | Application database. |
-| `postgresql.auth.username` | `middleware` | Application role. |
-| `externalDatabase.enabled` | `false` | Use external PostgreSQL. |
-| `externalDatabase.host` | `""` | External hostname. |
-| `externalDatabase.port` | `5432` | External port. |
-| `externalDatabase.existingSecret` | `""` | Password Secret. |
-| `externalDatabase.existingSecretPasswordKey` | `user-password` | Password key. |
-| `externalDatabase.sslMode` | `disable` | libpq SSL mode. |
+| Parameter                                    | Default         | Description                |
+| -------------------------------------------- | --------------- | -------------------------- |
+| `postgresql.enabled`                         | `true`          | Deploy bundled PostgreSQL. |
+| `postgresql.auth.database`                   | `mhq-oss`       | Application database.      |
+| `postgresql.auth.username`                   | `middleware`    | Application role.          |
+| `externalDatabase.enabled`                   | `false`         | Use external PostgreSQL.   |
+| `externalDatabase.host`                      | `""`            | External hostname.         |
+| `externalDatabase.port`                      | `5432`          | External port.             |
+| `externalDatabase.existingSecret`            | `""`            | Password Secret.           |
+| `externalDatabase.existingSecretPasswordKey` | `user-password` | Password key.              |
+| `externalDatabase.sslMode`                   | `disable`       | libpq SSL mode.            |
 
 Exactly one database mode must be active. PostgreSQL custom names, existing
 Secrets, custom password keys, replication primary Services, and External
@@ -233,14 +233,14 @@ Secrets target names are honored by the application wiring.
 
 ### Persistence and exposure
 
-| Parameter | Default | Description |
-|---|---|---|
-| `persistence.enabled` | `true` | Persist encryption keys. |
-| `persistence.size` | `1Gi` | Key PVC capacity. |
-| `persistence.existingClaim` | `""` | Reuse a PVC. |
-| `service.port` | `80` | Frontend Service port. |
-| `ingress.enabled` | `false` | Render Ingress. |
-| `networkPolicy.enabled` | `true` | Restrict inbound traffic to frontend. |
+| Parameter                   | Default | Description                           |
+| --------------------------- | ------- | ------------------------------------- |
+| `persistence.enabled`       | `true`  | Persist encryption keys.              |
+| `persistence.size`          | `1Gi`   | Key PVC capacity.                     |
+| `persistence.existingClaim` | `""`    | Reuse a PVC.                          |
+| `service.port`              | `80`    | Frontend Service port.                |
+| `ingress.enabled`           | `false` | Render Ingress.                       |
+| `networkPolicy.enabled`     | `true`  | Restrict inbound traffic to frontend. |
 
 ## Security
 
