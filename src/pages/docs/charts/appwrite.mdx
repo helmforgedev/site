@@ -497,21 +497,22 @@ certificates, the application Secret, and any external ClickHouse separately.
 
 ### Security and network policy
 
-| Parameter                                     | Type    | Default | Description                                                    |
-| --------------------------------------------- | ------- | ------- | -------------------------------------------------------------- |
-| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.                             |
-| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into Appwrite pods.             |
-| `networkPolicy.enabled`                       | boolean | `true`  | Create workload isolation and listener allow policies.         |
-| `networkPolicy.ingressFrom`                   | array   | `[]`    | Optional peers allowed to reach the three public listeners.    |
-| `networkPolicy.egress`                        | array   | `[{}]`  | Egress rules; permissive by default for external integrations. |
+| Parameter                                     | Type    | Default | Description                                                               |
+| --------------------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.                                        |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the API token into application pods; backup Pods always disable it. |
+| `networkPolicy.enabled`                       | boolean | `true`  | Create workload isolation and listener allow policies.                    |
+| `networkPolicy.ingressFrom`                   | array   | `[]`    | Optional peers allowed to reach the three public listeners.               |
+| `networkPolicy.egress`                        | array   | `[{}]`  | Egress rules; permissive by default for external integrations.            |
 
 The official Appwrite image needs writable runtime paths and is not forced to a
 non-root UID. The chart drops all capabilities by default; the Console
 Deployment then adds only `CHOWN`, `SETGID`, and `SETUID`, which its entrypoint
 requires. It also disables privilege escalation, applies RuntimeDefault
-seccomp, and disables ServiceAccount token automount. Restrict egress to the
-actual SMTP, OAuth, webhook, database, Redis, object-storage, and integration
-destinations used by the installation.
+seccomp, and disables ServiceAccount token automount by default. Token automount
+is configurable for application workloads, while backup Pods always disable
+it. Restrict egress to the actual SMTP, OAuth, webhook, database, Redis,
+object-storage, and integration destinations used by the installation.
 
 ### Ingress
 
