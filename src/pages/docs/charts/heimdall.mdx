@@ -24,6 +24,8 @@ before creating a workload.
 - **Persistent storage** — SQLite database and all configuration in `/config`
 - **S3 backup** — scheduled archive of the full `/config` directory to S3-compatible storage
 - **Ingress support** — configurable TLS via cert-manager
+- **End-to-end listener configuration** — custom application and Service ports remain independent
+- **Hardened defaults** — restricted capabilities, seccomp, no API token, and an ingress NetworkPolicy
 
 ## Chart Documentation
 
@@ -61,6 +63,7 @@ helm install heimdall oci://ghcr.io/helmforgedev/helm/heimdall
 ```yaml
 # values.yaml — Heimdall with Traefik ingress
 heimdall:
+  containerPort: 8080
   timezone: 'America/Sao_Paulo'
   puid: 1000
   pgid: 1000
@@ -142,6 +145,12 @@ resources:
   limits:
     memory: 256Mi
 
+service:
+  port: 80
+
+networkPolicy:
+  enabled: true
+
 ingress:
   enabled: true
   ingressClassName: traefik
@@ -183,12 +192,13 @@ ingress:
 
 ### Heimdall Configuration
 
-| Parameter           | Type    | Default | Description                                                             |
-| ------------------- | ------- | ------- | ----------------------------------------------------------------------- |
-| `heimdall.puid`     | integer | `1000`  | User ID used by the container process for file ownership in `/config`.  |
-| `heimdall.pgid`     | integer | `1000`  | Group ID used by the container process for file ownership in `/config`. |
-| `heimdall.timezone` | string  | `UTC`   | Container timezone for display purposes.                                |
-| `heimdall.extraEnv` | array   | `[]`    | Extra environment variables for advanced configuration.                 |
+| Parameter                | Type    | Default | Description                                                             |
+| ------------------------ | ------- | ------- | ----------------------------------------------------------------------- |
+| `heimdall.puid`          | integer | `1000`  | User ID used by the container process for file ownership in `/config`.  |
+| `heimdall.pgid`          | integer | `1000`  | Group ID used by the container process for file ownership in `/config`. |
+| `heimdall.timezone`      | string  | `UTC`   | Container timezone for display purposes.                                |
+| `heimdall.containerPort` | integer | `80`    | HTTP port used by the real NGINX listener.                              |
+| `heimdall.extraEnv`      | array   | `[]`    | Extra environment variables for advanced configuration.                 |
 
 <Callout type="warning" title="PUID/PGID must match the PVC file ownership">
   The LinuxServer.io image runs as the user and group defined by `heimdall.puid` and `heimdall.pgid`. If the PVC is
@@ -285,19 +295,39 @@ Probes use the `/` root path.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+The LinuxServer `/init` process starts as root to prepare `/config` and apply
+`PUID`/`PGID`. The chart documents that upstream requirement while disabling
+privilege escalation, minimizing capabilities, applying `RuntimeDefault`
+seccomp, and preventing ServiceAccount token automount. The main root filesystem
+remains writable because s6-overlay writes outside `/config` during startup.
+
+| Parameter                                  | Type    | Default          | Description                                                  |
+| ------------------------------------------ | ------- | ---------------- | ------------------------------------------------------------ |
+| `resources`                                | object  | `{}`             | CPU and memory requests and limits.                          |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Pod seccomp profile.                                         |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Permit privilege escalation.                                 |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `false`          | Read-only root; disabled for LinuxServer initialization.     |
+| `securityContext.capabilities.drop`        | array   | `[ALL]`          | Capabilities removed before the required allowlist is added. |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                              |
+| --------------------------------------------- | ------- | ------- | ---------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.       |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.        |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.      |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token in the pod. |
+
+### Network Policy
+
+The default policy restricts inbound traffic to the named HTTP port. Egress is
+left unrestricted because Heimdall enhanced tiles contact operator-selected
+services. Add a separate egress policy when every destination is known.
+
+| Parameter                    | Type    | Default | Description                              |
+| ---------------------------- | ------- | ------- | ---------------------------------------- |
+| `networkPolicy.enabled`      | boolean | `true`  | Create the server ingress NetworkPolicy. |
+| `networkPolicy.extraIngress` | array   | `[]`    | Additional complete ingress rules.       |
 
 ### Scheduling
 
@@ -333,6 +363,11 @@ Probes use the `/` root path.
   Heimdall supports enhanced tiles for apps like Sonarr, Radarr, Pi-hole, and others that display live statistics. These
   require an API token or key configured in the tile settings within the Heimdall UI. Check the [Heimdall supported apps
   list](https://heimdall.site/#applications) for available integrations.
+</Callout>
+
+<Callout type="info" title="Application and Service ports are independent">
+  Set `heimdall.containerPort` to change the NGINX listener. Set `service.port` to change only the cluster-facing
+  Service port. Probes, policy, and routing follow the named application port automatically.
 </Callout>
 
 ## More Information
