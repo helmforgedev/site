@@ -17310,6 +17310,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Application Port',
+          key: 'openWebui.port',
+          type: 'number',
+          default: '8080',
+          description: 'Open WebUI listener and probe port',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Cluster-facing Service port',
+        },
+        {
           label: 'Ollama URL',
           key: 'openWebui.ollamaBaseUrl',
           type: 'text',
@@ -17336,6 +17350,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '10Gi',
           description: 'PVC storage size',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use PostgreSQL instead of SQLite; required for chart-managed backups',
+        },
+        {
+          label: 'Bundled Redis',
+          key: 'redis.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable Redis WebSocket coordination',
         },
       ],
     },
@@ -17374,7 +17402,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'chat.example.com',
           description: 'Ingress hostname',
@@ -17386,6 +17414,19 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'traefik',
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Enable Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict inbound traffic to the Open WebUI HTTP port',
         },
       ],
     },
