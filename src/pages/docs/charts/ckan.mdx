@@ -320,7 +320,7 @@ ingress:
 | `database.external.existingSecret`                         | string  | `""`                      | Existing secret with database passwords.                                           |
 | `database.external.existingSecretPasswordKey`              | string  | `password`                | CKAN/DataStore write-role password key.                                            |
 | `database.external.existingSecretDatastoreReadPasswordKey` | string  | `datastore-read-password` | DataStore read-role password key.                                                  |
-| `database.external.sslMode`                                | string  | `require`                 | PostgreSQL TLS verification mode.                                                  |
+| `database.external.sslMode`                                | string  | `require`                 | libpq SSL mode; use `verify-full` with a trusted CA for certificate and hostname verification. |
 | `postgresql.enabled`                                       | boolean | `true`                    | Deploy the bundled PostgreSQL subchart.                                            |
 | `postgresql.startupProbe.initialDelaySeconds`              | integer | `30`                      | Delay startup checks until PostgreSQL completes its temporary init server cycle.   |
 | `postgresql.readinessProbe.initialDelaySeconds`            | integer | `30`                      | Delay readiness checks until PostgreSQL completes its temporary init server cycle. |
@@ -390,7 +390,10 @@ persistent storage, review the
 and test extensions against CKAN 2.12 before production rollout. Keep Solr,
 PostgreSQL, and Redis available while CKAN performs its upgrade steps.
 The former `redisConfig.external.url` value was replaced with structured
-connection fields and a Secret-backed password.
+connection fields and a Secret-backed password. The structured external Redis
+configuration enables TLS by default. Operators migrating a plaintext
+`redis://` endpoint must set `redisConfig.external.tls: false`; TLS-enabled
+endpoints can retain the default.
 
 ## More Information
 
