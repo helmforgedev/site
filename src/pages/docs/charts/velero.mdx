@@ -29,7 +29,11 @@ schedules, TTL-based expiration, and namespace-scoped or cluster-wide backup pol
 - **Node-agent DaemonSet** — optional filesystem backup for PVC data inclusion
 - **S3-compatible storage** — validated with the AWS plugin for MinIO and AWS S3
 - **Restore-only mode** — lock a cluster to restores only (useful for DR environments)
-- **Prometheus metrics** — metrics Service and optional ServiceMonitor enabled by default
+- **Prometheus metrics** — metrics Service enabled by default and optional ServiceMonitor
+- **Restricted server and plugin containers** — non-root identities, read-only root filesystems, dropped capabilities,
+  blocked privilege escalation, and RuntimeDefault seccomp
+- **NetworkPolicy enabled by default** — ingress is limited to the metrics listener
+- **Configurable metrics listener** — the process port, probes, and named Service target stay aligned
 
 ## Installation
 
@@ -229,6 +233,50 @@ service:
 Use `PreferDualStack` without `service.ipFamilies` when the same values file may run on both single-stack and dual-stack
 clusters. Set `service.ipFamilies` only when the target cluster advertises the requested families.
 
+## Security Boundary
+
+The Velero server and default AWS plugin run as the non-root identities declared by their official images. Their
+containers use read-only root filesystems, drop every Linux capability, block privilege escalation, and use
+RuntimeDefault seccomp. Writable `emptyDir` volumes are mounted at `/scratch`, `/plugins`, and `/tmp`; Velero uses
+`/tmp` for plugin process files.
+
+When the node-agent uses the default Kopia uploader, both the server and node-agent also receive ephemeral writable
+volumes at `/home/cnb/udmrepo` and `/home/cnb/.cache`. This keeps the rest of each root filesystem read-only while
+supporting filesystem backups activated globally, by schedule, or by annotation.
+
+The node-agent is the intentional exception: filesystem backup needs kubelet host-path access, so it runs as UID 0.
+It remains unprivileged, drops all capabilities, blocks privilege escalation, and uses a read-only root filesystem.
+Enable it only after reviewing Pod Security admission, hostPath policy, and node isolation.
+
+Velero needs its ServiceAccount token and cluster-wide API access to back up and restore Kubernetes resources. The
+default ClusterRoleBinding targets `cluster-admin`. Set `rbac.create: false` only when equivalent, reviewed RBAC is
+managed outside the chart.
+
+The default NetworkPolicy selects only the server and allows inbound traffic only to the metrics port. Egress remains
+open because Kubernetes API, DNS, and object-storage destinations are environment-specific. Set
+`networkPolicy.allowExternalEgress: false` before adding a restrictive server egress policy; NetworkPolicy rules are
+additive, so leaving the chart's allow-all rule enabled defeats a second restrictive policy. Restrict node-agent
+networking separately when it is enabled.
+
+## Operations
+
+Changing `metrics.containerPort` changes the Velero `--metrics-address` argument, container port, and all three TCP
+probes. `metrics.service.port` is independent and changes only the Service-facing port; the Service uses the named
+`metrics` target port.
+
+Before relying on backups, verify that the Deployment is ready and every configured backup storage location is
+available:
+
+```bash
+kubectl rollout status deployment/velero -n velero
+kubectl get backupstoragelocations.velero.io -n velero
+kubectl logs deployment/velero -n velero --since=15m
+```
+
+A successful backup is not a recovery test. Perform scheduled restores into an isolated namespace or cluster and
+verify application data there. Helm does not remove or roll back Velero CRDs automatically, so review CRD changes
+separately during upgrades.
+
 ## Configuration Reference
 
 ### Core
@@ -250,13 +298,14 @@ clusters. Set `service.ipFamilies` only when the target cluster advertises the r
 
 ### Plugins
 
-| Parameter                | Type    | Default                                  | Description                                  |
-| ------------------------ | ------- | ---------------------------------------- | -------------------------------------------- |
-| `plugins.enabled`        | boolean | `true`                                   | Enable the default AWS/S3-compatible plugin. |
-| `plugins.aws.name`       | string  | `velero-plugin-for-aws`                  | Init container name.                         |
-| `plugins.aws.repository` | string  | `docker.io/velero/velero-plugin-for-aws` | AWS plugin image repository.                 |
-| `plugins.aws.tag`        | string  | `v1.14.0`                                | AWS plugin image tag.                        |
-| `plugins.extra`          | array   | `[]`                                     | Extra plugin init containers.                |
+| Parameter                     | Type    | Default                                  | Description                                         |
+| ----------------------------- | ------- | ---------------------------------------- | --------------------------------------------------- |
+| `plugins.enabled`             | boolean | `true`                                   | Enable the default AWS/S3-compatible plugin.        |
+| `plugins.aws.name`            | string  | `velero-plugin-for-aws`                  | Init container name.                                |
+| `plugins.aws.repository`      | string  | `docker.io/velero/velero-plugin-for-aws` | AWS plugin image repository.                        |
+| `plugins.aws.tag`             | string  | `v1.14.0`                                | AWS plugin image tag.                               |
+| `plugins.aws.securityContext` | object  | restricted non-root defaults             | Security context for the AWS plugin init container. |
+| `plugins.extra`               | array   | `[]`                                     | Extra plugin init containers.                       |
 
 ### Credentials
 
@@ -343,6 +392,7 @@ server-level `defaultBackupTTL`.
 | Parameter                                 | Type    | Default     | Description                                  |
 | ----------------------------------------- | ------- | ----------- | -------------------------------------------- |
 | `metrics.enabled`                         | boolean | `true`      | Expose Velero metrics on a Service.          |
+| `metrics.containerPort`                   | integer | `8085`      | Port listened on by the Velero process.      |
 | `metrics.service.type`                    | string  | `ClusterIP` | Metrics service type.                        |
 | `metrics.service.port`                    | integer | `8085`      | Metrics service port.                        |
 | `metrics.serviceMonitor.enabled`          | boolean | `false`     | Create a Prometheus Operator ServiceMonitor. |
@@ -359,20 +409,32 @@ server-level `defaultBackupTTL`.
 
 ### Resources and Security
 
-| Parameter                       | Type    | Default | Description                                                                |
-| ------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
-| `resources`                     | object  | `{}`    | CPU and memory requests and limits for the Velero server.                  |
-| `terminationGracePeriodSeconds` | integer | `3600`  | Grace period (1 hour). Allows in-progress backups or restores to complete. |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the Velero server pod.                                   |
-| `podSecurityContext`            | object  | `{}`    | Pod-level security context.                                                |
+| Parameter                       | Type    | Default                      | Description                                                                |
+| ------------------------------- | ------- | ---------------------------- | -------------------------------------------------------------------------- |
+| `resources`                     | object  | `{}`                         | CPU and memory requests and limits for the Velero server.                  |
+| `terminationGracePeriodSeconds` | integer | `3600`                       | Grace period (1 hour). Allows in-progress backups or restores to complete. |
+| `priorityClassName`             | string  | `""`                         | PriorityClass for the Velero server pod.                                   |
+| `podSecurityContext`            | object  | restricted non-root defaults | Pod-level security context.                                                |
+| `containerSecurityContext`      | object  | restricted non-root defaults | Security context for the Velero server.                                    |
 
-### Service Account
+### Probes and Network Policy
 
 | Parameter                           | Type    | Default | Description                                                  |
 | ----------------------------------- | ------- | ------- | ------------------------------------------------------------ |
-| `serviceAccount.server.create`      | boolean | `true`  | Create the Velero service account.                           |
-| `serviceAccount.server.name`        | string  | `""`    | Override the service account name.                           |
-| `serviceAccount.server.annotations` | object  | `{}`    | Annotations for the service account (e.g. IRSA for AWS EKS). |
+| `startupProbe.enabled`              | boolean | `true`  | Probe the metrics listener while the server starts.          |
+| `readinessProbe.enabled`            | boolean | `true`  | Remove an unhealthy metrics endpoint from Service endpoints. |
+| `livenessProbe.enabled`             | boolean | `true`  | Restart a server whose metrics listener stops responding.    |
+| `networkPolicy.enabled`             | boolean | `true`  | Create the server NetworkPolicy.                             |
+| `networkPolicy.allowExternalEgress` | boolean | `true`  | Permit Kubernetes API and object-storage egress.             |
+
+### Service Account
+
+| Parameter                                            | Type    | Default | Description                                                  |
+| ---------------------------------------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `serviceAccount.server.create`                       | boolean | `true`  | Create the Velero service account.                           |
+| `serviceAccount.server.name`                         | string  | `""`    | Override the service account name.                           |
+| `serviceAccount.server.annotations`                  | object  | `{}`    | Annotations for the service account (e.g. IRSA for AWS EKS). |
+| `serviceAccount.server.automountServiceAccountToken` | boolean | `true`  | Mount the API token required by the controller.              |
 
 ### Scheduling
 
@@ -389,7 +451,7 @@ server-level `defaultBackupTTL`.
 | ------------------- | ----- | ------- | ----------------------------------------------- |
 | `extraVolumes`      | array | `[]`    | Extra volumes for the server pod.               |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the server container.   |
-| `extraObjects`      | array | `[]`    | Extra Kubernetes manifests rendered with `tpl`. |
+| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests rendered with `tpl`. |
 
 ## More Information
 
@@ -401,4 +463,6 @@ before upgrading production recovery infrastructure.
 - [Velero Official Website](https://velero.io)
 - [Velero Documentation](https://velero.io/docs/)
 - [Velero GitHub Repository](https://github.com/vmware-tanzu/velero)
+- [HelmForge Velero Operations Guide](https://github.com/helmforgedev/charts/blob/main/charts/velero/docs/operations.md)
+- [HelmForge Velero Security Guide](https://github.com/helmforgedev/charts/blob/main/charts/velero/docs/security.md)
 - [HelmForge Velero Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/velero)
