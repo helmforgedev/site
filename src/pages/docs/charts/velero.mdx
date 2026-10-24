@@ -240,6 +240,10 @@ containers use read-only root filesystems, drop every Linux capability, block pr
 RuntimeDefault seccomp. Writable `emptyDir` volumes are mounted at `/scratch`, `/plugins`, and `/tmp`; Velero uses
 `/tmp` for plugin process files.
 
+When the node-agent uses the default Kopia uploader, both the server and node-agent also receive ephemeral writable
+volumes at `/home/cnb/udmrepo` and `/home/cnb/.cache`. This keeps the rest of each root filesystem read-only while
+supporting filesystem backups activated globally, by schedule, or by annotation.
+
 The node-agent is the intentional exception: filesystem backup needs kubelet host-path access, so it runs as UID 0.
 It remains unprivileged, drops all capabilities, blocks privilege escalation, and uses a read-only root filesystem.
 Enable it only after reviewing Pod Security admission, hostPath policy, and node isolation.
@@ -248,9 +252,11 @@ Velero needs its ServiceAccount token and cluster-wide API access to back up and
 default ClusterRoleBinding targets `cluster-admin`. Set `rbac.create: false` only when equivalent, reviewed RBAC is
 managed outside the chart.
 
-The default NetworkPolicy allows inbound traffic only to the metrics port. Egress remains open because Kubernetes API,
-DNS, and object-storage destinations are environment-specific. Add an environment-specific egress policy when those
-destinations are known.
+The default NetworkPolicy selects only the server and allows inbound traffic only to the metrics port. Egress remains
+open because Kubernetes API, DNS, and object-storage destinations are environment-specific. Set
+`networkPolicy.allowExternalEgress: false` before adding a restrictive server egress policy; NetworkPolicy rules are
+additive, so leaving the chart's allow-all rule enabled defeats a second restrictive policy. Restrict node-agent
+networking separately when it is enabled.
 
 ## Operations
 
