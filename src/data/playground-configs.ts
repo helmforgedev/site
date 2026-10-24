@@ -17758,7 +17758,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'wallabag.domainName',
           type: 'text',
           default: 'https://wallabag.example.com',
-          description: 'Public domain name (required)',
+          description: 'Public URL, scheme and host without a trailing slash',
         },
         {
           label: 'Registration',
@@ -17766,6 +17766,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'false',
           description: 'Allow user registration',
+        },
+        {
+          label: 'Admin Username',
+          key: 'wallabag.admin.username',
+          type: 'text',
+          default: 'wallabag',
+          description: 'Initial super-admin created on the first install',
+        },
+        {
+          label: 'Admin Email',
+          key: 'wallabag.admin.email',
+          type: 'text',
+          default: 'wallabag@example.com',
+          description: 'Initial super-admin email',
         },
         {
           label: 'Storage Size',

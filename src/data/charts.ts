@@ -668,7 +668,7 @@ export const charts: Chart[] = [
   {
     name: 'Wallabag',
     slug: 'wallabag',
-    description: 'Self-hosted read-it-later with PostgreSQL, optional Redis, and Symfony config.',
+    description: 'Self-hosted read-it-later with automatic schema setup, PostgreSQL, Gateway API, and S3 backup.',
     maturity: 'stable',
     backup: true,
   },
