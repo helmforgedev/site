@@ -17229,7 +17229,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   middleware: [
     {
-      name: 'General',
+      name: 'Application',
       fields: [
         {
           label: 'Environment',
@@ -17246,11 +17246,73 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Timezone',
         },
         {
+          label: 'Frontend Port',
+          key: 'middleware.frontendPort',
+          type: 'number',
+          default: 3333,
+          description: 'Frontend process port',
+        },
+        {
+          label: 'Analytics Port',
+          key: 'middleware.analyticsPort',
+          type: 'number',
+          default: 9696,
+          description: 'Analytics API process port',
+        },
+        {
+          label: 'Sync Port',
+          key: 'middleware.syncPort',
+          type: 'number',
+          default: 9697,
+          description: 'Sync process port',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: 80,
+          description: 'Client-facing frontend Service port',
+        },
+      ],
+    },
+    {
+      name: 'Storage and Database',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Persist Encryption Keys',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: true,
+          description: 'Keep the RSA key pair across restarts',
+        },
+        {
           label: 'Storage Size',
           key: 'persistence.size',
           type: 'text',
           default: '1Gi',
           description: 'PVC storage size',
+        },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: true,
+          description: 'Deploy the PostgreSQL subchart',
+        },
+        {
+          label: 'External PostgreSQL',
+          key: 'externalDatabase.enabled',
+          type: 'toggle',
+          default: false,
+          description: 'Use an operator-managed PostgreSQL instead',
+        },
+        {
+          label: 'External Database Host',
+          key: 'externalDatabase.host',
+          type: 'text',
+          default: '',
+          description: 'Required when external PostgreSQL is enabled',
         },
       ],
     },
@@ -17289,7 +17351,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'middleware.example.com',
           description: 'Ingress hostname',
@@ -17301,6 +17363,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'traefik',
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Security',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: true,
+          description: 'Restrict inbound traffic to the frontend port',
+        },
+        {
+          label: 'Mount Service Account Token',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: false,
+          description: 'Provide a Kubernetes API token to the pod',
         },
       ],
     },
