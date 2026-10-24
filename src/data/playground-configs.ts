@@ -9158,6 +9158,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '10Gi',
           description: 'PVC storage size',
         },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Apache listener port; Service targeting remains name-based',
+        },
       ],
     },
     {
@@ -10717,7 +10724,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '7.0.4-apache',
+          default: '7.1.3-apache',
           description: 'Pinned WordPress image tag',
         },
         {

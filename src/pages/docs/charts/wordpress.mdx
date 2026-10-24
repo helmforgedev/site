@@ -53,7 +53,7 @@ and upgrade production installations promptly.
 - **Production controls** - ServiceAccount token mount control, resources, HPA, PDB, deterministic WordPress cron, probes, and scheduling.
 - **Backups** - S3-compatible CronJob that exports both the database and `wp-content`.
 - **Bootstrap** - optional WP-CLI Job for initial site install, permalinks, locale, and multisite setup.
-- **Plugins** - idempotent post-install/post-upgrade installer for official WordPress.org plugin slugs.
+- **Plugins** - idempotent installer for official WordPress.org slugs and checksum-verified custom ZIPs.
 - **Object Cache** - Redis provider for the official image, plus guarded Memcached wiring for custom images.
 - **Extensibility** - extra env, envFrom, init containers, sidecars, volumes, mounts, and raw extra manifests.
 
@@ -413,7 +413,7 @@ memcached:
 <div data-tab-panel="plugins">
 
 ```yaml
-# values.yaml - install official WordPress.org plugins
+# values.yaml - install official and verified custom plugins
 persistence:
   enabled: true
 
@@ -429,11 +429,35 @@ plugins:
     - slug: contact-form-7
       activate: true
       skipIfInstalled: true
+  custom:
+    - name: company-plugin
+      url: https://plugins.example.com/company-plugin-1.4.2.zip
+      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      activate: true
+      skipIfInstalled: true
+      authentication:
+        existingSecret: wordpress-plugin-download
+        tokenKey: token
 ```
+
+Custom ZIPs require HTTPS and an exact SHA-256 checksum. Optional bearer credentials are read only from an existing
+Secret, never from inline values or URL parameters. The installer rejects unsafe archive paths and reports download,
+checksum, archive, and activation failures separately. Provision the referenced Secret independently before installing
+the release.
 
 <Callout type="warning" title="The plugin installer requires persistent storage">
   The installer Job writes files into the WordPress volume. It fails validation when `plugins.installer.enabled=true`
   and `persistence.enabled=false`, because an isolated Job `emptyDir` would not be visible to the WordPress pod.
+</Callout>
+
+<Callout type="info" title="WordPress plugins are not PHP extensions">
+  A plugin is PHP application code under `wp-content/plugins`; an extension is a native module in the PHP image. The
+  official WordPress image includes `mysqli`, but requirements such as `pdo_mysql` or `memcached` need a derivative
+  image built before deployment. The chart never compiles PHP extensions at startup. Use matching custom runtime and
+  WP-CLI images when bootstrap or plugin jobs require the same extension; the cron CronJob calls WordPress over HTTP.
+  HelmForge provides a [reusable pipeline
+  example](https://github.com/helmforgedev/charts/tree/main/charts/wordpress/examples/custom-php-image) but does not
+  publish application-specific extension images.
 </Callout>
 
 </div>
@@ -518,6 +542,16 @@ read the same Secret and key.
 Memcached is guarded because the official WordPress image does not include the PHP `memcached` extension.
 Use custom WordPress and installer images before enabling `objectCache.provider: memcached`.
 
+### Custom Plugin Security
+
+`plugins.items` remains the contract for official WordPress.org slugs. `plugins.custom` accepts custom or private ZIPs
+only with HTTPS and a required SHA-256 checksum. Authentication can reference an existing Secret and token key; tokens
+are never rendered into manifests or placed in downloader arguments. With `skipIfInstalled: true`, upgrades skip both
+the download and installation when the plugin directory already exists.
+
+Do not use custom plugin installation to add PHP extensions. Build extensions into immutable runtime and WP-CLI images,
+scan before publishing, and pin the resulting tag or digest. Startup compilation is unsupported.
+
 ### NetworkPolicy
 
 `networkPolicy.enabled` isolates application ingress. Add `networkPolicy.ingress.extraFrom` for an
@@ -548,6 +582,7 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `image.tag`                 | string  | `7.1.3-apache`                | Image tag.                                                      |
 | `image.pullPolicy`          | string  | `IfNotPresent`                | Image pull policy.                                              |
 | `imagePullSecrets`          | array   | `[]`                          | Pull secrets for private registries.                            |
+| `containerPorts.http`       | integer | `80`                          | Apache listener port, independent from the Service port.        |
 | `coreSync.enabled`          | boolean | `true`                        | Synchronize image core files into an existing WordPress volume. |
 | `coreSync.allowCustomImage` | boolean | `false`                       | Opt a compatible custom repository into core synchronization.   |
 
@@ -671,6 +706,12 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `plugins.installer.backoffLimit`                           | integer | `1`        | Installer retry limit.                                   |
 | `plugins.installer.preferWordPressPodNode`                 | boolean | `true`     | Prefer node with WordPress pod for RWO PVCs.             |
 | `plugins.items`                                            | array   | `[]`       | Official WordPress.org plugin slugs.                     |
+| `plugins.custom`                                           | array   | `[]`       | Checksum-verified custom plugin ZIPs.                    |
+| `plugins.custom[].name`                                    | string  | required   | Safe plugin directory name.                              |
+| `plugins.custom[].url`                                     | string  | required   | HTTPS ZIP URL.                                           |
+| `plugins.custom[].sha256`                                  | string  | required   | Expected 64-character SHA-256 digest.                    |
+| `plugins.custom[].authentication.existingSecret`           | string  | `""`       | Existing download-token Secret.                          |
+| `plugins.custom[].authentication.tokenKey`                 | string  | `""`       | Token key in the existing Secret.                        |
 | `objectCache.enabled`                                      | boolean | `false`    | Enable object cache integration.                         |
 | `objectCache.provider`                                     | string  | `redis`    | `redis` or `memcached`.                                  |
 | `objectCache.installPlugin`                                | boolean | `true`     | Install and activate provider plugin.                    |
