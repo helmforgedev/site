@@ -30,10 +30,19 @@ connections.
 - **PodDisruptionBudget** — built-in disruption protection enabled by default
 - **MQTTX Web companion** — optional browser-based MQTT client for testing and debugging
 - **Connection and queue limits** — configurable caps to prevent runaway memory usage
+- **Restricted runtime baseline** — non-root containers, read-only root filesystems, dropped capabilities, RuntimeDefault seccomp, and no API token mount
+- **Listener-aware NetworkPolicies** — ingress is limited to enabled broker and MQTTX named ports
+
+<Callout type="info" title="Mosquitto 2.1 packet-size default">
+  Mosquitto 2.1 defaults `max_packet_size` to 2,000,000 bytes. Set `broker.limits.maxPacketSize` explicitly when clients
+  require larger packets. Authentication and ACL configuration uses the Mosquitto 2.1 plugin interfaces rather than the
+  deprecated file directives.
+</Callout>
 
 ## Security Scan
 
-Security Scan: Kubescape local scan against MITRE,NSA,SOC2 reports a 74.24% resource summary score.
+The default manifests score **93.93939%** in the local Kubescape scan against the MITRE, NSA, and SOC 2 frameworks.
+Every pull request publishes a fresh scan result before merge.
 
 ## Topology
 
@@ -278,7 +287,7 @@ mqttxWeb:
 | Parameter          | Type   | Default                               | Description                          |
 | ------------------ | ------ | ------------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/eclipse-mosquitto` | Mosquitto container image.           |
-| `image.tag`        | string | `"2.0.22"`                            | Image tag.                           |
+| `image.tag`        | string | `"2.1.2-alpine"`                      | Pinned Mosquitto image tag.          |
 | `image.pullPolicy` | string | `IfNotPresent`                        | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                                  | Pull secrets for private registries. |
 
@@ -328,16 +337,16 @@ mqttxWeb:
 
 #### Limits
 
-All limit values default to `0`, which means the Mosquitto broker default applies (typically unlimited).
+All limit values default to `0`, which means the Mosquitto broker default applies.
 Set explicit limits for production deployments with many connected devices.
 
-| Parameter                           | Type    | Default | Description                                                     |
-| ----------------------------------- | ------- | ------- | --------------------------------------------------------------- |
-| `broker.limits.maxConnections`      | integer | `0`     | Maximum concurrently connected clients. `0` = unlimited.        |
-| `broker.limits.maxInflightMessages` | integer | `0`     | Maximum in-flight QoS 1/2 messages per client. `0` = unlimited. |
-| `broker.limits.maxQueuedMessages`   | integer | `0`     | Maximum queued QoS 1/2 messages per client. `0` = unlimited.    |
-| `broker.limits.maxQueuedBytes`      | integer | `0`     | Maximum queued message bytes per client. `0` = unlimited.       |
-| `broker.limits.maxPacketSize`       | integer | `0`     | Maximum MQTT packet size in bytes. `0` = unlimited.             |
+| Parameter                           | Type    | Default | Description                                                        |
+| ----------------------------------- | ------- | ------- | ------------------------------------------------------------------ |
+| `broker.limits.maxConnections`      | integer | `0`     | Maximum concurrently connected clients. `0` = unlimited.           |
+| `broker.limits.maxInflightMessages` | integer | `0`     | Maximum in-flight QoS 1/2 messages per client. `0` = unlimited.    |
+| `broker.limits.maxQueuedMessages`   | integer | `0`     | Maximum queued QoS 1/2 messages per client. `0` = unlimited.       |
+| `broker.limits.maxQueuedBytes`      | integer | `0`     | Maximum queued message bytes per client. `0` = unlimited.          |
+| `broker.limits.maxPacketSize`       | integer | `0`     | Maximum MQTT packet size in bytes. `0` keeps the upstream default. |
 
 #### Federation
 
@@ -411,8 +420,9 @@ Set explicit limits for production deployments with many connected devices.
 | ----------------------------------- | ------- | -------------------------- | --------------------------------------------------------------------- |
 | `mqttxWeb.enabled`                  | boolean | `false`                    | Deploy the MQTTX Web companion browser client.                        |
 | `mqttxWeb.image.repository`         | string  | `docker.io/emqx/mqttx-web` | MQTTX Web container image.                                            |
-| `mqttxWeb.image.tag`                | string  | `""`                       | Image tag. Defaults to the upstream image default tag.                |
+| `mqttxWeb.image.tag`                | string  | `"v1.13.1"`                | Pinned MQTTX Web image tag.                                           |
 | `mqttxWeb.replicaCount`             | integer | `1`                        | Number of MQTTX Web replicas (independent from broker replicas).      |
+| `mqttxWeb.containerPort`            | integer | `8080`                     | HTTP listener passed to the real MQTTX Web process.                   |
 | `mqttxWeb.service.type`             | string  | `ClusterIP`                | Service type for MQTTX Web.                                           |
 | `mqttxWeb.service.port`             | integer | `80`                       | HTTP service port for MQTTX Web.                                      |
 | `mqttxWeb.broker.scheme`            | string  | `ws`                       | WebSocket scheme for browser connections: `ws` or `wss`.              |
@@ -453,21 +463,41 @@ Set explicit limits for production deployments with many connected devices.
 | `readinessProbe.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
 | `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
 
+### NetworkPolicy
+
+| Parameter                         | Type    | Default | Description                                                    |
+| --------------------------------- | ------- | ------- | -------------------------------------------------------------- |
+| `networkPolicy.enabled`           | boolean | `true`  | Create ingress policies for broker and enabled MQTTX Web pods. |
+| `networkPolicy.extraIngress`      | array   | `[]`    | Additional rules appended to broker ingress.                   |
+| `networkPolicy.mqttxExtraIngress` | array   | `[]`    | Additional rules appended to MQTTX Web ingress.                |
+
+Extra rules are additive; they do not replace the default named-port rule. Enforcement requires a NetworkPolicy-aware
+CNI.
+
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter            | Type   | Default                      | Description                         |
+| -------------------- | ------ | ---------------------------- | ----------------------------------- |
+| `resources`          | object | `{}`                         | CPU and memory requests and limits. |
+| `podSecurityContext` | object | restricted non-root defaults | Pod-level security context.         |
+| `securityContext`    | object | restricted defaults          | Container-level security context.   |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                               |
+| --------------------------------------------- | ------- | ------- | ----------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.        |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.         |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.       |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into pods. |
+
+## Production Security Checklist
+
+- Enable authentication and least-privilege ACLs before untrusted exposure.
+- Enable TLS or mTLS with a platform-managed existing Secret.
+- Set resources and broker connection, queue, and packet limits.
+- Keep NetworkPolicy enabled and add only the source selectors your environment requires.
+- Back up every broker PVC independently and test retained-message restoration.
 
 ### Scheduling
 
