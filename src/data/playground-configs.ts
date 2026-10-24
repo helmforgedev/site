@@ -17298,6 +17298,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'postgresql.enabled',
           type: 'toggle',
           default: true,
+          conflictsWith: ['externalDatabase.enabled'],
+          conflictResetValues: { 'externalDatabase.enabled': 'false' },
           description: 'Deploy the PostgreSQL subchart',
         },
         {
@@ -17305,6 +17307,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'externalDatabase.enabled',
           type: 'toggle',
           default: false,
+          conflictsWith: ['postgresql.enabled'],
+          conflictResetValues: { 'postgresql.enabled': 'false' },
           description: 'Use an operator-managed PostgreSQL instead',
         },
         {
@@ -17313,6 +17317,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '',
           description: 'Required when external PostgreSQL is enabled',
+        },
+        {
+          label: 'External Database Secret',
+          key: 'externalDatabase.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret containing the database password',
+        },
+        {
+          label: 'External Database Password Key',
+          key: 'externalDatabase.existingSecretPasswordKey',
+          type: 'text',
+          default: 'user-password',
+          description: 'Key in the Secret containing the database password',
         },
       ],
     },

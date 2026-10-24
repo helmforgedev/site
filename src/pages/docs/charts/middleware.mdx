@@ -114,7 +114,7 @@ externalDatabase:
   name: mhq-oss
   user: middleware
   existingSecret: middleware-database
-  existingSecretPasswordKey: password
+  existingSecretPasswordKey: user-password
   sslMode: require
 
 persistence:
@@ -150,9 +150,10 @@ create the same target:
 ```bash
 read -r -s -p 'External PostgreSQL password: ' MIDDLEWARE_DB_PASSWORD
 printf '\n'
+kubectl create namespace middleware --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic middleware-database \
   --namespace middleware \
-  --from-literal=password="$MIDDLEWARE_DB_PASSWORD"
+  --from-literal=user-password="$MIDDLEWARE_DB_PASSWORD"
 unset MIDDLEWARE_DB_PASSWORD
 ```
 
