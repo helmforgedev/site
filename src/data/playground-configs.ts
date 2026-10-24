@@ -9158,13 +9158,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '10Gi',
           description: 'PVC storage size',
         },
-        {
-          label: 'Container HTTP Port',
-          key: 'containerPorts.http',
-          type: 'number',
-          default: '80',
-          description: 'Apache listener port; Service targeting remains name-based',
-        },
       ],
     },
     {
@@ -10769,6 +10762,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'ReadWriteOnce',
           options: ['ReadWriteOnce', 'ReadWriteMany'],
           description: 'Use RWX before enabling multiple replicas',
+        },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Apache listener port; Service targeting remains name-based',
         },
       ],
     },
