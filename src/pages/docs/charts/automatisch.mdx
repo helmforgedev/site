@@ -11,7 +11,8 @@ import Callout from '../../../components/Callout.astro';
 
 Open-source business automation platform — a self-hosted alternative to Zapier and Make. Automatisch provides
 a visual workflow builder, pre-built integrations with popular services, webhook triggers, and OAuth-based
-connection management. It requires both PostgreSQL and Redis to operate.
+connection management. It requires PostgreSQL, Redis, an HTTP web process, and
+a background worker process to operate.
 
 <Callout type="danger" title="Set webAppUrl to your public URL before configuring integrations">
   The default `automatisch.webAppUrl` is `http://localhost:3000`. Without changing it to your public URL, OAuth
@@ -27,7 +28,22 @@ connection management. It requires both PostgreSQL and Redis to operate.
 - **OAuth connection management** — secure service connections with token refresh
 - **PostgreSQL backend** — stores workflows, connections, and execution history
 - **Redis queue** — asynchronous job execution for reliable workflow processing
+- **Dedicated worker** — required background process enabled by default and independently scalable
 - **Auto-generated secrets** — encryption and JWT keys generated on first install
+- **Hardened runtime** — non-root containers, read-only filesystems, dropped capabilities, and NetworkPolicy
+
+## Architecture
+
+The chart deploys separate web and worker Deployments from the same official
+image. The web process serves the API and UI and performs database migrations
+during startup. The worker sets `WORKER=true` and executes queued workflows.
+Both processes share PostgreSQL, Redis, and the same stable application keys.
+The Service selects only web pods, so it never routes HTTP traffic to workers.
+
+`automatisch.containerPorts.http` configures both the container port and the
+upstream `PORT` environment variable. `service.port` remains the independent
+client-facing Kubernetes Service port. The chart also sets `HOST=0.0.0.0` so
+Kubernetes probes and Services can reach the process.
 
 ## Installation
 
@@ -62,6 +78,10 @@ helm install automatisch oci://ghcr.io/helmforgedev/helm/automatisch
 automatisch:
   webAppUrl: 'https://automate.example.com'
 
+worker:
+  enabled: true
+  replicaCount: 1
+
 postgresql:
   enabled: true
   auth:
@@ -89,6 +109,16 @@ ingress:
 automatisch:
   webAppUrl: 'https://automate.example.com'
   appEnv: production
+
+worker:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
 
 postgresql:
   enabled: true
@@ -144,6 +174,8 @@ redis_config:
   external:
     host: redis.cache.svc.cluster.local
     port: '6379'
+    existingSecret: automatisch-redis-credentials
+    existingSecretPasswordKey: password
 
 postgresql:
   enabled: false
@@ -186,11 +218,21 @@ ingress:
 
 ### Automatisch Configuration
 
-| Parameter               | Type   | Default                 | Description                                                                        |
-| ----------------------- | ------ | ----------------------- | ---------------------------------------------------------------------------------- |
-| `automatisch.webAppUrl` | string | `http://localhost:3000` | Public URL of the Automatisch instance. Required for OAuth callbacks and webhooks. |
-| `automatisch.appEnv`    | string | `production`            | Application environment. Keep `production` in all non-development deployments.     |
-| `automatisch.extraEnv`  | array  | `[]`                    | Extra environment variables for advanced configuration.                            |
+| Parameter                         | Type    | Default                 | Description                                                                        |
+| --------------------------------- | ------- | ----------------------- | ---------------------------------------------------------------------------------- |
+| `automatisch.webAppUrl`           | string  | `http://localhost:3000` | Public URL of the Automatisch instance. Required for OAuth callbacks and webhooks. |
+| `automatisch.host`                | string  | `0.0.0.0`               | HTTP bind address inside the pod.                                                  |
+| `automatisch.appEnv`              | string  | `production`            | Application environment. Keep `production` in all non-development deployments.     |
+| `automatisch.containerPorts.http` | integer | `3000`                  | Process listener mapped to the upstream `PORT` variable.                           |
+| `automatisch.extraEnv`            | array   | `[]`                    | Extra environment variables applied to web and worker containers.                  |
+
+### Worker
+
+| Parameter             | Type    | Default | Description                                       |
+| --------------------- | ------- | ------- | ------------------------------------------------- |
+| `worker.enabled`      | boolean | `true`  | Run the required background workflow worker.      |
+| `worker.replicaCount` | integer | `1`     | Number of independently scalable worker replicas. |
+| `worker.resources`    | object  | `{}`    | Worker CPU and memory requests and limits.        |
 
 ### Database — External PostgreSQL
 
@@ -210,11 +252,13 @@ Used when `postgresql.enabled: false`.
 
 Used when `redis.enabled: false`. Note the key name is `redis_config` (with underscore).
 
-| Parameter                              | Type   | Default  | Description                                    |
-| -------------------------------------- | ------ | -------- | ---------------------------------------------- |
-| `redis_config.external.host`           | string | `""`     | External Redis hostname.                       |
-| `redis_config.external.port`           | string | `"6379"` | External Redis port.                           |
-| `redis_config.external.existingSecret` | string | `""`     | Existing secret containing the Redis password. |
+| Parameter                                         | Type   | Default    | Description                                    |
+| ------------------------------------------------- | ------ | ---------- | ---------------------------------------------- |
+| `redis_config.external.host`                      | string | `""`       | External Redis hostname.                       |
+| `redis_config.external.port`                      | string | `"6379"`   | External Redis port.                           |
+| `redis_config.external.password`                  | string | `""`       | Inline password for disposable installs.       |
+| `redis_config.external.existingSecret`            | string | `""`       | Existing secret containing the Redis password. |
+| `redis_config.external.existingSecretPasswordKey` | string | `password` | Key inside the existing Secret.                |
 
 <Callout type="warning" title="Both PostgreSQL and Redis are required">
   Automatisch uses PostgreSQL to store workflow definitions, connections, and execution logs, and Redis as a job queue
@@ -273,19 +317,28 @@ Used when `redis.enabled: false`. Note the key name is `redis_config` (with unde
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter            | Type   | Default                                    | Description                         |
+| -------------------- | ------ | ------------------------------------------ | ----------------------------------- |
+| `resources`          | object | `{}`                                       | Web CPU and memory requests/limits. |
+| `podSecurityContext` | object | non-root UID/GID 1000 and `RuntimeDefault` | Pod-level security context.         |
+| `securityContext`    | object | read-only, no escalation, all caps dropped | Container-level security context.   |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                         |
+| --------------------------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token.       |
+
+### Network Policy
+
+| Parameter               | Type    | Default | Description                                                   |
+| ----------------------- | ------- | ------- | ------------------------------------------------------------- |
+| `networkPolicy.enabled` | boolean | `true`  | Restrict inbound traffic to the HTTP listener.                |
+| `networkPolicy.ingress` | array   | `[]`    | Additional ingress rules.                                     |
+| `networkPolicy.egress`  | array   | `[{}]`  | Egress rules; open by default for arbitrary integration APIs. |
 
 ### Scheduling
 
