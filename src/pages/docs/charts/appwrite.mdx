@@ -506,10 +506,12 @@ certificates, the application Secret, and any external ClickHouse separately.
 | `networkPolicy.egress`                        | array   | `[{}]`  | Egress rules; permissive by default for external integrations. |
 
 The official Appwrite image needs writable runtime paths and is not forced to a
-non-root UID. The chart still drops all capabilities, disables privilege
-escalation, applies RuntimeDefault seccomp, and disables ServiceAccount token
-automount. Restrict egress to the actual SMTP, OAuth, webhook, database, Redis,
-object-storage, and integration destinations used by the installation.
+non-root UID. The chart drops all capabilities by default; the Console
+Deployment then adds only `CHOWN`, `SETGID`, and `SETUID`, which its entrypoint
+requires. It also disables privilege escalation, applies RuntimeDefault
+seccomp, and disables ServiceAccount token automount. Restrict egress to the
+actual SMTP, OAuth, webhook, database, Redis, object-storage, and integration
+destinations used by the installation.
 
 ### Ingress
 
