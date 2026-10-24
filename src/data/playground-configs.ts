@@ -17522,6 +17522,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Number of web server replicas',
         },
         {
+          label: 'Gunicorn Listener Port',
+          key: 'web.containerPort',
+          type: 'number',
+          default: '8088',
+          description: 'Actual container port used by Gunicorn and probes',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Cluster-facing Service port',
+        },
+        {
           label: 'Gunicorn Workers',
           key: 'web.workers',
           type: 'number',
@@ -17542,6 +17556,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
       collapsible: true,
       fields: [
         {
+          label: 'PostgreSQL Architecture',
+          key: 'postgresql.architecture',
+          type: 'select',
+          default: 'standalone',
+          options: ['standalone', 'replication'],
+          description: 'Bundled PostgreSQL topology',
+        },
+        {
           label: 'PostgreSQL Storage Class',
           key: 'postgresql.standalone.persistence.storageClass',
           type: 'text',
@@ -17554,6 +17576,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '8Gi',
           description: 'Persistent volume size for bundled PostgreSQL',
+        },
+        {
+          label: 'Redis Architecture',
+          key: 'redis.architecture',
+          type: 'select',
+          default: 'standalone',
+          options: ['standalone', 'replication'],
+          description: 'Bundled Redis topology',
         },
         {
           label: 'Redis Storage Class',
@@ -17606,7 +17636,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'superset.example.com',
           description: 'Ingress hostname',
@@ -17618,6 +17648,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'traefik',
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
+        },
+      ],
+    },
+    {
+      name: 'Security',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict ingress to the configured Superset listener',
+        },
+        {
+          label: 'Dedicated ServiceAccount',
+          key: 'serviceAccount.create',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create the namespaced ServiceAccount used by the init waiter',
         },
       ],
     },

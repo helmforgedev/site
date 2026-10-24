@@ -718,7 +718,7 @@ export const charts: Chart[] = [
   {
     name: 'Apache Superset',
     slug: 'superset',
-    description: 'Data exploration and visualization with Celery workers, PostgreSQL, and Redis.',
+    description: 'Production-aware BI with managed migrations, Celery workers, PostgreSQL, Redis, and secure defaults.',
     maturity: 'stable',
     backup: true,
   },
