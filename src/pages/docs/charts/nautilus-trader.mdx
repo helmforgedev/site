@@ -22,9 +22,9 @@ a venue or submit an order until an operator supplies strategy code and explicit
 - optional PostgreSQL and Redis dependencies or external service coordinates;
 - native External Secrets Operator resources;
 - optional PVCs for catalogs, event stores, and backtest results;
-- non-root execution, read-only root filesystem, dropped capabilities, and no API token;
+- non-root execution, read-only root filesystem, dropped capabilities, and no API token automount by default for runner workloads;
 - NetworkPolicy, dual-stack Service, scheduling controls, ServiceMonitor, and PrometheusRule.
-- optional PodDisruptionBudget and bounded writable temporary storage for every workload.
+- an optional PodDisruptionBudget for the live singleton and bounded writable temporary storage for every runner workload.
 
 NautilusTrader is not an HTTP application. The Service is private and exists only for runner health and metrics, so the
 chart does not create Ingress or Gateway API resources.
@@ -159,11 +159,14 @@ backtests use a Job or CronJob. Catalog, event-store, and result paths have
 independent PVC contracts. PostgreSQL and Redis provide coordinates to strategy
 code and do not silently activate upstream adapters.
 
-Every chart-managed workload runs as UID/GID 10001 with runtime-default seccomp,
-no privilege escalation, dropped capabilities, a read-only root filesystem, and
-no API token. Writable `/tmp` uses a bounded `emptyDir`. The optional
-PodDisruptionBudget reduces voluntary disruption but does not make a live trading
-node highly available.
+The chart-managed Nautilus runner Deployment, Job, and CronJob workloads run as
+UID/GID 10001 with runtime-default seccomp, no privilege escalation, dropped
+capabilities, a read-only root filesystem, and no API token automount by
+default. Their writable `/tmp` uses a bounded `emptyDir`. These claims do not
+describe the optional PostgreSQL or Redis dependency workloads, whose security
+contracts are owned by their respective charts. The optional PodDisruptionBudget
+reduces voluntary disruption of the live singleton but does not make a live
+trading node highly available.
 
 ## Configuration reference
 
