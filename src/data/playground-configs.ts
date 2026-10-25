@@ -5629,6 +5629,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '64Mi',
           description: 'Bound dashboard nginx temporary storage',
         },
+        {
+          label: 'STUN Allowed CIDR',
+          key: 'networkPolicy.stunIngressFrom[0].ipBlock.cidr',
+          type: 'text',
+          default: '',
+          description: 'Optional direct UDP STUN peer range, separate from HTTP ingress peers',
+        },
       ],
     },
     {

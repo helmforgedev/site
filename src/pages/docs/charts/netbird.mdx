@@ -68,7 +68,7 @@ Shared operations:
 - `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
 - `externalSecrets.enabled`, `externalSecrets.items`.
 - `pdb.enabled`, `pdb.minAvailable`, `pdb.maxUnavailable`.
-- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.stunIngressFrom`, `networkPolicy.extraEgress`.
 - `resources`, `runtimeStorage`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
 - `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
@@ -78,27 +78,29 @@ Shared operations:
 Process listeners are separate from Service-facing ports. Changing a `server.containerPorts` value updates the NetBird
 listener when the chart generates `config.yaml`. When `server.config.existingSecret` supplies that file, set the matching
 listener port in the Secret. `dashboard.containerPorts.http` updates the nginx listener. Named Service target ports keep
-routing synchronized with the pod declaration.
+routing synchronized with the pod declaration. STUN is the exception: `server.service.stunPort` must equal
+`server.containerPorts.stun` because NetBird advertises that listener port directly to peers.
 
-| Parameter                           | Type    | Default | Description                                                     |
-| ----------------------------------- | ------- | ------- | --------------------------------------------------------------- |
-| `server.containerPorts.http`        | integer | `80`    | Combined server HTTP and gRPC listener.                         |
-| `server.containerPorts.stun`        | integer | `3478`  | Combined server UDP STUN listener.                              |
-| `server.containerPorts.metrics`     | integer | `9090`  | Combined server Prometheus listener.                            |
-| `server.containerPorts.health`      | integer | `9000`  | Combined server health listener.                                |
-| `dashboard.containerPorts.http`     | integer | `80`    | Dashboard nginx listener.                                       |
-| `persistence.emptyDirSizeLimit`     | string  | `1Gi`   | Server data limit when persistent storage is disabled.          |
-| `runtimeStorage.nginxVarSizeLimit`  | string  | `32Mi`  | Dashboard `/var/lib/nginx` ephemeral-storage limit.             |
-| `runtimeStorage.nginxLogsSizeLimit` | string  | `64Mi`  | Dashboard `/var/log/nginx` ephemeral-storage limit.             |
-| `runtimeStorage.nginxTmpSizeLimit`  | string  | `64Mi`  | Dashboard `/var/cache/nginx` ephemeral-storage limit.           |
-| `runtimeStorage.nginxRunSizeLimit`  | string  | `8Mi`   | Dashboard `/run` ephemeral-storage limit.                       |
-| `resources.requests.cpu`            | string  | `50m`   | Default CPU request for each application container.             |
-| `resources.requests.memory`         | string  | `64Mi`  | Default memory request for each application container.          |
-| `resources.limits.cpu`              | string  | `500m`  | Default CPU limit for each application container.               |
-| `resources.limits.memory`           | string  | `256Mi` | Default memory limit for each application container.            |
-| `pdb.enabled`                       | boolean | `false` | Render disruption budgets for the server and dashboard.         |
-| `pdb.minAvailable`                  | integer | `1`     | Minimum available pods when disruption budgets are enabled.     |
-| `pdb.maxUnavailable`                | integer | `null`  | Alternative maximum unavailable pods; mutually exclusive above. |
+| Parameter                           | Type    | Default | Description                                                      |
+| ----------------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `server.containerPorts.http`        | integer | `80`    | Combined server HTTP and gRPC listener.                          |
+| `server.containerPorts.stun`        | integer | `3478`  | Combined server UDP STUN listener.                               |
+| `server.containerPorts.metrics`     | integer | `9090`  | Combined server Prometheus listener.                             |
+| `server.containerPorts.health`      | integer | `9000`  | Combined server health listener.                                 |
+| `dashboard.containerPorts.http`     | integer | `80`    | Dashboard nginx listener.                                        |
+| `persistence.emptyDirSizeLimit`     | string  | `1Gi`   | Server data limit when persistent storage is disabled.           |
+| `runtimeStorage.nginxVarSizeLimit`  | string  | `32Mi`  | Dashboard `/var/lib/nginx` ephemeral-storage limit.              |
+| `runtimeStorage.nginxLogsSizeLimit` | string  | `64Mi`  | Dashboard `/var/log/nginx` ephemeral-storage limit.              |
+| `runtimeStorage.nginxTmpSizeLimit`  | string  | `64Mi`  | Dashboard `/var/cache/nginx` ephemeral-storage limit.            |
+| `runtimeStorage.nginxRunSizeLimit`  | string  | `8Mi`   | Dashboard `/run` ephemeral-storage limit.                        |
+| `resources.requests.cpu`            | string  | `50m`   | Default CPU request for each application container.              |
+| `resources.requests.memory`         | string  | `64Mi`  | Default memory request for each application container.           |
+| `resources.limits.cpu`              | string  | `500m`  | Default CPU limit for each application container.                |
+| `resources.limits.memory`           | string  | `256Mi` | Default memory limit for each application container.             |
+| `pdb.enabled`                       | boolean | `false` | Render disruption budgets for the server and dashboard.          |
+| `pdb.minAvailable`                  | integer | `1`     | Minimum available pods when disruption budgets are enabled.      |
+| `pdb.maxUnavailable`                | integer | `null`  | Alternative maximum unavailable pods; mutually exclusive above.  |
+| `networkPolicy.stunIngressFrom`     | array   | `[]`    | Optional direct UDP STUN peers, separate from HTTP-facing peers. |
 
 ## Installation
 
