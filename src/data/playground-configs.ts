@@ -10731,7 +10731,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'podDisruptionBudget.enabled',
           type: 'toggle',
           default: 'false',
-          description: 'Protect the singleton pod from voluntary disruption',
+          description:
+            'Keep one pod available; voluntary eviction and node drain wait until this value changes or the PDB is removed',
         },
         {
           label: 'Network Policy',

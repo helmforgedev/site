@@ -15,8 +15,8 @@ third-party service — all traffic stays on your infrastructure.
 
 <Callout type="danger" title="Default access is open — secure before exposing publicly">
   `ntfy.authDefaultAccess` defaults to `read-write`, meaning any unauthenticated user can publish and subscribe to any
-  topic. If you expose ntfy to the internet, set `authDefaultAccess: deny-all` and configure users or OIDC to prevent
-  unauthorized access and notification spam.
+  topic. If you expose ntfy to the internet, set `ntfy.authDefaultAccess: deny-all` and configure users or OIDC to
+  prevent unauthorized access and notification spam.
 </Callout>
 
 ## Key Features
@@ -78,6 +78,14 @@ if you want to adopt the chart's `v2.32.0` default. Review the
 helm upgrade ntfy helmforge/ntfy \
   --reset-then-reuse-values
 ```
+
+ntfy 2.31.1 migrated the message database schema from version 16 to 17. After upgrading an instance from ntfy 2.30.0
+or earlier to 2.32.0, rolling back to 2.31.0 or earlier requires manually resetting the recorded message schema version
+before starting the older server. For PostgreSQL, run `UPDATE schema_version SET version = 16 WHERE store = 'message';`.
+For the SQLite cache file, run `UPDATE schemaVersion SET version = 16 WHERE id = 1;`. Rolling back to 2.31.1 or later
+does not require this adjustment because those releases tolerate newer message schemas. Review the upstream
+[2.31.1 migration and rollback notes](https://github.com/binwiederhier/ntfy/blob/main/docs/releases.md#ntfy-server-v2311)
+before downgrading.
 
 ## Deployment Examples
 
@@ -491,25 +499,25 @@ Probes use the `/v1/health` endpoint.
 The defaults run as UID/GID 1000 with `RuntimeDefault` seccomp, a read-only root filesystem, no privilege escalation,
 and all capabilities dropped. CPU and memory requests and limits are set by default; tune them from observed usage.
 
-| Parameter                                  | Type    | Default          | Description                                         |
-| ------------------------------------------ | ------- | ---------------- | --------------------------------------------------- |
-| `resources.requests.cpu`                   | string  | `50m`            | Default CPU request.                                |
-| `resources.requests.memory`                | string  | `64Mi`           | Default memory request.                             |
-| `resources.limits.cpu`                     | string  | `500m`           | Default CPU limit.                                  |
-| `resources.limits.memory`                  | string  | `256Mi`          | Default memory limit.                               |
-| `podSecurityContext.runAsNonRoot`          | boolean | `true`           | Require non-root execution.                         |
-| `podSecurityContext.runAsUser`             | integer | `1000`           | Pod user ID.                                        |
-| `podSecurityContext.runAsGroup`            | integer | `1000`           | Pod group ID.                                       |
-| `podSecurityContext.fsGroup`               | integer | `1000`           | Writable-volume group ID.                           |
-| `podSecurityContext.fsGroupChangePolicy`   | string  | `OnRootMismatch` | Avoid unnecessary recursive ownership changes.      |
-| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Container syscall profile.                          |
-| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Deny privilege escalation.                          |
-| `securityContext.readOnlyRootFilesystem`   | boolean | `true`           | Keep the image filesystem read-only.                |
-| `securityContext.capabilities.drop`        | array   | `["ALL"]`        | Drop Linux capabilities.                            |
-| `runtimeStorage.tmpSizeLimit`              | string  | `128Mi`          | Bound writable `/tmp` storage.                      |
-| `podDisruptionBudget.enabled`              | boolean | `false`          | Render a disruption budget for the singleton pod.   |
-| `podDisruptionBudget.minAvailable`         | integer | `1`              | Minimum available pod; mutually exclusive with max. |
-| `podDisruptionBudget.maxUnavailable`       | integer | `null`           | Alternative maximum unavailable pod count.          |
+| Parameter                                  | Type    | Default          | Description                                                                                                                    |
+| ------------------------------------------ | ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `resources.requests.cpu`                   | string  | `50m`            | Default CPU request.                                                                                                           |
+| `resources.requests.memory`                | string  | `64Mi`           | Default memory request.                                                                                                        |
+| `resources.limits.cpu`                     | string  | `500m`           | Default CPU limit.                                                                                                             |
+| `resources.limits.memory`                  | string  | `256Mi`          | Default memory limit.                                                                                                          |
+| `podSecurityContext.runAsNonRoot`          | boolean | `true`           | Require non-root execution.                                                                                                    |
+| `podSecurityContext.runAsUser`             | integer | `1000`           | Pod user ID.                                                                                                                   |
+| `podSecurityContext.runAsGroup`            | integer | `1000`           | Pod group ID.                                                                                                                  |
+| `podSecurityContext.fsGroup`               | integer | `1000`           | Writable-volume group ID.                                                                                                      |
+| `podSecurityContext.fsGroupChangePolicy`   | string  | `OnRootMismatch` | Avoid unnecessary recursive ownership changes.                                                                                 |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Container syscall profile.                                                                                                     |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Deny privilege escalation.                                                                                                     |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `true`           | Keep the image filesystem read-only.                                                                                           |
+| `securityContext.capabilities.drop`        | array   | `["ALL"]`        | Drop Linux capabilities.                                                                                                       |
+| `runtimeStorage.tmpSizeLimit`              | string  | `128Mi`          | Bound writable `/tmp` storage.                                                                                                 |
+| `podDisruptionBudget.enabled`              | boolean | `false`          | Render a disruption budget for the singleton pod.                                                                              |
+| `podDisruptionBudget.minAvailable`         | integer | `1`              | Keep one pod available; on a singleton, voluntary eviction and node drain wait until this value changes or the PDB is removed. |
+| `podDisruptionBudget.maxUnavailable`       | integer | `null`           | Alternative maximum unavailable pod count.                                                                                     |
 
 ### Network Policy
 
