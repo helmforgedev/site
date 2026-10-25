@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Wallabag Chart
-description: Wallabag Helm chart for Kubernetes read-it-later hosting with full-text extraction, PostgreSQL backend, optional Redis cache, persistence, and S3 backup.
+description: Wallabag Helm chart for Kubernetes read-it-later hosting with automatic schema setup, PostgreSQL backend, optional Redis import queue, Gateway API, persistence, and S3 backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -18,11 +18,16 @@ with tags, annotations, and reading lists, and share them with configurable acce
 - **Full-text extraction** — saves the complete article content, not just a link
 - **Multi-device access** — web UI, mobile apps, browser extensions, and e-reader exports
 - **Tag and annotation system** — organize articles with tags, highlights, and notes
+- **Working first install** — a setup init container installs the schema on first start and runs Doctrine migrations
+  on every upgrade
+- **Initial super-admin from a Secret** — configurable username and email with a generated or supplied password
 - **PostgreSQL backend** — bundled subchart or external database
-- **Optional Redis caching** — subchart or external Redis for session and query caching
-- **Persistent storage** — PVC-backed data directory for extracted images and local cache
+- **Optional Redis** — subchart or external Redis for the asynchronous import queue
+- **Persistent storage** — PVC-backed data directory for downloaded article images
 - **S3 backup** — scheduled `pg_dump` of the Wallabag database to S3-compatible storage
-- **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Ingress and Gateway API** — Ingress with TLS or Gateway API HTTPRoutes
+- **Hardened defaults** — no privilege escalation, minimal capabilities, `RuntimeDefault` seccomp, no ServiceAccount
+  token
 
 ## Installation
 
@@ -40,6 +45,19 @@ helm install wallabag helmforge/wallabag
 helm install wallabag oci://ghcr.io/helmforgedev/helm/wallabag
 ```
 
+## Getting Started
+
+The first pod start installs the schema and creates the initial super-admin. Read its password and open the UI:
+
+```bash
+kubectl rollout status deploy/wallabag-wallabag --timeout=300s
+kubectl get secret wallabag-wallabag-admin -o jsonpath='{.data.admin-password}' | base64 -d; echo
+kubectl port-forward svc/wallabag-wallabag 8080:80
+```
+
+Log in at `http://localhost:8080/` as `wallabag` (or `wallabag.admin.username`). Resource names follow
+`<release>-wallabag`.
+
 ## Deployment Examples
 
 <DocsTabs
@@ -48,6 +66,7 @@ helm install wallabag oci://ghcr.io/helmforgedev/helm/wallabag
     { id: 'with-redis', label: 'With Redis' },
     { id: 'external-db', label: 'External PostgreSQL' },
     { id: 'backup', label: 'With S3 Backup' },
+    { id: 'gateway', label: 'Gateway API' },
   ]}
 >
 
@@ -83,7 +102,7 @@ ingress:
 <div data-tab-panel="with-redis">
 
 ```yaml
-# values.yaml — Wallabag with PostgreSQL and Redis for caching
+# values.yaml — Wallabag with PostgreSQL and Redis for the asynchronous import queue
 wallabag:
   domainName: 'https://wallabag.example.com'
   secret: 'a-random-symfony-app-secret-here'
@@ -139,6 +158,8 @@ redis:
 externalRedis:
   host: redis.cache.svc
   port: '6379'
+  existingSecret: wallabag-redis
+  existingSecretPasswordKey: redis-password
 
 persistence:
   enabled: true
@@ -185,6 +206,27 @@ persistence:
 
 </div>
 
+<div data-tab-panel="gateway">
+
+```yaml
+# values.yaml — Wallabag published through a shared Gateway
+wallabag:
+  domainName: 'https://wallabag.example.com'
+
+gatewayAPI:
+  enabled: true
+  httpRoutes:
+    - name: public
+      parentRefs:
+        - name: shared-gateway
+          namespace: gateway-system
+          sectionName: https
+      hostnames:
+        - wallabag.example.com
+```
+
+</div>
+
 </DocsTabs>
 
 ## Configuration Reference
@@ -193,6 +235,7 @@ persistence:
 
 | Parameter          | Type   | Default | Description                          |
 | ------------------ | ------ | ------- | ------------------------------------ |
+| `global`           | object | `{}`    | Global values shared with parents.   |
 | `nameOverride`     | string | `""`    | Override the chart name.             |
 | `fullnameOverride` | string | `""`    | Override the full release name.      |
 | `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
@@ -208,15 +251,29 @@ persistence:
 
 ### Wallabag Configuration
 
-| Parameter                    | Type    | Default                          | Description                                                            |
-| ---------------------------- | ------- | -------------------------------- | ---------------------------------------------------------------------- |
-| `wallabag.port`              | integer | `80`                             | Internal HTTP port for the Wallabag container.                         |
-| `wallabag.domainName`        | string  | `"https://wallabag.example.com"` | Public URL of the Wallabag instance. Must be changed before deploying. |
-| `wallabag.secret`            | string  | `""`                             | Symfony APP_SECRET for cookie signing and CSRF protection.             |
-| `wallabag.existingSecret`    | string  | `""`                             | Existing Kubernetes Secret containing the Symfony secret.              |
-| `wallabag.existingSecretKey` | string  | `symfony-secret`                 | Key inside the existing secret holding the secret value.               |
-| `wallabag.registration`      | boolean | `false`                          | Allow new user registrations. Disabled by default for security.        |
-| `wallabag.extraEnv`          | array   | `[]`                             | Extra environment variables injected into the Wallabag container.      |
+| Parameter                                  | Type    | Default                          | Description                                                            |
+| ------------------------------------------ | ------- | -------------------------------- | ---------------------------------------------------------------------- |
+| `wallabag.port`                            | integer | `80`                             | nginx listener inside the container; the process binds this port.      |
+| `wallabag.domainName`                      | string  | `"https://wallabag.example.com"` | Public URL of the Wallabag instance. Must be changed before deploying. |
+| `wallabag.serverName`                      | string  | `Wallabag`                       | Instance name shown in the UI and API.                                 |
+| `wallabag.secret`                          | string  | `""`                             | Symfony secret; generated once and preserved across upgrades.          |
+| `wallabag.existingSecret`                  | string  | `""`                             | Existing Kubernetes Secret containing the Symfony secret.              |
+| `wallabag.existingSecretKey`               | string  | `symfony-secret`                 | Key inside the existing secret holding the secret value.               |
+| `wallabag.registration`                    | boolean | `false`                          | Allow new user registrations. Disabled by default for security.        |
+| `wallabag.admin.username`                  | string  | `wallabag`                       | Initial super-admin username, applied on the first install.            |
+| `wallabag.admin.email`                     | string  | `wallabag@example.com`           | Initial super-admin email, applied on the first install.               |
+| `wallabag.admin.password`                  | string  | `""`                             | Initial super-admin password; generated once when empty.               |
+| `wallabag.admin.existingSecret`            | string  | `""`                             | Existing Secret with the initial super-admin password.                 |
+| `wallabag.admin.existingSecretPasswordKey` | string  | `admin-password`                 | Key inside the admin Secret.                                           |
+| `wallabag.extraEnv`                        | array   | `[]`                             | Extra environment variables injected into the Wallabag container.      |
+
+### Database Setup
+
+| Parameter                          | Type    | Default | Description                                                         |
+| ---------------------------------- | ------- | ------- | ------------------------------------------------------------------- |
+| `setup.enabled`                    | boolean | `true`  | Install the schema on first start and run migrations on each start. |
+| `setup.databaseWaitTimeoutSeconds` | integer | `300`   | Seconds the setup container waits for PostgreSQL.                   |
+| `setup.resources`                  | object  | `{}`    | Resources for the setup init container.                             |
 
 <Callout type="warning" title="Change domainName before deploying">
   The default `wallabag.domainName` is `https://wallabag.example.com`. Wallabag uses this value to generate internal
@@ -224,15 +281,16 @@ persistence:
   will be broken.
 </Callout>
 
-<Callout type="danger" title="Always set wallabag.secret explicitly">
-  If `wallabag.secret` is empty, the chart auto-generates a Symfony APP_SECRET. If the pod is recreated without a
-  persistent secret, **all user sessions are invalidated** and CSRF tokens become invalid. Always set an explicit secret
-  or use `wallabag.existingSecret`.
+<Callout type="warning" title="Use existing Secrets with GitOps">
+  When `wallabag.secret` and `wallabag.admin.password` are empty, the chart generates them once and reads them back from
+  the cluster on `helm upgrade`. Tools that render without cluster access, such as Argo CD or `helm template`, generate
+  new values on every render. Set `wallabag.existingSecret` and `wallabag.admin.existingSecret` in that case.
 </Callout>
 
-<Callout type="info" title="User registration is disabled by default">
-  `wallabag.registration: false` is the chart default. After the initial deploy, create your admin account via the
-  Wallabag setup wizard at `/install`. Enable `registration: true` only if you want public self-service sign-ups.
+<Callout type="info" title="Initial super-admin and registration">
+  The upstream installer always creates `wallabag/wallabag`. The chart replaces it on the first install with
+  `wallabag.admin.username`, `wallabag.admin.email`, and the password from the admin Secret. Later password changes go
+  through the Wallabag UI. `wallabag.registration: false` keeps public sign-ups disabled.
 </Callout>
 
 ### Database — Embedded Subchart
@@ -257,20 +315,29 @@ persistence:
 | `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
 | `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
 
-### Cache — Redis Subchart
+### Import Queue — Redis Subchart
 
-| Parameter             | Type    | Default      | Description                                                    |
-| --------------------- | ------- | ------------ | -------------------------------------------------------------- |
-| `redis.enabled`       | boolean | `false`      | Deploy a bundled Redis subchart for session and query caching. |
-| `redis.architecture`  | string  | `standalone` | Redis deployment architecture.                                 |
-| `redis.auth.password` | string  | `""`         | Redis password (auto-generated if empty).                      |
+| Parameter             | Type    | Default      | Description                                               |
+| --------------------- | ------- | ------------ | --------------------------------------------------------- |
+| `redis.enabled`       | boolean | `false`      | Deploy a bundled Redis subchart for the import queue.     |
+| `redis.architecture`  | string  | `standalone` | Redis deployment architecture.                            |
+| `redis.auth.password` | string  | `""`         | Redis password (auto-generated by the subchart if empty). |
 
-### Cache — External Redis
+### Import Queue — External Redis
 
-| Parameter            | Type   | Default | Description                    |
-| -------------------- | ------ | ------- | ------------------------------ |
-| `externalRedis.host` | string | `""`    | External Redis hostname or IP. |
-| `externalRedis.port` | string | `6379`  | External Redis port.           |
+| Parameter                                 | Type   | Default          | Description                                          |
+| ----------------------------------------- | ------ | ---------------- | ---------------------------------------------------- |
+| `externalRedis.host`                      | string | `""`             | External Redis hostname or IP.                       |
+| `externalRedis.port`                      | string | `"6379"`         | External Redis port.                                 |
+| `externalRedis.password`                  | string | `""`             | External Redis password (prefer an existing Secret). |
+| `externalRedis.existingSecret`            | string | `""`             | Existing Secret with the external Redis password.    |
+| `externalRedis.existingSecretPasswordKey` | string | `redis-password` | Key inside the Redis Secret.                         |
+
+<Callout type="warning" title="Redis needs import workers">
+  Wallabag uses Redis only as the queue for asynchronous imports. The queue is consumed by
+  `wallabag:import:redis-worker` processes, which the chart does not run. Keep the internal setting "Enable Redis to
+  fetch data asynchronously" disabled unless you deploy those workers.
+</Callout>
 
 ### Persistence
 
@@ -300,25 +367,33 @@ persistence:
 | `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
 
+### Gateway API
+
+| Parameter               | Type    | Default | Description                                                         |
+| ----------------------- | ------- | ------- | ------------------------------------------------------------------- |
+| `gatewayAPI.enabled`    | boolean | `false` | Render Gateway API HTTPRoutes.                                      |
+| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoutes; each requires `parentRefs` and defaults to the Service. |
+
 ### Probes
 
-| Parameter                              | Type    | Default | Description                        |
-| -------------------------------------- | ------- | ------- | ---------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
-| `probes.startup.periodSeconds`         | integer | `10`    | Startup probe period.              |
-| `probes.startup.timeoutSeconds`        | integer | `5`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+| Parameter                              | Type    | Default     | Description                        |
+| -------------------------------------- | ------- | ----------- | ---------------------------------- |
+| `probes.path`                          | string  | `/api/info` | HTTP path used by every probe.     |
+| `probes.startup.enabled`               | boolean | `true`      | Enable startup probe.              |
+| `probes.startup.initialDelaySeconds`   | integer | `15`        | Startup probe initial delay.       |
+| `probes.startup.periodSeconds`         | integer | `10`        | Startup probe period.              |
+| `probes.startup.timeoutSeconds`        | integer | `5`         | Startup probe timeout.             |
+| `probes.startup.failureThreshold`      | integer | `30`        | Startup probe failure threshold.   |
+| `probes.liveness.enabled`              | boolean | `true`      | Enable liveness probe.             |
+| `probes.liveness.initialDelaySeconds`  | integer | `0`         | Liveness probe initial delay.      |
+| `probes.liveness.periodSeconds`        | integer | `15`        | Liveness probe period.             |
+| `probes.liveness.timeoutSeconds`       | integer | `5`         | Liveness probe timeout.            |
+| `probes.liveness.failureThreshold`     | integer | `3`         | Liveness probe failure threshold.  |
+| `probes.readiness.enabled`             | boolean | `true`      | Enable readiness probe.            |
+| `probes.readiness.initialDelaySeconds` | integer | `0`         | Readiness probe initial delay.     |
+| `probes.readiness.periodSeconds`       | integer | `10`        | Readiness probe period.            |
+| `probes.readiness.timeoutSeconds`      | integer | `5`         | Readiness probe timeout.           |
+| `probes.readiness.failureThreshold`    | integer | `3`         | Readiness probe failure threshold. |
 
 ### Backup
 
@@ -358,11 +433,18 @@ protects all saved articles, tags, annotations, and user accounts.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                      | Type    | Default                                       | Description                                             |
+| ------------------------------ | ------- | --------------------------------------------- | ------------------------------------------------------- |
+| `resources`                    | object  | `{}`                                          | CPU and memory requests and limits.                     |
+| `podSecurityContext`           | object  | `fsGroup: 65534`, `RuntimeDefault` seccomp    | Pod-level security context.                             |
+| `securityContext`              | object  | no privilege escalation, minimal capabilities | Security context for the Wallabag and setup containers. |
+| `automountServiceAccountToken` | boolean | `false`                                       | Mount the ServiceAccount token into the pod.            |
+
+<Callout type="info" title="Why the container starts as root">
+  The upstream image renders its configuration and starts nginx as root, then runs PHP-FPM as `nobody`. `runAsNonRoot`
+  and a read-only root filesystem are therefore not supported. The defaults drop every capability except `CHOWN`,
+  `DAC_OVERRIDE`, `FOWNER`, `SETGID`, `SETUID`, and `NET_BIND_SERVICE`.
+</Callout>
 
 ### Service Account
 
@@ -401,9 +483,14 @@ protects all saved articles, tags, annotations, and user accounts.
   to generate internal links pointing to the wrong host.
 </Callout>
 
-<Callout type="tip" title="Enable Redis for better performance under load">
-  Redis is optional but recommended for multi-user setups. With Redis enabled, Wallabag offloads session storage and
-  query result caching, reducing database load and improving response times for concurrent users.
+<Callout type="danger" title="HTTP 500 on every page">
+  Wallabag returns HTTP 500 when its schema is missing. Check `kubectl logs deploy/<release>-wallabag -c setup` and
+  confirm that `setup.enabled` is `true` and PostgreSQL is reachable with the configured credentials.
+</Callout>
+
+<Callout type="info" title="Restoring a backup">
+  The setup container creates the schema on first start. Restore a `pg_dump` archive into an empty `public` schema while
+  Wallabag is scaled to zero; on the next start the setup container only applies newer migrations.
 </Callout>
 
 ## More Information
