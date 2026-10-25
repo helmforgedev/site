@@ -16937,6 +16937,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '5Gi',
           description: 'Uploads PVC size',
         },
+        {
+          label: 'Admin Username',
+          key: 'listmonk.admin.username',
+          type: 'text',
+          default: 'admin',
+          description: 'Superadmin created on a fresh database',
+        },
       ],
     },
     {

@@ -654,7 +654,7 @@ export const charts: Chart[] = [
   {
     name: 'Listmonk',
     slug: 'listmonk',
-    description: 'Self-hosted newsletter and mailing list manager with PostgreSQL and S3 backup.',
+    description: 'Self-hosted newsletter manager with automatic superadmin, a hardened pod, PostgreSQL, and S3 backup.',
     maturity: 'stable',
     backup: true,
   },

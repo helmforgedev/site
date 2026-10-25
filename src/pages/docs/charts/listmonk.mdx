@@ -27,6 +27,10 @@ SMTP provider to send emails.
 - **PostgreSQL backend** — bundled subchart or external database with `pgcrypto` auto-provisioned
 - **Persistent uploads storage** — media and attachment files on a dedicated PVC
 - **Idempotent bootstrap** — init container applies schema migrations on every pod start
+- **Superadmin from a Secret** — created on a fresh database, so the first-run admin page is never exposed
+- **Hardened pod** — non-root, read-only root filesystem, no privilege escalation, all capabilities dropped
+- **Configurable listener** — `listmonk.port` changes the real HTTP listener
+- **Ingress or Gateway API** — Ingress or HTTPRoutes
 - **S3 backup** — scheduled PostgreSQL `pg_dump` to S3-compatible storage
 
 ## Operational Patterns
@@ -40,15 +44,11 @@ together for disaster recovery.
 
 Security Scan: Kubescape on rendered default manifests.
 
-| Framework | Score   |
-| --------- | ------- |
-| MITRE     | 100.00% |
-| NSA       | 70.00%  |
-| SOC2      | 90.00%  |
-| Aggregate | 86.67%  |
+| Framework          | Score     |
+| ------------------ | --------- |
+| MITRE + NSA + SOC2 | 90.90909% |
 
-Default findings map to production controls that should be provided through values or platform policy: resource limits,
-container hardening context, service account token policy, and namespace network policy.
+Remaining findings map to controls that depend on the platform: resource limits and namespace network policy.
 
 ## Installation
 
@@ -66,13 +66,20 @@ helm install listmonk helmforge/listmonk
 helm install listmonk oci://ghcr.io/helmforgedev/helm/listmonk
 ```
 
-After the first pod starts, access the Listmonk admin UI via port-forward and complete the setup wizard
-to set the admin password and configure SMTP:
+## Getting Started
+
+The `db-init` init container creates the superadmin (`admin` by default) on a fresh database. Read the password,
+port-forward, and log in:
 
 ```bash
-kubectl port-forward svc/<release>-listmonk 9000:80
-# Open http://localhost:9000
+kubectl rollout status deploy/listmonk --timeout=300s
+kubectl get secret listmonk-admin -o jsonpath='{.data.admin-password}' | base64 -d; echo
+kubectl port-forward svc/listmonk 9000:80
+# Open http://localhost:9000/admin
 ```
+
+A release whose name contains `listmonk` uses it as the resource prefix; other releases use `<release>-listmonk`.
+Configure SMTP under **Settings → SMTP** before sending campaigns.
 
 ## Deployment Examples
 
@@ -250,15 +257,28 @@ storage:
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/listmonk/listmonk` | Listmonk container image.            |
-| `image.tag`        | string | `"v6.1.0"`                    | Image tag.                           |
+| `image.tag`        | string | `"v6.2.0"`                    | Pinned image tag.                    |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
 ### Listmonk Configuration
 
-| Parameter           | Type  | Default | Description                                                                      |
-| ------------------- | ----- | ------- | -------------------------------------------------------------------------------- |
-| `listmonk.extraEnv` | array | `[]`    | Extra environment variables. Use for SMTP, admin credentials, and feature flags. |
+| Parameter                                  | Type    | Default                                  | Description                                                       |
+| ------------------------------------------ | ------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| `listmonk.port`                            | integer | `9000`                                   | HTTP listener (`LISTMONK_app__address`), 1024-65535.              |
+| `listmonk.extraEnv`                        | array   | `[]`                                     | Extra environment variables for the app and `db-init` containers. |
+| `listmonk.admin.username`                  | string  | `admin`                                  | Superadmin created by the first install (3+ characters).          |
+| `listmonk.admin.password`                  | string  | `""`                                     | Superadmin password (8+ characters); generated once when empty.   |
+| `listmonk.admin.existingSecret`            | string  | `""`                                     | Existing Secret with the superadmin password.                     |
+| `listmonk.admin.existingSecretPasswordKey` | string  | `admin-password`                         | Key in the existing Secret.                                       |
+| `setup.waitImage`                          | string  | `docker.io/library/postgres:18.6-alpine` | Image used to wait for PostgreSQL.                                |
+| `setup.databaseWaitTimeoutSeconds`         | integer | `300`                                    | Seconds to wait for PostgreSQL.                                   |
+| `setup.resources`                          | object  | `{}`                                     | Resources for the init containers.                                |
+
+<Callout type="info" title="The superadmin is created only on a fresh database">
+  `listmonk.admin.*` is applied by `listmonk --install` when the database is empty. Changing it later does not change
+  existing accounts; manage users in the admin UI.
+</Callout>
 
 <Callout type="tip" title="Configure SMTP via environment variables for GitOps workflows">
   The Listmonk UI stores SMTP configuration in the PostgreSQL database. For GitOps or automated deployments, set SMTP
@@ -322,29 +342,29 @@ init SQL scripts. This extension is mandatory for Listmonk — deployments again
 
 ### Backup
 
-| Parameter                              | Type    | Default                                | Description                                                  |
-| -------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                                | Enable scheduled PostgreSQL S3 backup CronJob.               |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                                | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                               | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                                    | Number of successful Job records to keep.                    |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                                    | Number of failed Job records to keep.                        |
-| `backup.backoffLimit`                  | integer | `1`                                    | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `listmonk`                             | Prefix for backup archive filenames.                         |
-| `backup.images.postgresql`             | string  | `docker.io/library/postgres:17-alpine` | Image for `pg_dump`.                                         |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`         | Image for S3 upload.                                         |
-| `backup.resources`                     | object  | `{}`                                   | Resources for backup containers.                             |
-| `backup.database.pgDumpArgs`           | string  | `""`                                   | Extra arguments passed to `pg_dump`.                         |
-| `backup.s3.endpoint`                   | string  | `""`                                   | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                                   | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `listmonk`                             | Key prefix within the bucket.                                |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                 | Create the bucket automatically if it does not exist.        |
-| `backup.s3.existingSecret`             | string  | `""`                                   | Existing secret containing S3 access and secret keys.        |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                           | Key in the existing secret for the S3 access key.            |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.            |
-| `backup.s3.accessKey`                  | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                              | Type    | Default                                  | Description                                                  |
+| -------------------------------------- | ------- | ---------------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                                  | Enable scheduled PostgreSQL S3 backup CronJob.               |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                            | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                                  | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                                 | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                                      | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                                      | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                                      | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `listmonk`                               | Prefix for backup archive filenames.                         |
+| `backup.images.postgresql`             | string  | `docker.io/library/postgres:18.6-alpine` | Image for `pg_dump`; must not be older than the server.      |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`           | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                                     | Resources for backup containers.                             |
+| `backup.database.pgDumpArgs`           | string  | `""`                                     | Extra arguments passed to `pg_dump`.                         |
+| `backup.s3.endpoint`                   | string  | `""`                                     | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                                     | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `listmonk`                               | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                   | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                                     | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                             | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                             | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                                     | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                                     | Inline S3 secret key (ignored when `existingSecret` is set). |
 
 ### Service
 
@@ -364,33 +384,42 @@ init SQL scripts. This extension is mandatory for Listmonk — deployments again
 | `ingress.hosts`            | array   | `[]`    | Ingress host and path rules.                     |
 | `ingress.tls`              | array   | `[]`    | TLS configuration (secret name and hosts).       |
 
+### Gateway API
+
+| Parameter               | Type    | Default | Description                             |
+| ----------------------- | ------- | ------- | --------------------------------------- |
+| `gatewayAPI.enabled`    | boolean | `false` | Render Gateway API HTTPRoutes.          |
+| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoutes; each requires `parentRefs`. |
+
 ### Probes
 
-| Parameter                            | Type    | Default | Description                        |
-| ------------------------------------ | ------- | ------- | ---------------------------------- |
-| `startupProbe.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `startupProbe.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
-| `startupProbe.periodSeconds`         | integer | `5`     | Startup probe period.              |
-| `startupProbe.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `startupProbe.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `livenessProbe.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `livenessProbe.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `livenessProbe.periodSeconds`        | integer | `30`    | Liveness probe period.             |
-| `livenessProbe.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `livenessProbe.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `readinessProbe.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `readinessProbe.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `readinessProbe.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `readinessProbe.timeoutSeconds`      | integer | `3`     | Readiness probe timeout.           |
-| `readinessProbe.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+| Parameter                                                          | Type    | Default   | Description                        |
+| ------------------------------------------------------------------ | ------- | --------- | ---------------------------------- |
+| `startupProbe.path` / `livenessProbe.path` / `readinessProbe.path` | string  | `/health` | HTTP probe paths.                  |
+| `startupProbe.enabled`                                             | boolean | `true`    | Enable startup probe.              |
+| `startupProbe.initialDelaySeconds`                                 | integer | `5`       | Startup probe initial delay.       |
+| `startupProbe.periodSeconds`                                       | integer | `5`       | Startup probe period.              |
+| `startupProbe.timeoutSeconds`                                      | integer | `3`       | Startup probe timeout.             |
+| `startupProbe.failureThreshold`                                    | integer | `30`      | Startup probe failure threshold.   |
+| `livenessProbe.enabled`                                            | boolean | `true`    | Enable liveness probe.             |
+| `livenessProbe.initialDelaySeconds`                                | integer | `0`       | Liveness probe initial delay.      |
+| `livenessProbe.periodSeconds`                                      | integer | `30`      | Liveness probe period.             |
+| `livenessProbe.timeoutSeconds`                                     | integer | `5`       | Liveness probe timeout.            |
+| `livenessProbe.failureThreshold`                                   | integer | `3`       | Liveness probe failure threshold.  |
+| `readinessProbe.enabled`                                           | boolean | `true`    | Enable readiness probe.            |
+| `readinessProbe.initialDelaySeconds`                               | integer | `0`       | Readiness probe initial delay.     |
+| `readinessProbe.periodSeconds`                                     | integer | `10`      | Readiness probe period.            |
+| `readinessProbe.timeoutSeconds`                                    | integer | `3`       | Readiness probe timeout.           |
+| `readinessProbe.failureThreshold`                                  | integer | `3`       | Readiness probe failure threshold. |
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                      | Type    | Default                                             | Description                                                 |
+| ------------------------------ | ------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| `resources`                    | object  | `{}`                                                | CPU and memory requests and limits.                         |
+| `podSecurityContext`           | object  | uid 65534, `runAsNonRoot`, `RuntimeDefault` seccomp | Pod-level security context.                                 |
+| `securityContext`              | object  | read-only root, no escalation, drop `ALL`           | Container security context for the app and init containers. |
+| `automountServiceAccountToken` | boolean | `false`                                             | Mount the ServiceAccount token.                             |
 
 ### Service Account
 
