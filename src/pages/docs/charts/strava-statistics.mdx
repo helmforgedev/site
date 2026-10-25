@@ -69,6 +69,10 @@ docker run --rm -it --entrypoint bin/console robiningelbrecht/dreeve:v5.6.2 secu
 
 Helm values preserve `$` characters as written; do not apply Docker Compose's double-dollar escaping.
 
+When `dreeve.appSecret` is empty, the chart generates a 64-character value and reuses the value stored in the live
+Secret during upgrades. Set `dreeve.appSecret` or `dreeve.existingSecret` explicitly for reproducible GitOps and offline
+rendering.
+
 ## Deployment Examples
 
 <DocsTabs
@@ -108,6 +112,10 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+  tls:
+    - secretName: dreeve-tls
+      hosts:
+        - dreeve.example.com
 ```
 
 </div>
@@ -232,19 +240,19 @@ gatewayAPI:
 
 ### Image and Runtime
 
-| Parameter                  | Type    | Default                             | Description                                    |
-| -------------------------- | ------- | ----------------------------------- | ---------------------------------------------- |
-| `image.repository`         | string  | `docker.io/robiningelbrecht/dreeve` | Official Dreeve image.                         |
-| `image.tag`                | string  | `v5.6.2`                            | Pinned release with the critical PHP fix.      |
-| `image.pullPolicy`         | string  | `IfNotPresent`                      | Kubernetes image pull policy.                  |
-| `dreeve.appUrl`            | string  | `http://localhost:8080`             | Public root URL.                               |
-| `dreeve.importMode`        | string  | `stravaApi`                         | `stravaApi` or `files`.                        |
-| `dreeve.appSecret`         | string  | `mock-app-secret`                   | Session-signing secret; replace in production. |
-| `dreeve.adminUsername`     | string  | `admin`                             | Admin panel username.                          |
-| `dreeve.adminPasswordHash` | string  | `""`                                | Bcrypt admin password hash.                    |
-| `dreeve.apiKey`            | string  | `""`                                | Optional activity-upload API key.              |
-| `dreeve.existingSecret`    | string  | `""`                                | Existing Secret for Dreeve runtime secrets.    |
-| `daemon.enabled`           | boolean | `true`                              | Run the mandatory Dreeve background daemon.    |
+| Parameter                  | Type    | Default                             | Description                                                 |
+| -------------------------- | ------- | ----------------------------------- | ----------------------------------------------------------- |
+| `image.repository`         | string  | `docker.io/robiningelbrecht/dreeve` | Official Dreeve image.                                      |
+| `image.tag`                | string  | `v5.6.2`                            | Pinned release with the critical PHP fix.                   |
+| `image.pullPolicy`         | string  | `IfNotPresent`                      | Kubernetes image pull policy.                               |
+| `dreeve.appUrl`            | string  | `http://localhost:8080`             | Public root URL.                                            |
+| `dreeve.importMode`        | string  | `stravaApi`                         | `stravaApi` or `files`.                                     |
+| `dreeve.appSecret`         | string  | `""`                                | Session-signing secret; generated and preserved when empty. |
+| `dreeve.adminUsername`     | string  | `admin`                             | Admin panel username.                                       |
+| `dreeve.adminPasswordHash` | string  | `""`                                | Bcrypt admin password hash.                                 |
+| `dreeve.apiKey`            | string  | `""`                                | Optional activity-upload API key.                           |
+| `dreeve.existingSecret`    | string  | `""`                                | Existing Secret for Dreeve runtime secrets.                 |
+| `daemon.enabled`           | boolean | `true`                              | Run the mandatory Dreeve background daemon.                 |
 
 <Callout type="danger" title="Replace the validation credentials">
   The `mock-*` defaults allow deterministic chart rendering and runtime tests. They are not safe production credentials.
