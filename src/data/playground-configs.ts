@@ -660,6 +660,39 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Listeners',
+      fields: [
+        {
+          label: 'Router listener',
+          key: 'router.containerPorts.http',
+          type: 'number',
+          default: '8080',
+          description: 'Caddy process listener port',
+        },
+        {
+          label: 'Public Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Kubernetes Service port targeting the named router listener',
+        },
+        {
+          label: 'RustFS S3 listener',
+          key: 'rustfs.containerPorts.s3',
+          type: 'number',
+          default: '9000',
+          description: 'RustFS S3 process listener',
+        },
+        {
+          label: 'RustFS S3 Service port',
+          key: 'rustfs.service.ports.s3',
+          type: 'number',
+          default: '9000',
+          description: 'In-cluster S3 port; the named target remains the process listener',
+        },
+      ],
+    },
+    {
       name: 'Ingress',
       collapsible: true,
       gateField: 'ingress.enabled',
