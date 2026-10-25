@@ -725,9 +725,9 @@ export const charts: Chart[] = [
   {
     name: 'Castopod',
     slug: 'castopod',
-    description: 'Open-source podcast hosting with MariaDB and optional Redis cache.',
+    description: 'Podcast hosting with automatic setup, a hardened pod, MariaDB, optional Redis, and S3 backup.',
     maturity: 'stable',
-    backup: false,
+    backup: true,
   },
   {
     name: 'changedetection.io',
