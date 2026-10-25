@@ -787,6 +787,8 @@ export const scenarios: Record<string, { label: string; description: string; val
       description: 'Port-forward friendly setup with durable storage',
       values: {
         'karakeep.nextAuthUrl': 'http://localhost:3000',
+        'containerPorts.http': '3000',
+        'meilisearch.port': '7700',
         'persistence.size': '10Gi',
         'resources.requests.cpu': '100m',
         'resources.limits.memory': '512Mi',

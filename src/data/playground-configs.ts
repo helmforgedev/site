@@ -9940,6 +9940,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '10Gi',
           description: 'PVC size for SQLite, uploads, and sidecar data',
         },
+        {
+          label: 'Application Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '3000',
+          description: 'Karakeep process listener port',
+        },
       ],
     },
     {
@@ -9952,6 +9959,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'true',
           description: 'Enable full-text search sidecar',
+        },
+        {
+          label: 'Meilisearch Port',
+          key: 'meilisearch.port',
+          type: 'number',
+          default: '7700',
+          description: 'Meilisearch process listener port',
         },
         {
           label: 'Chromium',
