@@ -516,30 +516,31 @@ and all capabilities dropped. CPU and memory requests and limits are set by defa
 Ingress isolation can be enabled independently. When egress isolation is enabled, list every external dependency.
 External PostgreSQL requires an explicit database CIDR; SMTP, OIDC, web push, and S3 need suitable `extraEgress` rules.
 
-| Parameter                                   | Type    | Default | Description                                                 |
-| ------------------------------------------- | ------- | ------- | ----------------------------------------------------------- |
-| `networkPolicy.enabled`                     | boolean | `false` | Render a NetworkPolicy.                                     |
-| `networkPolicy.ingressFrom`                 | array   | `[]`    | Peers allowed to reach the ntfy and optional metrics ports. |
-| `networkPolicy.egress.enabled`              | boolean | `false` | Apply egress isolation.                                     |
-| `networkPolicy.egress.allowDNS`             | boolean | `true`  | Permit DNS when egress isolation is active.                 |
-| `networkPolicy.egress.externalDatabaseCIDR` | string  | `""`    | CIDR allowed for external PostgreSQL.                       |
-| `networkPolicy.egress.extraEgress`          | array   | `[]`    | Complete additional egress rules for external integrations. |
+| Parameter                                   | Type    | Default       | Description                                                 |
+| ------------------------------------------- | ------- | ------------- | ----------------------------------------------------------- |
+| `networkPolicy.enabled`                     | boolean | `false`       | Render a NetworkPolicy.                                     |
+| `networkPolicy.ingressFrom`                 | array   | `[]`          | Peers allowed to reach the ntfy and optional metrics ports. |
+| `networkPolicy.egress.enabled`              | boolean | `false`       | Apply egress isolation.                                     |
+| `networkPolicy.egress.allowDNS`             | boolean | `true`        | Permit DNS when egress isolation is active.                 |
+| `networkPolicy.egress.dnsPeers`             | array   | `kube-system` | Peers allowed to serve DNS; override for custom DNS.        |
+| `networkPolicy.egress.externalDatabaseCIDR` | string  | `""`          | CIDR allowed for external PostgreSQL.                       |
+| `networkPolicy.egress.extraEgress`          | array   | `[]`          | Complete additional egress rules for external integrations. |
 
 ### Backup
 
 The optional CronJob archives `/var/cache/ntfy` and uploads it to S3-compatible storage. It requires persistent storage
 and does not dump PostgreSQL. Use an existing Secret containing `access-key` and `secret-key` in production.
 
-| Parameter                  | Type    | Default     | Description                          |
-| -------------------------- | ------- | ----------- | ------------------------------------ |
-| `backup.enabled`           | boolean | `false`     | Enable scheduled data-volume backup. |
-| `backup.schedule`          | string  | `0 3 * * *` | Cron schedule in UTC.                |
-| `backup.scratchSizeLimit`  | string  | `2Gi`       | Bound temporary archive storage.     |
-| `backup.tmpSizeLimit`      | string  | `64Mi`      | Bound backup container `/tmp`.       |
-| `backup.s3.endpoint`       | string  | `""`        | S3-compatible endpoint.              |
-| `backup.s3.bucket`         | string  | `""`        | Destination bucket.                  |
-| `backup.s3.prefix`         | string  | `ntfy`      | Object-key prefix.                   |
-| `backup.s3.existingSecret` | string  | `""`        | Existing S3 credential Secret.       |
+| Parameter                  | Type    | Default     | Description                                    |
+| -------------------------- | ------- | ----------- | ---------------------------------------------- |
+| `backup.enabled`           | boolean | `false`     | Enable scheduled data-volume backup.           |
+| `backup.schedule`          | string  | `0 3 * * *` | Cron schedule in UTC.                          |
+| `backup.scratchSizeLimit`  | string  | `3Gi`       | Bound temporary archive storage with headroom. |
+| `backup.tmpSizeLimit`      | string  | `64Mi`      | Bound backup container `/tmp`.                 |
+| `backup.s3.endpoint`       | string  | `""`        | S3-compatible endpoint.                        |
+| `backup.s3.bucket`         | string  | `""`        | Destination bucket.                            |
+| `backup.s3.prefix`         | string  | `ntfy`      | Object-key prefix.                             |
+| `backup.s3.existingSecret` | string  | `""`        | Existing S3 credential Secret.                 |
 
 ### OpenID Connect and SMTP
 
