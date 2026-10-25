@@ -50,6 +50,12 @@ bounded temporary volumes. Credentials come from Kubernetes Secrets. Optional Ne
 egress, while TLS termination, database availability, SMTP delivery, backup retention, restore testing and platform
 observability remain operator responsibilities.
 
+<Callout type="warning" title="Chart version requirement">
+  The configurable listener, hardened runtime, bounded ephemeral storage, PodDisruptionBudget and NetworkPolicy
+  documented on this page require Ghost chart 1.3.0 or later. Publish the companion chart release before publishing this
+  documentation update.
+</Callout>
+
 ## Installation
 
 **HTTPS repository:**
@@ -453,12 +459,12 @@ Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the a
 
 ### Resources and Security
 
-| Parameter                     | Type   | Default  | Description                                          |
-| ----------------------------- | ------ | -------- | ---------------------------------------------------- |
-| `resources`                   | object | `{}`     | CPU and memory requests and limits.                  |
-| `podSecurityContext`          | object | hardened | Non-root UID/GID 1000 with `RuntimeDefault` seccomp. |
-| `securityContext`             | object | hardened | Read-only root, no escalation, and all caps dropped. |
-| `runtimeStorage.tmpSizeLimit` | string | `256Mi`  | Maximum writable `/tmp` storage.                     |
+| Parameter                     | Type   | Default    | Description                                          |
+| ----------------------------- | ------ | ---------- | ---------------------------------------------------- |
+| `resources`                   | object | configured | Requests: 100m CPU/256Mi; limits: 500m CPU/768Mi.    |
+| `podSecurityContext`          | object | hardened   | Non-root UID/GID 1000 with `RuntimeDefault` seccomp. |
+| `securityContext`             | object | hardened   | Read-only root, no escalation, and all caps dropped. |
+| `runtimeStorage.tmpSizeLimit` | string | `256Mi`    | Maximum writable `/tmp` storage.                     |
 
 ### Service Account
 
