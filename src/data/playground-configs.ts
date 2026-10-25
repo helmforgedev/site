@@ -1691,6 +1691,33 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'Operations',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PodDisruptionBudget',
+          key: 'podDisruptionBudget.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Protect the singleton live pod from voluntary disruption',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict ingress after reviewing strategy connectivity',
+        },
+        {
+          label: 'Temporary storage limit',
+          key: 'runtimeStorage.tmpSizeLimit',
+          type: 'text',
+          default: '256Mi',
+          description: 'Writable /tmp limit for live and backtest workloads',
+        },
+      ],
+    },
   ],
   webodm: [
     {
