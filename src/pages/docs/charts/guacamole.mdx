@@ -28,6 +28,10 @@ installation required.
 - **OIDC, SAML, and TOTP** — SSO and MFA integrations
 - **Tomcat reverse proxy** — correct client IP via `X-Forwarded-For` support
 - **Database-aware backup** — `pg_dump` or `mysqldump` to S3
+- **Real listener overrides** — configure Tomcat HTTP and guacd process ports independently from the Service
+- **Immutable official images** — Guacamole and guacd 1.6.0 are pinned by multi-architecture digest
+- **Secure pod defaults** — non-root users, read-only filesystems, seccomp, dropped capabilities, and no API token
+- **Ingress isolation** — NetworkPolicy enabled by default
 
 ## Chart Documentation
 
@@ -213,16 +217,39 @@ ingress:
 
 </DocsTabs>
 
+## Application and Service Ports
+
+`containerPorts.http` configures the real Tomcat HTTP connector through the
+official image's supported `entrypoint.d` startup extension. `guacd.port`
+configures both the daemon listener and the web application's local connection.
+`service.port` remains the independent client-facing Kubernetes Service port.
+
+```yaml
+containerPorts:
+  http: 18080
+
+guacd:
+  port: 14822
+
+service:
+  port: 8080
+```
+
+The chart's k3d validation requires both overridden listeners to become Ready;
+these settings do not change only Kubernetes metadata.
+
 ## Configuration Reference
 
 ### Images
 
-| Parameter                | Type   | Default                         | Description                  |
-| ------------------------ | ------ | ------------------------------- | ---------------------------- |
-| `image.repository`       | string | `docker.io/guacamole/guacamole` | Guacamole web app image.     |
-| `image.tag`              | string | `"1.6.0"`                       | Image tag.                   |
-| `guacd.image.repository` | string | `docker.io/guacamole/guacd`     | guacd protocol daemon image. |
-| `guacd.image.tag`        | string | `"1.6.0"`                       | guacd image tag.             |
+| Parameter                | Type   | Default                         | Description                      |
+| ------------------------ | ------ | ------------------------------- | -------------------------------- |
+| `image.repository`       | string | `docker.io/guacamole/guacamole` | Guacamole web app image.         |
+| `image.tag`              | string | `"1.6.0"`                       | Image tag.                       |
+| `image.digest`           | string | pinned 1.6.0 digest             | Immutable web image manifest.    |
+| `guacd.image.repository` | string | `docker.io/guacamole/guacd`     | guacd protocol daemon image.     |
+| `guacd.image.tag`        | string | `"1.6.0"`                       | guacd image tag.                 |
+| `guacd.image.digest`     | string | pinned 1.6.0 digest             | Immutable daemon image manifest. |
 
 ### Guacamole
 
@@ -230,7 +257,8 @@ ingress:
 | ----------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
 | `guacamole.contextPath` | string  | `ROOT`  | Web context path. `ROOT` = serve at `/`. Change to `guacamole` for `/guacamole/`. |
 | `guacamole.extraEnv`    | array   | `[]`    | Extra environment variables.                                                      |
-| `guacd.port`            | integer | `4822`  | Internal guacd daemon port.                                                       |
+| `containerPorts.http`   | integer | `8080`  | Actual Tomcat HTTP listener.                                                      |
+| `guacd.port`            | integer | `4822`  | Actual internal guacd daemon listener.                                            |
 | `guacd.logLevel`        | string  | `info`  | guacd log level: `info`, `debug`, `warning`, `error`.                             |
 
 ### Reverse Proxy
@@ -286,12 +314,14 @@ ingress:
 
 ### Service and Ingress
 
-| Parameter                  | Type    | Default     | Description                 |
-| -------------------------- | ------- | ----------- | --------------------------- |
-| `service.type`             | string  | `ClusterIP` | Service type.               |
-| `service.port`             | integer | `80`        | Service port.               |
-| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
-| `ingress.ingressClassName` | string  | `traefik`   | Ingress class name.         |
+| Parameter                                     | Type    | Default     | Description                          |
+| --------------------------------------------- | ------- | ----------- | ------------------------------------ |
+| `service.type`                                | string  | `ClusterIP` | Service type.                        |
+| `service.port`                                | integer | `80`        | Service port.                        |
+| `ingress.enabled`                             | boolean | `false`     | Enable an Ingress resource.          |
+| `ingress.ingressClassName`                    | string  | `traefik`   | Ingress class name.                  |
+| `networkPolicy.enabled`                       | boolean | `true`      | Isolate inbound application traffic. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount the Kubernetes API token.      |
 
 ### Backup
 
@@ -308,6 +338,28 @@ Database-aware: `pg_dump` for PostgreSQL, `mysqldump` for MySQL.
 | `backup.s3.accessKey`      | string  | `""`          | Inline S3 access key. Prefer secrets. |
 | `backup.s3.secretKey`      | string  | `""`          | Inline S3 secret key. Prefer secrets. |
 | `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
+
+## Security and Operations
+
+The official web and guacd images run as their upstream non-root UIDs. The
+default pod uses `RuntimeDefault` seccomp, a read-only root filesystem, no
+privilege escalation, no Linux capabilities, explicit writable `/tmp` volumes,
+and no mounted Kubernetes API token. Keep these defaults unless an audited
+extension requires a documented exception.
+
+The default NetworkPolicy isolates ingress but leaves egress open because
+guacd must reach operator-selected remote desktop targets and the web
+application may contact identity providers. Add ingress-controller peers with
+`networkPolicy.ingressFrom` when they are outside the release. Use existing
+Secrets or External Secrets for production database and backup credentials,
+and change the default `guacadmin` password immediately.
+
+```bash
+kubectl -n <namespace> rollout status deployment/<release>-guacamole
+kubectl -n <namespace> logs deployment/<release>-guacamole -c guacamole
+kubectl -n <namespace> logs deployment/<release>-guacamole -c guacd
+kubectl -n <namespace> get events --sort-by=.lastTimestamp
+```
 
 ## More Information
 
