@@ -45,13 +45,15 @@ presets, and automated gravity database management.
 
 ## Security Scan
 
-| Framework          | Score   |
-| ------------------ | ------- |
+| Framework          | Score         |
+| ------------------ | ------------- |
 | MITRE + NSA + SOC2 | **90.90909%** |
 
 Security posture includes tag-and-digest image pins, runtime-default seccomp, disabled service-account
 token mounting, least-privilege sidecars, and a default ingress NetworkPolicy. The main Pi-hole container
-retains only the DNS/network capabilities required by its documented runtime contract.
+drops all capabilities, then retains `DAC_OVERRIDE`, `FOWNER`, `SETGID`, `SETUID`, `CHOWN`, `SETFCAP`, and
+`KILL` for image setup, ownership, privilege management, file capabilities, and shutdown, plus
+`NET_BIND_SERVICE`, `NET_RAW`, and `SYS_NICE` for DNS and network operation.
 
 ## Architecture
 
@@ -292,12 +294,12 @@ serviceDns:
 
 ### Image
 
-| Parameter          | Type   | Default                   | Description        |
-| ------------------ | ------ | ------------------------- | ------------------ |
-| `image.repository` | string | `docker.io/pihole/pihole` | Pi-hole image.           |
-| `image.tag`        | string | `"2026.10.0"`             | Pinned image tag.        |
-| `image.digest`     | string | pinned SHA-256            | Immutable image digest.  |
-| `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.       |
+| Parameter          | Type   | Default                   | Description             |
+| ------------------ | ------ | ------------------------- | ----------------------- |
+| `image.repository` | string | `docker.io/pihole/pihole` | Pi-hole image.          |
+| `image.tag`        | string | `"2026.10.0"`             | Pinned image tag.       |
+| `image.digest`     | string | pinned SHA-256            | Immutable image digest. |
+| `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.      |
 
 When overriding an image tag, also update its matching digest. Kubernetes resolves the digest as the deployed image
 identity, so a tag-only override does not select a different image.
@@ -354,14 +356,14 @@ When `dhcp.enabled` is true, set `dhcp.hostNetwork: true` plus the required `dhc
 `dhcp.router` addresses. The chart configures Pi-hole FTL, exposes fixed UDP port 67, and adds `NET_ADMIN` only for
 that DHCP-enabled workload.
 
-| Parameter          | Type    | Default | Description                                      |
-| ------------------ | ------- | ------- | ------------------------------------------------ |
+| Parameter          | Type    | Default | Description                                       |
+| ------------------ | ------- | ------- | ------------------------------------------------- |
 | `dhcp.enabled`     | boolean | `false` | Enable Pi-hole DHCP and expose fixed UDP port 67. |
-| `dhcp.hostNetwork` | boolean | `false` | Use host networking for DHCP broadcasts.         |
-| `dhcp.start`       | string  | `""`    | First IPv4 address in the required lease range.  |
-| `dhcp.end`         | string  | `""`    | Last IPv4 address in the required lease range.   |
-| `dhcp.router`      | string  | `""`    | Router IPv4 address advertised to clients.       |
-| `dhcp.leaseTime`   | string  | `24h`   | Lease duration accepted by Pi-hole FTL.          |
+| `dhcp.hostNetwork` | boolean | `false` | Use host networking for DHCP broadcasts.          |
+| `dhcp.start`       | string  | `""`    | First IPv4 address in the required lease range.   |
+| `dhcp.end`         | string  | `""`    | Last IPv4 address in the required lease range.    |
+| `dhcp.router`      | string  | `""`    | Router IPv4 address advertised to clients.        |
+| `dhcp.leaseTime`   | string  | `24h`   | Lease duration accepted by Pi-hole FTL.           |
 
 ### Security and Resources
 
@@ -376,8 +378,12 @@ that DHCP-enabled workload.
 | `podSecurityContext.seccompProfile.type`      | string  | `RuntimeDefault`                           | Enables the Kubernetes default seccomp profile.                              |
 | `securityContext.allowPrivilegeEscalation`    | boolean | `false`                                    | Prevents privilege escalation while keeping Pi-hole's required capabilities. |
 | `serviceAccount.automountServiceAccountToken` | boolean | `false`                                    | Keeps Kubernetes API tokens out of the pod unless explicitly needed.         |
-| `networkPolicy.enabled`                         | boolean | `true`                                     | Restricts ingress to the enabled Pi-hole ports.                               |
-| `networkPolicy.ingressFrom`                     | array   | `[]`                                       | Optional source selectors; empty allows all sources on allowed ports.         |
+| `networkPolicy.enabled`                       | boolean | `true`                                     | Restricts ingress to the enabled Pi-hole ports.                              |
+| `networkPolicy.ingressFrom`                   | array   | `[]`                                       | Optional source selectors; empty allows all sources on allowed ports.        |
+
+When `dhcp.hostNetwork: true`, NetworkPolicy enforcement for the pod's host-networked listeners depends
+on the cluster network plugin. Verify that behavior in the target cluster and use node firewall or other
+node-level controls when access to those listeners must be restricted.
 
 `containerPorts.dns` and `containerPorts.http` change the actual Pi-hole FTL listeners. Service ports remain an
 independent cluster-facing contract, and each Service targets the named container port.
