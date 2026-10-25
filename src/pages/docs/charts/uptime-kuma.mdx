@@ -31,6 +31,8 @@ Discord, Slack, email, and more), and publishes customizable public status pages
 - **Gateway API and Ingress** — expose the UI with classic Ingress or HTTPRoute
 - **External Secrets Operator** — source database and S3 credentials from external providers
 - **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
+- **Secure runtime defaults** — seccomp, dropped capabilities, read-only root filesystem, and no API token mount
+- **Availability controls** — optional PodDisruptionBudget and NetworkPolicy
 
 ## Installation
 
@@ -299,6 +301,36 @@ externalSecrets:
 
 </DocsTabs>
 
+## Architecture and Production Boundaries
+
+One Uptime Kuma pod receives traffic from a ClusterIP Service and optional
+Ingress or HTTPRoute. The pod stores state either on `/app/data` in SQLite mode
+or in a bundled/external MariaDB-compatible database. An optional CronJob reads
+that same data path and uploads a tar archive or database dump to S3-compatible
+storage.
+
+Uptime Kuma must remain single-replica because monitor execution and WebSocket
+state are not coordinated between application processes. The optional
+PodDisruptionBudget protects against voluntary disruption, but it does not make
+the application highly available.
+
+<Callout type="warning" title="Review NetworkPolicy flows before enabling it">
+  Empty ingress or egress rule lists deny all traffic in that direction. Allow the ingress controller, cluster DNS,
+  monitor targets, notification endpoints, database, and S3 service required by your deployment.
+</Callout>
+
+## Security Defaults
+
+Application, database-wait, and backup containers deny privilege escalation,
+drop all Linux capabilities, use runtime-default seccomp, and keep the image root
+filesystem read-only. Writable temporary state uses bounded `emptyDir` volumes.
+Service-account API token mounting is disabled by default, and database contract
+changes trigger a workload rollout through a checksum annotation.
+
+The official standard Uptime Kuma image starts as UID 0, so this chart does not
+claim a non-root runtime. Platform admission controls, node isolation, explicit
+resources, tested backups, and network policy remain operator responsibilities.
+
 ## Configuration Reference
 
 ### Core
@@ -356,7 +388,7 @@ externalSecrets:
 <Callout type="info" title="The mysql subchart is MariaDB-compatible">
   The subchart is named `mysql` in the values, but Uptime Kuma uses it as a MariaDB-compatible backend. Set
   `database.type: mariadb` alongside `mysql.enabled: true` to activate this mode. The bundled dependency is the
-  HelmForge MySQL chart `2.1.0`.
+  HelmForge MySQL chart `2.1.1`.
 </Callout>
 
 | Parameter             | Type    | Default       | Description                                           |
@@ -395,6 +427,9 @@ The backup strategy adapts to the configured database mode automatically:
 | `backup.backoffLimit`                  | integer | `1`                       | Job retry limit.                                             |
 | `backup.archivePrefix`                 | string  | `uptime-kuma`             | Prefix for backup archive filenames.                         |
 | `backup.resources`                     | object  | `{}`                      | Resources for backup containers.                             |
+| `backup.podSecurityContext`            | object  | RuntimeDefault seccomp    | Pod-level backup security context.                           |
+| `backup.securityContext`               | object  | Restricted defaults       | Backup container security context.                           |
+| `backup.tmpSizeLimit`                  | string  | `64Mi`                    | Writable backup temporary-storage limit.                     |
 | `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`  | S3 uploader image repository.                                |
 | `backup.images.uploader.tag`           | string  | `"1.0.0"`                 | S3 uploader image tag.                                       |
 | `backup.images.mysql.repository`       | string  | `docker.io/library/mysql` | mysqldump image repository (MariaDB mode).                   |
@@ -472,19 +507,32 @@ External Secrets can materialize database, S3, or integration credentials withou
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                     | Type   | Default                | Description                                 |
+| ----------------------------- | ------ | ---------------------- | ------------------------------------------- |
+| `resources`                   | object | `{}`                   | CPU and memory requests and limits.         |
+| `podSecurityContext`          | object | RuntimeDefault seccomp | Pod-level security context.                 |
+| `securityContext`             | object | Restricted defaults    | Container-level security context.           |
+| `runtimeStorage.tmpSizeLimit` | string | `256Mi`                | Writable application temporary-storage cap. |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                                                    |
+| --------------------------------------------- | ------- | ------- | -------------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                             |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                              |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                            |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token in application and backup pods. |
+
+### Availability and Network Isolation
+
+| Parameter                            | Type           | Default | Description                                                  |
+| ------------------------------------ | -------------- | ------- | ------------------------------------------------------------ |
+| `podDisruptionBudget.enabled`        | boolean        | `false` | Render a PodDisruptionBudget for voluntary disruptions.      |
+| `podDisruptionBudget.minAvailable`   | integer/string | `1`     | Minimum available pod count or percentage.                   |
+| `podDisruptionBudget.maxUnavailable` | integer/string | `null`  | Maximum unavailable count or percentage; mutually exclusive. |
+| `networkPolicy.enabled`              | boolean        | `false` | Render an application NetworkPolicy.                         |
+| `networkPolicy.ingress`              | array          | `[]`    | Complete ingress rules; empty denies all ingress.            |
+| `networkPolicy.egress`               | array          | `[]`    | Complete egress rules; empty denies all egress.              |
 
 ### Scheduling
 
@@ -514,6 +562,12 @@ security-sensitive dependencies. The container and storage contracts are
 unchanged. Review the
 [upstream 2.5.6 release](https://github.com/louislam/uptime-kuma/releases/tag/2.5.6)
 and back up the `/app/data` PVC before upgrading.
+
+After each backup or chart upgrade, restore the newest backup in a disposable
+namespace and verify monitor history, status pages, and notification settings.
+For Helm upgrades, prefer a reviewed values file with
+`--reset-then-reuse-values` so new security defaults are adopted without losing
+intentional overrides.
 
 ## More Information
 
