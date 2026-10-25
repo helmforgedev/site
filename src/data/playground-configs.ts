@@ -9138,6 +9138,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Require users to sign in before viewing pages',
         },
         {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '3000',
+          description: 'Port listened on by the Gitea process',
+        },
+        {
           label: 'PostgreSQL',
           key: 'postgresql.enabled',
           type: 'toggle',

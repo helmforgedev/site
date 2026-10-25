@@ -13,10 +13,11 @@ Deploy [Gitea](https://gitea.io/) on Kubernetes — a lightweight self-hosted Gi
 web UI, issue tracking, CI/CD (Gitea Actions), package registry, and SSH access. The chart uses the
 official **rootless** image (UID 1000) for improved security.
 
-<Callout type="warning" title="Gitea 1.27 upgrade">
-  Gitea 1.27 changes reusable Actions workflow behavior and requires per-request CSP nonces for inline scripts. Review
-  custom workflows, templates, themes, and embeds before upgrading. Back up repositories and the database first because
-  Gitea applies required database migrations during the initial startup.
+<Callout type="warning" title="Gitea 28 upgrade">
+  Gitea 28 changes Git network allow/block-list behavior and defaults completed Actions runs to 400 days of retention.
+  Review `GITEA__security__*` overrides and set `GITEA__actions__RUN_RETENTION_DAYS=0` before upgrading if historical
+  runs must be retained. Back up the database, repositories, LFS objects, packages, attachments, and configuration
+  first.
 </Callout>
 
 <Callout type="warning" title="gitea.rootUrl is required — wrong value breaks all clone URLs and webhooks">
@@ -29,11 +30,13 @@ official **rootless** image (UID 1000) for improved security.
 
 - **Rootless official image** — runs as UID 1000 for improved pod security
 - **Dual service** — separate HTTP (3000) and SSH (2222) services
+- **Configurable HTTP listener** — the process listener and Kubernetes Service port remain independent
 - **Three database backends** — SQLite (default), PostgreSQL, MySQL with auto-detection
 - **Admin bootstrap Job** — optional first-run Job to create the admin user
 - **`GITEA__` env configuration** — all `app.ini` keys configurable via environment variables
 - **Database-aware backup** — `tar` for SQLite, `pg_dump`/`mysqldump` for SQL databases
 - **External Secrets guard** — admin credentials can be reconciled by ESO without chart-managed drift
+- **Optional NetworkPolicy** — limit HTTP and SSH ingress to declared peers
 
 ## Chart Documentation
 
@@ -260,18 +263,19 @@ backup:
 
 ### Core
 
-| Parameter          | Type    | Default | Description                           |
-| ------------------ | ------- | ------- | ------------------------------------- |
-| `replicaCount`     | integer | `1`     | Pod replicas. SQLite supports 1 only. |
-| `nameOverride`     | string  | `""`    | Override the chart name.              |
-| `fullnameOverride` | string  | `""`    | Override the full release name.       |
+| Parameter             | Type    | Default | Description                              |
+| --------------------- | ------- | ------- | ---------------------------------------- |
+| `replicaCount`        | integer | `1`     | Pod replicas. SQLite supports 1 only.    |
+| `nameOverride`        | string  | `""`    | Override the chart name.                 |
+| `fullnameOverride`    | string  | `""`    | Override the full release name.          |
+| `containerPorts.http` | integer | `3000`  | HTTP listener used by the Gitea process. |
 
 ### Image
 
 | Parameter          | Type   | Default                 | Description                    |
 | ------------------ | ------ | ----------------------- | ------------------------------ |
 | `image.repository` | string | `docker.io/gitea/gitea` | Gitea image.                   |
-| `image.tag`        | string | `"1.27.3-rootless"`     | Rootless image tag (UID 1000). |
+| `image.tag`        | string | `"28.2.0-rootless"`     | Rootless image tag (UID 1000). |
 
 ### Gitea Configuration
 
@@ -358,6 +362,23 @@ Pass these via `gitea.extraEnv`; for sensitive values, use `valueFrom.secretKeyR
 | `service.ssh.port`     | integer | `2222`      | SSH service port.                                           |
 | `service.ssh.nodePort` | string  | `""`        | NodePort for SSH (only when `type: NodePort`).              |
 
+`containerPorts.http` configures the actual process through
+`GITEA__server__HTTP_PORT`. `service.http.port` only controls the Service-facing
+port and targets the named `http` container port.
+
+### Security and Network Policy
+
+| Parameter                                     | Type    | Default | Description                                                 |
+| --------------------------------------------- | ------- | ------- | ----------------------------------------------------------- |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into Gitea and chart jobs.     |
+| `networkPolicy.enabled`                       | boolean | `false` | Render an ingress NetworkPolicy for the Gitea pod.          |
+| `networkPolicy.ingressFrom`                   | array   | `[]`    | Allowed peers; empty permits pods in the release namespace. |
+
+The rootless process runs as UID/GID 1000, drops all capabilities, disables
+privilege escalation, and uses RuntimeDefault seccomp. Enable the NetworkPolicy
+only after including the peers used by an ingress controller or Gateway running
+outside the release namespace.
+
 ### Ingress and Probes
 
 | Parameter                  | Type    | Default | Description                         |
@@ -436,12 +457,18 @@ uses `pg_dump`. MySQL uses `mysqldump`.
 
 ## Upgrade Notes
 
-Gitea 1.27.3 contains security and maintenance fixes without a documented
-change to the rootless image contract. Back up the database, repositories, and
-LFS data before upgrading; Gitea applies required database migrations during
-startup. Review the
-[upstream v1.27.3 release](https://github.com/go-gitea/gitea/releases/tag/v1.27.3)
-before production rollout.
+The default image is `docker.io/gitea/gitea:28.2.0-rootless`. Gitea 28 introduces
+an internal proxy for Git network operations. Existing `ALLOWED_HOST_LIST`,
+`BLOCKED_HOST_LIST`, `ALLOWED_DOMAINS`, and `BLOCKED_DOMAINS` overrides must be
+reviewed: wildcard and domain matching changed, the `external` preset was
+removed, and an exclusive allow list now requires `EGRESS_MODE=strict`.
+
+Completed Actions runs now default to 400 days of retention. Set
+`GITEA__actions__RUN_RETENTION_DAYS=0` before upgrading if all historical runs
+must be retained. Gitea applies required database migrations at first startup;
+back up every persistent asset before production rollout. Review the
+[v28.0.0 migration notes](https://github.com/go-gitea/gitea/releases/tag/v28.0.0)
+and [v28.2.0 fixes](https://github.com/go-gitea/gitea/releases/tag/v28.2.0).
 
 ## More Information
 
