@@ -54,6 +54,8 @@ helm install chiefonboarding oci://ghcr.io/helmforgedev/helm/chiefonboarding
 # values.yaml — ChiefOnboarding with bundled PostgreSQL (default)
 chiefonboarding:
   baseUrl: 'https://onboarding.example.com'
+  allowedHosts:
+    - onboarding.example.com
   secretKey: 'a-random-50-char-django-secret-key-here-replace-me'
 
 postgresql:
@@ -79,6 +81,8 @@ ingress:
 # values.yaml — ChiefOnboarding with external PostgreSQL
 chiefonboarding:
   baseUrl: 'https://onboarding.example.com'
+  allowedHosts:
+    - onboarding.example.com
   secretKey: 'a-random-50-char-django-secret-key-here-replace-me'
 
 postgresql:
@@ -110,6 +114,8 @@ ingress:
 # values.yaml — Production setup with secrets, TLS, and Slack integration
 chiefonboarding:
   baseUrl: 'https://onboarding.example.com'
+  allowedHosts:
+    - onboarding.example.com
   existingSecret: chiefonboarding-secret
   existingSecretKey: secret-key
   extraEnv:
@@ -151,6 +157,12 @@ ingress:
     - secretName: chiefonboarding-tls
       hosts:
         - onboarding.example.com
+
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
 ```
 
 </div>
@@ -158,6 +170,27 @@ ingress:
 </DocsTabs>
 
 ## Configuration Reference
+
+## Application and Service ports
+
+`chiefonboarding.port` configures the real Gunicorn listener in the official
+Supervisor topology. `service.port` remains an independent client-facing port
+and targets the named application listener:
+
+```yaml
+chiefonboarding:
+  port: 9080
+
+service:
+  port: 8080
+```
+
+The chart copies the upstream Supervisor configuration to a writable temporary
+file and replaces only its fixed `8000` bind value before startup. The k3d
+custom-port scenario performs an HTTP request against the overridden listener.
+It also applies idempotent migrations before Supervisor starts, preventing the
+upstream Django Q process from querying queue tables while a fresh database is
+still being migrated.
 
 ## Security Scan
 
@@ -170,8 +203,8 @@ Kubescape scan for the chart standards backfill:
 | SOC2      | 90%   |
 
 Production hardening should include stable existing Secrets, explicit CPU and
-memory requests and limits, TLS ingress, and platform-level network policy
-where required.
+memory requests and limits, TLS ingress, and an explicit ingress-controller
+peer in the default NetworkPolicy.
 
 ### Core
 
@@ -187,6 +220,7 @@ where required.
 | ------------------ | ------ | ------------------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/chiefonboarding/chiefonboarding` | ChiefOnboarding container image.     |
 | `image.tag`        | string | `"v2.5.0"`                                  | Image tag.                           |
+| `image.digest`     | string | pinned SHA-256                              | Immutable official image manifest.   |
 | `image.pullPolicy` | string | `IfNotPresent`                              | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                                        | Pull secrets for private registries. |
 
@@ -194,8 +228,9 @@ where required.
 
 | Parameter                           | Type    | Default      | Description                                                              |
 | ----------------------------------- | ------- | ------------ | ------------------------------------------------------------------------ |
-| `chiefonboarding.port`              | integer | `8000`       | Internal HTTP port (Django development server).                          |
+| `chiefonboarding.port`              | integer | `8000`       | Actual Gunicorn listener, independent from the Service port.             |
 | `chiefonboarding.baseUrl`           | string  | `""`         | Public base URL of the instance (e.g. `https://onboarding.example.com`). |
+| `chiefonboarding.allowedHosts`      | array   | local hosts  | Django Host-header allowlist; add every public hostname.                 |
 | `chiefonboarding.secretKey`         | string  | `""`         | Django SECRET_KEY for session signing and CSRF protection.               |
 | `chiefonboarding.existingSecret`    | string  | `""`         | Existing Kubernetes Secret containing the Django secret key.             |
 | `chiefonboarding.existingSecretKey` | string  | `secret-key` | Key inside the existing secret holding the Django SECRET_KEY.            |
@@ -207,10 +242,10 @@ where required.
   incorrect.
 </Callout>
 
-<Callout type="danger" title="Always set secretKey explicitly">
-  If `chiefonboarding.secretKey` is empty, a Django SECRET_KEY is auto-generated at startup. If the pod is recreated
-  with a new key, **all user sessions are invalidated, all pending password reset links expire, and all CSRF tokens
-  become invalid**. Always provide a stable, explicit key or use `chiefonboarding.existingSecret`.
+<Callout type="warning" title="Back up the retained Django secret">
+  When `chiefonboarding.secretKey` is empty, the chart generates the key once, reuses it with `lookup` on upgrades, and
+  retains the Secret on uninstall. Back it up with PostgreSQL. Deliberately changing or deleting it invalidates user
+  sessions, pending password reset links, and CSRF tokens. An existing Secret is preferred for production.
 </Callout>
 
 <Callout type="tip" title="Integrations via extraEnv">
@@ -222,13 +257,15 @@ where required.
 
 ### Database — Embedded Subchart
 
-| Parameter                  | Type    | Default           | Description                                               |
-| -------------------------- | ------- | ----------------- | --------------------------------------------------------- |
-| `postgresql.enabled`       | boolean | `true`            | Deploy a bundled PostgreSQL subchart for ChiefOnboarding. |
-| `postgresql.architecture`  | string  | `standalone`      | PostgreSQL deployment architecture.                       |
-| `postgresql.auth.database` | string  | `chiefonboarding` | Database name created by the subchart.                    |
-| `postgresql.auth.username` | string  | `chiefonboarding` | Database username created by the subchart.                |
-| `postgresql.auth.password` | string  | `""`              | Database password (auto-generated if empty).              |
+| Parameter                                       | Type    | Default           | Description                                               |
+| ----------------------------------------------- | ------- | ----------------- | --------------------------------------------------------- |
+| `postgresql.enabled`                            | boolean | `true`            | Deploy a bundled PostgreSQL subchart for ChiefOnboarding. |
+| `postgresql.architecture`                       | string  | `standalone`      | PostgreSQL deployment architecture.                       |
+| `postgresql.auth.database`                      | string  | `chiefonboarding` | Database name created by the subchart.                    |
+| `postgresql.auth.username`                      | string  | `chiefonboarding` | Database username created by the subchart.                |
+| `postgresql.auth.password`                      | string  | `""`              | Database password (auto-generated if empty).              |
+| `postgresql.auth.existingSecret`                | string  | `""`              | Existing bundled PostgreSQL Secret.                       |
+| `postgresql.auth.existingSecretUserPasswordKey` | string  | `user-password`   | Application password key.                                 |
 
 ### Database — External
 
@@ -282,19 +319,35 @@ where required.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                  | Type    | Default          | Description                                     |
+| ------------------------------------------ | ------- | ---------------- | ----------------------------------------------- |
+| `resources`                                | object  | `{}`             | CPU and memory requests and limits.             |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Pod seccomp profile.                            |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Prevent privilege escalation.                   |
+| `securityContext.capabilities.drop`        | array   | `[ALL]`          | Dropped Linux capabilities.                     |
+| `securityContext.runAsNonRoot`             | boolean | `false`          | Upstream root compatibility exception.          |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `false`          | Upstream writable-path compatibility exception. |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                         |
+| --------------------------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token.     |
+
+### NetworkPolicy
+
+| Parameter                   | Type    | Default | Description                                          |
+| --------------------------- | ------- | ------- | ---------------------------------------------------- |
+| `networkPolicy.enabled`     | boolean | `true`  | Isolate application ingress.                         |
+| `networkPolicy.ingressFrom` | array   | `[]`    | Additional peers allowed to reach the HTTP listener. |
+
+The default policy permits pods from the same Helm release. Add the actual
+ingress-controller namespace and pod selectors when the controller runs
+elsewhere. Egress stays unrestricted for SMTP, Slack, OIDC, S3, and custom
+integration destinations. A NetworkPolicy-capable CNI is required.
 
 ### Scheduling
 
@@ -318,6 +371,11 @@ where required.
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Common Issues
+
+<Callout type="warning" title="Restart after external Secret rotation">
+  Helm cannot observe data-only changes in an externally managed application or database Secret. Restart the
+  ChiefOnboarding Deployment after rotation and verify login, database access, and a background workflow.
+</Callout>
 
 <Callout type="danger" title="Users cannot log in after upgrade">
   If users cannot log in after a Helm upgrade, the Django `SECRET_KEY` may have changed. Check that
