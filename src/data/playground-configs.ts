@@ -29,6 +29,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Multiple replicas require fully shared state',
         },
         {
+          label: 'Application listener port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '3000',
+          min: 1,
+          max: 65535,
+          description: 'Configures the real Puma listener through PORT',
+        },
+        {
           label: 'Existing application Secret',
           key: 'docuseal.existingSecret',
           type: 'text',
