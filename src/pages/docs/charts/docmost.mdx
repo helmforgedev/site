@@ -29,8 +29,7 @@ Helm upgrades preserve the generated Secret; explicitly manage
 The release updates Node and collaboration services, adds page-version comparison
 and attachments, fixes Redis ACL/URL/TLS handling, and includes security fixes.
 Review the [official notes](https://github.com/docmost/docmost/releases/tag/v0.96.0).
-The bundled Redis chart moves to 3.0.0, retaining its image, storage and
-authentication defaults while fixing its health probes.
+The bundled dependency set now uses PostgreSQL `2.1.1` and Redis `3.1.0`.
 
 ## Key Features
 
@@ -40,6 +39,19 @@ authentication defaults while fixing its health probes.
 - **Storage modes** — local PVC (single replica) or S3-compatible (scalable)
 - **pg_dump backup** — scheduled CronJob to S3; database-only (uploads separate)
 - **JWT sessions** — configurable `jwtTokenExpiresIn` with auto-generated app secret
+- **Explicit listener contract** — `containerPorts.http` changes the real Docmost process port
+- **Least-privilege pod identity** — Kubernetes API token mounting is disabled by default
+
+## Architecture and Runtime Port
+
+The Kubernetes Service targets the named `http` container port.
+`containerPorts.http` configures both that declared port and Docmost's supported
+`PORT` environment variable, so probes, runtime, and Service routing remain
+aligned. `service.port` changes only the Kubernetes-facing port and does not
+reconfigure the process listener.
+
+PostgreSQL and Redis can be bundled or external. Uploads use a local PVC for a
+single replica or S3-compatible storage when replicas are scaled horizontally.
 
 ## Installation
 
@@ -272,12 +284,13 @@ ingress:
 
 ### Core
 
-| Parameter          | Type    | Default | Description                                                  |
-| ------------------ | ------- | ------- | ------------------------------------------------------------ |
-| `replicaCount`     | integer | `1`     | Pod replicas. Safe to increase only with `storage.mode: s3`. |
-| `nameOverride`     | string  | `""`    | Override the chart name.                                     |
-| `fullnameOverride` | string  | `""`    | Override the full release name.                              |
-| `commonLabels`     | object  | `{}`    | Extra labels added to all resources.                         |
+| Parameter             | Type    | Default | Description                                                  |
+| --------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `replicaCount`        | integer | `1`     | Pod replicas. Safe to increase only with `storage.mode: s3`. |
+| `nameOverride`        | string  | `""`    | Override the chart name.                                     |
+| `fullnameOverride`    | string  | `""`    | Override the full release name.                              |
+| `commonLabels`        | object  | `{}`    | Extra labels added to all resources.                         |
+| `containerPorts.http` | integer | `3000`  | Docmost process listener and declared container port.        |
 
 ### Image
 
@@ -409,15 +422,42 @@ All probes use `/api/health` as the HTTP path.
 
 ### Resources and Scheduling
 
-| Parameter                       | Type    | Default | Description                     |
-| ------------------------------- | ------- | ------- | ------------------------------- |
-| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
-| `extraVolumes`                  | array   | `[]`    | Extra volumes.                  |
-| `extraVolumeMounts`             | array   | `[]`    | Extra volume mounts.            |
-| `extraManifests`                | array   | `[]`    | Extra Kubernetes manifests.     |
+| Parameter                                     | Type    | Default | Description                                       |
+| --------------------------------------------- | ------- | ------- | ------------------------------------------------- |
+| `resources`                                   | object  | `{}`    | CPU and memory requests/limits.                   |
+| `terminationGracePeriodSeconds`               | integer | `30`    | Termination grace period.                         |
+| `nodeSelector`                                | object  | `{}`    | Node selector for scheduling.                     |
+| `tolerations`                                 | array   | `[]`    | Tolerations for scheduling.                       |
+| `extraVolumes`                                | array   | `[]`    | Extra volumes.                                    |
+| `extraVolumeMounts`                           | array   | `[]`    | Extra volume mounts.                              |
+| `extraManifests`                              | array   | `[]`    | Extra Kubernetes manifests.                       |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into Docmost pods. |
+
+## Security and Production Boundaries
+
+The default workload drops all Linux capabilities, denies privilege
+escalation, uses RuntimeDefault seccomp, and does not mount the Kubernetes API
+token. Enable `serviceAccount.automountServiceAccountToken` only for a concrete
+integration that needs Kubernetes API credentials. The upstream image needs a
+writable filesystem, so the chart does not claim immutable-root support.
+
+The chart does not provision DNS, TLS issuers, routing controllers, Storage
+Classes, external databases, Redis, S3, or External Secrets providers. For
+production, preserve `APP_SECRET`, back up PostgreSQL and uploads separately,
+and use `storage.mode=s3` before increasing `replicaCount`.
+
+## Troubleshooting
+
+- When probes fail after a port override, verify that `containerPorts.http`
+  renders as both the container port and the `PORT` environment variable.
+- When encrypted data fails after restore, restore the original `APP_SECRET`
+  through `docmost.existingSecret`.
+- When files differ between replicas, switch to S3 storage; a local PVC is a
+  single-replica contract.
+- For startup failures, inspect Docmost, PostgreSQL, and Redis logs together;
+  the init containers only prove TCP reachability.
+- For S3 errors, verify endpoint reachability, bucket policy, path-style mode,
+  and both credential keys in the referenced Secret.
 
 ## More Information
 
