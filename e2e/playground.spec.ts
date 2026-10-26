@@ -256,7 +256,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="netbird"]').click();
 
-    await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.78.1');
+    await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.81.3');
     await expect(page.locator('input[data-field-key="dashboard.auth.clientId"]')).toHaveValue('netbird-dashboard');
   });
 
