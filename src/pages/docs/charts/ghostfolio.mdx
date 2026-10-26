@@ -15,7 +15,7 @@ process, so this release deliberately runs one replica with a `Recreate` rollout
 
 ## What this chart provides
 
-- official `docker.io/ghostfolio/ghostfolio:3.82.0` release image;
+- official `docker.io/ghostfolio/ghostfolio:3.88.0` release image;
 - maintained PostgreSQL and Redis dependencies, with contracts for externally managed services;
 - upstream-native startup, liveness and dependency-aware readiness probes;
 - retained application identity, existing Secret support and native External Secrets Operator resources;
@@ -42,8 +42,28 @@ Ghostfolio instance becomes its administrator. Keep external exposure private un
 
 ## Understand the pinned image
 
-The default image is the official Ghostfolio `3.82.0` release. Its manifest was verified for Linux `amd64`, `arm/v7`
+The default image is the official Ghostfolio `3.88.0` release. Its manifest was verified for Linux `amd64`, `arm/v7`
 and `arm64`. Changing `image.tag` remains available for a reviewed upgrade or private mirror.
+
+## Configure listener and Service ports
+
+`containerPorts.http` configures the real Ghostfolio listener through the
+official `PORT` environment variable. `service.port` is independent and
+controls the Kubernetes Service-facing port, which targets the named `http`
+container port. Both default to `3333`.
+
+```yaml
+containerPorts:
+  http: 3344
+
+service:
+  port: 8080
+```
+
+This example makes Ghostfolio listen on 3344 while clients connect to the
+Service on 8080. The chart rejects listener ports below 1024 because the
+container runs as UID 1000 with every Linux capability dropped. Ingress and
+HTTPRoute backends continue to use `service.port`.
 
 ## Expose the application
 
@@ -212,7 +232,7 @@ provider refresh before declaring the recovery procedure successful.
 | `commonLabels`                      | `{}`                              | Labels added to every chart-owned resource            |
 | `replicaCount`                      | `1`                               | Enforced singleton migration and cron owner           |
 | `image.repository`                  | `docker.io/ghostfolio/ghostfolio` | Official application repository                       |
-| `image.tag`                         | `3.82.0`                          | Pinned official application release                   |
+| `image.tag`                         | `3.88.0`                          | Pinned official application release                   |
 | `image.pullPolicy`                  | `IfNotPresent`                    | Kubernetes image pull policy                          |
 | `imagePullSecrets`                  | `[]`                              | Registry credential references                        |
 | `ghostfolio.rootUrl`                | `""`                              | Canonical origin; empty derives it from HTTP exposure |
@@ -292,6 +312,7 @@ charts. The defaults above are the values this parent chart sets explicitly.
 | `serviceAccount.automountServiceAccountToken` | `false`     | Keep the Kubernetes API token unmounted    |
 | `service.type`                                | `ClusterIP` | Kubernetes Service type                    |
 | `service.port`                                | `3333`      | Application Service port                   |
+| `containerPorts.http`                         | `3333`      | Ghostfolio process listener                |
 | `service.annotations`                         | `{}`        | Service annotations                        |
 | `service.ipFamilyPolicy`                      | `""`        | Cluster default or explicit family policy  |
 | `service.ipFamilies`                          | `[]`        | Ordered Service address families           |
