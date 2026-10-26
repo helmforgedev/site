@@ -364,7 +364,7 @@ Backup mode is automatically selected based on the active database vendor.
 | `ingress.ingressClassName`                    | string  | `""`        | Ingress class name.                                       |
 | `startupProbe.enabled`                        | boolean | `true`      | Startup probe on `/healthz`.                              |
 | `livenessProbe.enabled`                       | boolean | `true`      | Liveness probe on `/healthz`.                             |
-| `readinessProbe.enabled`                      | boolean | `true`      | Readiness probe on `/healthz`.                            |
+| `readinessProbe.enabled`                      | boolean | `true`      | Readiness probe on `/healthz/readiness`.                  |
 | `resources`                                   | object  | `{}`        | CPU and memory requests/limits.                           |
 | `extraManifests`                              | array   | `[]`        | Extra Kubernetes manifests.                               |
 | `serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount the Kubernetes API token into main and worker pods. |
@@ -379,8 +379,10 @@ remain inside the credential trust boundary.
 
 The chart does not provision DNS, TLS issuers, routing controllers, external
 PostgreSQL or Redis, object storage, NetworkPolicy, or monitoring controllers.
-If the task broker is reachable outside its pod, restrict the Service port to
-trusted runner clients with platform-managed network policy.
+If the task broker is reachable outside its pod, restrict the broker Service
+port configured by `containerPorts.runnerBroker` (`5679` by default) to trusted
+runner clients with platform-managed network policy. `service.port` controls
+the separate HTTP Service port.
 
 ## Troubleshooting
 

@@ -198,7 +198,7 @@ test.describe('Playground', () => {
   test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="n8n"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.39.5');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2.44.4');
     await page.locator('[data-section-toggle="Queue"]').click();
     const queue = page.locator('button[data-field-key="queue.enabled"]');
     await queue.click();
@@ -219,7 +219,7 @@ test.describe('Playground', () => {
     await page
       .locator('.playground-scenario-btn')
       .filter({ hasText: /^Production$/ })
-      .click();
+      .evaluate((button: HTMLButtonElement) => button.click());
     await expect(code).toContainText('ingress.hosts[0].host=n8n.example.com');
     await expect(code).toContainText('ingress.hosts[0].paths[0].pathType=Prefix');
     await expect(code).toContainText('ingress.tls[0].secretName=n8n-tls');
