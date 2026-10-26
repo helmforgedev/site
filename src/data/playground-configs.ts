@@ -896,6 +896,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'false',
           description: 'Enable upstream anonymous analytics deliberately',
         },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '7788',
+          description: 'Actual OpenHuman Core listener port',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '7788',
+          description: 'Client-facing Kubernetes Service port',
+        },
       ],
     },
     {

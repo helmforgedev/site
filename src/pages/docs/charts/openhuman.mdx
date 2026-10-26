@@ -28,7 +28,7 @@ The container is the headless Core. It does not serve the complete Tauri desktop
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
 helm install openhuman helmforge/openhuman \
-  --version 1.0.0 \
+  --version 1.1.0 \
   --namespace openhuman \
   --create-namespace
 ```
@@ -59,7 +59,7 @@ openssl rand -hex 32 > /secure/path/openhuman-token
 kubectl -n openhuman create secret generic openhuman-auth \
   --from-file=core-token=/secure/path/openhuman-token
 helm upgrade openhuman helmforge/openhuman \
-  --version 1.0.0 \
+  --version 1.1.0 \
   --namespace openhuman \
   --set auth.existingSecret=openhuman-auth
 ```
@@ -85,7 +85,7 @@ openssl rand -hex 32 > /secure/path/openhuman-master-key
 kubectl -n openhuman create secret generic openhuman-keyring \
   --from-file=master-key=/secure/path/openhuman-master-key
 helm upgrade openhuman helmforge/openhuman \
-  --version 1.0.0 \
+  --version 1.1.0 \
   --namespace openhuman \
   --reuse-values \
   --set keyring.existingSecret=openhuman-keyring
@@ -154,11 +154,30 @@ ingress:
 
 Never send the bearer over unencrypted public HTTP. Gateway API users must select a parent Gateway that terminates TLS.
 
+## Application listener
+
+`containerPorts.http` changes the real OpenHuman Core process through
+`OPENHUMAN_CORE_PORT`. `service.port` is independent and targets the named
+application port, while probes and NetworkPolicy follow the Core listener:
+
+```yaml
+containerPorts:
+  http: 7799
+
+service:
+  port: 7788
+```
+
+This preserves a stable client-facing Service port while moving the process
+listener without replacing the upstream entrypoint.
+
 ## Important defaults
 
 | Value                        | Default                     | Purpose                                                                 |
 | ---------------------------- | --------------------------- | ----------------------------------------------------------------------- |
 | `auth.existingSecret`        | `""`                        | Use an operator-managed bearer instead of the retained generated Secret |
+| `containerPorts.http`        | `7788`                      | Actual OpenHuman Core listener                                          |
+| `service.port`               | `7788`                      | Client-facing Kubernetes Service port                                   |
 | `keyring.existingSecret`     | `""`                        | Select the encrypted-keyring master-key Secret                          |
 | `openhuman.backendUrl`       | `https://api.tinyhumans.ai` | Upstream backend endpoint                                               |
 | `openhuman.allowedOrigins`   | `""`                        | Extra browser origins allowed to call RPC                               |
