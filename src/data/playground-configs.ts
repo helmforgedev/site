@@ -8362,6 +8362,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'false',
           description: 'Allow upstream sample watches on a fresh datastore',
         },
+        {
+          label: 'API Token Mount',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Mount the Kubernetes API token into the application pod',
+        },
       ],
     },
     {
@@ -8369,6 +8376,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       collapsible: true,
       gateField: 'browser.enabled',
       fields: [
+        {
+          label: 'Browser Port',
+          key: 'browser.port',
+          type: 'number',
+          default: '3000',
+          description: 'Internal Sockpuppet WebSocket listener',
+        },
         {
           label: 'Browser Memory',
           key: 'browser.resources.requests.memory',
