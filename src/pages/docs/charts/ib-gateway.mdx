@@ -16,7 +16,7 @@ IBKR agreements, permissions, subscriptions, and trading controls.
 
 ## What this chart provides
 
-- `ghcr.io/gnzsnz/ib-gateway:10.50.1f` pinned by immutable amd64 and arm64 manifest digest;
+- `ghcr.io/gnzsnz/ib-gateway:10.51` pinned by immutable amd64 and arm64 manifest digest;
 - paper trading, read-only API, blind trading disabled, VNC disabled, and ClusterIP exposure by default;
 - exactly one Deployment replica with `Recreate` upgrades to prevent overlapping account sessions;
 - managed Secret, existing Secret key mapping, and External Secrets Operator resources;
@@ -24,7 +24,7 @@ IBKR agreements, permissions, subscriptions, and trading controls.
 - persistent TWS settings with retained PVC support;
 - live, paper, or simultaneous Service port mapping;
 - internal-listener readiness checks and conservative process liveness;
-- NetworkPolicy, dual-stack Services, scheduling controls, and baseline Pod hardening.
+- NetworkPolicy, dual-stack Services, scheduling controls, baseline Pod hardening, and an optional disruption budget.
 
 The IBKR API is raw TCP without chart-provided authentication or encryption. The chart intentionally does not create
 Ingress or Gateway API resources.
@@ -49,7 +49,7 @@ Install the chart:
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
 helm install ib-gateway helmforge/ib-gateway \
-  --version 1.0.0 \
+  --version 1.0.1 \
   --namespace ib-gateway \
   --set auth.existingSecret=ib-gateway-credentials
 ```
@@ -71,6 +71,10 @@ kubectl -n ib-gateway port-forward service/ib-gateway 4002:4002
 
 Connect the client to `127.0.0.1:4002`. The live API uses Service port 4001. The container internally proxies those
 ports through 4004 and 4003 respectively, matching the upstream image contract.
+
+The upstream image fixes the container listeners at 4003, 4004, and 5900. The chart keeps those ports fixed rather
+than exposing values that would change only Kubernetes metadata. Client-facing Service ports remain independently
+configurable.
 
 Set `networkPolicy.apiIngressFrom` to explicit namespace or Pod selectors when clients run elsewhere in the cluster.
 Use a private encrypted network for any path outside the cluster. Never expose the Service directly to the internet.
@@ -143,6 +147,12 @@ release.
 A persisted `jts.ini` can retain the initial timezone. Changing `gateway.timeZone` may therefore require a deliberate
 backup and cleanup of that setting so upstream can regenerate it.
 
+## Protect the singleton from voluntary eviction
+
+Set `podDisruptionBudget.enabled: true` to create a budget with `minAvailable: 1`. This protects the active singleton
+session from voluntary eviction, but it can block a node drain indefinitely. Enable it only when operators can
+coordinate maintenance or deliberately disable the budget. It does not provide high availability.
+
 ## Use VNC for maintenance
 
 VNC is disabled by default. When visual diagnostics are necessary, enable `vnc.enabled`, supply a Secret-backed
@@ -165,7 +175,7 @@ the complete public values contract.
 | `podAnnotations`   | `{}`                        | Additional Pod annotations                |
 | `imagePullSecrets` | `[]`                        | Registry credential references            |
 | `image.repository` | `ghcr.io/gnzsnz/ib-gateway` | Community upstream image repository       |
-| `image.tag`        | `10.50.1f`                  | Exact upstream release                    |
+| `image.tag`        | `10.51`                     | Selected upstream release channel         |
 | `image.digest`     | pinned SHA-256              | Immutable multi-architecture manifest     |
 | `image.pullPolicy` | `IfNotPresent`              | Kubernetes pull policy                    |
 
@@ -210,23 +220,24 @@ the complete public values contract.
 
 ### Workload extensions and state
 
-| Value                        | Default           | Purpose                                     |
-| ---------------------------- | ----------------- | ------------------------------------------- |
-| `workload.command`           | `[]`              | Container command override                  |
-| `workload.args`              | `[]`              | Container argument override                 |
-| `workload.extraEnv`          | `[]`              | Additional non-secret environment entries   |
-| `workload.envFrom`           | `[]`              | Additional Secret or ConfigMap sources      |
-| `workload.extraVolumeMounts` | `[]`              | Additional container mounts                 |
-| `workload.extraVolumes`      | `[]`              | Additional Pod volumes                      |
-| `workload.initContainers`    | `[]`              | Additional init containers                  |
-| `workload.sidecars`          | `[]`              | Additional sidecars                         |
-| `persistence.enabled`        | `true`            | Persist TWS settings                        |
-| `persistence.existingClaim`  | `""`              | Existing settings PVC                       |
-| `persistence.storageClass`   | `""`              | StorageClass or `-` for static provisioning |
-| `persistence.size`           | `2Gi`             | Settings PVC capacity                       |
-| `persistence.accessModes`    | `[ReadWriteOnce]` | PVC access modes                            |
-| `persistence.retain`         | `true`            | Retain generated PVC after uninstall        |
-| `persistence.annotations`    | `{}`              | Additional PVC annotations                  |
+| Value                         | Default           | Purpose                                     |
+| ----------------------------- | ----------------- | ------------------------------------------- |
+| `workload.command`            | `[]`              | Container command override                  |
+| `workload.args`               | `[]`              | Container argument override                 |
+| `workload.extraEnv`           | `[]`              | Additional non-secret environment entries   |
+| `workload.envFrom`            | `[]`              | Additional Secret or ConfigMap sources      |
+| `workload.extraVolumeMounts`  | `[]`              | Additional container mounts                 |
+| `workload.extraVolumes`       | `[]`              | Additional Pod volumes                      |
+| `workload.initContainers`     | `[]`              | Additional init containers                  |
+| `workload.sidecars`           | `[]`              | Additional sidecars                         |
+| `persistence.enabled`         | `true`            | Persist TWS settings                        |
+| `persistence.existingClaim`   | `""`              | Existing settings PVC                       |
+| `persistence.storageClass`    | `""`              | StorageClass or `-` for static provisioning |
+| `persistence.size`            | `2Gi`             | Settings PVC capacity                       |
+| `persistence.accessModes`     | `[ReadWriteOnce]` | PVC access modes                            |
+| `persistence.retain`          | `true`            | Retain generated PVC after uninstall        |
+| `persistence.annotations`     | `{}`              | Additional PVC annotations                  |
+| `podDisruptionBudget.enabled` | `false`           | Block voluntary eviction of the singleton   |
 
 ### Services and VNC
 
