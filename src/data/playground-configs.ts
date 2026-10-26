@@ -11206,6 +11206,41 @@ export const chartConfigs: Record<string, ChartConfig> = {
           options: ['ReadWriteOnce', 'ReadWriteMany'],
           description: 'Use RWX before enabling multi-replica Drupal',
         },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Actual Apache listener port',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing Kubernetes Service port',
+        },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'Restrict Egress',
+          key: 'networkPolicy.egress.enabled',
+          type: 'boolean',
+          default: false,
+          description: 'Allow only explicitly configured egress paths',
+        },
+        {
+          label: 'Allow HTTPS Egress',
+          key: 'networkPolicy.egress.allowHTTPS',
+          type: 'boolean',
+          default: false,
+          description: 'Allow Drupal updates and HTTPS integrations',
+        },
       ],
     },
     {
