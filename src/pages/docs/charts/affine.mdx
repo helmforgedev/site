@@ -15,7 +15,7 @@ storage and dependency contracts.
 ## Operational features
 
 - Native first-administrator API runs on verified loopback before public startup.
-- Retained bootstrap Secret and native SEC1 key; existing identities are preserved.
+- Retained generated bootstrap Secret and native SEC1 key; existing identities are preserved.
 - Non-root application, read-only image filesystem, bounded writable paths and no Kubernetes API token.
 - HelmForge PostgreSQL and Redis dependencies, or independently configured external services with verified TLS and
   operator-managed credentials.
@@ -31,8 +31,9 @@ storage and dependency contracts.
 ## Architecture
 
 The chart runs one AFFiNE application Pod with a bootstrap init container and a Recreate update strategy. The Pod owns
-the native configuration, signing key and filesystem objects on one retained PVC. PostgreSQL stores relational and
-document metadata; Redis provides cache, sessions, collaboration and background queues. The default dependencies are
+the native configuration, signing key and filesystem objects on one PVC, retained on uninstall when
+`persistence.retain=true` and the chart creates the claim. PostgreSQL stores relational and document metadata; Redis
+provides cache, sessions, collaboration and background queues. The default dependencies are
 HelmForge PostgreSQL 2.1.1 and Redis 3.1.0, both fetched from the HelmForge OCI registry.
 
 Ingress or Gateway API routes terminate at the public Service. Native metrics use a separate private Service and
@@ -180,7 +181,9 @@ untrusted dependency certificate, mismatched hostname, unresolved migration or a
 failure by design.
 
 ```bash
-kubectl -n knowledge logs deployment/affine -c bootstrap
+kubectl -n knowledge logs \
+  -l app.kubernetes.io/instance=affine,app.kubernetes.io/name=affine \
+  -c bootstrap --tail=-1
 kubectl -n knowledge describe pod -l app.kubernetes.io/name=affine
 kubectl -n knowledge get events --sort-by=.lastTimestamp
 ```
@@ -260,12 +263,16 @@ local port 3010. This is a local HTTP configuration; production access should us
 Useful diagnostics:
 
 ```bash
-kubectl -n knowledge logs deployment/affine -c bootstrap
-kubectl -n knowledge logs deployment/affine -c affine
+kubectl -n knowledge logs \
+  -l app.kubernetes.io/instance=affine,app.kubernetes.io/name=affine \
+  -c bootstrap --tail=-1
+kubectl -n knowledge logs \
+  -l app.kubernetes.io/instance=affine,app.kubernetes.io/name=affine \
+  -c affine --tail=-1
 kubectl -n knowledge describe pod -l app.kubernetes.io/name=affine
 ```
 
-Replace the namespace and Deployment name with those of the installation.
+Replace the namespace and release label with those of the installation.
 
 Ingress/Gateway controller routing and browser certificate trust are deployment responsibilities. A rendered route does
 not establish that its controller has accepted it or that the configured hostname resolves from clients.
