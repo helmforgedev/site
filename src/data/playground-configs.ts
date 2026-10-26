@@ -4803,7 +4803,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'app.port',
           type: 'number',
           default: '6060',
-          description: 'BookLore application and Service port',
+          description: 'BookLore application listener; service.port is independent',
         },
         {
           label: 'Allowed Origins',
@@ -4811,6 +4811,17 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '*',
           description: 'CORS origin contract; restrict this for public deployments',
+        },
+        {
+          label: 'Disk Type',
+          key: 'app.diskType',
+          type: 'select',
+          default: 'LOCAL',
+          options: [
+            { label: 'Local', value: 'LOCAL' },
+            { label: 'Network (read-safe)', value: 'NETWORK' },
+          ],
+          description: 'NETWORK disables file writes and reorganization',
         },
       ],
     },

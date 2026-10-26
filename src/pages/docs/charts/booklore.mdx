@@ -13,11 +13,10 @@ Deploy [BookLore](https://github.com/booklore-app/booklore) on Kubernetes using 
 A self-hosted eBook library management application with metadata fetching, OPDS support,
 and a modern web-based reader for managing your personal digital book collection.
 
-<Callout type="danger" title="Three PVCs required -- losing /app/data destroys your library metadata">
-  BookLore uses **three separate PVCs**: `/app/data` for the application database and metadata, `/books` for the
-  physical book files (ePub, PDF, etc.), and optionally `/bookdrop` for automated book import. Losing `/app/data`
-  destroys all library metadata, reading progress, and user accounts. The `/books` PVC holds the raw files and can be
-  restored from your source collection. Always back up `/app/data`.
+<Callout type="danger" title="Back up MariaDB and every enabled storage domain">
+  BookLore stores relational state in MariaDB and uses separate filesystem domains: `/app/data` for application data,
+  settings, and caches; `/books` for the physical library; and optional `/bookdrop` for imports. A recoverable snapshot
+  must keep MariaDB and these volumes consistent.
 </Callout>
 
 ## Chart References
@@ -30,12 +29,24 @@ and a modern web-based reader for managing your personal digital book collection
 - **MariaDB bundled** -- HelmForge MariaDB subchart handles the database automatically
 - **External database** -- connect to an existing MariaDB/MySQL instance instead
 - **Triple PVC architecture** -- `/app/data` (metadata), `/books` (library files), `/bookdrop` (imports)
-- **OIDC authentication** -- optional OpenID Connect SSO integration
+- **OIDC guardrail** -- force-disable upstream OIDC while it is configured through the BookLore interface
 - **Remote/proxy auth** -- header-based authentication for reverse proxy setups
 - **NetworkPolicy** -- egress constrained to kube-system (DNS) and MariaDB only
 - **Gateway API** -- optional HTTPRoute support for clusters using Gateway API
 - **External Secrets** -- optional ExternalSecret items for secrets management
 - **HPA guardrails** -- validation prevents multi-replica scaling with ReadWriteOnce storage
+
+## Architecture
+
+The Service targets the Deployment's named `http` port. `app.port` configures
+the actual `BOOKLORE_PORT` listener and all health probes; `service.port`
+remains an independent Kubernetes-facing port. BookLore connects to the
+bundled or external MariaDB service and mounts separate data, books, and
+optional BookDrop volumes.
+
+The official health endpoint is `/api/v1/healthcheck`. The default
+`Recreate` strategy prevents overlapping mounts during upgrades that use
+`ReadWriteOnce` storage.
 
 ## Installation
 
@@ -226,15 +237,15 @@ gatewayAPI:
 
 ### Application Settings
 
-| Parameter            | Description                      | Default |
-| -------------------- | -------------------------------- | ------- |
-| `app.port`           | HTTP port inside the container   | `6060`  |
-| `app.rootLogLevel`   | Root log level                   | `INFO`  |
-| `app.logLevel`       | BookLore-specific log level      | `INFO`  |
-| `app.allowedOrigins` | CORS allowed origins             | `"*"`   |
-| `app.diskType`       | Disk type for file storage       | `LOCAL` |
-| `app.env`            | Additional environment variables | `[]`    |
-| `app.envFrom`        | Additional envFrom sources       | `[]`    |
+| Parameter            | Description                         | Default |
+| -------------------- | ----------------------------------- | ------- |
+| `app.port`           | HTTP port inside the container      | `6060`  |
+| `app.rootLogLevel`   | Root log level                      | `INFO`  |
+| `app.logLevel`       | BookLore-specific log level         | `INFO`  |
+| `app.allowedOrigins` | CORS allowed origins                | `"*"`   |
+| `app.diskType`       | `LOCAL` or read-safe `NETWORK` mode | `LOCAL` |
+| `app.env`            | Additional environment variables    | `[]`    |
+| `app.envFrom`        | Additional envFrom sources          | `[]`    |
 
 ### Image Configuration
 
@@ -273,15 +284,15 @@ gatewayAPI:
 
 ### Authentication
 
-| Parameter                   | Description                               | Default        |
-| --------------------------- | ----------------------------------------- | -------------- |
-| `oidc.enabled`              | Enable OIDC authentication                | `false`        |
-| `oidc.forceDisable`         | Force disable OIDC even when configured   | `false`        |
-| `remoteAuth.enabled`        | Enable proxy-based authentication headers | `false`        |
-| `remoteAuth.createNewUsers` | Create users from remote auth headers     | `true`         |
-| `remoteAuth.headerName`     | Display name header                       | `Remote-Name`  |
-| `remoteAuth.headerUser`     | Username header                           | `Remote-User`  |
-| `remoteAuth.headerEmail`    | Email header                              | `Remote-Email` |
+| Parameter                   | Description                                       | Default        |
+| --------------------------- | ------------------------------------------------- | -------------- |
+| `oidc.enabled`              | Deprecated compatibility value; no runtime effect | `false`        |
+| `oidc.forceDisable`         | Force-disable OIDC configured through BookLore    | `false`        |
+| `remoteAuth.enabled`        | Enable proxy-based authentication headers         | `false`        |
+| `remoteAuth.createNewUsers` | Create users from remote auth headers             | `true`         |
+| `remoteAuth.headerName`     | Display name header                               | `Remote-Name`  |
+| `remoteAuth.headerUser`     | Username header                                   | `Remote-User`  |
+| `remoteAuth.headerEmail`    | Email header                                      | `Remote-Email` |
 
 ### Networking
 
@@ -315,7 +326,28 @@ gatewayAPI:
 </Callout>
 
 <Callout type="warning" title="HPA requires ReadWriteMany storage">
-  Enabling autoscaling with `maxReplicas > 1` while persistence uses `ReadWriteOnce` access mode
-  will cause volume scheduling failures in multi-node clusters. Set `persistence.data.accessModes`
-  and `persistence.books.accessModes` to `ReadWriteMany` before enabling HPA.
+  Setting `replicaCount > 1` or autoscaling with `maxReplicas > 1` requires every enabled persistence volume to
+  declare `ReadWriteMany`. The chart rejects unsafe data, books, and BookDrop combinations before installation.
 </Callout>
+
+## Security and production boundaries
+
+- Service-account token mounting is disabled by default.
+- Database credentials can come from an existing Secret or ExternalSecret;
+  inline passwords remain visible in Helm release state.
+- Restrict `app.allowedOrigins` to the public HTTPS origin and allow required
+  metadata-provider egress when enabling NetworkPolicy restrictions.
+- `app.diskType=NETWORK` disables file writes and reorganization for
+  network-attached book storage; it does not make every network filesystem
+  safe or supported.
+- The stock pinned image has no Prometheus endpoint, so ServiceMonitor remains
+  disabled unless an operator supplies a compatible image and path.
+
+## Troubleshooting
+
+- For slow startup, inspect Flyway and MariaDB logs before restarting the pod.
+- For probe failures, verify `BOOKLORE_PORT` matches `app.port` and request
+  `/api/v1/healthcheck` inside the container.
+- For missing books, verify the `/books` PVC and `app.diskType` contract.
+- For database failures, verify the JDBC endpoint, username, and Secret key
+  refer to the same MariaDB instance.
