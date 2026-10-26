@@ -315,6 +315,26 @@ store deletion outcomes.
 The metrics listener is a separate ClusterIP Service and is never routed by
 the generated Ingress or HTTPRoute.
 
+## Listener and Service ports
+
+`containerPorts.http` configures the real Atuin HTTP listener through
+`ATUIN_PORT`. `service.port` is independent and controls the port exposed by
+the Kubernetes Service, which targets the named `http` container port. Both
+default to `8888`.
+
+```yaml
+containerPorts:
+  http: 8899
+
+service:
+  port: 8080
+```
+
+With this configuration Atuin listens on 8899, while clients connect to the
+Service on 8080. The chart rejects application and metrics listener ports below
+1024 because the container runs as UID 1000 with every Linux capability
+dropped. Ingress and HTTPRoute backends continue to use `service.port`.
+
 ## Health semantics
 
 Startup, readiness and liveness probes call the upstream `/healthz` endpoint.
@@ -491,10 +511,11 @@ This is an intentional safety check. Switch to PostgreSQL before increasing
 | ------------ | ---------------------------------------------------------------------- |
 | Image        | `image.repository`, `image.tag`, `image.digest`                        |
 | Server       | `atuin.openRegistration`, `atuin.path`, `atuin.maxRecordSize`          |
+| Listener     | `containerPorts.http`, `service.port`                                  |
 | Database     | `database.type`, `database.existingSecret`, `postgresql.enabled`       |
 | Persistence  | `persistence.enabled`, `persistence.existingClaim`, `persistence.size` |
 | Exposure     | `ingress`, `gatewayAPI`                                                |
-| Monitoring   | `metrics.enabled`, `metrics.serviceMonitor`                            |
+| Monitoring   | `metrics.enabled`, `metrics.port`, `metrics.serviceMonitor`            |
 | Security     | `podSecurityContext`, `securityContext`, `networkPolicy`               |
 | Availability | `replicaCount`, `podDisruptionBudget`, `autoscaling`                   |
 | Extensions   | `externalSecrets`, `extraVolumes`, `extraManifests`                    |
