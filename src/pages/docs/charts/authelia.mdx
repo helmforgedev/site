@@ -45,6 +45,16 @@ Generate with: `openssl rand -base64 64 | head -c 64`
 - **Brute force protection** — configurable regulation (`max_retries`, `ban_time`)
 - **Prometheus metrics** with optional ServiceMonitor
 
+## Architecture
+
+The chart runs the official Authelia image behind a named-port Service and
+optional Ingress or HTTPRoute. A rendered configuration Secret and separate
+credential/user Secrets are mounted read-only. SQLite uses the application PVC;
+production profiles can select bundled or external PostgreSQL/MySQL and optional
+Redis session storage. Native health and metrics listeners follow
+`containerPorts`, while the ingress-only NetworkPolicy limits reachable Pod
+ports without blocking external identity, mail or storage dependencies.
+
 ## Installation
 
 **HTTPS repository:**
@@ -399,9 +409,16 @@ The output hash goes in `usersDatabase.users.<user>.password`.
 | -------------------------------- | ------- | ------- | -------------------------------------------------------- |
 | `persistence.enabled`            | boolean | `true`  | Enable PVC for `/data` (SQLite DB, filesystem notifier). |
 | `persistence.size`               | string  | `1Gi`   | PVC size.                                                |
-| `service.port`                   | integer | `80`    | Service port (Authelia listens on 9091).                 |
-| `metrics.enabled`                | boolean | `false` | Enable separate metrics service on port 9959.            |
+| `containerPorts.http`            | integer | `9091`  | Native Authelia HTTP listener.                           |
+| `containerPorts.metrics`         | integer | `9959`  | Native Prometheus listener.                              |
+| `service.port`                   | integer | `80`    | Client-facing Service port.                              |
+| `networkPolicy.enabled`          | boolean | `true`  | Restrict ingress to declared listeners.                  |
+| `metrics.enabled`                | boolean | `false` | Enable the separate metrics Service.                     |
 | `metrics.serviceMonitor.enabled` | boolean | `false` | Enable Prometheus ServiceMonitor.                        |
+
+The container ports are the listener source of truth. The chart generates
+Authelia's `server.address` and `telemetry.metrics.address` from them, keeping the
+process, probes and named Service targets aligned.
 
 ### Backup
 
@@ -427,8 +444,30 @@ Review [4.39.23](https://github.com/authelia/authelia/releases/tag/v4.39.23),
 [4.39.26](https://github.com/authelia/authelia/releases/tag/v4.39.26),
 [4.39.27](https://github.com/authelia/authelia/releases/tag/v4.39.27), and
 [4.39.28](https://github.com/authelia/authelia/releases/tag/v4.39.28).
-Redis dependency 3.0.0 retains its image, storage and authentication defaults
-and fixes TLS/custom-port probes.
+The bundled dependency baseline is PostgreSQL 2.1.1, MySQL 2.1.1 and Redis 3.1.0.
+These updates retain the documented storage and authentication contracts.
+
+## Security and recovery
+
+Use stable existing Secrets or External Secrets for the JWT, session and storage
+encryption keys. Treat those values and the selected database as one recovery
+set; losing the storage encryption key permanently makes enrolled TOTP and
+WebAuthn data unreadable. Terminate TLS at a trusted proxy and restrict access to
+the rendered configuration Secret. The default read-only root filesystem uses a
+bounded `/tmp` volume, disables API token mounting and restricts ingress to the
+HTTP and optional metrics listeners. Configure explicit
+`networkPolicy.ingressFrom` peers for trusted proxy namespaces.
+
+## Troubleshooting
+
+- If the Pod does not become ready, inspect `/api/health`, application logs and
+  database or Redis endpoints before restarting it.
+- If a custom port fails, confirm `containerPorts.http` or
+  `containerPorts.metrics`; listener addresses under `config` are chart-managed.
+- If login redirects or cookies fail, verify the public Authelia URL, cookie
+  domain, TLS scheme and reverse-proxy forwarded headers.
+- If MFA data cannot be decrypted, restore the matching database and original
+  storage encryption key. Generating a replacement key does not recover data.
 
 Authelia 4.39.21 changes storage encryption to use HKDF and authenticated additional data;
 4.39.22 fixes the access-token JWT session migration. Back up the database and retain
