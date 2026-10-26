@@ -14,6 +14,14 @@ export function chartIcon(slug: string): string {
 
 export const charts: Chart[] = [
   {
+    name: 'RustFS',
+    slug: 'rustfs',
+    description:
+      'S3-compatible object storage with standalone or distributed topology, durable volumes and replication setup.',
+    maturity: 'alpha',
+    backup: false,
+  },
+  {
     name: 'Transmute',
     slug: 'transmute',
     description:

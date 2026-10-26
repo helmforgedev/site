@@ -41,6 +41,10 @@ export const chartCategories: ChartCategory[] = [
     ],
   },
   {
+    label: 'Object Storage',
+    charts: [{ label: 'RustFS', href: '/docs/charts/rustfs', maturity: 'alpha' }],
+  },
+  {
     label: 'Messaging & Streaming',
     charts: [
       { label: 'Stalwart', href: '/docs/charts/stalwart', maturity: 'beta' },
