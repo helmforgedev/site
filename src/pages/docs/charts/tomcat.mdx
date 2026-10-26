@@ -143,6 +143,10 @@ For immutable images, keep `webapps.copyImageContent.enabled=true`; the chart co
 For artifact-driven deployments, add an init container:
 
 ```yaml
+webapps:
+  copyImageContent:
+    enabled: false
+
 extraInitContainers:
   - name: fetch-war
     image: docker.io/curlimages/curl:8.17.0
@@ -158,6 +162,9 @@ extraInitContainers:
       - name: webapps
         mountPath: /webapps
 ```
+
+Disable image content copying for this path unless the downloader explicitly
+removes the image-provided applications before installing its artifact.
 
 Use persistent `webapps` only when applications are intentionally installed or mutated at runtime:
 
@@ -258,7 +265,8 @@ webapp.
 | `logs.persistence.enabled`         | `false`                       | Persist Tomcat logs.                            |
 | `jmx.enabled`                      | `false`                       | Enable JMX remote settings and Service ports.   |
 | `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                   |
-| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                           |
+| `networkPolicy.enabled`            | `false`                       | Isolate ingress; egress remains unrestricted.   |
+| `networkPolicy.egress.enabled`     | `false`                       | Enforce built-in egress rules.                  |
 | `networkPolicy.egress.extraTo`     | `[]`                          | Additional peers for built-in egress rules.     |
 | `networkPolicy.egress.extraEgress` | `[]`                          | Additional complete NetworkPolicy egress rules. |
 
