@@ -374,6 +374,11 @@ root filesystem, disabled privilege escalation, and only the
 writable and `/tmp` is ephemeral. Kubernetes API token mounting is disabled by
 default because Answer does not use the cluster API.
 
+Before upgrading an existing release, verify that the `/data` volume is writable
+by UID/GID `1000`. A volume created by an older root-running deployment can
+remain root-owned when its storage driver does not apply `fsGroup`; perform an
+administrator-controlled ownership migration before the upgrade when required.
+
 The default NetworkPolicy controls ingress only. With
 `networkPolicy.extraIngress: []`, any source may use the named HTTP port; provide
 namespace or pod selectors to restrict access to the ingress controller or
