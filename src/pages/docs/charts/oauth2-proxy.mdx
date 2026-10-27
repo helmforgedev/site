@@ -15,6 +15,7 @@ OAuth2 Proxy is a reverse proxy and authentication gateway for OAuth2 and OIDC p
 - Reverse proxy header trust disabled by default
 - Config validation init container using `--config-test`
 - Legacy config and alpha structured config support
+- Chart-owned HTTP and metrics listeners aligned across config, pod ports, probes, and Service targets
 - Ingress, Gateway API, dual-stack Service fields, ServiceMonitor, HPA, PDB, NetworkPolicy, and runtime tests
 
 Version v7.15.5 hardens authentication boundaries for ambiguous skip-auth
@@ -82,6 +83,20 @@ config:
     trustedProxyIps:
       - 10.42.0.0/16
 ```
+
+Custom listener with the Service kept on port 80:
+
+```yaml
+containerPorts:
+  http: 8080
+
+service:
+  port: 80
+```
+
+The chart passes the official `--http-address` flag to both the config-test init
+container and runtime. `service.port` is the cluster-facing port, while
+`containerPorts.http` changes the real process listener and pod port.
 
 ## Operations
 
@@ -198,8 +213,11 @@ required keys.
 ## Alpha Config
 
 Use `alphaConfig.enabled=true` when you need structured OAuth2 Proxy alpha configuration instead of command-line flags.
-Keep the generated config and classic `config` values aligned so the rendered arguments do not describe a different
-provider or cookie contract than the mounted config file.
+The chart enforces `server.bindAddress` from `containerPorts.http` and
+`metricsServer.bindAddress` from `metrics.port`, and passes matching official
+listener flags to configuration validation and runtime. Do not set
+`extraArgs.http-address` or `extraArgs.metrics-address`; those keys are rejected
+to prevent the Service and probes from diverging from the process.
 
 ## Validation
 
@@ -228,21 +246,24 @@ callback URL, cookie domain, and upstream proxy integration are correct.
 
 ## Values
 
-| Parameter                     | Default                             | Description                      |
-| ----------------------------- | ----------------------------------- | -------------------------------- |
-| `replicaCount`                | `2`                                 | Number of OAuth2 Proxy pods.     |
-| `image.repository`            | `quay.io/oauth2-proxy/oauth2-proxy` | Official image repository.       |
-| `auth.clientID`               | `helmforge-local-client`            | Local placeholder OAuth client.  |
-| `auth.clientSecret`           | `helmforge-local-client-credential` | Local placeholder OAuth secret.  |
-| `auth.existingSecret`         | `""`                                | Existing credential Secret.      |
-| `config.provider`             | `github`                            | OAuth2/OIDC provider.            |
-| `config.reverseProxy.enabled` | `false`                             | Trust reverse proxy headers.     |
-| `alphaConfig.enabled`         | `false`                             | Render structured alpha config.  |
-| `metrics.enabled`             | `true`                              | Enable metrics endpoint.         |
-| `ingress.enabled`             | `false`                             | Render Ingress.                  |
-| `gateway.enabled`             | `false`                             | Render Gateway API HTTPRoute.    |
-| `networkPolicy.extraEgress`   | `[]`                                | Append full custom egress rules. |
-| `externalSecrets.enabled`     | `false`                             | Render ExternalSecret resources. |
+| Parameter                     | Default                             | Description                        |
+| ----------------------------- | ----------------------------------- | ---------------------------------- |
+| `replicaCount`                | `2`                                 | Number of OAuth2 Proxy pods.       |
+| `image.repository`            | `quay.io/oauth2-proxy/oauth2-proxy` | Official image repository.         |
+| `containerPorts.http`         | `4180`                              | Real HTTP listener and pod port.   |
+| `service.port`                | `80`                                | Cluster-facing HTTP port.          |
+| `auth.clientID`               | `helmforge-local-client`            | Local placeholder OAuth client.    |
+| `auth.clientSecret`           | `helmforge-local-client-credential` | Local placeholder OAuth secret.    |
+| `auth.existingSecret`         | `""`                                | Existing credential Secret.        |
+| `config.provider`             | `github`                            | OAuth2/OIDC provider.              |
+| `config.reverseProxy.enabled` | `false`                             | Trust reverse proxy headers.       |
+| `alphaConfig.enabled`         | `false`                             | Render structured alpha config.    |
+| `metrics.enabled`             | `true`                              | Enable metrics endpoint.           |
+| `metrics.port`                | `44180`                             | Metrics listener and Service port. |
+| `ingress.enabled`             | `false`                             | Render Ingress.                    |
+| `gateway.enabled`             | `false`                             | Render Gateway API HTTPRoute.      |
+| `networkPolicy.extraEgress`   | `[]`                                | Append full custom egress rules.   |
+| `externalSecrets.enabled`     | `false`                             | Render ExternalSecret resources.   |
 
 ## Links
 
