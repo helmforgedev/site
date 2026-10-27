@@ -17444,13 +17444,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
-          label: 'Public URL',
-          key: 'dreeve.appUrl',
-          type: 'text',
-          default: 'http://localhost:8080',
-          description: 'Public root URL used by Dreeve',
-        },
-        {
           label: 'Import Mode',
           key: 'dreeve.importMode',
           type: 'select',
@@ -17541,6 +17534,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       collapsible: true,
       gateField: 'ingress.enabled',
       fields: [
+        {
+          label: 'Public URL',
+          key: 'dreeve.appUrl',
+          type: 'text',
+          default: 'https://dreeve.example.com',
+          description: 'Must match the externally reachable Ingress URL for redirects and admin sessions',
+        },
         {
           label: 'Ingress Class',
           key: 'ingress.ingressClassName',
