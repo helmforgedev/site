@@ -12187,11 +12187,39 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
-          label: 'Storage Size',
-          key: 'persistence.size',
+          label: 'Configuration Storage',
+          key: 'persistence.conf.size',
+          type: 'text',
+          default: '256Mi',
+          description: 'Configuration PVC size',
+        },
+        {
+          label: 'Work Storage',
+          key: 'persistence.work.size',
           type: 'text',
           default: '2Gi',
-          description: 'Config storage size',
+          description: 'Query log, statistics and filters PVC size',
+        },
+        {
+          label: 'Setup Listener',
+          key: 'containerPorts.setup',
+          type: 'number',
+          default: '3000',
+          description: 'Initial setup wizard process port',
+        },
+        {
+          label: 'Configured HTTP Listener',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Configured admin UI process port',
+        },
+        {
+          label: 'DNS Listener',
+          key: 'containerPorts.dns',
+          type: 'number',
+          default: '53',
+          description: 'DNS process port',
         },
       ],
     },
@@ -12230,7 +12258,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'adguard.example.com',
           description: 'Ingress hostname',
@@ -12244,6 +12272,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Ingress controller class',
         },
         { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
+      ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [
+        {
+          label: 'API Token Automount',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Keep disabled unless a workload explicitly needs Kubernetes API access',
+        },
       ],
     },
     {
