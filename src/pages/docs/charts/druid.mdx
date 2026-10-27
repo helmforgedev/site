@@ -48,6 +48,7 @@ for BI dashboards and real-time data exploration.
 - **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` for IPv4/IPv6 clusters
 - **External Secrets Operator** — optional `ExternalSecret` resources for metadata and S3 credentials
 - **NetworkPolicy** — optional ingress and egress controls for compatible CNIs
+- **Startup-aware health checks** — slow JVM initialization is protected before liveness checks begin
 
 ## Installation
 
@@ -282,12 +283,12 @@ zookeeper:
 | Parameter          | Type   | Default                  | Description  |
 | ------------------ | ------ | ------------------------ | ------------ |
 | `image.repository` | string | `docker.io/apache/druid` | Druid image. |
-| `image.tag`        | string | `"37.0.0"`               | Image tag.   |
+| `image.tag`        | string | `"38.0.0"`               | Image tag.   |
 
-<Callout type="warning" title="Review Apache Druid 37.0.0 upgrade notes before upgrading persistent clusters">
-  Apache Druid 37.0.0 removes Hadoop-based ingestion, moves S3 integrations to AWS SDK v2, and enables Broker segment
-  metadata cache by default. Review the upstream [release
-  notes](https://druid.apache.org/docs/latest/release-info/release-notes/) and [upgrade
+<Callout type="warning" title="Review Apache Druid 38.0.0 upgrade notes before upgrading persistent clusters">
+  Apache Druid 38.0.0 removes Java 17 support, the ZooKeeper-based `remote` task runner, and ZooKeeper-based segment
+  announcement and discovery. Remove legacy overrides or move to `httpRemote` and HTTP server views before upgrading.
+  Review the upstream [release notes](https://druid.apache.org/docs/latest/release-info/release-notes/) and [upgrade
   notes](https://druid.apache.org/docs/latest/release-info/upgrade-notes/) before upgrading production deployments.
 </Callout>
 
@@ -372,16 +373,17 @@ service:
 
 ### Advanced Configuration
 
-| Parameter                          | Type    | Default | Description                                          |
-| ---------------------------------- | ------- | ------- | ---------------------------------------------------- |
-| `druid.extraCommonProperties`      | string  | `""`    | Extra runtime properties applied to all components.  |
-| `druid.extraEnv`                   | array   | `[]`    | Extra environment variables for all components.      |
-| `podSecurityContext.fsGroup`       | integer | `1000`  | Shared filesystem group for Druid volumes.           |
-| `securityContext.runAsNonRoot`     | boolean | `true`  | Run Druid containers as a non-root user.             |
-| `networkPolicy.enabled`            | boolean | `false` | Render NetworkPolicy resources.                      |
-| `networkPolicy.egress.extraTo`     | array   | `[]`    | Additional egress peers wrapped in a generated rule. |
-| `networkPolicy.egress.extraEgress` | array   | `[]`    | Additional complete egress rules appended as-is.     |
-| `extraManifests`                   | array   | `[]`    | Extra Kubernetes manifests.                          |
+| Parameter                                     | Type    | Default | Description                                                     |
+| --------------------------------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `druid.extraCommonProperties`                 | string  | `""`    | Extra runtime properties applied to all components.             |
+| `druid.extraEnv`                              | array   | `[]`    | Extra environment variables for all components.                 |
+| `podSecurityContext.fsGroup`                  | integer | `1000`  | Shared filesystem group for Druid volumes.                      |
+| `securityContext.runAsNonRoot`                | boolean | `true`  | Run Druid containers as a non-root user.                        |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount Kubernetes API credentials into Druid and ZooKeeper Pods. |
+| `networkPolicy.enabled`                       | boolean | `false` | Render NetworkPolicy resources.                                 |
+| `networkPolicy.egress.extraTo`                | array   | `[]`    | Additional egress peers wrapped in a generated rule.            |
+| `networkPolicy.egress.extraEgress`            | array   | `[]`    | Additional complete egress rules appended as-is.                |
+| `extraManifests`                              | array   | `[]`    | Extra Kubernetes manifests.                                     |
 
 ### Gateway API
 
@@ -466,7 +468,16 @@ externalSecrets:
 
 Druid workload containers run as UID/GID `1000` by default with privilege escalation disabled, all Linux capabilities
 dropped, and the runtime default seccomp profile. The `prepare-dirs` init container runs as root only to create and
-chown writable Druid directories.
+chown writable Druid directories. Service account token automounting is disabled at both ServiceAccount and Pod level
+because Druid and ZooKeeper do not use the Kubernetes API. Enable it only for an integration that requires API access.
+
+### Configuration Validation
+
+The chart rejects ambiguous bundled/external PostgreSQL and ZooKeeper modes,
+missing external endpoints or credentials, incomplete S3 configuration, and
+public routes without an enabled Router or required routing references. These
+checks run during `helm install`, `helm upgrade`, and `helm template`, before
+Kubernetes resources are created.
 
 ### NetworkPolicy
 
