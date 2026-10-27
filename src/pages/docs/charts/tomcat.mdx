@@ -144,8 +144,17 @@ For artifact-driven deployments, add an init container:
 
 ```yaml
 webapps:
+  defaultRoot:
+    enabled: false
   copyImageContent:
     enabled: false
+
+startupProbe:
+  mode: tcp
+livenessProbe:
+  mode: tcp
+readinessProbe:
+  mode: tcp
 
 extraInitContainers:
   - name: fetch-war
@@ -163,8 +172,10 @@ extraInitContainers:
         mountPath: /webapps
 ```
 
-Disable image content copying for this path unless the downloader explicitly
-removes the image-provided applications before installing its artifact.
+Disable both default ROOT seeding and image content copying for this path. The
+example uses TCP probes because the fetched artifact's health endpoint is
+application-specific; prefer HTTP probes pointed at an endpoint that the WAR
+actually serves.
 
 Use persistent `webapps` only when applications are intentionally installed or mutated at runtime:
 
