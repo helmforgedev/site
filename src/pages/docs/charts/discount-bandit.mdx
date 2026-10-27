@@ -31,19 +31,13 @@ available for development and small single-replica installs.
 
 ## Architecture
 
-```mermaid
-flowchart TB
-  users[Users] --> edge[Gateway API HTTPRoute or Ingress]
-  edge --> service[Discount Bandit Service]
-  service --> app[Discount Bandit Deployment]
-  app --> web[FrankenPHP web UI]
-  app --> scheduler[Laravel scheduler]
-  app --> worker[Laravel queue worker]
-  app --> crawler[Chromium crawler runtime]
-  app --> mysqlService[MySQL Service]
-  mysqlService --> mysql[MySQL StatefulSet]
-  mysql --> storage[(MySQL data PVC)]
-```
+1. Users enter through a Gateway API HTTPRoute or Kubernetes Ingress.
+2. The edge resource routes to the Discount Bandit Service, which targets the
+   named HTTP port on the Deployment.
+3. The application pod runs the FrankenPHP web UI, Laravel scheduler, Laravel
+   queue worker, and Chromium crawler runtime under Supervisor.
+4. The application connects to the bundled MySQL Service or an external
+   MySQL/MariaDB endpoint. Bundled MySQL persists its data on a PVC.
 
 For production, use the bundled MySQL subchart or an external MySQL/MariaDB service. SQLite is intentionally documented as
 a development path because it is single-writer and normally uses `ReadWriteOnce` storage.
