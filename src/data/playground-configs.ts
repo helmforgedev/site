@@ -8854,6 +8854,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'containerPorts.http',
           type: 'number',
           default: '80',
+          min: 1,
+          max: 65535,
           description: 'Apache listener and pod HTTP port',
         },
       ],
