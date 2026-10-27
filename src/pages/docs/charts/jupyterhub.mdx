@@ -65,6 +65,37 @@ singleuser:
         mem_limit: 2G
 ```
 
+### Listener and Service Ports
+
+JupyterHub has three distinct process listeners. `containerPorts.hub` configures the Hub bind URL,
+`containerPorts.proxy` configures the public configurable-http-proxy listener, and
+`containerPorts.proxyApi` configures the private proxy control API. The corresponding `service.*` values are
+Kubernetes Service ports and may be changed independently because the Services use named target ports.
+
+| Purpose           | Process listener          | Service port           | Default listener / Service |
+| ----------------- | ------------------------- | ---------------------- | -------------------------- |
+| Hub               | `containerPorts.hub`      | `service.hubPort`      | `8081` / `8081`            |
+| Public proxy      | `containerPorts.proxy`    | `service.port`         | `8000` / `80`              |
+| Proxy control API | `containerPorts.proxyApi` | `service.proxyApiPort` | `8001` / `8001`            |
+
+To move the actual application listeners while preserving stable Service ports:
+
+```yaml
+containerPorts:
+  hub: 18081
+  proxy: 18000
+  proxyApi: 18001
+
+service:
+  port: 80
+  hubPort: 8081
+  proxyApiPort: 8001
+```
+
+The public proxy and proxy API listener ports must differ because both sockets are opened by the same proxy
+container. Changing only `service.port`, `service.hubPort`, or `service.proxyApiPort` does not change the process
+listener.
+
 ## Operations
 
 Keep the default SQLite Hub database to a single Hub replica. For HA Hub deployments, configure an external database, provide a shared cookie secret, and avoid single-writer PVC modes for shared Hub state.
@@ -260,12 +291,18 @@ when `hub.cleanupServers=false`.
 
 | Parameter                        | Default                         | Description                                |
 | -------------------------------- | ------------------------------- | ------------------------------------------ |
+| `containerPorts.hub`             | `8081`                          | Actual Hub process listener.               |
+| `containerPorts.proxy`           | `8000`                          | Actual public proxy process listener.      |
+| `containerPorts.proxyApi`        | `8001`                          | Actual proxy control API listener.         |
 | `hub.replicaCount`               | `1`                             | Number of Hub replicas.                    |
 | `hub.persistence.enabled`        | `true`                          | Persist Hub state.                         |
 | `proxy.secretToken`              | `""`                            | Inline proxy token, generated when empty.  |
 | `proxy.existingSecret`           | `""`                            | Existing Secret for proxy token.           |
 | `singleuser.image.name`          | `quay.io/jupyter/base-notebook` | Default notebook image.                    |
 | `singleuser.storage.enabled`     | `false`                         | Create user notebook PVCs.                 |
+| `service.port`                   | `80`                            | Public proxy Service port.                 |
+| `service.hubPort`                | `8081`                          | Internal Hub Service port.                 |
+| `service.proxyApiPort`           | `8001`                          | Internal proxy API Service port.           |
 | `service.ipFamilyPolicy`         | `null`                          | Optional Service dual-stack policy.        |
 | `gateway.enabled`                | `false`                         | Render Gateway API HTTPRoute.              |
 | `networkPolicy.extraEgress`      | `[]`                            | Additional Hub NetworkPolicy egress rules. |
