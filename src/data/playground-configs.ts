@@ -12266,11 +12266,25 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
-          label: 'Replica Count',
-          key: 'replicaCount',
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
           type: 'number',
-          default: '1',
-          description: 'Number of replicas',
+          default: '80',
+          description: 'Port opened by the Apache Answer process',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing Kubernetes Service port',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict inbound traffic to the Answer HTTP listener',
         },
         {
           label: 'Storage Size',
@@ -12304,32 +12318,9 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Memory Limit',
           key: 'resources.limits.memory',
           type: 'text',
-          default: '256Mi',
+          default: '512Mi',
           description: 'Memory limit',
         },
-      ],
-    },
-    {
-      name: 'Ingress',
-      collapsible: true,
-      gateField: 'ingress.enabled',
-      fields: [
-        {
-          label: 'Hostname',
-          key: 'ingress.hostname',
-          type: 'text',
-          default: 'answer.example.com',
-          description: 'Ingress hostname',
-        },
-        {
-          label: 'Ingress Class',
-          key: 'ingress.ingressClassName',
-          type: 'select',
-          default: 'traefik',
-          options: ['traefik', 'nginx'],
-          description: 'Ingress controller class',
-        },
-        { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
       ],
     },
     {

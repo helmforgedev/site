@@ -26,6 +26,8 @@ automatic unattended installation and database-aware scheduled backups.
 - **Auto-install** — unattended first-boot setup via environment variables (`autoInstall: true`)
 - **Database-aware backup** — `tar` for SQLite, `pg_dump` for PostgreSQL, `mysqldump` for MySQL
 - **Admin credentials** — `existingSecret` for GitOps-safe secret management
+- **Independent ports** — configure the real Answer listener separately from the Service port
+- **Hardened defaults** — non-root execution, read-only root filesystem, disabled API token, and NetworkPolicy
 
 ## Installation
 
@@ -112,7 +114,7 @@ postgresql:
     database: answer
     username: answer
     password: 'strong-db-password'
-  primary:
+  standalone:
     persistence:
       enabled: true
       size: 20Gi
@@ -154,7 +156,7 @@ mysql:
     username: answer
     password: 'strong-db-password'
     rootPassword: 'strong-root-password'
-  primary:
+  standalone:
     persistence:
       enabled: true
       size: 20Gi
@@ -222,18 +224,19 @@ backup:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter          | Type   | Default | Description                            |
+| ------------------ | ------ | ------- | -------------------------------------- |
+| `global`           | object | `{}`    | Values shared with chart dependencies. |
+| `nameOverride`     | string | `""`    | Override the chart name.               |
+| `fullnameOverride` | string | `""`    | Override the full release name.        |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources.   |
 
 ### Image
 
 | Parameter          | Type   | Default                   | Description                    |
 | ------------------ | ------ | ------------------------- | ------------------------------ |
 | `image.repository` | string | `docker.io/apache/answer` | Apache Answer container image. |
-| `image.tag`        | string | `"2.0.2"`                 | Image tag.                     |
+| `image.tag`        | string | `"2.0.3"`                 | Image tag.                     |
 | `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.             |
 
 ### Answer Configuration
@@ -324,7 +327,7 @@ Only the images needed for the active database vendor are used.
 | `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                         |
 | `backup.archivePrefix`             | string  | `answer`                   | Prefix for backup archive filenames.   |
 | `backup.images.sqlite`             | string  | `alpine:3.22`              | Image for SQLite backup (tar).         |
-| `backup.images.postgresql`         | string  | `postgres:18.3-alpine`     | Image for PostgreSQL backup (pg_dump). |
+| `backup.images.postgresql`         | string  | `postgres:18.4-alpine`     | Image for PostgreSQL backup (pg_dump). |
 | `backup.images.mysql`              | string  | `mysql:8.4`                | Image for MySQL backup (mysqldump).    |
 | `backup.images.uploader`           | string  | `helmforge/mc:1.0.0`       | Image for S3 upload (MinIO client).    |
 | `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.            |
@@ -335,15 +338,47 @@ Only the images needed for the active database vendor are used.
 
 ### Service and Ingress
 
-| Parameter                  | Type    | Default     | Description                 |
-| -------------------------- | ------- | ----------- | --------------------------- |
-| `service.type`             | string  | `ClusterIP` | Service type.               |
-| `service.port`             | integer | `80`        | Service port.               |
-| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource. |
-| `ingress.ingressClassName` | string  | `""`        | Ingress class name.         |
-| `ingress.annotations`      | object  | `{}`        | Ingress annotations.        |
-| `ingress.hosts`            | array   | `[]`        | Host and path rules.        |
-| `ingress.tls`              | array   | `[]`        | TLS configuration.          |
+`containerPorts.http` configures the actual Apache Answer process through the
+upstream-supported `INSTALL_PORT`, `SITE_ADDR`, and `SWAGGER_ADDRESS_PORT`
+variables. `service.port` is client-facing and may differ because the Service uses
+the named `http` target.
+
+| Parameter                    | Type    | Default     | Description                              |
+| ---------------------------- | ------- | ----------- | ---------------------------------------- |
+| `containerPorts.http`        | integer | `80`        | Port opened by the Answer process.       |
+| `service.type`               | string  | `ClusterIP` | Service type.                            |
+| `service.port`               | integer | `80`        | Client-facing Service port.              |
+| `networkPolicy.enabled`      | boolean | `true`      | Restrict ingress to the named HTTP port. |
+| `networkPolicy.extraIngress` | array   | `[]`        | Optional peers allowed to reach Answer.  |
+| `ingress.enabled`            | boolean | `false`     | Enable an Ingress resource.              |
+| `ingress.ingressClassName`   | string  | `""`        | Ingress class name.                      |
+| `ingress.annotations`        | object  | `{}`        | Ingress annotations.                     |
+| `ingress.hosts`              | array   | `[]`        | Host and path rules.                     |
+| `ingress.tls`                | array   | `[]`        | TLS configuration.                       |
+
+Example with separate ports:
+
+```yaml
+containerPorts:
+  http: 8080
+
+service:
+  port: 9080
+```
+
+## Security Defaults
+
+The Answer pod runs as UID/GID `1000` with RuntimeDefault seccomp, a read-only
+root filesystem, disabled privilege escalation, and only the
+`NET_BIND_SERVICE` capability required by the default port `80`. `/data` remains
+writable and `/tmp` is ephemeral. Kubernetes API token mounting is disabled by
+default because Answer does not use the cluster API.
+
+The default NetworkPolicy controls ingress only. With
+`networkPolicy.extraIngress: []`, any source may use the named HTTP port; provide
+namespace or pod selectors to restrict access to the ingress controller or
+Gateway. Egress remains unrestricted for SMTP, external databases, identity
+providers, plugins, and external content.
 
 ### Probes
 
@@ -358,18 +393,19 @@ All probes use `/healthz` as the HTTP path.
 
 ### Resources and Scheduling
 
-| Parameter                       | Type    | Default | Description                     |
-| ------------------------------- | ------- | ------- | ------------------------------- |
-| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
-| `extraVolumes`                  | array   | `[]`    | Extra volumes.                  |
-| `extraVolumeMounts`             | array   | `[]`    | Extra volume mounts.            |
-| `extraManifests`                | array   | `[]`    | Extra Kubernetes manifests.     |
+| Parameter                                     | Type    | Default    | Description                       |
+| --------------------------------------------- | ------- | ---------- | --------------------------------- |
+| `resources`                                   | object  | see values | CPU and memory requests/limits.   |
+| `terminationGracePeriodSeconds`               | integer | `30`       | Termination grace period.         |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`    | Mount Kubernetes API credentials. |
+| `nodeSelector`                                | object  | `{}`       | Node selector for scheduling.     |
+| `tolerations`                                 | array   | `[]`       | Tolerations for scheduling.       |
+| `extraVolumes`                                | array   | `[]`       | Extra volumes.                    |
+| `extraVolumeMounts`                           | array   | `[]`       | Extra volume mounts.              |
+| `extraManifests`                              | array   | `[]`       | Extra Kubernetes manifests.       |
 
 ## More Information
 
 - [Apache Answer Official Documentation](https://answer.apache.org/docs/)
-- [Apache Answer GitHub Repository](https://github.com/apache/incubator-answer)
+- [Apache Answer GitHub Repository](https://github.com/apache/answer)
 - [HelmForge Answer Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/answer)
