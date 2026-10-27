@@ -14646,6 +14646,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Listener',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Apache HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Actual Apache process listener',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Stable Kubernetes Service port',
+        },
+      ],
+    },
+    {
       name: 'Multi-Server',
       collapsible: true,
       fields: [
