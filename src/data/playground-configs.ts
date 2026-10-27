@@ -4817,10 +4817,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'app.diskType',
           type: 'select',
           default: 'LOCAL',
-          options: [
-            { label: 'Local', value: 'LOCAL' },
-            { label: 'Network (read-safe)', value: 'NETWORK' },
-          ],
+          options: ['LOCAL', 'NETWORK'],
           description: 'NETWORK disables file writes and reorganization',
         },
       ],
