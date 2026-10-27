@@ -176,6 +176,7 @@ export const scenarios: Record<string, { label: string; description: string; val
         'dolibarr.companyName': 'Acme Corp',
         'dolibarr.timezone': 'America/Sao_Paulo',
         'dolibarr.enableModules': 'societe,produit,service,propal,commande,facture,stock,projet',
+        'containerPorts.http': '8080',
         'admin.existingSecret': 'dolibarr-admin-secret',
         'externalSecrets.enabled': 'true',
         'externalSecrets.secretStoreRef.name': 'production-secrets',

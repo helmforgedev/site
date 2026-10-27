@@ -29,6 +29,8 @@ PHP application backed by MySQL.
 - **PHP tuning** — configurable `memory_limit`, `upload_max_filesize`, `post_max_size`, and `max_execution_time`
 - **Secret preservation** — admin and runtime secrets survive upgrades via `existingSecret`
 - **S3 backup** — scheduled `mysqldump` CronJob to S3-compatible storage
+- **Port contract** — `containerPorts.http` changes the real Apache listener, probes, and Service target
+- **Network isolation** — ingress is restricted to the named Dolibarr HTTP port by default
 
 ## Installation
 
@@ -409,9 +411,14 @@ Dolibarr uses two separate PVCs. Both must be preserved in backups independently
 
 | Parameter             | Type    | Default     | Description                          |
 | --------------------- | ------- | ----------- | ------------------------------------ |
+| `containerPorts.http` | integer | `80`        | Apache listener and pod HTTP port.   |
 | `service.type`        | string  | `ClusterIP` | Kubernetes service type.             |
 | `service.port`        | integer | `80`        | Service port exposed to the cluster. |
 | `service.annotations` | object  | `{}`        | Annotations for the Service.         |
+
+`service.port` controls the cluster-facing port. `containerPorts.http` is separate and rewrites both Apache
+listener declarations before the official foreground process starts. The Service uses the named `http` target port,
+so custom values remain aligned with probes and routing.
 
 ### Ingress
 
@@ -479,7 +486,19 @@ Dolibarr uses two separate PVCs. Both must be preserved in backups independently
 
 The official Dolibarr image performs first-run file ownership and Apache setup as root. The chart keeps
 `securityContext` empty by default and applies pod-level `RuntimeDefault` seccomp; operators can add stricter
-container security after validating their image and storage combination.
+container security after validating their image and storage combination. `runAsNonRoot` and
+`readOnlyRootFilesystem` are therefore not safe defaults for the pinned official image.
+
+### Network Policy
+
+| Parameter                   | Type    | Default | Description                                                            |
+| --------------------------- | ------- | ------- | ---------------------------------------------------------------------- |
+| `networkPolicy.enabled`     | boolean | `true`  | Restrict inbound traffic to the named Dolibarr HTTP port.              |
+| `networkPolicy.ingressFrom` | array   | `[]`    | Optional ingress peers; empty allows the HTTP port from any namespace. |
+
+The policy selects the Dolibarr component label, so Helm tests and unrelated release pods are not isolated. Egress
+is intentionally unrestricted because external databases, mail servers, payment providers, webhooks, and APIs are
+deployment-specific. Define cluster-level egress policy when those destinations are known.
 
 ### Security Scan
 
@@ -492,11 +511,12 @@ container security after validating their image and storage combination.
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                                       |
+| --------------------------------------------- | ------- | ------- | ------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                 |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.               |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token in the Dolibarr pod. |
 
 ### Scheduling
 
