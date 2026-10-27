@@ -12219,7 +12219,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'containerPorts.dns',
           type: 'number',
           default: '53',
-          description: 'DNS process port',
+          description: 'DNS process port; select this custom port in the setup wizard instead of its proposed port 53',
         },
       ],
     },
@@ -12275,9 +12275,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
-      name: 'Network Policy',
+      name: 'Service Account',
       collapsible: true,
-      gateField: 'networkPolicy.enabled',
       fields: [
         {
           label: 'API Token Automount',
@@ -12287,6 +12286,12 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Keep disabled unless a workload explicitly needs Kubernetes API access',
         },
       ],
+    },
+    {
+      name: 'Network Policy',
+      collapsible: true,
+      gateField: 'networkPolicy.enabled',
+      fields: [],
     },
     {
       name: 'S3 Backup',
