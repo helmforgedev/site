@@ -7272,6 +7272,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'containerPorts.http',
           type: 'number',
           default: '4180',
+          min: 1,
+          max: 65535,
           description: 'Real OAuth2 Proxy HTTP listener and pod port',
         },
         {
