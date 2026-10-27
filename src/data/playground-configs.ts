@@ -453,6 +453,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'containerPorts.web',
           type: 'number',
           default: '8080',
+          max: 65535,
           description: 'Sets TEMPORAL_UI_PORT in the official UI image',
         },
         {
@@ -460,6 +461,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'webService.port',
           type: 'number',
           default: '8080',
+          max: 65535,
           description: 'Kubernetes Service port targeting the named Web UI listener',
         },
         {
@@ -467,6 +469,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'containerPorts.metrics',
           type: 'number',
           default: '9090',
+          max: 65535,
           description: 'Prometheus listener configured in every Temporal Server role',
         },
         {
@@ -474,6 +477,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'monitoring.servicePort',
           type: 'number',
           default: '9090',
+          max: 65535,
           description: 'Headless Service port targeting the named metrics listener',
         },
       ],
