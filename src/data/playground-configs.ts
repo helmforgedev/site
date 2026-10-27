@@ -7783,6 +7783,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '80',
           description: 'Redis HTTP bridge process listener',
         },
+        {
+          label: 'Redis HTTP Service Port',
+          key: 'redisHttp.service.port',
+          type: 'number',
+          default: '80',
+          description: 'Redis HTTP bridge Kubernetes Service port',
+        },
       ],
     },
     {
