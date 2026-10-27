@@ -807,7 +807,7 @@ export const charts: Chart[] = [
     description:
       'Self-hosted personal medical records manager with PostgreSQL, uploads, backups, and privacy controls.',
     maturity: 'stable',
-    backup: false,
+    backup: true,
   },
   {
     name: 'Poznote',

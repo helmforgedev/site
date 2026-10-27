@@ -24,6 +24,12 @@ reads and attachment filenames. It does not change the service port, uploads
 path or authentication environment contract.
 Back up PostgreSQL and uploaded records before upgrading.
 
+The chart no longer accepts the legacy `app.port` value. The pinned upstream
+entrypoint always starts Uvicorn on container port `8000`, so that value changed
+only Kubernetes metadata and could break traffic. Remove it from existing values
+files. Configure `service.port` when clients need a different Kubernetes Service
+port; the Service targets the fixed named `http` listener.
+
 Configure `SSO_ONLY_MODE` and `SSO_AUTO_REDIRECT` through `app.env`; they require
 `medikeep.sso.enabled=true` and complete provider settings. Accepted boolean
 values are `true/false`, `1/0`, `yes/no` and `on/off`. Invalid values stop startup.
@@ -38,7 +44,7 @@ Core runtime:
 
 - `image.repository`, `image.tag`, `image.pullPolicy`: official pinned MediKeep image and pull behavior.
 - `replicaCount`: pod count. The chart rejects values greater than `1` because MediKeep writes to local mounted paths.
-- `app.port`, `app.timezone`, `app.logLevel`, `app.debug`, `app.enableApiDocs`, `app.enableSsl`.
+- `app.timezone`, `app.logLevel`, `app.debug`, `app.enableApiDocs`, `app.enableSsl`.
 - `app.command`, `app.args`, `app.env`, `app.envFrom`.
 - `commonLabels`, `nameOverride`, `fullnameOverride`.
 
@@ -73,6 +79,15 @@ Exposure and operations:
 - `resources`, `podSecurityContext`, `securityContext`, `waitForDatabase`.
 - `serviceAccount`, `pdb`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`.
 - `priorityClassName`, `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+MediKeep's application listener is fixed at container port `8000` by the
+upstream image. `service.port` is independent; for example, this exposes
+Service port `8080` without changing the application process:
+
+```yaml
+service:
+  port: 8080
+```
 
 ## Installation
 

@@ -4903,7 +4903,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.69.0',
+          default: 'v0.72.0',
           description: 'Pinned official MediKeep image tag',
         },
         {
@@ -4912,6 +4912,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: 'UTC',
           description: 'Timezone used for medical records and reminders',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '8000',
+          description: 'Kubernetes Service port targeting the fixed MediKeep listener',
         },
         {
           label: 'API Documentation',
