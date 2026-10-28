@@ -15286,7 +15286,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.30.0',
+          default: '0.31.0',
           description: 'Pinned official Memos image',
         },
         {
@@ -15297,11 +15297,11 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'SQLite, local attachments and instance state',
         },
         {
-          label: 'Public instance URL',
+          label: 'Canonical instance URL',
           key: 'memos.instanceUrl',
           type: 'text',
           default: '',
-          description: 'Enables anonymous public notes and RSS; leave empty for a private instance',
+          description: 'External HTTP(S) URL; Memos ACCESS settings independently control anonymous access',
         },
         {
           label: 'Administrator Secret',
