@@ -12,7 +12,7 @@ SonarQube Community Build provides code quality and security analysis. The HelmF
 
 - Official `docker.io/library/sonarqube` image pinned to `26.8.0.126808-community`
 - HelmForge PostgreSQL dependency or external PostgreSQL
-- Plugin download init container
+- Plugin download init container with shell-safe URLs and optional SHA-256 verification
 - First-class community branch plugin wiring, Java agents, and webapp replacement support
 - Gateway API, Ingress, dual-stack Service fields, NetworkPolicy, PDB, persistence, and Helm tests
 - External Secrets Operator support for database credentials
@@ -53,6 +53,8 @@ Community branch plugin:
 communityBranchPlugin:
   enabled: true
   version: '26.4.0'
+  jarSha256: ''
+  webappSha256: ''
 ```
 
 ## Operations
@@ -69,6 +71,10 @@ The chart runs SonarQube Community Build with one of three database paths:
 
 SonarQube also embeds Elasticsearch for search. That makes node kernel settings, persistent data, and startup probes
 part of the production contract.
+
+The Service targets the named `http` port. `containerPorts.http` changes the real
+SonarQube listener through `SONAR_WEB_PORT`; `service.port` changes only the
+client-facing Kubernetes Service port.
 
 ## Production Values
 
@@ -150,9 +156,12 @@ plugins:
   install:
     - name: sonar-auth-oidc
       url: https://artifacts.example.com/sonar-auth-oidc.jar
+      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-Use an internal artifact repository for production. Startup should not depend on public internet availability.
+Plugin URLs are passed through environment variables so shell characters are not
+interpreted. When `sha256` is set, the init container verifies the artifact before
+SonarQube starts. Use an internal artifact repository and checksums for production.
 
 ## Extension Manifests
 
@@ -188,7 +197,19 @@ persistence:
 ```
 
 Keep the plugin major and minor version aligned with the SonarQube major and minor version. Mirror `jarUrl` and
-`webappUrl` internally when outbound internet is restricted.
+`webappUrl` internally when outbound internet is restricted. Configure
+`jarSha256` and `webappSha256` to establish artifact integrity.
+
+## Backup and Security Boundaries
+
+A recoverable backup includes PostgreSQL plus the data and extensions volumes.
+The logs volume is optional and is not application state. Backup scheduling,
+retention, and restore testing remain platform responsibilities.
+
+The pod defaults to a non-root UID, RuntimeDefault seccomp, dropped capabilities,
+no privilege escalation, a read-only root filesystem, and no service account
+token. NetworkPolicy is opt-in because database and plugin-mirror destinations
+are environment-specific.
 
 ## Networking
 
@@ -248,21 +269,26 @@ is enabled.
 
 ## Values
 
-| Parameter                          | Default                       | Description                                                     |
-| ---------------------------------- | ----------------------------- | --------------------------------------------------------------- |
-| `image.repository`                 | `docker.io/library/sonarqube` | Official SonarQube image.                                       |
-| `image.tag`                        | `26.8.0.126808-community`     | SonarQube Community Build tag.                                  |
-| `sonarqube.databaseMode`           | `auto`                        | Database mode: `auto`, `embedded`, `postgresql`, or `external`. |
-| `postgresql.enabled`               | `false`                       | Deploy HelmForge PostgreSQL dependency.                         |
-| `waitForDatabase.enabled`          | `true`                        | Wait for PostgreSQL before startup.                             |
-| `plugins.enabled`                  | `false`                       | Enable plugin download init container.                          |
-| `communityBranchPlugin.enabled`    | `false`                       | Install and wire the community branch plugin.                   |
-| `persistence.data.enabled`         | `true`                        | Persist SonarQube data.                                         |
-| `gatewayAPI.enabled`               | `false`                       | Render Gateway API HTTPRoute.                                   |
-| `networkPolicy.enabled`            | `false`                       | Render NetworkPolicy.                                           |
-| `networkPolicy.egress.extraEgress` | `[]`                          | Additional complete NetworkPolicy egress rules.                 |
-| `externalSecrets.enabled`          | `false`                       | Render ExternalSecret resources.                                |
-| `extraManifests`                   | `[]`                          | Additional Kubernetes manifests rendered with the release.      |
+| Parameter                            | Default                       | Description                                                     |
+| ------------------------------------ | ----------------------------- | --------------------------------------------------------------- |
+| `image.repository`                   | `docker.io/library/sonarqube` | Official SonarQube image.                                       |
+| `image.tag`                          | `26.8.0.126808-community`     | SonarQube Community Build tag.                                  |
+| `containerPorts.http`                | `9000`                        | Real SonarQube listener wired through `SONAR_WEB_PORT`.         |
+| `service.port`                       | `9000`                        | Client-facing Service port targeting named port `http`.         |
+| `sonarqube.databaseMode`             | `auto`                        | Database mode: `auto`, `embedded`, `postgresql`, or `external`. |
+| `postgresql.enabled`                 | `false`                       | Deploy HelmForge PostgreSQL dependency.                         |
+| `waitForDatabase.enabled`            | `true`                        | Wait for PostgreSQL before startup.                             |
+| `plugins.enabled`                    | `false`                       | Enable plugin download init container.                          |
+| `communityBranchPlugin.enabled`      | `false`                       | Install and wire the community branch plugin.                   |
+| `communityBranchPlugin.jarSha256`    | `""`                          | Optional SHA-256 checksum for the branch plugin JAR.            |
+| `communityBranchPlugin.webappSha256` | `""`                          | Optional SHA-256 checksum for the patched webapp ZIP.           |
+| `persistence.data.enabled`           | `true`                        | Persist SonarQube data.                                         |
+| `persistence.extensions.enabled`     | `true`                        | Persist installed plugins and extensions.                       |
+| `gatewayAPI.enabled`                 | `false`                       | Render Gateway API HTTPRoute.                                   |
+| `networkPolicy.enabled`              | `false`                       | Render NetworkPolicy.                                           |
+| `networkPolicy.egress.extraEgress`   | `[]`                          | Additional complete NetworkPolicy egress rules.                 |
+| `externalSecrets.enabled`            | `false`                       | Render ExternalSecret resources.                                |
+| `extraManifests`                     | `[]`                          | Additional Kubernetes manifests rendered with the release.      |
 
 ## Links
 
