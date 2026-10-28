@@ -163,7 +163,16 @@ stringData:
       "generalSetting": {
         "disallowUserRegistration": true,
         "disallowPasswordAuth": false,
-        "weekStartDayOffset": 1
+        "additionalScript": "",
+        "additionalStyle": "",
+        "customProfile": {
+          "title": "",
+          "description": "",
+          "logoUrl": ""
+        },
+        "weekStartDayOffset": 1,
+        "disallowChangeUsername": false,
+        "disallowChangeNickname": false
       }
     }
 ```
@@ -492,6 +501,10 @@ non-root container.
 Treat every matching JSON file as sensitive plaintext. Do not place provisioning JSON directly in Helm values, logs, or
 ConfigMaps. Memos rejects invalid files before serving traffic, redacts secret fields from APIs, and keeps file-backed
 resources immutable until the file is removed and the pod restarts.
+
+Drain external traffic before changing `ACCESS` or `GENERAL`. With multiple replicas, scale the StatefulSet to zero
+before updating the Secret, restore the previous replica count, and wait for every replica to become Ready before
+restoring traffic. A rolling restart can temporarily leave replicas enforcing different security policies.
 
 ### NetworkPolicy
 
