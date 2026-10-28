@@ -208,6 +208,19 @@ test.describe('Playground', () => {
     await expect(code).toContainText('service.port=9080');
     await expect(code).not.toContainText('ingress.enabled');
   });
+  test('matomo exposes the patched image and independent HTTP ports', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="matomo"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('5.14.2-apache');
+    await expect(page.locator('input[data-field-key="containerPorts.http"]')).toHaveValue('80');
+    await expect(page.locator('input[data-field-key="service.port"]')).toHaveValue('80');
+
+    await page.locator('input[data-field-key="containerPorts.http"]').fill('8088');
+    await page.locator('input[data-field-key="service.port"]').fill('9080');
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('containerPorts.http=8088');
+    await expect(code).toContainText('service.port=9080');
+  });
   test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="n8n"]').click();

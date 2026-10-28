@@ -6179,6 +6179,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Application',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '5.14.2-apache',
+          description: 'Pinned official Matomo Apache image tag',
+        },
+        {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Port opened by the Matomo Apache process',
+        },
+        {
+          label: 'HTTP Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing Kubernetes Service port',
+        },
+        {
           label: 'Site URL',
           key: 'matomo.siteUrl',
           type: 'text',

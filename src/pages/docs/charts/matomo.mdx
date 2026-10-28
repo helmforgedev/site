@@ -10,8 +10,8 @@ Matomo is a privacy-first web analytics platform. The HelmForge chart deploys th
 
 ## Key Features
 
-- Official `docker.io/library/matomo` image pinned to `5.14.0-apache`
-- HelmForge MySQL dependency for self-contained deployments
+- Official `docker.io/library/matomo` image pinned to `5.14.2-apache`
+- HelmForge MySQL 2.1.1 dependency for self-contained deployments
 - External MySQL or MariaDB mode for production databases
 - Persistent `/var/www/html` storage for application files and plugins
 - Automatic synchronization of image code into the persistent application volume
@@ -20,9 +20,13 @@ Matomo is a privacy-first web analytics platform. The HelmForge chart deploys th
 - External Secrets Operator support for database credentials
 - `extraManifests` extension point for companion resources
 
-Matomo 5.14.0 is the current stable production release. Review the
-[official changelog](https://matomo.org/changelog/matomo-5-14-0/), and back up the database and persistent application
-volume before production rollout so the native updater can be rolled back together with its data.
+Matomo 5.14.2 is the current stable production release. Review the
+[5.14.1](https://matomo.org/changelog/matomo-5-14-1/) and
+[5.14.2](https://matomo.org/changelog/matomo-5-14-2/) changelogs, and back up
+the database and persistent application volume before production rollout so
+the native updater can be rolled back together with its data. The pinned image
+contains PHP 8.4.27, including the fixes referenced by Matomo's critical PHP
+security notice.
 
 <a id="install"></a>
 
@@ -94,6 +98,12 @@ kubectl exec -n matomo deploy/matomo -- php /var/www/html/console core:update --
 ```
 
 Set `persistence.codeSync.enabled=false` only when another process manages the application code in the PVC.
+
+The Apache image listens on `containerPorts.http`; the chart changes the real
+Apache listener and virtual host when this value is overridden.
+`service.port` remains independent. FPM images require an HTTP sidecar and
+`webServer.mode=external`; the maintained chart CI profile uses nginx for this
+topology.
 
 ## Production Values
 
@@ -268,12 +278,13 @@ Also validate the Matomo installer, tracking endpoint, archive job completion, d
 
 ## Common Issues
 
-| Symptom                              | Likely Cause                                 | Fix                                                 |
-| ------------------------------------ | -------------------------------------------- | --------------------------------------------------- |
-| Installer cannot connect to database | Host, Secret key, or network policy is wrong | Check database Secret, DNS, and egress rules.       |
-| Reports stay empty or slow           | Archiver CronJob is disabled or failing      | Enable `archiver.enabled` and inspect CronJob logs. |
-| Redirects use the wrong hostname     | Public URL or trusted host is incomplete     | Set `matomo.siteUrl` and `matomo.trustedHost`.      |
-| Plugins disappear after restart      | Application persistence is disabled          | Enable `persistence.enabled`.                       |
+| Symptom                              | Likely Cause                                 | Fix                                                                        |
+| ------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------- |
+| Installer cannot connect to database | Host, Secret key, or network policy is wrong | Check database Secret, DNS, and egress rules.                              |
+| Reports stay empty or slow           | Archiver CronJob is disabled or failing      | Enable `archiver.enabled` and inspect CronJob logs.                        |
+| Redirects use the wrong hostname     | Public URL or trusted host is incomplete     | Set `matomo.siteUrl` and `matomo.trustedHost`.                             |
+| Plugins disappear after restart      | Application persistence is disabled          | Enable `persistence.enabled`.                                              |
+| Port override is not reachable       | Serving mode or sidecar port does not match  | Use `apache` for the Apache image or wire an HTTP sidecar with `external`. |
 
 <a id="values"></a>
 
@@ -282,7 +293,8 @@ Also validate the Matomo installer, tracking endpoint, archive job completion, d
 | Parameter                        | Default                    | Description                                                 |
 | -------------------------------- | -------------------------- | ----------------------------------------------------------- |
 | `image.repository`               | `docker.io/library/matomo` | Official Matomo image repository.                           |
-| `image.tag`                      | `5.14.0-apache`            | Official Apache image tag.                                  |
+| `image.tag`                      | `5.14.2-apache`            | Official Apache image tag.                                  |
+| `webServer.mode`                 | `apache`                   | HTTP runtime owner: `apache` or `external`.                 |
 | `replicaCount`                   | `1`                        | Matomo web replica count.                                   |
 | `matomo.siteUrl`                 | `""`                       | Public URL used by archiver jobs.                           |
 | `matomo.trustedHost`             | `""`                       | Trusted host used for redirects behind a reverse proxy.     |
@@ -304,6 +316,8 @@ Also validate the Matomo installer, tracking endpoint, archive job completion, d
 | `externalSecrets.enabled`        | `false`                    | Render ExternalSecret resources.                            |
 | `networkPolicy.enabled`          | `false`                    | Render NetworkPolicy.                                       |
 | `service.ipFamilyPolicy`         | `""`                       | Kubernetes Service IP family policy.                        |
+| `containerPorts.http`            | `80`                       | Real Apache listener or external sidecar HTTP port.         |
+| `service.port`                   | `80`                       | Client-facing Kubernetes Service port.                      |
 | `extraManifests`                 | `[]`                       | Additional Kubernetes manifests rendered with the release.  |
 
 ## Links
