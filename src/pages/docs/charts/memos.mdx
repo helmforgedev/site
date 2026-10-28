@@ -502,9 +502,11 @@ Treat every matching JSON file as sensitive plaintext. Do not place provisioning
 ConfigMaps. Memos rejects invalid files before serving traffic, redacts secret fields from APIs, and keeps file-backed
 resources immutable until the file is removed and the pod restarts.
 
-Drain external traffic before changing `ACCESS` or `GENERAL`. With multiple replicas, scale the StatefulSet to zero
-before updating the Secret, restore the previous replica count, and wait for every replica to become Ready before
-restoring traffic. A rolling restart can temporarily leave replicas enforcing different security policies.
+Drain external traffic before changing `ACCESS` or `GENERAL`, and scale the StatefulSet to zero before updating the
+Secret regardless of `replicaCount`. Memos reads the files only during startup, and external Secret data is not part of
+the pod-template checksum. Restore the previous replica count, wait for every replica to become Ready, and only then
+restore traffic. With multiple replicas, a rolling restart can temporarily leave replicas enforcing different security
+policies.
 
 ### NetworkPolicy
 
