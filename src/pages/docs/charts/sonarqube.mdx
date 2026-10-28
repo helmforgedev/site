@@ -206,6 +206,12 @@ A recoverable backup includes PostgreSQL plus the data and extensions volumes.
 The logs volume is optional and is not application state. Backup scheduling,
 retention, and restore testing remain platform responsibilities.
 
+Also preserve the Secret source of truth for external database credentials, or
+the ExternalSecret definition and provider-side data that recreate it. During a
+restore, keep SonarQube stopped, restore PostgreSQL and required volumes, remove
+the restored `data/es8` directory, and then start SonarQube so it rebuilds its
+Elasticsearch indexes from PostgreSQL.
+
 The pod defaults to a non-root UID, RuntimeDefault seccomp, dropped capabilities,
 no privilege escalation, a read-only root filesystem, and no service account
 token. NetworkPolicy is opt-in because database and plugin-mirror destinations
