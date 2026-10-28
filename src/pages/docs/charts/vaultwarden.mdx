@@ -294,13 +294,13 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 
 ### Core
 
-| Parameter          | Type   | Default         | Description                                     |
-| ------------------ | ------ | --------------- | ----------------------------------------------- |
-| `nameOverride`     | string | `""`            | Override the chart name.                        |
-| `fullnameOverride` | string | `""`            | Override the full release name.                 |
-| `commonLabels`     | object | `{}`            | Extra labels added to all resources.            |
-| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                      |
-| `domain`           | string | `""`            | **Required.** Public HTTPS URL for Vaultwarden. |
+| Parameter          | Type   | Default         | Description                                            |
+| ------------------ | ------ | --------------- | ------------------------------------------------------ |
+| `nameOverride`     | string | `""`            | Override the chart name.                               |
+| `fullnameOverride` | string | `""`            | Override the full release name.                        |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                             |
+| `domain`           | string | `""`            | Public URL; strongly recommended for real deployments. |
 
 ### Image
 
@@ -410,12 +410,12 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                  |
-| --------------------- | ------- | ----------- | ---------------------------- |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.     |
-| `service.port`        | integer | `80`        | Service port.                |
-| `service.targetPort`  | integer | `80`        | Container port.              |
-| `service.annotations` | object  | `{}`        | Annotations for the Service. |
+| Parameter             | Type    | Default     | Description                           |
+| --------------------- | ------- | ----------- | ------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.              |
+| `service.port`        | integer | `80`        | Service port.                         |
+| `service.targetPort`  | integer | `8085`      | Non-privileged Rocket container port. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.          |
 
 ### Ingress
 
@@ -503,7 +503,8 @@ as `/vaultwarden/alive`. Custom probe paths that already include the domain path
 
 ### Resources and Security
 
-Vaultwarden runs fully hardened: non-root (`UID 1000`), all capabilities dropped, seccomp `RuntimeDefault`.
+Default pod hardening uses non-root `UID 1000`, drops all capabilities, applies seccomp `RuntimeDefault`, and disables
+Kubernetes API credential automounting for both the application and backup pods.
 
 | Parameter                                  | Type    | Default          | Description                            |
 | ------------------------------------------ | ------- | ---------------- | -------------------------------------- |
