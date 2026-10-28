@@ -212,11 +212,17 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="matomo"]').click();
     await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('5.14.2-apache');
-    await expect(page.locator('input[data-field-key="containerPorts.http"]')).toHaveValue('80');
-    await expect(page.locator('input[data-field-key="service.port"]')).toHaveValue('80');
+    const listenerPort = page.locator('input[data-field-key="containerPorts.http"]');
+    const servicePort = page.locator('input[data-field-key="service.port"]');
+    await expect(listenerPort).toHaveValue('80');
+    await expect(listenerPort).toHaveAttribute('min', '1');
+    await expect(listenerPort).toHaveAttribute('max', '65535');
+    await expect(servicePort).toHaveValue('80');
+    await expect(servicePort).toHaveAttribute('min', '1');
+    await expect(servicePort).toHaveAttribute('max', '65535');
 
-    await page.locator('input[data-field-key="containerPorts.http"]').fill('8088');
-    await page.locator('input[data-field-key="service.port"]').fill('9080');
+    await listenerPort.fill('8088');
+    await servicePort.fill('9080');
     const code = page.locator('#playground-code');
     await expect(code).toContainText('containerPorts.http=8088');
     await expect(code).toContainText('service.port=9080');
