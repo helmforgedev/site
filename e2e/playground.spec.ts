@@ -178,6 +178,21 @@ test.describe('Playground', () => {
     await expect(code).not.toContainText('mysql.enabled=true');
     await expect(code).not.toContainText('postgresql.enabled=true');
   });
+
+  test('hoppscotch uses the current PostgreSQL standalone storage contract', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="hoppscotch"]').click();
+    await page.locator('[data-section-toggle="Database"]').click();
+
+    const storage = page.locator('input[data-field-key="postgresql.standalone.persistence.size"]');
+    const code = page.locator('#playground-code');
+    await expect(storage).toHaveValue('10Gi');
+    await storage.fill('20Gi');
+
+    await expect(code).toContainText('postgresql.standalone.persistence.size=20Gi');
+    await expect(code).not.toContainText('postgresql.primary.persistence.size');
+  });
+
   test('langflow keeps automatic login opt-in', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="langflow"]').click();
