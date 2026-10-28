@@ -195,6 +195,19 @@ test.describe('Playground', () => {
     await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.9.0');
     await expect(page.locator('#playground-code')).not.toContainText('2026.8.3');
   });
+  test('matterbridge defaults stay aligned with the chart', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="matterbridge"]').click();
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('3.10.14');
+    await expect(page.locator('input[data-field-key="frontend.port"]')).toHaveValue('8283');
+    await expect(page.locator('input[data-field-key="service.port"]')).toHaveValue('8283');
+    await page.locator('input[data-field-key="frontend.port"]').fill('8383');
+    await page.locator('input[data-field-key="service.port"]').fill('9080');
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('frontend.port=8383');
+    await expect(code).toContainText('service.port=9080');
+    await expect(code).not.toContainText('ingress.enabled');
+  });
   test('n8n queue config includes supported dependencies and preserves passwords', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="n8n"]').click();
