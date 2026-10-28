@@ -120,6 +120,11 @@ provisioning:
   existingSecret: memos-provisioning
 ```
 
+This Secret replaces the generated provisioning Secret rather than merging with it. To retain the chart's
+closed-registration policy while also owning private access, include both a complete
+`memos-instance-setting-general.json` with `disallowUserRegistration: true` and
+`memos-instance-setting-access.json` with `INSTANCE_ACCESS_MODE_PRIVATE`.
+
 The Secret keys become filenames and must use Memos' supported names:
 
 - `memos-idp-<label>.json`
@@ -250,7 +255,8 @@ Configure ingress-controller and external-service peers before applying network 
 Back up the data volume and external database before upgrading. Review these upstream compatibility changes:
 
 - the first 0.31 startup initializes the new `ACCESS` setting from the previous URL-based behavior; afterward, select
-  public or private access explicitly in the administrator instance settings or a deployment-managed access file
+  public or private access explicitly in the administrator instance settings or a deployment-managed access file; an
+  existing provisioning Secret must also include the complete `GENERAL` file when closed registration must be retained
 - RSS support was removed; existing feed URLs no longer provide feeds
 - the shared-memo endpoint is now `GET /api/v1/shares/{share_token}/memo`
 - saved filters use CEL timestamp fields and `now` instead of `now()`; for example,
