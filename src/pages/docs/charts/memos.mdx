@@ -120,10 +120,13 @@ provisioning:
   existingSecret: memos-provisioning
 ```
 
-This Secret replaces the generated provisioning Secret rather than merging with it. To retain the chart's
-closed-registration policy while also owning private access, include both a complete
-`memos-instance-setting-general.json` with `disallowUserRegistration: true` and
-`memos-instance-setting-access.json` with `INSTANCE_ACCESS_MODE_PRIVATE`.
+This Secret replaces the generated provisioning Secret rather than merging the two Secret sources. Memos still applies
+precedence by setting group: a group without a file remains database-managed, while a supplied file replaces that
+complete group. To guarantee the chart's closed-registration policy while also owning private access, include both a
+complete `memos-instance-setting-general.json` with `disallowUserRegistration: true` and
+`memos-instance-setting-access.json` with `INSTANCE_ACCESS_MODE_PRIVATE`. Preserve the intended
+`disallowPasswordAuth` value and every other `GENERAL` field; omit the `GENERAL` file instead when the database must
+remain authoritative for that group.
 
 The Secret keys become filenames and must use Memos' supported names:
 
@@ -255,8 +258,9 @@ Configure ingress-controller and external-service peers before applying network 
 Back up the data volume and external database before upgrading. Review these upstream compatibility changes:
 
 - the first 0.31 startup initializes the new `ACCESS` setting from the previous URL-based behavior; afterward, select
-  public or private access explicitly in the administrator instance settings or a deployment-managed access file; an
-  existing provisioning Secret must also include the complete `GENERAL` file when closed registration must be retained
+  public or private access explicitly in the administrator instance settings or a deployment-managed access file
+- an existing provisioning Secret without a `GENERAL` file retains the database `GENERAL` policy; a supplied file
+  replaces the complete group, so preserve `disallowPasswordAuth` and every other intended value
 - RSS support was removed; existing feed URLs no longer provide feeds
 - the shared-memo endpoint is now `GET /api/v1/shares/{share_token}/memo`
 - saved filters use CEL timestamp fields and `now` instead of `now()`; for example,
