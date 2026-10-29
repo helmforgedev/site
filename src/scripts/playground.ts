@@ -5,6 +5,7 @@ interface FieldConfig {
   default: string;
   min?: string;
   max?: string;
+  excludedValues?: number[];
   enables?: string;
   options?: string[];
   valueActivationValues?: Record<string, Record<string, string>>;
@@ -122,7 +123,8 @@ function isValidNumberValue(field: FieldConfig, value: string): boolean {
   return (
     Number.isSafeInteger(number) &&
     (minimum === undefined || number >= minimum) &&
-    (maximum === undefined || number <= maximum)
+    (maximum === undefined || number <= maximum) &&
+    !field.excludedValues?.includes(number)
   );
 }
 
@@ -221,10 +223,11 @@ function updateToggleVisual(btn: HTMLButtonElement, isOn: boolean) {
   }
 }
 
-function setFieldValue(key: string, value: string) {
+function setFieldValue(key: string, value: string): boolean {
   currentValues[key] = value;
   syncLinkedFieldValue(key, value);
   syncDerivedFieldValues();
+  return true;
 }
 
 function syncDerivedFieldValues() {
@@ -708,8 +711,19 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.addEventListener('input', () => {
       const candidateValues = { ...currentValues, [field.key]: input.value };
       const valid = isValidFieldValue(field, input.value, candidateValues);
-      input.setCustomValidity(valid ? '' : 'Enter a valid, non-conflicting value.');
-      if (!valid) return;
+      const reserved = field.excludedValues?.includes(Number(input.value)) === true;
+      input.setCustomValidity(
+        valid
+          ? ''
+          : reserved
+            ? `${input.value} is reserved for another listener`
+            : 'Enter a valid, non-conflicting value.',
+      );
+      input.setAttribute('aria-invalid', String(!valid));
+      if (!valid) {
+        updateOutput();
+        return;
+      }
       setFieldValue(field.key, input.value);
       enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);

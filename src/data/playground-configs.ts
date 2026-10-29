@@ -5413,6 +5413,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '8080',
           min: 1,
           max: 65535,
+          excludedValues: [2112],
           description: 'Configures the real Museum HTTP process listener',
         },
         {
