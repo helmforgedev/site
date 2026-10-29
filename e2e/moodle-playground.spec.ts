@@ -27,3 +27,26 @@ test('Moodle emits independent web and metrics listeners', async ({ page }) => {
   await expect(code).toContainText('metrics.port=19090');
   await expect(code).toContainText('metrics.serviceMonitor.enabled=true');
 });
+
+test('Moodle rejects invalid and conflicting listener ports', async ({ page }) => {
+  await page.goto('/playground');
+  await page.locator('.playground-chart-btn[data-slug="moodle"]').click();
+
+  const code = page.locator('#playground-code');
+  const listener = page.locator('input[data-field-key="containerPorts.http"]');
+  await listener.fill('80');
+  expect(await listener.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
+  await expect(code).not.toContainText('containerPorts.http=80');
+
+  await listener.fill('18080');
+  await page.locator('button[data-section-toggle="Application metrics"]').click();
+  const metrics = page.locator('input[data-field-key="metrics.port"]');
+  await metrics.fill('18080');
+  expect(await metrics.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
+  await expect(code).not.toContainText('metrics.port=18080');
+
+  await metrics.fill('19090');
+  expect(await metrics.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  await expect(code).toContainText('containerPorts.http=18080');
+  await expect(code).toContainText('metrics.port=19090');
+});

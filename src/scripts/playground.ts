@@ -103,6 +103,46 @@ function getFieldDefault(key: string): string | undefined {
   return undefined;
 }
 
+function getFieldConfig(key: string): FieldConfig | undefined {
+  for (const group of getGroups(selectedSlug)) {
+    const field = group.fields.find((candidate) => candidate.key === key);
+    if (field) return field;
+  }
+
+  return undefined;
+}
+
+function isValidNumberValue(field: FieldConfig, value: string): boolean {
+  if (field.type !== 'number') return true;
+  if (!/^-?\d+$/.test(value)) return false;
+
+  const number = Number(value);
+  const minimum = field.min === undefined ? undefined : Number(field.min);
+  const maximum = field.max === undefined ? undefined : Number(field.max);
+  return (
+    Number.isSafeInteger(number) &&
+    (minimum === undefined || number >= minimum) &&
+    (maximum === undefined || number <= maximum)
+  );
+}
+
+function hasMoodleListenerConflict(values: Record<string, string>): boolean {
+  return (
+    selectedSlug === 'moodle' &&
+    values['metrics.enabled'] === 'true' &&
+    values['containerPorts.http'] === values['metrics.port']
+  );
+}
+
+function isValidFieldValue(field: FieldConfig, value: string, values: Record<string, string>): boolean {
+  if (!isValidNumberValue(field, value)) return false;
+  if (hasMoodleListenerConflict(values) && (field.key === 'containerPorts.http' || field.key === 'metrics.port')) {
+    return false;
+  }
+
+  return true;
+}
+
 function getConfiguredKeys(groups: GroupConfig[]): Set<string> {
   const keys = new Set<string>();
   for (const group of groups) {
@@ -666,6 +706,10 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.className =
       'w-20 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base text-center focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
+      const candidateValues = { ...currentValues, [field.key]: input.value };
+      const valid = isValidFieldValue(field, input.value, candidateValues);
+      input.setCustomValidity(valid ? '' : 'Enter a valid, non-conflicting value.');
+      if (!valid) return;
       setFieldValue(field.key, input.value);
       enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);
@@ -803,6 +847,7 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 
     for (const field of group.fields) {
       const val = currentValues[field.key];
+      if (val !== undefined && !isValidFieldValue(field, val, currentValues)) continue;
       if (group.collapsible && expandedSections.has(group.name) && group.emitDefaultsOnExpand !== false) {
         // Expanded collapsible sections normally emit all fields; opt out for read-only tuning groups.
         if (val !== undefined && val !== '') {
@@ -819,7 +864,8 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
 
   for (const key of scenarioOnlyKeys) {
     const value = currentValues[key];
-    if (value !== undefined && value !== '') {
+    const field = getFieldConfig(key);
+    if (value !== undefined && value !== '' && (!field || isValidFieldValue(field, value, currentValues))) {
       changes.push({ key, value, defaultValue: '' });
     }
   }
