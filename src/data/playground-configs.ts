@@ -1914,6 +1914,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Must remain one in standalone mode; distributed API servers are stateless',
         },
         {
+          label: 'HTTP listener port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '8080',
+          description: 'Controls both the Attic process listener and the named container port',
+        },
+        {
           label: 'Persistent volume size',
           key: 'persistence.size',
           type: 'text',
