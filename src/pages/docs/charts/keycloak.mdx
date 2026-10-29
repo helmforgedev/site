@@ -420,6 +420,7 @@ externalSecrets:
 | `features.enabled`                                  | array          | `[]`              | Keycloak features rendered as `KC_FEATURES`.                                                                  |
 | `features.disabled`                                 | array          | `[]`              | Keycloak features rendered as `KC_FEATURES_DISABLED`.                                                         |
 | `optimized.enabled`                                 | boolean        | `false`           | Add `--optimized`; use only with pre-built/custom optimized images in production.                             |
+| `deployment.progressDeadlineSeconds`                | integer        | `600`             | Seconds Kubernetes allows startup and database migrations to make rollout progress.                           |
 | `deployment.strategy.type`                          | string         | `RollingUpdate`   | Deployment strategy: `RollingUpdate` or `Recreate`.                                                           |
 | `deployment.strategy.rollingUpdate.maxUnavailable`  | string/integer | `0`               | Maximum unavailable pods during rolling update.                                                               |
 | `deployment.strategy.rollingUpdate.maxSurge`        | string/integer | `1`               | Maximum surge pods during rolling update.                                                                     |
@@ -573,7 +574,7 @@ externalSecrets:
 - Multi-replica cache traffic uses `cache.embeddedNetworkBindPort` and the upstream FD_SOCK2 offset of 50000; keep both resulting ports open between Keycloak pods.
 - The configured cache transport port is applied from the first replica, so scaling out does not change the listener implicitly.
 - When changing `cache.embeddedNetworkBindPort`, set `deployment.strategy.type: Recreate` for that rollout so old and new pods cannot form separate cache clusters on different ports.
-- Bundled databases prepare Liquibase bookkeeping tables before Keycloak starts. Bundled PostgreSQL can use them for fresh multi-replica startup. For an external empty PostgreSQL database, bootstrap one replica or pre-create those tables before scaling out.
+- Bundled databases prepare Liquibase bookkeeping tables before Keycloak starts. Bundled PostgreSQL can use them for fresh multi-replica startup in the default `public` schema. When `database.external.schema` selects another PostgreSQL schema, pre-create both tables there or initialize with one replica before scaling out. External empty PostgreSQL databases have the same requirement.
 - Bundled and external MySQL use an explicit staged-bootstrap contract: start with one replica and `database.mysqlSchemaInitialized: false`, wait for Keycloak readiness, then set the confirmation to `true` while scaling out. The chart rejects multiple MySQL-backed replicas until the confirmation is set, and the same two-step values transition works with Helm or GitOps. This avoids the upstream MySQL Liquibase lock failure during concurrent schema initialization.
 - Built-in backup is database-only. Back up providers, themes, realm import files, truststores, and external secret backends through their own source-of-truth.
 - The management service is private and should not be exposed through public ingress.
