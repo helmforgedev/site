@@ -22,7 +22,7 @@ Prometheus metrics, S3-compatible database backup, and dual-stack Service fields
 - **Keycloak 26.8.x alignment** — image tag and app version use `quay.io/keycloak/keycloak:26.8.1`.
 - **Database choices** — embedded H2 for dev only, bundled PostgreSQL/MySQL subcharts, or external PostgreSQL/MySQL/MariaDB.
 - **HA-ready controls** — JDBC_PING cache stack, multi-replica scheduling defaults, PDB, rollout strategy, and capacity profiles.
-- **Explicit cluster transport** — one configurable embedded-cache bind port drives Keycloak, pod ports, and NetworkPolicy; failure detection follows the upstream +50000 offset.
+- **Explicit cluster transport** — one configurable non-privileged embedded-cache bind port drives Keycloak, pod ports, and NetworkPolicy; failure detection follows the upstream +50000 offset, and port changes use a Recreate rollout.
 - **Routing options** — separate public/admin Ingress resources plus optional Gateway API `HTTPRoute` resources.
 - **Security integration** — non-root defaults, configurable ServiceAccount token mount, truststore controls, NetworkPolicy ingress and egress, and External Secrets Operator opt-in.
 - **Observability** — health probes, management service, metrics endpoint, ServiceMonitor, telemetry, tracing, and structured logging controls.
@@ -353,35 +353,35 @@ externalSecrets:
 
 ### Database
 
-| Parameter                                     | Type           | Default       | Description                                                                      |
-| --------------------------------------------- | -------------- | ------------- | -------------------------------------------------------------------------------- |
-| `database.external.vendor`                    | string         | `postgres`    | External database vendor: `postgres`, `mysql`, or `mariadb`.                     |
-| `database.external.host`                      | string         | `""`          | External database host.                                                          |
-| `database.external.port`                      | string/integer | `""`          | External database port. Auto-detected from vendor when empty.                    |
-| `database.external.name`                      | string         | `keycloak`    | External database name.                                                          |
-| `database.external.username`                  | string         | `keycloak`    | External database username.                                                      |
-| `database.external.password`                  | string         | `""`          | External database password. Generated when empty and no existing secret is set.  |
-| `database.external.existingSecret`            | string         | `""`          | Existing Secret containing database password.                                    |
-| `database.external.existingSecretPasswordKey` | string         | `db-password` | Password key in the existing Secret.                                             |
-| `database.external.jdbcParameters`            | string         | `""`          | Additional JDBC URL parameters.                                                  |
-| `database.external.schema`                    | string         | `""`          | Optional database schema passed to `KC_DB_SCHEMA`.                               |
-| `database.external.pool.initialSize`          | string/integer | `""`          | Initial DB connection pool size.                                                 |
-| `database.external.pool.minSize`              | string/integer | `""`          | Minimum DB connection pool size.                                                 |
-| `database.external.pool.maxSize`              | string/integer | `""`          | Maximum DB connection pool size.                                                 |
-| `database.external.pool.maxLifetime`          | string         | `""`          | Maximum DB connection lifetime.                                                  |
-| `database.external.logSlowQueriesThreshold`   | string         | `""`          | Slow query log threshold.                                                        |
-| `database.external.transaction.xaEnabled`     | string/boolean | `""`          | Enable or disable XA transactions.                                               |
-| `database.external.transaction.timeout`       | string         | `""`          | Transaction timeout.                                                             |
-| `postgresql.enabled`                          | boolean        | `false`       | Enable the bundled PostgreSQL chart.                                             |
-| `postgresql.auth.database`                    | string         | `keycloak`    | PostgreSQL database name.                                                        |
-| `postgresql.auth.username`                    | string         | `keycloak`    | PostgreSQL username.                                                             |
-| `postgresql.auth.password`                    | string         | `""`          | PostgreSQL password. Required for deterministic subchart connections.            |
-| `postgresql.initdb.scripts`                   | object         | built-in      | First-boot scripts that prepare Liquibase bookkeeping tables for safe scale-out. |
-| `mysql.enabled`                               | boolean        | `false`       | Enable the bundled MySQL chart.                                                  |
-| `mysql.auth.database`                         | string         | `keycloak`    | MySQL database name.                                                             |
-| `mysql.auth.username`                         | string         | `keycloak`    | MySQL username.                                                                  |
-| `mysql.auth.password`                         | string         | `""`          | MySQL password. Required for deterministic subchart connections.                 |
-| `mysql.initdb.scripts`                        | object         | built-in      | First-boot scripts that prepare Liquibase bookkeeping tables for safe scale-out. |
+| Parameter                                     | Type           | Default       | Description                                                                                              |
+| --------------------------------------------- | -------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| `database.external.vendor`                    | string         | `postgres`    | External database vendor: `postgres`, `mysql`, or `mariadb`.                                             |
+| `database.external.host`                      | string         | `""`          | External database host.                                                                                  |
+| `database.external.port`                      | string/integer | `""`          | External database port. Auto-detected from vendor when empty.                                            |
+| `database.external.name`                      | string         | `keycloak`    | External database name.                                                                                  |
+| `database.external.username`                  | string         | `keycloak`    | External database username.                                                                              |
+| `database.external.password`                  | string         | `""`          | External database password. Generated when empty and no existing secret is set.                          |
+| `database.external.existingSecret`            | string         | `""`          | Existing Secret containing database password.                                                            |
+| `database.external.existingSecretPasswordKey` | string         | `db-password` | Password key in the existing Secret.                                                                     |
+| `database.external.jdbcParameters`            | string         | `""`          | Additional JDBC URL parameters.                                                                          |
+| `database.external.schema`                    | string         | `""`          | Optional database schema passed to `KC_DB_SCHEMA`.                                                       |
+| `database.external.pool.initialSize`          | string/integer | `""`          | Initial DB connection pool size.                                                                         |
+| `database.external.pool.minSize`              | string/integer | `""`          | Minimum DB connection pool size.                                                                         |
+| `database.external.pool.maxSize`              | string/integer | `""`          | Maximum DB connection pool size.                                                                         |
+| `database.external.pool.maxLifetime`          | string         | `""`          | Maximum DB connection lifetime.                                                                          |
+| `database.external.logSlowQueriesThreshold`   | string         | `""`          | Slow query log threshold.                                                                                |
+| `database.external.transaction.xaEnabled`     | string/boolean | `""`          | Enable or disable XA transactions.                                                                       |
+| `database.external.transaction.timeout`       | string         | `""`          | Transaction timeout.                                                                                     |
+| `postgresql.enabled`                          | boolean        | `false`       | Enable the bundled PostgreSQL chart.                                                                     |
+| `postgresql.auth.database`                    | string         | `keycloak`    | PostgreSQL database name.                                                                                |
+| `postgresql.auth.username`                    | string         | `keycloak`    | PostgreSQL username.                                                                                     |
+| `postgresql.auth.password`                    | string         | `""`          | PostgreSQL password. Required for deterministic subchart connections.                                    |
+| `postgresql.initdb.scripts`                   | object         | built-in      | First-boot scripts that prepare Liquibase bookkeeping tables for safe scale-out.                         |
+| `mysql.enabled`                               | boolean        | `false`       | Enable bundled MySQL; fresh installs require one Keycloak replica until schema initialization completes. |
+| `mysql.auth.database`                         | string         | `keycloak`    | MySQL database name.                                                                                     |
+| `mysql.auth.username`                         | string         | `keycloak`    | MySQL username.                                                                                          |
+| `mysql.auth.password`                         | string         | `""`          | MySQL password. Required for deterministic subchart connections.                                         |
+| `mysql.initdb.scripts`                        | object         | built-in      | First-boot scripts that prepare Liquibase bookkeeping tables for safe scale-out.                         |
 
 ### Database TLS and Truststore
 
@@ -407,24 +407,24 @@ externalSecrets:
 
 ### Runtime, HA, and Capacity
 
-| Parameter                                           | Type           | Default           | Description                                                                       |
-| --------------------------------------------------- | -------------- | ----------------- | --------------------------------------------------------------------------------- |
-| `replicaCount`                                      | integer        | `1`               | Number of Keycloak replicas.                                                      |
-| `cache.enabled`                                     | boolean        | `true`            | Enable distributed cache settings in production mode.                             |
-| `cache.stack`                                       | string         | `jdbc-ping`       | Cache stack used for multi-replica production deployments.                        |
-| `cache.embeddedNetworkBindPort`                     | integer        | `7800`            | Embedded-cache transport port; failure detection uses this port plus 50000.       |
-| `cache.multiReplicaDefaults.enabled`                | boolean        | `true`            | Apply scheduling defaults for multi-replica deployments.                          |
-| `cache.multiReplicaDefaults.podAntiAffinity`        | string         | `preferred`       | Automatic anti-affinity mode: `preferred`, `required`, or `none`.                 |
-| `cache.multiReplicaDefaults.topologySpread.enabled` | boolean        | `true`            | Apply automatic topology spread for multi-replica deployments.                    |
-| `features.enabled`                                  | array          | `[]`              | Keycloak features rendered as `KC_FEATURES`.                                      |
-| `features.disabled`                                 | array          | `[]`              | Keycloak features rendered as `KC_FEATURES_DISABLED`.                             |
-| `optimized.enabled`                                 | boolean        | `false`           | Add `--optimized`; use only with pre-built/custom optimized images in production. |
-| `deployment.strategy.type`                          | string         | `RollingUpdate`   | Deployment strategy: `RollingUpdate` or `Recreate`.                               |
-| `deployment.strategy.rollingUpdate.maxUnavailable`  | string/integer | `0`               | Maximum unavailable pods during rolling update.                                   |
-| `deployment.strategy.rollingUpdate.maxSurge`        | string/integer | `1`               | Maximum surge pods during rolling update.                                         |
-| `resources`                                         | object         | `{}`              | Custom container resources when `capacity.profile=custom`.                        |
-| `capacity.profile`                                  | string         | `custom`          | Resource profile: `custom`, `small`, `medium`, or `large`.                        |
-| `capacity.profiles`                                 | object         | built-in profiles | Profile definitions for `small`, `medium`, and `large`.                           |
+| Parameter                                           | Type           | Default           | Description                                                                                                   |
+| --------------------------------------------------- | -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `replicaCount`                                      | integer        | `1`               | Number of Keycloak replicas.                                                                                  |
+| `cache.enabled`                                     | boolean        | `true`            | Enable distributed cache settings in production mode.                                                         |
+| `cache.stack`                                       | string         | `jdbc-ping`       | Cache stack used for multi-replica production deployments.                                                    |
+| `cache.embeddedNetworkBindPort`                     | integer        | `7800`            | Non-privileged transport port (1024-15535); failure detection adds 50000; changes require a Recreate rollout. |
+| `cache.multiReplicaDefaults.enabled`                | boolean        | `true`            | Apply scheduling defaults for multi-replica deployments.                                                      |
+| `cache.multiReplicaDefaults.podAntiAffinity`        | string         | `preferred`       | Automatic anti-affinity mode: `preferred`, `required`, or `none`.                                             |
+| `cache.multiReplicaDefaults.topologySpread.enabled` | boolean        | `true`            | Apply automatic topology spread for multi-replica deployments.                                                |
+| `features.enabled`                                  | array          | `[]`              | Keycloak features rendered as `KC_FEATURES`.                                                                  |
+| `features.disabled`                                 | array          | `[]`              | Keycloak features rendered as `KC_FEATURES_DISABLED`.                                                         |
+| `optimized.enabled`                                 | boolean        | `false`           | Add `--optimized`; use only with pre-built/custom optimized images in production.                             |
+| `deployment.strategy.type`                          | string         | `RollingUpdate`   | Deployment strategy: `RollingUpdate` or `Recreate`.                                                           |
+| `deployment.strategy.rollingUpdate.maxUnavailable`  | string/integer | `0`               | Maximum unavailable pods during rolling update.                                                               |
+| `deployment.strategy.rollingUpdate.maxSurge`        | string/integer | `1`               | Maximum surge pods during rolling update.                                                                     |
+| `resources`                                         | object         | `{}`              | Custom container resources when `capacity.profile=custom`.                                                    |
+| `capacity.profile`                                  | string         | `custom`          | Resource profile: `custom`, `small`, `medium`, or `large`.                                                    |
+| `capacity.profiles`                                 | object         | built-in profiles | Profile definitions for `small`, `medium`, and `large`.                                                       |
 
 ### Realm Import, Providers, and Themes
 
@@ -570,7 +570,9 @@ externalSecrets:
 
 - `Chart.yaml` pins the HelmForge PostgreSQL and MySQL charts at `2.1.1`.
 - Multi-replica cache traffic uses `cache.embeddedNetworkBindPort` and the upstream FD_SOCK2 offset of 50000; keep both resulting ports open between Keycloak pods.
+- When changing `cache.embeddedNetworkBindPort`, set `deployment.strategy.type: Recreate` for that rollout so old and new pods cannot form separate cache clusters on different ports.
 - Bundled databases prepare Liquibase bookkeeping tables before Keycloak starts, preventing concurrent fresh replicas from racing table creation. For an external empty database, bootstrap one replica or pre-create those tables before scaling out.
+- Bundled MySQL enforces a staged bootstrap: install with one replica, wait for Keycloak to become ready, and then scale out with `helm upgrade`. This avoids the upstream MySQL Liquibase lock failure during concurrent schema initialization.
 - Built-in backup is database-only. Back up providers, themes, realm import files, truststores, and external secret backends through their own source-of-truth.
 - The management service is private and should not be exposed through public ingress.
 - Gateway API routes target the application service only; they do not route the management service.
