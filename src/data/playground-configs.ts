@@ -4679,6 +4679,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       gateField: 'metrics.enabled',
       fields: [
         {
+          label: 'Metrics listener port',
+          key: 'metrics.port',
+          type: 'number',
+          default: '9090',
+          min: 1,
+          max: 65535,
+          description: 'Private Apache listener and metrics Service port',
+        },
+        {
           label: 'ServiceMonitor',
           key: 'metrics.serviceMonitor.enabled',
           type: 'toggle',
@@ -4697,6 +4706,24 @@ export const chartConfigs: Record<string, ChartConfig> = {
     {
       name: 'Learning site',
       fields: [
+        {
+          label: 'Application listener port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '8080',
+          min: 1,
+          max: 65535,
+          description: 'Real Apache web listener inside the Moodle pod',
+        },
+        {
+          label: 'Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          min: 1,
+          max: 65535,
+          description: 'Independent Kubernetes Service port targeting the named web listener',
+        },
         {
           label: 'Public URL',
           key: 'moodle.wwwroot',
