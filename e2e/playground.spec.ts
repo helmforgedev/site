@@ -435,6 +435,12 @@ test.describe('Playground', () => {
     await listenerPort.fill('2112');
     await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
     await expect(code).not.toContainText('museum.containerPorts.http=2112');
+    await listenerPort.fill('65536');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
+    await expect(code).not.toContainText('museum.containerPorts.http=65536');
+    await listenerPort.fill('18080.5');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
+    await expect(code).not.toContainText('museum.containerPorts.http=18080.5');
     await listenerPort.fill('18080');
     await expect(listenerPort).toHaveAttribute('aria-invalid', 'false');
     await expect(code).toContainText('museum.containerPorts.http=18080');
