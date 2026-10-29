@@ -5414,7 +5414,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           min: 1,
           max: 65535,
           excludedValues: [2112],
-          description: 'Configures the real Museum HTTP process listener',
+          description: 'Real Museum listener; low ports require runtime support for non-root binds',
         },
         {
           label: 'Museum Service port',
