@@ -32,6 +32,8 @@ official **rootless** image (UID 1000) for improved security.
 - **Dual service** — separate HTTP (3000) and SSH (2222) services
 - **Configurable HTTP listener** — the process listener and Kubernetes Service port remain independent
 - **Three database backends** — SQLite (default), PostgreSQL, MySQL with auto-detection
+- **Singleton-safe rollouts** — Recreate avoids concurrent writers and ReadWriteOnce multi-attach failures
+- **Pod annotations** — integrate secret reloaders and other rollout controllers without post-render patches
 - **Admin bootstrap Job** — optional first-run Job to create the admin user
 - **`GITEA__` env configuration** — all `app.ini` keys configurable via environment variables
 - **Database-aware backup** — `tar` for SQLite, `pg_dump`/`mysqldump` for SQL databases
@@ -263,12 +265,14 @@ backup:
 
 ### Core
 
-| Parameter             | Type    | Default | Description                              |
-| --------------------- | ------- | ------- | ---------------------------------------- |
-| `replicaCount`        | integer | `1`     | Pod replicas. SQLite supports 1 only.    |
-| `nameOverride`        | string  | `""`    | Override the chart name.                 |
-| `fullnameOverride`    | string  | `""`    | Override the full release name.          |
-| `containerPorts.http` | integer | `3000`  | HTTP listener used by the Gitea process. |
+| Parameter             | Type    | Default    | Description                                         |
+| --------------------- | ------- | ---------- | --------------------------------------------------- |
+| `replicaCount`        | integer | `1`        | Pod replicas; the default state model is singleton. |
+| `strategy.type`       | string  | `Recreate` | Deployment strategy for single-writer local state.  |
+| `podAnnotations`      | object  | `{}`       | Additional annotations for the Gitea pod.           |
+| `nameOverride`        | string  | `""`       | Override the chart name.                            |
+| `fullnameOverride`    | string  | `""`       | Override the full release name.                     |
+| `containerPorts.http` | integer | `3000`     | HTTP listener used by the Gitea process.            |
 
 ### Image
 
@@ -375,7 +379,9 @@ port and targets the named `http` container port.
 | `networkPolicy.ingressFrom`                   | array   | `[]`    | Allowed peers; empty permits pods in the release namespace. |
 
 The rootless process runs as UID/GID 1000, drops all capabilities, disables
-privilege escalation, and uses RuntimeDefault seccomp. Enable the NetworkPolicy
+privilege escalation, and uses RuntimeDefault seccomp. The built-in
+`wait-for-db` init container inherits the same restricted security context.
+Enable the NetworkPolicy
 only after including the peers used by an ingress controller or Gateway running
 outside the release namespace. If admin bootstrap is configured, the chart always
 allows that Job to reach Gitea HTTP so the post-install hook cannot deadlock.
@@ -457,6 +463,13 @@ uses `pg_dump`. MySQL uses `mysqldump`.
 | `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra `mysqldump` arguments.         |
 
 ## Upgrade Notes
+
+The Deployment now defaults to `Recreate` for SQLite, PostgreSQL, MySQL, and
+external database modes. SQL backends do not externalize repositories, queues,
+indexes, or configuration from the Gitea data volume. The new default prevents
+concurrent writers during upgrades and avoids multi-attach failures with a
+`ReadWriteOnce` PVC. Only select `RollingUpdate` after externalizing every
+shared-state dependency and validating concurrent storage access.
 
 The default image is `docker.io/gitea/gitea:28.2.0-rootless`. Gitea 28 introduces
 an internal proxy for Git network operations. Existing `ALLOWED_HOST_LIST`,
