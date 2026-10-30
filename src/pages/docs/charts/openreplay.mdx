@@ -12,7 +12,7 @@ The default installation includes:
 
 - fifteen official OpenReplay application services pinned by immutable digest;
 - an internal Caddy router for OpenReplay-specific paths and WebSockets;
-- HelmForge PostgreSQL, Redis, and ClickHouse dependencies;
+- HelmForge PostgreSQL 2.1.1, Redis 3.1.0, and ClickHouse 2.0.7 dependencies;
 - RustFS S3-compatible object storage;
 - a revision-scoped schema migration Job with downgrade protection;
 - persistent recording scratch space, generated credentials, and operational probes.
@@ -46,6 +46,10 @@ HTTPS is required for tracker recording and replay outside isolated local testin
 Public traffic reaches one controller-neutral router Service. The router sends UI traffic to `frontend`, API traffic to `api`, ingestion to `http`, replay objects to S3-compatible storage, and collaboration traffic to `assist` and `spot`. PostgreSQL stores relational state, ClickHouse stores event data, Redis coordinates transient state, and RustFS stores recordings and assets.
 
 Enterprise-only connector, Kafka, and Vault workloads are intentionally excluded from this OSS chart.
+
+Application listener ports and Kubernetes Service ports are separate contracts. `router.containerPorts.http` changes
+Caddy's real bind address, while `service.port` changes only the public Service. RustFS likewise uses
+`rustfs.containerPorts` for its process listeners and `rustfs.service.ports` for in-cluster access.
 
 ## Expose OpenReplay
 
@@ -167,6 +171,30 @@ objectStorage:
 
 Keep `credentials.existingSecret` aligned with all external service credentials.
 
+## Listener overrides
+
+The chart wires listener changes through the real processes, probes, containers, and named Service targets:
+
+```yaml
+router:
+  containerPorts:
+    http: 18080
+service:
+  port: 8088
+
+rustfs:
+  containerPorts:
+    s3: 19000
+    console: 19001
+  service:
+    ports:
+      s3: 20000
+      console: 20001
+```
+
+`service.port` and `rustfs.service.ports.*` may differ from their process listeners because Services use named
+`targetPort` values. Component ports should be changed only with compatible upstream images that listen on the same value.
+
 ## Migrations and upgrades
 
 The migration Job fetches the exact schema tag matching the chart AppVersion and runs the official PostgreSQL, ClickHouse, and object-storage migration scripts using pinned client images. Application pods wait for the PostgreSQL schema before starting. A version ConfigMap blocks downgrades unless `migration.allowDowngrade=true` is explicitly set.
@@ -196,7 +224,13 @@ Set `monitoring.serviceMonitor.enabled=true` only when Prometheus Operator CRDs 
 | `externalSecrets.enabled`           | `false`                  | Render ExternalSecret resources              |
 | `scratch.accessModes`               | `[ReadWriteOnce]`        | Shared scratch access modes                  |
 | `migration.enabled`                 | `true`                   | Run revision-scoped schema migration         |
+| `router.containerPorts.http`        | `8080`                   | Caddy process listener                       |
 | `router.replicaCount`               | `1`                      | Internal router replicas                     |
+| `service.port`                      | `80`                     | Public router Service port                   |
+| `rustfs.containerPorts.s3`          | `9000`                   | RustFS S3 process listener                   |
+| `rustfs.containerPorts.console`     | `9001`                   | RustFS console process listener              |
+| `rustfs.service.ports.s3`           | `9000`                   | RustFS in-cluster S3 Service port            |
+| `rustfs.service.ports.console`      | `9001`                   | RustFS in-cluster console Service port       |
 | `postgresql.enabled`                | `true`                   | Deploy bundled PostgreSQL                    |
 | `redis.enabled`                     | `true`                   | Deploy bundled Redis                         |
 | `clickhouse.enabled`                | `true`                   | Deploy bundled ClickHouse                    |
@@ -207,6 +241,9 @@ Set `monitoring.serviceMonitor.enabled=true` only when Prometheus Operator CRDs 
 | `monitoring.serviceMonitor.enabled` | `false`                  | Create ServiceMonitors                       |
 
 Each entry under `components` controls one official application image, replica count, service port, and metrics port. Use the full chart `values.yaml` as the authoritative reference for image pins, scheduling, resources, persistence, probes, and advanced migration settings.
+
+Application and RustFS pods include credential-contract checksums. Changes to Secret names or key mappings trigger a
+rollout; rotating the data in an externally managed Secret still requires a controlled restart of all consumers.
 
 ## Backup and restore
 
