@@ -16,7 +16,7 @@ verified before extraction. MoodleHQ's image supplies the runtime, not the LMS.
 
 ## Features
 
-- Read-only Moodle code, non-root Apache on port 8080, dropped capabilities.
+- Read-only Moodle code, configurable non-root Apache listeners, dropped capabilities.
 - PostgreSQL, MySQL or MariaDB: external servers or selectable HelmForge subcharts.
 - Verified database TLS, custom connection ports and existing credential Secrets.
 - Serialized first installation using upstream CLI and database advisory locks.
@@ -410,8 +410,9 @@ course backups often need more memory and disk than ordinary web requests.
 ### Public URL and TLS
 
 Configure one canonical root URL without a trailing slash. DNS and certificates
-are managed by your infrastructure. Route requests to the chart Service on port
-80; Apache runs on unprivileged port 8080 inside the pod.
+are managed by your infrastructure. Route requests to `service.port`; the
+Service targets the named `http` listener configured by `containerPorts.http`.
+These values are independent, and Apache runs as a non-root process.
 
 ```yaml
 moodle:
@@ -662,9 +663,10 @@ your own multi-node environment.
 
 ### NetworkPolicy
 
-NetworkPolicy is opt-in. Its default policy permits web ingress to port 8080,
-DNS egress, the selected bundled database and Redis endpoints and HTTPS egress in archive
-mode. Configure `ingressFrom` to restrict traffic to your gateway/controller.
+NetworkPolicy is opt-in. Its default policy permits web ingress to
+`containerPorts.http`, DNS egress, the selected bundled database and Redis
+endpoints and HTTPS egress in archive mode. Configure `ingressFrom` to restrict
+traffic to your gateway/controller.
 
 Add explicit `extraEgress` rules for external databases, Redis, SMTP, identity
 providers, object stores and other application integrations. Kubernetes network
@@ -1114,7 +1116,8 @@ Prometheus Operator and its CRDs must already exist. Configure its ServiceMonito
 and PrometheusRule selectors to match the labels above and include the Moodle
 namespace. The chart does not install Prometheus itself.
 
-The dedicated ClusterIP Service listens on port 9090. Only
+The dedicated ClusterIP Service and private Apache listener use `metrics.port`,
+which defaults to `9090`. Only
 `/r.php/monitoringexporter_prometheus/metrics` is allowed on that listener, with
 Bearer authentication. Missing and invalid tokens return 403. The application
 listener rejects the monitoring route, including requests with valid tokens.
@@ -1565,27 +1568,28 @@ Explicit maintenance window; stops web/task pods before running an operator-requ
 
 Optional authenticated Moodle application metrics through tool_monitoring.
 
-| Parameter                                  | Default                                                                                                          | Meaning                                                                                       |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `metrics.enabled`                          | `false`                                                                                                          | Install/configure the plugin and expose a private metrics listener.                           |
-| `metrics.existingSecret`                   | `""`                                                                                                             | Existing Secret containing the bearer token; empty generates a retained Secret.               |
-| `metrics.existingSecretTokenKey`           | `token`                                                                                                          | Key containing a nonempty token in the metrics Secret.                                        |
-| `metrics.plugin.mode`                      | `archive`                                                                                                        | archive downloads pinned source; image requires the plugin in the application image.          |
-| `metrics.plugin.url`                       | `https://codeload.github.com/daniil-berg/moodle-tool_monitoring/tar.gz/23c45f66b6c3ed409b0749017b3387c1744016cc` | Immutable upstream tool_monitoring 1.1.0 archive.                                             |
-| `metrics.plugin.sha256`                    | `dc7a5256e93e10b0514fcb752767e2554b7aa0cd24e8c8d74e54c33b358028e1`                                               | SHA-256 checked before extracting plugin code.                                                |
-| `metrics.enabledMetrics`                   | `["courses","overdue_tasks","quiz_attempts_in_progress","user_accounts","users_online"]`                         | Built-in metrics managed by Helm; custom metrics remain administrator-managed.                |
-| `metrics.serviceMonitor.enabled`           | `false`                                                                                                          | Create an authenticated ServiceMonitor for the private metrics Service.                       |
-| `metrics.serviceMonitor.labels`            | `{}`                                                                                                             | Labels matching the Prometheus serviceMonitorSelector.                                        |
-| `metrics.serviceMonitor.annotations`       | `{}`                                                                                                             | Extra ServiceMonitor annotations.                                                             |
-| `metrics.serviceMonitor.interval`          | `60s`                                                                                                            | Scrape interval; metrics query Moodle's database.                                             |
-| `metrics.serviceMonitor.scrapeTimeout`     | `20s`                                                                                                            | Per-scrape timeout, lower than interval.                                                      |
-| `metrics.serviceMonitor.relabelings`       | `[]`                                                                                                             | Target relabeling rules.                                                                      |
-| `metrics.serviceMonitor.metricRelabelings` | `[]`                                                                                                             | Metric relabeling rules; avoid summing global Moodle counts across web replicas.              |
-| `metrics.ingressFrom`                      | `[]`                                                                                                             | Allowed metrics clients when NetworkPolicy is enabled; empty permits any client on port 9090. |
-| `metrics.prometheusRule.enabled`           | `false`                                                                                                          | Create scrape availability and persistent overdue-task alerts; requires ServiceMonitor.       |
-| `metrics.prometheusRule.labels`            | `{}`                                                                                                             | Labels matching the Prometheus ruleSelector.                                                  |
-| `metrics.prometheusRule.unavailableFor`    | `5m`                                                                                                             | How long all scrape targets must be missing or down before alerting.                          |
-| `metrics.prometheusRule.overdueTasksFor`   | `15m`                                                                                                            | How long overdue tasks must remain present before alerting.                                   |
+| Parameter                                  | Default                                                                                                          | Meaning                                                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `metrics.enabled`                          | `false`                                                                                                          | Install/configure the plugin and expose a private metrics listener.                                |
+| `metrics.port`                             | `9090`                                                                                                           | Private unprivileged Apache metrics listener and metrics Service port (1024-65535).                |
+| `metrics.existingSecret`                   | `""`                                                                                                             | Existing Secret containing the bearer token; empty generates a retained Secret.                    |
+| `metrics.existingSecretTokenKey`           | `token`                                                                                                          | Key containing a nonempty token in the metrics Secret.                                             |
+| `metrics.plugin.mode`                      | `archive`                                                                                                        | archive downloads pinned source; image requires the plugin in the application image.               |
+| `metrics.plugin.url`                       | `https://codeload.github.com/daniil-berg/moodle-tool_monitoring/tar.gz/23c45f66b6c3ed409b0749017b3387c1744016cc` | Immutable upstream tool_monitoring 1.1.0 archive.                                                  |
+| `metrics.plugin.sha256`                    | `dc7a5256e93e10b0514fcb752767e2554b7aa0cd24e8c8d74e54c33b358028e1`                                               | SHA-256 checked before extracting plugin code.                                                     |
+| `metrics.enabledMetrics`                   | `["courses","overdue_tasks","quiz_attempts_in_progress","user_accounts","users_online"]`                         | Built-in metrics managed by Helm; custom metrics remain administrator-managed.                     |
+| `metrics.serviceMonitor.enabled`           | `false`                                                                                                          | Create an authenticated ServiceMonitor for the private metrics Service.                            |
+| `metrics.serviceMonitor.labels`            | `{}`                                                                                                             | Labels matching the Prometheus serviceMonitorSelector.                                             |
+| `metrics.serviceMonitor.annotations`       | `{}`                                                                                                             | Extra ServiceMonitor annotations.                                                                  |
+| `metrics.serviceMonitor.interval`          | `60s`                                                                                                            | Scrape interval; metrics query Moodle's database.                                                  |
+| `metrics.serviceMonitor.scrapeTimeout`     | `20s`                                                                                                            | Per-scrape timeout, lower than interval.                                                           |
+| `metrics.serviceMonitor.relabelings`       | `[]`                                                                                                             | Target relabeling rules.                                                                           |
+| `metrics.serviceMonitor.metricRelabelings` | `[]`                                                                                                             | Metric relabeling rules; avoid summing global Moodle counts across web replicas.                   |
+| `metrics.ingressFrom`                      | `[]`                                                                                                             | Allowed metrics clients when NetworkPolicy is enabled; empty permits any client on `metrics.port`. |
+| `metrics.prometheusRule.enabled`           | `false`                                                                                                          | Create scrape availability and persistent overdue-task alerts; requires ServiceMonitor.            |
+| `metrics.prometheusRule.labels`            | `{}`                                                                                                             | Labels matching the Prometheus ruleSelector.                                                       |
+| `metrics.prometheusRule.unavailableFor`    | `5m`                                                                                                             | How long all scrape targets must be missing or down before alerting.                               |
+| `metrics.prometheusRule.overdueTasksFor`   | `15m`                                                                                                            | How long overdue tasks must remain present before alerting.                                        |
 
 ### smtp
 
@@ -1735,15 +1739,23 @@ Dedicated service account configuration.
 | `serviceAccount.name`        | `""`    | Account name override. |
 | `serviceAccount.annotations` | `{}`    | Account annotations.   |
 
+### containerPorts
+
+Container listeners configured in the chart-owned Apache configuration.
+
+| Parameter             | Default | Meaning                                                    |
+| --------------------- | ------- | ---------------------------------------------------------- |
+| `containerPorts.http` | `8080`  | Moodle unprivileged web application listener (1024-65535). |
+
 ### service
 
 Web service options.
 
-| Parameter             | Default     | Meaning                                            |
-| --------------------- | ----------- | -------------------------------------------------- |
-| `service.type`        | `ClusterIP` | Service type.                                      |
-| `service.port`        | `80`        | Service port; Apache listens on unprivileged 8080. |
-| `service.annotations` | `{}`        | Service annotations.                               |
+| Parameter             | Default     | Meaning                                               |
+| --------------------- | ----------- | ----------------------------------------------------- |
+| `service.type`        | `ClusterIP` | Service type.                                         |
+| `service.port`        | `80`        | Service port, independent from `containerPorts.http`. |
+| `service.annotations` | `{}`        | Service annotations.                                  |
 
 ### ingress
 
