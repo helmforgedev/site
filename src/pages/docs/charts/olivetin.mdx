@@ -23,7 +23,7 @@ clean web UI, without giving users direct shell access.
 
 - **ConfigMap-based actions** — define shell commands in YAML, mounted as a ConfigMap
 - **No external dependencies** — no database, no state, stateless by design
-- **Prometheus metrics** — optional scraping with ServiceMonitor support
+- **Prometheus metrics** — optional dedicated listener with ServiceMonitor support
 - **Gateway API and Ingress** — expose the UI with either classic Ingress or HTTPRoute
 - **External Secrets Operator** — render ExternalSecret resources for credentials used by custom actions
 - **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
@@ -165,6 +165,7 @@ config: |
 
 metrics:
   enabled: true
+  port: 1341
   serviceMonitor:
     enabled: true
     interval: 30s
@@ -292,7 +293,7 @@ externalSecrets:
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/jamesread/olivetin` | OliveTin container image.            |
-| `image.tag`        | string | `"3000.19.0"`                  | Image tag.                           |
+| `image.tag`        | string | `"3000.20.0"`                  | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
@@ -317,6 +318,13 @@ externalSecrets:
   `config` during a Helm upgrade will trigger a pod restart to pick up the new configuration. Keep action definitions in
   version control alongside your values files.
 </Callout>
+
+The chart parses `config` as YAML and owns its top-level `prometheus` and
+`listenAddressPrometheus` settings. Use the `metrics` values below instead of
+setting those keys in custom configuration. When metrics are disabled, the
+chart forces `prometheus.enabled=false` and removes any custom Prometheus
+listener address. Enable `configTpl.enabled` only when Helm templating is
+intentional; OliveTin runtime templates remain literal by default.
 
 The `config` block supports the full OliveTin configuration schema. Key action options:
 
@@ -346,7 +354,7 @@ See the [full OliveTin configuration reference](https://docs.olivetin.app/config
 
 ## Upgrade Notes
 
-The chart pins OliveTin `3000.19.0`. Review the upstream changelog before
+The chart pins OliveTin `3000.20.0`. Review the upstream changelog before
 upgrading production workloads. The chart propagates `olivetin.port` through
 `PORT`; remove duplicate `PORT` entries from `olivetin.extraEnv`.
 Persistence-enabled installs create the data PVC when
@@ -356,7 +364,9 @@ Persistence-enabled installs create the data PVC when
 
 | Parameter                              | Type    | Default | Description                                           |
 | -------------------------------------- | ------- | ------- | ----------------------------------------------------- |
-| `metrics.enabled`                      | boolean | `false` | Enable Prometheus metrics scraping annotations.       |
+| `metrics.enabled`                      | boolean | `false` | Enable the dedicated Prometheus listener and port.    |
+| `metrics.port`                         | integer | `1341`  | Prometheus listener and Service port.                 |
+| `metrics.defaultGoMetrics`             | boolean | `false` | Include default Go runtime metrics.                   |
 | `metrics.serviceMonitor.enabled`       | boolean | `false` | Create a ServiceMonitor for Prometheus Operator.      |
 | `metrics.serviceMonitor.namespace`     | string  | `""`    | Namespace for the ServiceMonitor (defaults to chart). |
 | `metrics.serviceMonitor.labels`        | object  | `{}`    | Extra labels applied to the ServiceMonitor.           |
@@ -444,6 +454,26 @@ External Secrets can materialize credentials for custom actions without committi
 | `resources`          | object | requests/limits set | CPU and memory requests and limits. |
 | `podSecurityContext` | object | hardened defaults   | Pod-level security context.         |
 | `securityContext`    | object | hardened defaults   | Container-level security context.   |
+
+## Security and Production Boundary
+
+OliveTin executes operator-defined shell commands. Treat every action,
+argument, executable, mounted credential, and Kubernetes permission as part of
+your production security boundary. Keep public exposure behind authentication
+and authorization, use least-privilege RBAC, and prevent clients from bypassing
+any trusted authentication proxy. Never place credentials in `config`, because
+the chart stores it in a ConfigMap.
+
+The chart provides non-root security defaults, explicit writable paths,
+optional ExternalSecret resources, exposure primitives, and metrics. Operators
+remain responsible for TLS, DNS, network segmentation, credential rotation,
+action review, capacity planning, backup, restore, and disaster recovery. The
+optional PVC is mounted only at `/data`; `/config` sessions, themes, and logs
+remain pod-local and ephemeral.
+
+Metrics listen on the separate `metrics.port` only when enabled. The chart does
+not install Prometheus Operator, dashboards, alert rules, log collectors, or
+long-term audit storage.
 
 ### Service Account
 
