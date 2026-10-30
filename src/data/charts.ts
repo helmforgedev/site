@@ -711,7 +711,7 @@ export const charts: Chart[] = [
   {
     name: 'Middleware',
     slug: 'middleware',
-    description: 'DORA metrics platform with PostgreSQL, Redis, and engineering performance tracking.',
+    description: 'DORA metrics with PostgreSQL migrations, durable encryption keys, and embedded Redis.',
     maturity: 'stable',
     backup: false,
   },
