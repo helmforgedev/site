@@ -17,7 +17,7 @@ startup, and the chart deliberately preserves that supported behavior.
 ## What this chart provides
 
 - immutable official Linux amd64/arm64 image pinned by manifest digest;
-- HelmForge PostgreSQL and optional HelmForge Redis subcharts;
+- HelmForge PostgreSQL 2.1.1 and optional HelmForge Redis 3.1.0 subcharts;
 - external PostgreSQL, Redis, SMTP, S3, signing, and Gotenberg Secret contracts;
 - local, BullMQ, and Inngest background-job modes;
 - native External Secrets Operator resources;
@@ -213,7 +213,10 @@ gatewayAPI:
 NetworkPolicy allows namespace-local HTTP ingress, DNS, declared state
 services, public HTTP/HTTPS, and the configured public SMTP port while excluding
 private address ranges. Add explicit egress rules for private SMTP, S3,
-Gotenberg, OAuth, or webhook destinations.
+Gotenberg, OAuth, or webhook destinations. Add an Ingress or Gateway controller
+from another namespace to `networkPolicy.ingressFrom`. A non-empty list replaces
+the default namespace-local peer, so include `podSelector: {}` alongside the
+controller peer when same-namespace clients must retain access.
 
 ## Backup and restore
 
@@ -232,6 +235,7 @@ reverse database schema changes.
 
 | Value                                 | Default                       | Purpose                                 |
 | ------------------------------------- | ----------------------------- | --------------------------------------- |
+| `global`                              | `{}`                          | Values shared with dependency charts    |
 | `nameOverride`                        | `""`                          | Override chart resource names           |
 | `fullnameOverride`                    | `""`                          | Override the full release name          |
 | `commonLabels`                        | `{}`                          | Labels applied to chart-owned resources |
