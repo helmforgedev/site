@@ -13216,6 +13216,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Web context path; ROOT serves Guacamole at /',
         },
         {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '8080',
+          description: 'Actual Tomcat HTTP listener; independent from the Service port',
+        },
+        {
+          label: 'guacd Listener Port',
+          key: 'guacd.port',
+          type: 'number',
+          default: '4822',
+          description: 'Actual guacd daemon listener used by the web container',
+        },
+        {
           label: 'guacd Log Level',
           key: 'guacd.logLevel',
           type: 'select',
@@ -13291,6 +13305,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '',
           description: 'Existing secret containing the database password',
+        },
+      ],
+    },
+    {
+      name: 'Security',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Ingress NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Isolate inbound application traffic',
+        },
+        {
+          label: 'Service Account Token',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Mount the Kubernetes API token into application and job pods',
         },
       ],
     },
