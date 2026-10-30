@@ -467,9 +467,22 @@ uses `pg_dump`. MySQL uses `mysqldump`.
 The Deployment now defaults to `Recreate` for SQLite, PostgreSQL, MySQL, and
 external database modes. SQL backends do not externalize repositories, queues,
 indexes, or configuration from the Gitea data volume. The new default prevents
-concurrent writers during upgrades and avoids multi-attach failures with a
-`ReadWriteOnce` PVC. Only select `RollingUpdate` after externalizing every
-shared-state dependency and validating concurrent storage access.
+replacement-pod overlap during upgrades and avoids multi-attach failures with a
+`ReadWriteOnce` PVC. It does not enforce a singleton replica count: keep
+`replicaCount: 1` unless every shared-state dependency has been externalized and
+concurrent storage access has been validated. Only select `RollingUpdate` after
+meeting the same requirements.
+
+When changing an existing server-side-applied Deployment from `RollingUpdate`
+to `Recreate`, clear the API-defaulted rolling settings before the Helm upgrade:
+
+```bash
+kubectl patch deployment <release-name>-gitea --type=merge \
+  -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+```
+
+The chart omits stale `strategy.rollingUpdate` values whenever `Recreate` is
+selected, including upgrades that use `--reuse-values`.
 
 The default image is `docker.io/gitea/gitea:28.2.0-rootless`. Gitea 28 introduces
 an internal proxy for Git network operations. Existing `ALLOWED_HOST_LIST`,
