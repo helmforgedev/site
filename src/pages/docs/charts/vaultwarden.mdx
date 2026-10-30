@@ -13,11 +13,11 @@ Self-hosted Bitwarden-compatible password manager. Vaultwarden is a lightweight 
 the Bitwarden server API, compatible with all official Bitwarden clients (iOS, Android, browser extensions,
 desktop apps). Supports SQLite, PostgreSQL, and MySQL backends.
 
-<Callout type="danger" title="Set domain before creating any user accounts">
-  Vaultwarden 1.33+ crashes at startup if `domain` is empty. Even when the server starts, leaving `domain` unset breaks
-  WebSocket notifications, attachment URLs, and all email links (invites, 2FA, password reset). Always configure
-  `domain` with your full public HTTPS URL before first use. When that URL includes a path, the chart automatically
-  prefixes startup, readiness, and liveness probe paths with it.
+<Callout type="warning" title="Set domain before production use">
+  The chart can start with an empty `domain`, but real deployments should configure the final public HTTPS URL.
+  Vaultwarden uses it for WebSocket notifications, attachment URLs, and email links such as invites, 2FA, and password
+  resets. When the URL includes a path, the chart automatically prefixes startup, readiness, and liveness probe paths
+  with it.
 </Callout>
 
 <Callout type="danger" title="Vaultwarden 1.37.4 security update">
@@ -294,13 +294,13 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 
 ### Core
 
-| Parameter          | Type   | Default         | Description                                     |
-| ------------------ | ------ | --------------- | ----------------------------------------------- |
-| `nameOverride`     | string | `""`            | Override the chart name.                        |
-| `fullnameOverride` | string | `""`            | Override the full release name.                 |
-| `commonLabels`     | object | `{}`            | Extra labels added to all resources.            |
-| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                      |
-| `domain`           | string | `""`            | **Required.** Public HTTPS URL for Vaultwarden. |
+| Parameter          | Type   | Default         | Description                                            |
+| ------------------ | ------ | --------------- | ------------------------------------------------------ |
+| `nameOverride`     | string | `""`            | Override the chart name.                               |
+| `fullnameOverride` | string | `""`            | Override the full release name.                        |
+| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
+| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain.                             |
+| `domain`           | string | `""`            | Public URL; strongly recommended for real deployments. |
 
 ### Image
 
@@ -410,12 +410,12 @@ Store the resulting `$argon2id$...` string in `admin.token` or in a Kubernetes S
 
 ### Service
 
-| Parameter             | Type    | Default     | Description                  |
-| --------------------- | ------- | ----------- | ---------------------------- |
-| `service.type`        | string  | `ClusterIP` | Kubernetes service type.     |
-| `service.port`        | integer | `80`        | Service port.                |
-| `service.targetPort`  | integer | `80`        | Container port.              |
-| `service.annotations` | object  | `{}`        | Annotations for the Service. |
+| Parameter             | Type    | Default     | Description                           |
+| --------------------- | ------- | ----------- | ------------------------------------- |
+| `service.type`        | string  | `ClusterIP` | Kubernetes service type.              |
+| `service.port`        | integer | `80`        | Service port.                         |
+| `service.targetPort`  | integer | `8085`      | Non-privileged Rocket container port. |
+| `service.annotations` | object  | `{}`        | Annotations for the Service.          |
 
 ### Ingress
 
@@ -446,6 +446,10 @@ The backup CronJob automatically selects the correct dump tool based on the acti
 - **SQLite** — `tar` + `cp` via Alpine (archives `/data`)
 - **PostgreSQL** — `pg_dump`
 - **MySQL** — `mysqldump`
+
+The SQLite path archives live files and does not coordinate a SQLite transaction. Concurrent writes can produce an
+inconsistent or corrupt database archive. Quiesce Vaultwarden before taking a production recovery point, or use a
+SQLite-aware backup or volume-snapshot workflow and preserve the complete `/data` boundary.
 
 For an HTTPS S3-compatible endpoint signed by a private or self-signed CA, set `backup.s3.caSecret` to a Secret containing the CA certificate and select its key with `backup.s3.caKey`. The certificate is mounted in the MinIO Client trust directory. Prefer this verified path over `backup.s3.insecureSkipVerify`, which disables certificate verification for every S3 operation. The two settings are mutually exclusive.
 
@@ -503,7 +507,8 @@ as `/vaultwarden/alive`. Custom probe paths that already include the domain path
 
 ### Resources and Security
 
-Vaultwarden runs fully hardened: non-root (`UID 1000`), all capabilities dropped, seccomp `RuntimeDefault`.
+Default pod hardening uses non-root `UID 1000`, drops all capabilities, applies seccomp `RuntimeDefault`, and disables
+Kubernetes API credential automounting for both the application and backup pods.
 
 | Parameter                                  | Type    | Default          | Description                            |
 | ------------------------------------------ | ------- | ---------------- | -------------------------------------- |
