@@ -7653,6 +7653,25 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   kibana: [
     {
+      name: 'Application listener',
+      fields: [
+        {
+          label: 'Kibana HTTP listener',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '5601',
+          description: 'Configures the real Kibana server.port listener',
+        },
+        {
+          label: 'Kibana Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '5601',
+          description: 'Kubernetes Service port targeting the named HTTP listener',
+        },
+      ],
+    },
+    {
       name: 'General',
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'Kibana pod count' },

@@ -10,7 +10,7 @@ Kibana is the Elastic Stack analytics and visualization UI. The HelmForge chart 
 
 ## Key Features
 
-- Official Elastic Kibana image pinned to `9.5.2`
+- Official Elastic Kibana image pinned to `9.5.1`
 - Optional Wolfi image flavor
 - Basic auth or Elasticsearch service account token wiring
 - Static encryption key support for HA sessions and encrypted saved objects
@@ -60,6 +60,20 @@ elasticsearch:
 ## Operations
 
 Set stable encryption keys before scaling beyond one replica. Elastic recommends matching Kibana and Elasticsearch versions across the stack.
+
+## Application Listener
+
+The Kibana process listener and Kubernetes Service port are separate values.
+`containerPorts.http` writes the official Kibana `server.port` setting and
+updates the container port, probes, and NetworkPolicy. `service.port` changes
+only the Service-facing port, which targets the named `http` listener.
+
+```yaml
+containerPorts:
+  http: 15601
+service:
+  port: 15602
+```
 
 ## Architecture
 
@@ -117,7 +131,7 @@ bundledElasticsearch:
 bundled-elasticsearch:
   clusterProfile: dev
   image:
-tag: '9.5.2'
+    tag: '9.5.1'
   kibana:
     enabled: false
   master:
@@ -225,6 +239,8 @@ Also validate login, saved object access, index pattern discovery, and TLS verif
 | `image.repository`              | `docker.elastic.co/kibana/kibana` | Official Kibana image.                                |
 | `image.flavor`                  | `default`                         | Image flavor: `default` or `wolfi`.                   |
 | `replicaCount`                  | `1`                               | Number of Kibana replicas.                            |
+| `containerPorts.http`           | `5601`                            | Kibana `server.port` application listener.            |
+| `service.port`                  | `5601`                            | Kubernetes Service port.                              |
 | `elasticsearch.hosts`           | `[http://elasticsearch:9200]`     | External Elasticsearch endpoints.                     |
 | `bundledElasticsearch.enabled`  | `true`                            | Deploy HelmForge Elasticsearch dependency.            |
 | `elasticsearch.auth.type`       | `none`                            | Auth mode: `none`, `basic`, or `serviceAccountToken`. |
