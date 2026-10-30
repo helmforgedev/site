@@ -31,31 +31,13 @@ available for development and small single-replica installs.
 
 ## Architecture
 
-```text
-Users
-  |
-  v
-Gateway API HTTPRoute or Ingress
-  |
-  v
-Service discount-bandit
-  |
-  v
-Deployment discount-bandit
-  |-- FrankenPHP web UI
-  |-- Laravel scheduler
-  |-- Laravel queue worker
-  |-- Chromium crawler runtime
-  |
-  v
-Service <release>-mysql
-  |
-  v
-StatefulSet mysql
-  |
-  v
-PVC MySQL data
-```
+1. Users enter through a Gateway API HTTPRoute or Kubernetes Ingress.
+2. The edge resource routes to the Discount Bandit Service, which targets the
+   named HTTP port on the Deployment.
+3. The application pod runs the FrankenPHP web UI, Laravel scheduler, Laravel
+   queue worker, and Chromium crawler runtime under Supervisor.
+4. The application connects to the bundled MySQL Service or an external
+   MySQL/MariaDB endpoint. Bundled MySQL persists its data on a PVC.
 
 For production, use the bundled MySQL subchart or an external MySQL/MariaDB service. SQLite is intentionally documented as
 a development path because it is single-writer and normally uses `ReadWriteOnce` storage.
@@ -85,6 +67,22 @@ kubectl port-forward -n discount-bandit svc/discount-bandit-discount-bandit 8080
 ```
 
 Open `http://localhost:8080` and create the first admin account.
+
+## Application Listener
+
+The FrankenPHP process listener and Kubernetes Service port are independent.
+`containerPorts.http` configures Laravel Octane's real `--port` option in the
+Supervisor configuration and updates the container port, probes, and
+NetworkPolicy. `service.port` changes only the Service-facing port, which
+targets the named `http` listener. Custom listener ports require
+`supervisor.configMap.enabled=true`.
+
+```yaml
+containerPorts:
+  http: 18080
+service:
+  port: 18081
+```
 
 ## Deployment Examples
 
@@ -310,13 +308,14 @@ externalSecrets:
 | Parameter          | Default                               | Description                      |
 | ------------------ | ------------------------------------- | -------------------------------- |
 | `image.repository` | `docker.io/cybrarist/discount-bandit` | Discount Bandit container image. |
-| `image.tag`        | `"v4.0.4"`                            | Image tag.                       |
+| `image.tag`        | `"v4.0.5"`                            | Image tag.                       |
 | `image.pullPolicy` | `IfNotPresent`                        | Image pull policy.               |
 
 ### Networking
 
 | Parameter                                         | Default     | Description                                                                |
 | ------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
+| `containerPorts.http`                             | `80`        | FrankenPHP HTTP application listener.                                      |
 | `service.type`                                    | `ClusterIP` | Kubernetes Service type.                                                   |
 | `service.port`                                    | `80`        | Service HTTP port.                                                         |
 | `service.ipFamilyPolicy`                          | `""`        | Optional Service IP family policy.                                         |
@@ -384,9 +383,9 @@ Chromium crawlers, and NetworkPolicy/firewall decisions that depend on store and
 </Callout>
 
 <Callout type="info" title="Runtime hardening is intentionally conservative">
-  The upstream image currently runs as root and listens on port 80. The chart sets seccomp, resources, and privilege
-  escalation defaults, but does not force `runAsNonRoot`, a read-only filesystem, or dropped capabilities until the
-  upstream runtime supports those constraints.
+  The upstream image currently runs as root and listens on port 80 by default. The chart configures the listener through
+  `containerPorts.http`, sets seccomp, resources, and privilege escalation defaults, but does not force `runAsNonRoot`,
+  a read-only filesystem, or dropped capabilities until the upstream runtime supports those constraints.
 </Callout>
 
 ## Common Issues

@@ -13699,6 +13699,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   'discount-bandit': [
     {
+      name: 'Application listener',
+      fields: [
+        {
+          label: 'HTTP listener',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          max: '65535',
+          description: 'Configures the real Laravel Octane FrankenPHP listener',
+        },
+        {
+          label: 'Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          max: '65535',
+          description: 'Kubernetes Service port targeting the named HTTP listener',
+        },
+      ],
+    },
+    {
       name: 'General',
       fields: [
         {
