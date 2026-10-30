@@ -12,15 +12,17 @@ Private location history with the official Dawarich image, PostGIS and authentic
 public NGINX proxy run together in a single Recreate Pod so local attachments and watched imports have consistent
 storage ownership and scheduling.
 
-## Upgrade to 1.15.2
+## Upgrade to 1.16.0
 
-This release adds the experimental read-only MCP endpoint and exploration
-achievements, and fixes point uploads, account deletion, route-gap settings and
-IPv4 fallback for outbound connections. Back up PostGIS and persistent files,
-and preserve encryption secrets before upgrading. See the
-[release notes](https://github.com/Freika/dawarich/releases/tag/1.15.2).
-The Redis dependency moves to 3.0.0 with unchanged image, storage and
-authentication defaults and corrected health probes.
+This release adds address-aware visits, richer yearly Insights, trip search and
+filters, and a consolidated Family map tab. It redirects `/` to sign-in, so
+uptime checks should use `/api/v1/health`. It also fixes duplicate legacy-point
+migration, sensitive request-path logging, stale two-factor challenges and
+duplicate Prometheus series. Back up PostGIS and persistent files, and preserve
+encryption secrets before upgrading. See the
+[release notes](https://github.com/Freika/dawarich/releases/tag/1.16.0).
+The HelmForge PostgreSQL and Redis dependencies use their current compatible
+minor releases without changing the documented storage or authentication model.
 
 ## Installation
 
@@ -162,7 +164,7 @@ Coordinated recovery into a fresh PostGIS database and PVC passed, including a c
 attachment bytes, exact coordinates and native 2FA. Production acceptance also verifies tokenless dependency Pods and
 withdrawn readiness for a quiet worker.
 
-The complete `make validate-chart CHART=dawarich` gate passed on 2026-09-11: 23 validation layers, 36 Helm unit tests
+The complete `make validate-chart CHART=dawarich` gate passed on 2026-09-15: 23 validation layers, 36 Helm unit tests
 and 13 isolated k3d scenarios, including all CI profiles. It covers real CRD schemas, ESO, dual-stack Services, Ingress,
 Gateway API, browser interaction, private Prometheus scraping, external TLS, coordinated recovery and original S3 object
 bytes. Application and dependency Pods had no unexpected restarts or crash terminations in the accepted scenarios.
@@ -176,7 +178,7 @@ bytes. Application and dependency Pods had no unexpected restarts or crash termi
 | NSA       | **97.57%** |
 | SOC2      | **94.29%** |
 
-Kubescape 4.0.13, default rendered manifests, 2026-09-11. C-0012 flags the literal
+Kubescape 4.0.14, default rendered manifests, 2026-09-15. C-0012 flags the literal
 `ALLOW_EMAIL_PASSWORD_REGISTRATION=false` policy setting and TLS admission code that reads credential environment
 variables; neither contains a credential value. No controls were suppressed.
 
@@ -187,7 +189,7 @@ replace image vulnerability management or application review.
 
 ## Sources
 
-- [Dawarich 1.15.2](https://github.com/Freika/dawarich/tree/1.15.2)
+- [Dawarich 1.16.0](https://github.com/Freika/dawarich/tree/1.16.0)
 - [Official PostGIS image](https://github.com/postgis/docker-postgis)
 - [Official unprivileged NGINX image](https://github.com/nginx/docker-nginx-unprivileged)
 
@@ -537,6 +539,8 @@ networkPolicy:
 
 ```yaml
 # SPDX-License-Identifier: Apache-2.0
+# -- Global values reserved for Helm ecosystem compatibility.
+global: {}
 # -- Override the chart name used in labels.
 nameOverride: ''
 # -- Override generated resource names.
@@ -714,7 +718,7 @@ image:
   # -- Configure repository.
   repository: docker.io/freikin/dawarich
   # -- Configure tag.
-  tag: 1.15.2
+  tag: 1.16.0
   # -- Configure pull policy.
   pullPolicy: IfNotPresent
 # -- Public origin and application listener.
