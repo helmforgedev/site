@@ -364,8 +364,10 @@ parameters stable unless measured results justify a migration.
 ## Health and observability
 
 The pinned upstream image has no `/healthz`, `/readyz` or `/metrics` endpoint.
-The chart uses TCP probes on port 8080. Those probes show that the listener is
-open; they do not verify PostgreSQL or S3.
+The chart uses TCP probes on the named port configured by
+`containerPorts.http`. That value also controls the real Attic listener, while
+`service.port` remains an independent Kubernetes Service contract. The probes
+show that the listener is open; they do not verify PostgreSQL or S3.
 
 Attic writes Rust tracing logs to stdout and stderr. Change
 `config.logLevel` to tune `RUST_LOG`. The chart intentionally does not create a
@@ -426,28 +428,35 @@ Upstream image tags are commit SHAs, not releases. Before changing the tag:
 Do not assume that changing the image tag back reverses a database migration.
 Restore the pre-upgrade backup when backward compatibility is unknown.
 
+The initial chart exposed the complete `config.listen` socket string. It is
+still accepted when its port matches `containerPorts.http`, but new values
+should set the address through `config.listenAddress` and the application port
+through `containerPorts.http`.
+
 ## Configuration reference
 
 ### Core and image
 
-| Value               | Default                    | Description                           |
-| ------------------- | -------------------------- | ------------------------------------- |
-| `nameOverride`      | `""`                       | Override chart resource names         |
-| `fullnameOverride`  | `""`                       | Override the complete release name    |
-| `commonLabels`      | `{}`                       | Labels on all resources               |
-| `commonAnnotations` | `{}`                       | Workload annotations                  |
-| `mode`              | `standalone`               | `standalone` or `distributed`         |
-| `image.repository`  | `ghcr.io/zhaofengli/attic` | Official upstream image               |
-| `image.tag`         | commit SHA                 | Immutable upstream image tag          |
-| `image.pullPolicy`  | `IfNotPresent`             | Kubernetes pull policy                |
-| `imagePullSecrets`  | `[]`                       | Registry credentials                  |
-| `replicaCount`      | `1`                        | API replicas; standalone requires one |
+| Value                 | Default                    | Description                           |
+| --------------------- | -------------------------- | ------------------------------------- |
+| `nameOverride`        | `""`                       | Override chart resource names         |
+| `fullnameOverride`    | `""`                       | Override the complete release name    |
+| `commonLabels`        | `{}`                       | Labels on all resources               |
+| `commonAnnotations`   | `{}`                       | Workload annotations                  |
+| `mode`                | `standalone`               | `standalone` or `distributed`         |
+| `image.repository`    | `ghcr.io/zhaofengli/attic` | Official upstream image               |
+| `image.tag`           | commit SHA                 | Immutable upstream image tag          |
+| `image.pullPolicy`    | `IfNotPresent`             | Kubernetes pull policy                |
+| `imagePullSecrets`    | `[]`                       | Registry credentials                  |
+| `replicaCount`        | `1`                        | API replicas; standalone requires one |
+| `containerPorts.http` | `8080`                     | Attic process and container port      |
 
 ### Attic configuration
 
 | Value                                             | Default               | Description                              |
 | ------------------------------------------------- | --------------------- | ---------------------------------------- |
-| `config.listen`                                   | `[::]:8080`           | Container listener                       |
+| `config.listenAddress`                            | `[::]`                | Container listener bind address          |
+| `config.listen`                                   | `""`                  | Deprecated complete listener override    |
 | `config.apiEndpoint`                              | `http://attic.local/` | Canonical public URL with trailing slash |
 | `config.substituterEndpoint`                      | `""`                  | Optional alternate substituter URL       |
 | `config.allowedHosts`                             | `[attic.local]`       | Accepted Host headers                    |
