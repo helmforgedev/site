@@ -8,7 +8,7 @@ description: Deploy WebODM drone mapping on Kubernetes with PostGIS, Redis, Cele
 
 [WebODM](https://www.webodm.org/) turns aerial images into orthophotos,
 elevation models, point clouds and textured 3D models. The HelmForge chart
-deploys WebODM 3.3.0 with persistent media, PostgreSQL/PostGIS, Redis, Celery
+deploys WebODM 3.3.1 with persistent media, PostgreSQL/PostGIS, Redis, Celery
 workers and an authenticated NodeODM 3.6.2 processing engine.
 
 The chart is beta while it gains release history. CPU processing is the
@@ -66,6 +66,31 @@ The default release creates a 20 GiB media claim, a 20 GiB processing claim,
 PostgreSQL/PostGIS, Redis, one web pod, one Celery worker and one CPU NodeODM
 processor. These defaults prove functionality; they are not a production size
 recommendation.
+
+## Configure application and Service ports
+
+Process listeners and Service ports are independent. `web.containerPort`
+configures the real upstream WebODM NGINX listener through `WO_PORT`, while
+`processing.containerPort` is passed to NodeODM's `--port` argument. Services
+route to named `http` target ports and can expose different client-facing ports:
+
+```yaml
+web:
+  containerPort: 9080
+
+service:
+  port: 8080
+
+processing:
+  containerPort: 3100
+
+processingService:
+  port: 3200
+```
+
+The chart's custom-port k3d scenario verifies both processes on their overridden
+listeners. Changing only `service.port` or `processingService.port` does not
+change the process listener.
 
 ## Size processing resources
 
@@ -289,6 +314,11 @@ externalSecrets:
 Use additional items for OIDC, external database or external Redis Secrets.
 Every item needs a store or generator reference.
 
+Helm cannot checksum data in externally managed Secrets. After the secret
+manager rotates application, OIDC, database, or Redis credentials, explicitly
+restart the consuming Deployments and wait for their rollouts; a Helm upgrade
+with unchanged values cannot detect that external data change.
+
 ## Storage, backup and recovery
 
 Treat PostgreSQL and the WebODM media claim as one consistency domain:
@@ -306,11 +336,11 @@ Helm keep policy and survive uninstall.
 
 ## NetworkPolicy
 
-`networkPolicy.enabled` isolates WebODM application pods, permits same-release
-traffic and DNS, and allows HTTPS egress needed for package and identity
-provider access. Use `ingressFrom` for controller namespaces and `extraEgress`
-for external database, Redis or identity-provider paths. Kubernetes
-NetworkPolicy cannot portably select arbitrary DNS names.
+`networkPolicy.enabled` defaults to `true`. It isolates WebODM application pods,
+permits same-release traffic and DNS, and allows HTTPS egress needed for package
+and identity provider access. Use `ingressFrom` for controller namespaces and
+`extraEgress` for external database, Redis or identity-provider paths.
+Kubernetes NetworkPolicy cannot portably select arbitrary DNS names.
 
 ## Runtime security
 
@@ -373,30 +403,30 @@ WebODM hides incomplete provider definitions.
 
 ## Complete values reference
 
-| Area               | Values and defaults                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Naming             | `nameOverride=""`, `fullnameOverride=""`, `commonLabels={}`                                                                              |
-| WebODM image       | `image.repository=docker.io/webodm/webodm_webapp`, `tag=3.3.0`, immutable `digest`, `pullPolicy=IfNotPresent`, `imagePullSecrets=[]`     |
-| Application        | `webodm.host=localhost`, `debug=false`, generated or existing Secret keys, `extraEnv=[]`, `extraEnvFrom=[]`                              |
-| Web process        | `web.concurrency=2`, resources, startup timing and 120-second termination grace                                                          |
-| Celery             | `worker.replicaCount=1`, `concurrency=2`, resources and 300-second termination grace                                                     |
-| CPU processing     | `processing.enabled=true`, official NodeODM 3.6.2 image and digest, label, queue concurrency, image/runtime/cleanup limits and resources |
-| GPU processing     | `processing.gpu.enabled=false`, pinned `3.6.2-gpu` image, `count=1`, RuntimeClass, node selector and tolerations                         |
-| Processing storage | `processing.persistence` 20 GiB retained RWO claim, `tmpSizeLimit=10Gi`                                                                  |
-| Media storage      | `persistence` 20 GiB retained RWO claim or existing claim                                                                                |
-| Services           | `service.type=ClusterIP`, ports 80 and 3000, annotations and dual-stack fields                                                           |
-| OIDC               | Disabled; provider label, client ID and Secret, three endpoints, icon, email allowlist, profile, scope and group controls                |
-| Ingress            | Disabled; `ingressClassName`, annotations, hosts, paths and TLS                                                                          |
-| Gateway API        | Disabled; `parentRefs`, `hostnames`, annotations and HTTP path rules                                                                     |
-| External database  | Host, port 5432, database/user `webodm`, existing Secret and password key                                                                |
-| External Redis     | Host, port 6379, database 0, existing Secret and password key                                                                            |
-| Bundled PostgreSQL | Enabled standalone HelmForge chart, official PostGIS image, initialized extensions and 10 GiB persistence                                |
-| Bundled Redis      | Enabled standalone authenticated HelmForge chart with 2 GiB persistence                                                                  |
-| NetworkPolicy      | Disabled; ingress peers and extra egress rules                                                                                           |
-| Availability       | Disabled worker `pdb`, `minAvailable=1`                                                                                                  |
-| External Secrets   | Disabled; `refreshInterval=1h`, canonical `items=[]`                                                                                     |
-| Pod controls       | Labels, annotations, security contexts, node selector, tolerations, affinity, topology spread and priority class                         |
-| ServiceAccount     | Created, unnamed override, annotations and API token automount disabled                                                                  |
+| Area               | Values and defaults                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Naming             | `nameOverride=""`, `fullnameOverride=""`, `commonLabels={}`                                                                          |
+| WebODM image       | `image.repository=docker.io/webodm/webodm_webapp`, `tag=3.3.1`, immutable `digest`, `pullPolicy=IfNotPresent`, `imagePullSecrets=[]` |
+| Application        | `webodm.host=localhost`, `debug=false`, generated or existing Secret keys, `extraEnv=[]`, `extraEnvFrom=[]`                          |
+| Web process        | `web.containerPort=8000`, `concurrency=2`, resources, startup timing and 120-second termination grace                                |
+| Celery             | `worker.replicaCount=1`, `concurrency=2`, resources and 300-second termination grace                                                 |
+| CPU processing     | `processing.enabled=true`, `containerPort=3000`, official NodeODM 3.6.2 image and digest, queue, cleanup and resources               |
+| GPU processing     | `processing.gpu.enabled=false`, pinned `3.6.2-gpu` image, `count=1`, RuntimeClass, node selector and tolerations                     |
+| Processing storage | `processing.persistence` 20 GiB retained RWO claim, `tmpSizeLimit=10Gi`                                                              |
+| Media storage      | `persistence` 20 GiB retained RWO claim or existing claim                                                                            |
+| Services           | `service.type=ClusterIP`, ports 80 and 3000, annotations and dual-stack fields                                                       |
+| OIDC               | Disabled; provider label, client ID and Secret, three endpoints, icon, email allowlist, profile, scope and group controls            |
+| Ingress            | Disabled; `ingressClassName`, annotations, hosts, paths and TLS                                                                      |
+| Gateway API        | Disabled; `parentRefs`, `hostnames`, annotations and HTTP path rules                                                                 |
+| External database  | Host, port 5432, database/user `webodm`, existing Secret and password key                                                            |
+| External Redis     | Host, port 6379, database 0, existing Secret and password key                                                                        |
+| Bundled PostgreSQL | Enabled standalone HelmForge chart, official PostGIS image, initialized extensions and 10 GiB persistence                            |
+| Bundled Redis      | Enabled standalone authenticated HelmForge chart with 2 GiB persistence                                                              |
+| NetworkPolicy      | Enabled; same-release ingress, DNS and HTTPS egress, additional ingress peers and extra egress rules                                 |
+| Availability       | Disabled worker `pdb`, `minAvailable=1`                                                                                              |
+| External Secrets   | Disabled; `refreshInterval=1h`, canonical `items=[]`                                                                                 |
+| Pod controls       | Labels, annotations, security contexts, node selector, tolerations, affinity, topology spread and priority class                     |
+| ServiceAccount     | Created, unnamed override, annotations and API token automount disabled                                                              |
 
 The [playground](/playground/) generates a starting values file. The chart's
 `values.yaml` and JSON schema remain the authoritative complete contract.

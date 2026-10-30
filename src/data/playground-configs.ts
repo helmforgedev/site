@@ -1711,6 +1711,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Values above one require ReadWriteMany media storage',
         },
         {
+          label: 'Web container port',
+          key: 'web.containerPort',
+          type: 'number',
+          default: '8000',
+          description: 'Actual upstream NGINX listener configured through WO_PORT',
+        },
+        {
+          label: 'Web Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing cluster port routed to the named web listener',
+        },
+        {
           label: 'Celery concurrency',
           key: 'worker.concurrency',
           type: 'number',
@@ -1735,6 +1749,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'true',
           description: 'Deploy and register a private authenticated processing engine',
+        },
+        {
+          label: 'NodeODM container port',
+          key: 'processing.containerPort',
+          type: 'number',
+          default: '3000',
+          description: 'Actual NodeODM listener passed to the --port argument',
+        },
+        {
+          label: 'NodeODM Service port',
+          key: 'processingService.port',
+          type: 'number',
+          default: '3000',
+          description: 'Private client-facing port routed to the named NodeODM listener',
         },
         {
           label: 'NVIDIA GPU',
