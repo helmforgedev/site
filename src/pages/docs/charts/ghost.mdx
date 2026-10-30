@@ -22,17 +22,38 @@ backed by MySQL.
 - **Content persistence** — PVC-backed content directory for media, themes, routes, and redirects
 - **S3 content backup** — scheduled archive of the Ghost content directory to S3-compatible storage
 - **Ingress support** — TLS via cert-manager with configurable ingress class
+- **Hardened runtime** — non-root, read-only root filesystem, dropped capabilities, seccomp, and no API token mount
+- **Operational policies** — optional disruption and network policies with explicit database egress
+- **Configurable listener** — one value configures Ghost, probes, the Service target, and network policy
 
 <Callout type="info" title="Adapter paths">
   Ghost supports adapters installed outside the content directory. Keep custom adapters in the image rather than the
   content PVC so application code and user-managed content retain separate lifecycles.
 </Callout>
 
-<Callout type="info" title="Ghost 6.65.0 update">
-  Ghost 6.65.0 updates the Source and Casper themes, improves sitemap responsiveness and memory use, and fixes
-  gated-post comments, subscription conversion accounting, theme activation and mobile analytics layout. Back up content
-  and the database, then validate themes, integrations, newsletters, comments, and member signup paths before upgrading
-  production sites.
+<Callout type="info" title="Ghost 6.71.0 update">
+  Ghost 6.71.0 adds automation analytics, self-service site exports, member location maps and refreshed post and member
+  screens. It also includes fixes across scheduled posts, member imports, Portal, uploads, the editor, social previews
+  and analytics links. Back up content and the database, then validate themes, integrations, newsletters, comments and
+  member signup paths before upgrading production sites.
+</Callout>
+
+## Architecture and Boundaries
+
+The chart runs one Ghost Deployment with a persistent content volume and either the HelmForge MySQL 2.1.1 dependency or
+an external MySQL-compatible service. A ClusterIP Service exposes the named HTTP port to an optional Ingress or Gateway
+API HTTPRoute. Ghost remains a singleton: its PodDisruptionBudget can protect voluntary maintenance, but it does not
+provide application high availability.
+
+The default runtime is non-root and read-only, has no Kubernetes API token, and limits writable storage to content and
+bounded temporary volumes. Credentials come from Kubernetes Secrets. Optional NetworkPolicy can restrict ingress and
+egress, while TLS termination, database availability, SMTP delivery, backup retention, restore testing and platform
+observability remain operator responsibilities.
+
+<Callout type="warning" title="Chart version requirement">
+  The configurable listener, hardened runtime, bounded ephemeral storage, PodDisruptionBudget and NetworkPolicy
+  documented on this page require Ghost chart 1.3.0 or later. Publish the companion chart release before publishing this
+  documentation update.
 </Callout>
 
 ## Installation
@@ -241,7 +262,7 @@ backup:
 # values.yaml — custom Ghost image with adapters outside the content PVC
 image:
   repository: registry.example.com/ghost-with-adapters
-  tag: '6.65.0'
+  tag: '6.71.0'
 
 ghost:
   url: 'https://blog.example.com'
@@ -273,7 +294,7 @@ when the container starts.
 | Parameter          | Type   | Default                   | Description                          |
 | ------------------ | ------ | ------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/library/ghost` | Ghost container image.               |
-| `image.tag`        | string | `"6.65.0"`                | Image tag.                           |
+| `image.tag`        | string | `"6.71.0"`                | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`            | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                      | Pull secrets for private registries. |
 
@@ -283,6 +304,10 @@ when the container starts.
 | ---------------- | ------ | ------- | -------------------------------------------------------------------------- |
 | `ghost.url`      | string | `""`    | Public URL of the Ghost instance (e.g. `https://blog.example.com`).        |
 | `ghost.extraEnv` | array  | `[]`    | Extra environment variables for SMTP, integrations, and advanced settings. |
+
+| Parameter             | Type    | Default | Description                                                         |
+| --------------------- | ------- | ------- | ------------------------------------------------------------------- |
+| `containerPorts.http` | integer | `2368`  | Ghost process listener, container port and Service target endpoint. |
 
 <Callout type="warning" title="ghost.url must match your actual public URL">
   Ghost uses `ghost.url` to generate all links: newsletter emails, canonical URLs, webhook payloads, and API responses.
@@ -350,13 +375,14 @@ The chart renders `external-secrets.io/v1` resources and supports multiple compl
 
 ### Content Persistence
 
-| Parameter                   | Type    | Default             | Description                                                                   |
-| --------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/lib/ghost/content` (media, themes, routes, redirects). |
-| `persistence.size`          | string  | `10Gi`              | PVC size.                                                                     |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                                     |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                                             |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                                  |
+| Parameter                       | Type    | Default             | Description                                                                   |
+| ------------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
+| `persistence.enabled`           | boolean | `true`              | Enable a PVC for `/var/lib/ghost/content` (media, themes, routes, redirects). |
+| `persistence.size`              | string  | `10Gi`              | PVC size.                                                                     |
+| `persistence.storageClass`      | string  | `""`                | StorageClass for the PVC.                                                     |
+| `persistence.accessModes`       | array   | `["ReadWriteOnce"]` | PVC access modes.                                                             |
+| `persistence.existingClaim`     | string  | `""`                | Use an existing PVC instead of creating one.                                  |
+| `persistence.emptyDirSizeLimit` | string  | `1Gi`               | Maximum ephemeral content storage when persistence is disabled.               |
 
 ### Backup
 
@@ -380,6 +406,7 @@ The chart renders `external-secrets.io/v1` resources and supports multiple compl
 | `backup.images.backup`                 | string  | `docker.io/library/busybox:1.37` | Image used for `tar` archive.                                |
 | `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image used for S3 upload.                                    |
 | `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
+| `backup.scratchSizeLimit`              | string  | `2Gi`                            | Maximum ephemeral archive size per backup Job.               |
 | `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
 | `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
 | `backup.s3.prefix`                     | string  | `ghost`                          | Key prefix within the bucket.                                |
@@ -432,19 +459,21 @@ Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the a
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                     | Type   | Default    | Description                                          |
+| ----------------------------- | ------ | ---------- | ---------------------------------------------------- |
+| `resources`                   | object | configured | Requests: 100m CPU/256Mi; limits: 500m CPU/768Mi.    |
+| `podSecurityContext`          | object | hardened   | Non-root UID/GID 1000 with `RuntimeDefault` seccomp. |
+| `securityContext`             | object | hardened   | Read-only root, no escalation, and all caps dropped. |
+| `runtimeStorage.tmpSizeLimit` | string | `256Mi`    | Maximum writable `/tmp` storage.                     |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                                                |
+| --------------------------------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                         |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                          |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                        |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into Ghost and backup pods. |
 
 ### Scheduling
 
@@ -459,6 +488,20 @@ Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the a
 | `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
 | `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
 
+### Availability and Network Policy
+
+| Parameter                                   | Type    | Default | Description                                                      |
+| ------------------------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `podDisruptionBudget.enabled`               | boolean | `false` | Protect the singleton pod during voluntary disruption.           |
+| `podDisruptionBudget.minAvailable`          | integer | `1`     | Minimum available server pods.                                   |
+| `podDisruptionBudget.maxUnavailable`        | integer | `null`  | Alternative disruption limit; clear `minAvailable` when used.    |
+| `networkPolicy.enabled`                     | boolean | `false` | Restrict inbound traffic to the Ghost HTTP port.                 |
+| `networkPolicy.ingressFrom`                 | array   | `[]`    | Allowed ingress peers; empty permits all peers on the HTTP port. |
+| `networkPolicy.egress.enabled`              | boolean | `false` | Isolate egress in addition to ingress.                           |
+| `networkPolicy.egress.allowDNS`             | boolean | `true`  | Permit DNS while egress is isolated.                             |
+| `networkPolicy.egress.externalDatabaseCIDR` | string  | `""`    | Required database CIDR for isolated external database mode.      |
+| `networkPolicy.egress.extraEgress`          | array   | `[]`    | Additional complete egress rules for SMTP, S3 and integrations.  |
+
 ### Extra
 
 | Parameter           | Type  | Default | Description                                              |
@@ -468,6 +511,16 @@ Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the a
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Common Issues
+
+<Callout type="warning" title="Ghost cannot reach MySQL">
+  Verify the database Secret, DNS name and port. If egress isolation is enabled, bundled MySQL is allowed by pod labels;
+  external MySQL requires `networkPolicy.egress.externalDatabaseCIDR`.
+</Callout>
+
+<Callout type="warning" title="Custom listener is not reachable">
+  Set `containerPorts.http` instead of injecting `server__port` through `ghost.extraEnv`. The chart reserves that
+  environment variable so the real Ghost listener, probes, Service target and NetworkPolicy cannot diverge.
+</Callout>
 
 <Callout type="danger" title="Newsletter emails not sending">
   Ghost starts successfully without SMTP configured, but no emails will be delivered. If member invitations, newsletter
