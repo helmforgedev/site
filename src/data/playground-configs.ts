@@ -13176,6 +13176,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '1Gi',
           description: 'Data storage size',
         },
+        {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '9091',
+          description: 'Port opened by the native Authelia HTTP server',
+        },
+        {
+          label: 'Metrics Listener Port',
+          key: 'containerPorts.metrics',
+          type: 'number',
+          default: '9959',
+          description: 'Port opened when native Prometheus telemetry is enabled',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict ingress to the native HTTP and optional metrics listeners',
+        },
       ],
     },
     {
@@ -13201,7 +13222,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Memory Limit',
           key: 'resources.limits.memory',
           type: 'text',
-          default: '256Mi',
+          default: '512Mi',
           description: 'Memory limit',
         },
       ],
@@ -13213,7 +13234,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'auth.example.com',
           description: 'Ingress hostname',
@@ -13226,7 +13247,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
         },
-        { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
       ],
     },
     {
