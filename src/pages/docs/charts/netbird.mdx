@@ -12,7 +12,7 @@ Deploy [NetBird](https://github.com/netbirdio/netbird) on Kubernetes as a self-h
 
 The HelmForge NetBird chart follows the current upstream combined self-hosted architecture:
 
-- `netbirdio/netbird-server:0.81.3` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
+- `netbirdio/netbird-server:0.81.5` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
 - `netbirdio/dashboard:v2.90.10` for the web dashboard
 - Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
 - HelmForge PostgreSQL subchart as the default production store
@@ -217,9 +217,11 @@ network. The chart's existing TCP probe policy is unchanged.
 
 ## Upgrade Notes
 
-NetBird `0.81.3` is the current server default. This release contains upstream features, bug fixes, and stability
-improvements without a chart value migration. Review the
-[0.81.3 release](https://github.com/netbirdio/netbird/releases/tag/v0.81.3), back up the configured database, config
+NetBird `0.81.5` is the current server default. It includes the `0.81.4` security update that distrusts compromised
+eMudhra CA keys across management, signal, relay, proxy, and client components. The `0.81.5` release also includes
+client SSH session hardening; this chart deploys the server components only, so upgrade peer clients separately to
+receive those client fixes. Review the [0.81.4 release](https://github.com/netbirdio/netbird/releases/tag/v0.81.4) and
+[0.81.5 release](https://github.com/netbirdio/netbird/releases/tag/v0.81.5), back up the configured database, config
 Secret, and `/var/lib/netbird`, then validate peer enrollment, routes, OIDC, relay, and STUN in staging.
 
 The chart now supports independent process and Service ports. `server.containerPorts.*` updates the generated NetBird
@@ -275,7 +277,7 @@ helm upgrade netbird helmforge/netbird \
 ```
 
 Using `--reuse-values` alone retains the previous image tag and does not deploy
-NetBird `0.81.3`.
+NetBird `0.81.5`.
 
 This v1 hardening release changes the default store from sqlite to PostgreSQL
 subchart mode. Existing sqlite installs that want to keep sqlite must preserve
