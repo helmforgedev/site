@@ -12,7 +12,7 @@ Deploy [Memos](https://github.com/usememos/memos), a lightweight self-hosted not
 production-oriented Kubernetes defaults.
 
 This chart packages the official `docker.io/neosmemo/memos:0.31.0` image and exposes the runtime settings that matter
-for Kubernetes: persistent data, SQLite or external database configuration, public instance URL, ingress/Gateway API
+for Kubernetes: persistent data, SQLite or external database configuration, canonical instance URL, ingress/Gateway API
 exposure, network policy, pod disruption budgets, file-backed deployment configuration, and non-root security context.
 
 ## Architecture
@@ -112,7 +112,7 @@ the administrator instance settings, or manage it declaratively with `memos-inst
 
 ## Deployment Configuration
 
-Memos 0.30 can load OAuth2 identity providers and instance settings from JSON files under `/etc/secrets`. Keep the JSON
+Memos 0.31 can load OAuth2 identity providers and instance settings from JSON files under `/etc/secrets`. Keep the JSON
 in a Kubernetes Secret and let the chart mount it read-only:
 
 ```yaml
@@ -120,16 +120,26 @@ provisioning:
   existingSecret: memos-provisioning
 ```
 
+This Secret replaces the generated provisioning Secret rather than merging the two Secret sources. Memos still applies
+precedence by setting group: a group without a file remains database-managed, while a supplied file replaces that
+complete group. To guarantee the chart's closed-registration policy while also owning private access, include both a
+complete `memos-instance-setting-general.json` with `disallowUserRegistration: true` and
+`memos-instance-setting-access.json` with `INSTANCE_ACCESS_MODE_PRIVATE`. Preserve the intended
+`disallowPasswordAuth` value and every other `GENERAL` field; omit the `GENERAL` file instead when the database must
+remain authoritative for that group.
+
 The Secret keys become filenames and must use Memos' supported names:
 
 - `memos-idp-<label>.json`
+- `memos-instance-setting-access.json`
 - `memos-instance-setting-general.json`
 - `memos-instance-setting-storage.json`
 - `memos-instance-setting-memo-related.json`
 - `memos-instance-setting-notification.json`
 - `memos-instance-setting-ai.json`
 
-Unsupported instance-setting suffixes are ignored.
+Only supported filenames are loaded. Files beginning with `memos-` but not matching a supported pattern produce a
+startup warning; invalid matching files fail startup.
 
 For example:
 
@@ -140,13 +150,29 @@ metadata:
   name: memos-provisioning
 type: Opaque
 stringData:
+  memos-instance-setting-access.json: |
+    {
+      "key": "ACCESS",
+      "accessSetting": {
+        "accessMode": "INSTANCE_ACCESS_MODE_PRIVATE"
+      }
+    }
   memos-instance-setting-general.json: |
     {
       "key": "GENERAL",
       "generalSetting": {
         "disallowUserRegistration": true,
         "disallowPasswordAuth": false,
-        "weekStartDayOffset": 1
+        "additionalScript": "",
+        "additionalStyle": "",
+        "customProfile": {
+          "title": "",
+          "description": "",
+          "logoUrl": ""
+        },
+        "weekStartDayOffset": 1,
+        "disallowChangeUsername": false,
+        "disallowChangeNickname": false
       }
     }
 ```
@@ -154,7 +180,7 @@ stringData:
 Files are validated atomically during startup and remain authoritative for the process lifetime. Each setting file
 replaces its complete database-backed group; omitted scalar fields reset to defaults, so include every required field.
 Every replica must mount identical files, and Secret changes require an orderly restart of every replica. Supported
-instance setting keys are `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`; Memos rejects `BASIC`, `TAGS`,
+instance setting keys are `ACCESS`, `GENERAL`, `STORAGE`, `MEMO_RELATED`, `NOTIFICATION`, and `AI`; Memos rejects `BASIC`, `TAGS`,
 unknown fields, duplicate stable keys, and invalid cross-resource authentication configuration.
 
 ## External Database
@@ -229,7 +255,9 @@ The chart blocks unsafe topologies:
 - MySQL/PostgreSQL without a bundled database, external components or complete DSN source
 - external database with no persistent data volume
 
-## Upgrading To Memos 0.30
+## Upgrade Notes
+
+### Upgrading to Memos 0.30
 
 This chart revision also changes deployment defaults: protected initial setup, closed registration through a complete
 GENERAL provisioning file, a read-only root filesystem, and default network isolation. Existing users and passwords are
@@ -240,6 +268,8 @@ Back up the data volume and external database before upgrading. Review these ups
 
 - the first 0.31 startup initializes the new `ACCESS` setting from the previous URL-based behavior; afterward, select
   public or private access explicitly in the administrator instance settings or a deployment-managed access file
+- an existing provisioning Secret without a `GENERAL` file retains the database `GENERAL` policy; a supplied file
+  replaces the complete group, so preserve `disallowPasswordAuth` and every other intended value
 - RSS support was removed; existing feed URLs no longer provide feeds
 - the shared-memo endpoint is now `GET /api/v1/shares/{share_token}/memo`
 - saved filters use CEL timestamp fields and `now` instead of `now()`; for example,
@@ -248,6 +278,8 @@ Back up the data volume and external database before upgrading. Review these ups
 
 The release also adds the Web Clipper, a rebuilt Markdown editor, multi-column feeds, signed webhooks, file-backed
 settings, and a rebuilt MCP toolset.
+
+### Upgrading to Memos 0.31
 
 Memos 0.31 adds collaborative Spaces, Calendar and Map views, portable ZIP
 exports, multiple attachment backends and request hardening. Before upgrading,
@@ -463,12 +495,18 @@ ranges. Only use it when the targets are trusted internal services and egress is
 ### Deployment Configuration Secrets
 
 Use `provisioning.existingSecret` for OAuth2 client secrets, SMTP credentials, S3 credentials, and AI provider keys that
-Memos 0.30 loads from `/etc/secrets`. The chart mounts the Secret read-only with group-readable mode `0440` for the
+Memos 0.31 loads from `/etc/secrets`. The chart mounts the Secret read-only with group-readable mode `0440` for the
 non-root container.
 
 Treat every matching JSON file as sensitive plaintext. Do not place provisioning JSON directly in Helm values, logs, or
 ConfigMaps. Memos rejects invalid files before serving traffic, redacts secret fields from APIs, and keeps file-backed
 resources immutable until the file is removed and the pod restarts.
+
+Drain external traffic before changing `ACCESS` or `GENERAL`, and scale the StatefulSet to zero before updating the
+Secret regardless of `replicaCount`. Memos reads the files only during startup, and external Secret data is not part of
+the pod-template checksum. Restore the previous replica count, wait for every replica to become Ready, and only then
+restore traffic. With multiple replicas, a rolling restart can temporarily leave replicas enforcing different security
+policies.
 
 ### NetworkPolicy
 
@@ -547,7 +585,7 @@ operation. Helm rollback does not reverse database migrations.
 
 ### Native OAuth2
 
-Memos 0.30 uses generic OAuth2 authorization-code exchange and a configured HTTPS UserInfo endpoint. It does not perform
+Memos uses generic OAuth2 authorization-code exchange and a configured HTTPS UserInfo endpoint. It does not perform
 OIDC issuer/JWKS/ID-token validation merely because `openid` is included in scopes. Configure only a trusted provider,
 exact callback URLs and stable subject mapping; keep client credentials in `provisioning.existingSecret`.
 
@@ -600,6 +638,9 @@ fullnameOverride: ''
 
 # -- Extra labels applied to all Kubernetes objects rendered by this chart.
 commonLabels: {}
+
+# -- Global values passed to this chart and its dependencies.
+global: {}
 
 image:
   # -- Official Memos container image repository.

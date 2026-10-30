@@ -167,6 +167,10 @@ test.describe('Playground', () => {
     await page.locator('.playground-chart-btn[data-slug="memos"]').click();
     const driver = page.locator('select[data-field-key="database.driver"]');
     const code = page.locator('#playground-code');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.0');
+    await expect(page.locator('div[data-field-key="memos.instanceUrl"]')).toContainText(
+      'External HTTP(S) URL; Memos ACCESS settings independently control anonymous access',
+    );
     await page.locator('button[data-field-key="postgresql.enabled"]').click();
     await expect(driver).toHaveValue('postgres');
     await expect(code).toContainText('postgresql.enabled=true');
