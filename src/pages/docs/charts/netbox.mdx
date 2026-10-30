@@ -87,6 +87,25 @@ With chart-managed ReadWriteOnce media, worker pods use a `Recreate` rollout
 and required pod affinity to stay on the web pod's node. ReadWriteMany media
 removes that placement constraint and allows independent multi-node scaling.
 
+## Configure listener and Service ports
+
+`containerPorts.http` configures the real Granian listener through its
+`--port` command-line option. `service.port` is independent and controls
+the Kubernetes Service-facing port, which targets the named `http` container
+port. The defaults are `8080` and `80`, respectively.
+
+```yaml
+containerPorts:
+  http: 8181
+
+service:
+  port: 8080
+```
+
+This example makes NetBox listen on 8181 while clients connect to the Service
+on 8080. Probes follow the named container port. Listener values below 1024 are
+rejected because the application runs without root or added capabilities.
+
 ## Production Values
 
 Apply this profile after the initial administrator has been created and its
@@ -317,6 +336,11 @@ release notes and keep them compatible. Before changing the image:
 Major releases may require staged application upgrades. The default chart
 never uses a moving image tag.
 
+The former `web.requestTimeout` value was removed because netbox-docker 5.0.2
+never consumed `GRANIAN_REQUEST_TIMEOUT`, and Granian 2.7.9 has no equivalent
+whole-request timeout option. Remove this key from overlays; enforce external
+request deadlines at the ingress, Gateway, or load balancer.
+
 <a id="values"></a>
 
 ## Configuration Reference
@@ -334,7 +358,6 @@ never uses a moving image tag.
 | `imagePullSecrets`                                | `[]`                               | Registry credentials for all NetBox workloads.                    |
 | `web.replicaCount`                                | `1`                                | Web Deployment replica count.                                     |
 | `web.workers`                                     | `3`                                | Granian worker processes per web pod.                             |
-| `web.requestTimeout`                              | `120`                              | Granian request timeout in seconds.                               |
 | `web.resources`                                   | See values                         | Web requests and limits.                                          |
 | `worker.enabled`                                  | `true`                             | Deploy RQ background workers.                                     |
 | `worker.replicaCount`                             | `1`                                | RQ worker replica count.                                          |
@@ -392,8 +415,9 @@ never uses a moving image tag.
 | `persistence.size`                                | `10Gi`                             | Media PVC capacity.                                               |
 | `persistence.existingClaim`                       | `""`                               | Existing media PVC.                                               |
 | `persistence.annotations`                         | `{}`                               | Additional media PVC annotations.                                 |
+| `containerPorts.http`                             | `8080`                             | Real Granian HTTP process listener.                               |
 | `service.type`                                    | `ClusterIP`                        | Kubernetes Service type.                                          |
-| `service.port`                                    | `80`                               | Service port mapped to NetBox 8080.                               |
+| `service.port`                                    | `80`                               | Independent Kubernetes Service-facing port.                       |
 | `service.annotations`                             | `{}`                               | Service annotations.                                              |
 | `service.ipFamilyPolicy`                          | `""`                               | Optional dual-stack policy.                                       |
 | `service.ipFamilies`                              | `[]`                               | Requested IP families.                                            |
@@ -410,7 +434,7 @@ never uses a moving image tag.
 | `metrics.serviceMonitor.interval`                 | `30s`                              | Metrics scrape interval.                                          |
 | `metrics.serviceMonitor.scrapeTimeout`            | `10s`                              | Metrics scrape timeout.                                           |
 | `networkPolicy.enabled`                           | `false`                            | Isolate web and worker pods.                                      |
-| `networkPolicy.ingressFrom`                       | `[]`                               | Allowed ingress peers; empty means release namespace only.        |
+| `networkPolicy.ingressFrom`                       | `[]`                               | Explicit HTTP peers; empty permits IPv4 and IPv6 clients.         |
 | `networkPolicy.egress.enabled`                    | `false`                            | Enforce egress isolation.                                         |
 | `networkPolicy.egress.allowDNS`                   | `true`                             | Allow CoreDNS.                                                    |
 | `networkPolicy.egress.extraEgress`                | `[]`                               | Explicit external-service and integration egress rules.           |

@@ -6126,6 +6126,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Application',
       fields: [
         {
+          label: 'Application HTTP port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '8080',
+          min: 1024,
+          max: 65535,
+          description: 'Configures the real Granian listener; service.port remains independent',
+        },
+        {
           label: 'Allowed Host',
           key: 'netbox.allowedHosts[0]',
           type: 'text',
