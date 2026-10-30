@@ -8,6 +8,139 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  rustfs: [
+    {
+      name: 'Storage topology',
+      fields: [
+        {
+          label: 'Architecture',
+          key: 'architecture',
+          type: 'select',
+          default: 'standalone',
+          options: ['standalone', 'distributed', 'cluster'],
+          description: 'Use one node or a four-or-more-member distributed StatefulSet',
+        },
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          min: 1,
+          max: 16,
+          description: 'Standalone requires 1; distributed and cluster require at least 4',
+        },
+        {
+          label: 'Persistent storage',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Create a retained data claim for every storage Pod',
+        },
+        {
+          label: 'Storage size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Requested capacity for each generated PVC',
+        },
+        {
+          label: 'Storage class',
+          key: 'persistence.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Leave empty for the cluster default StorageClass',
+        },
+      ],
+    },
+    {
+      name: 'Listeners and services',
+      fields: [
+        {
+          label: 'S3 API listener',
+          key: 'containerPorts.api',
+          type: 'number',
+          default: '9000',
+          min: 1,
+          max: 65535,
+          description: 'Real RustFS S3 API and internode RPC process port',
+        },
+        {
+          label: 'Console listener',
+          key: 'containerPorts.console',
+          type: 'number',
+          default: '9001',
+          min: 1,
+          max: 65535,
+          description: 'Real RustFS web console process port',
+        },
+        {
+          label: 'S3 Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '9000',
+          min: 1,
+          max: 65535,
+          description: 'Client-facing Service port, independent from the process listener',
+        },
+        {
+          label: 'Console Service port',
+          key: 'consoleService.port',
+          type: 'number',
+          default: '9001',
+          min: 1,
+          max: 65535,
+          description: 'Client-facing console Service port',
+        },
+        {
+          label: 'Web console',
+          key: 'config.consoleEnabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Enable the console listener and its dedicated Service',
+        },
+      ],
+    },
+    {
+      name: 'Production controls',
+      fields: [
+        {
+          label: 'Existing S3 credential Secret',
+          key: 'auth.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing the configured access-key and secret-key entries',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict S3, internode RPC and console ingress to declared peers',
+        },
+        {
+          label: 'PodDisruptionBudget',
+          key: 'pdb.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Limit voluntary disruptions without claiming storage quorum guarantees',
+        },
+        {
+          label: 'S3 API Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create an Ingress for the S3 API; host rules are still required',
+        },
+        {
+          label: 'Console Ingress',
+          key: 'consoleIngress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create a separate console Ingress; host rules are still required',
+        },
+      ],
+    },
+  ],
   docuseal: [
     {
       name: 'Application',
