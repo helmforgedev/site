@@ -507,7 +507,7 @@ export const charts: Chart[] = [
   {
     name: 'Automatisch',
     slug: 'automatisch',
-    description: 'Open-source workflow automation platform with PostgreSQL and Redis.',
+    description: 'Open-source workflow automation with dedicated web and worker processes, PostgreSQL, and Redis.',
     maturity: 'stable',
     backup: false,
   },
