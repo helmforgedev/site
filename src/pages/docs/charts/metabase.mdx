@@ -25,6 +25,18 @@ data source credentials) in a PostgreSQL database.
 - **Gateway API support** — optional HTTPRoute for Kubernetes-native traffic routing
 - **Dual-stack ready Service** — optional `ipFamilyPolicy` and `ipFamilies`
 - **External Secrets support** — ESO integration for the Metabase encryption key
+- **Secure runtime defaults** — non-root UID 2000, read-only root filesystem, dropped capabilities, and no API token
+- **Optional traffic and disruption controls** — NetworkPolicy and PodDisruptionBudget templates
+
+## Architecture
+
+The chart runs one Metabase Deployment behind a named-port Service. Application metadata is stored in either the
+bundled HelmForge PostgreSQL StatefulSet or an external PostgreSQL service; analytical source databases remain outside
+the release boundary. The application Secret supplies the stable encryption key, and the optional backup CronJob
+exports the PostgreSQL metadata database to S3-compatible storage.
+
+The application container runs as UID/GID `2000` with a read-only root filesystem. Bounded `emptyDir` volumes provide
+the only writable paths at `/plugins`, `/tmp`, and `/target`.
 
 ## Installation
 
@@ -197,18 +209,19 @@ ingress:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter          | Type   | Default | Description                            |
+| ------------------ | ------ | ------- | -------------------------------------- |
+| `nameOverride`     | string | `""`    | Override the chart name.               |
+| `fullnameOverride` | string | `""`    | Override the full release name.        |
+| `commonLabels`     | object | `{}`    | Extra labels added to all resources.   |
+| `global`           | object | `{}`    | Values shared with chart dependencies. |
 
 ### Image
 
 | Parameter          | Type   | Default                       | Description                          |
 | ------------------ | ------ | ----------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/metabase/metabase` | Metabase container image.            |
-| `image.tag`        | string | `"v0.64.1"`                   | Image tag.                           |
+| `image.tag`        | string | `"v0.64.2"`                   | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                          | Pull secrets for private registries. |
 
@@ -220,7 +233,7 @@ cluster must pull helper images from an internal registry or proxy.
 ```yaml
 image:
   repository: registry.example.com/proxy/metabase/metabase
-  tag: v0.64.1
+  tag: v0.64.2
 
 waitForDatabase:
   image:
@@ -249,9 +262,9 @@ waitForDatabase:
 | `metabase.extraEnv`            | array   | `[]`                    | Extra environment variables injected into the Metabase container.     |
 
 <Callout type="danger" title="Always set encryptionSecretKey">
-  If `metabase.encryptionSecretKey` is empty, Metabase auto-generates one at startup. If the pod is recreated without a
-  persistent key, **all saved data source credentials become unreadable** and must be re-entered manually. Always set an
-  explicit key or use `metabase.existingSecret`.
+  The chart generates an encryption key and reuses the existing Kubernetes Secret during connected Helm upgrades.
+  Offline rendering cannot perform that lookup. GitOps and production installations should use `metabase.existingSecret`
+  or set an explicit stable key, then back it up separately from PostgreSQL.
 </Callout>
 
 <Callout type="warning" title="JVM memory sizing">
@@ -281,6 +294,7 @@ waitForDatabase:
 | `database.external.password`                  | string | `""`       | Password for the external database (plain text — prefer secret). |
 | `database.external.existingSecret`            | string | `""`       | Existing secret containing the database password.                |
 | `database.external.existingSecretPasswordKey` | string | `password` | Key inside the existing secret for the password.                 |
+| `database.external.networkPolicyPeers`        | array  | `[]`       | Egress peers for the external metadata database.                 |
 
 ### Service
 
@@ -365,36 +379,39 @@ Metabase has a slow startup — the JVM initialization and database migrations c
 The backup CronJob runs `pg_dump` against the Metabase PostgreSQL metadata database and uploads the archive to
 S3-compatible storage. This protects dashboards, saved questions, users, and data source definitions.
 
-| Parameter                                   | Type    | Default                                | Description                                                        |
-| ------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------ |
-| `backup.enabled`                            | boolean | `false`                                | Enable scheduled S3 backup CronJob.                                |
-| `backup.schedule`                           | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                         |
-| `backup.suspend`                            | boolean | `false`                                | Suspend the CronJob without deleting it.                           |
-| `backup.concurrencyPolicy`                  | string  | `Forbid`                               | CronJob concurrency policy.                                        |
-| `backup.successfulJobsHistoryLimit`         | integer | `3`                                    | Number of successful Job records to keep.                          |
-| `backup.failedJobsHistoryLimit`             | integer | `3`                                    | Number of failed Job records to keep.                              |
-| `backup.backoffLimit`                       | integer | `1`                                    | Job retry limit.                                                   |
-| `backup.archivePrefix`                      | string  | `metabase`                             | Prefix for backup archive filenames.                               |
-| `backup.images.postgresql`                  | string  | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                                          |
-| `backup.images.uploader`                    | string  | `docker.io/helmforge/mc:1.0.0`         | Image used for S3 upload.                                          |
-| `backup.resources`                          | object  | `{}`                                   | Resources for backup containers.                                   |
-| `backup.s3.endpoint`                        | string  | `""`                                   | S3-compatible endpoint URL.                                        |
-| `backup.s3.bucket`                          | string  | `""`                                   | Target bucket name.                                                |
-| `backup.s3.prefix`                          | string  | `metabase`                             | Key prefix within the bucket.                                      |
-| `backup.s3.createBucketIfNotExists`         | boolean | `true`                                 | Create the bucket automatically if it does not exist.              |
-| `backup.s3.existingSecret`                  | string  | `""`                                   | Existing secret containing S3 access and secret keys.              |
-| `backup.s3.existingSecretAccessKeyKey`      | string  | `access-key`                           | Key in the existing secret for the S3 access key.                  |
-| `backup.s3.existingSecretSecretKeyKey`      | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.                  |
-| `backup.s3.accessKey`                       | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set).       |
-| `backup.s3.secretKey`                       | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set).       |
-| `backup.database.host`                      | string  | `""`                                   | Override database host for backup (uses app credentials if empty). |
-| `backup.database.port`                      | string  | `""`                                   | Override database port for backup.                                 |
-| `backup.database.name`                      | string  | `""`                                   | Override database name for backup.                                 |
-| `backup.database.username`                  | string  | `""`                                   | Override database username for backup.                             |
-| `backup.database.password`                  | string  | `""`                                   | Override database password for backup.                             |
-| `backup.database.existingSecret`            | string  | `""`                                   | Existing secret containing backup database credentials.            |
-| `backup.database.existingSecretPasswordKey` | string  | `password`                             | Key in the existing secret for the backup database password.       |
-| `backup.database.postgresDumpArgs`          | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
+| Parameter                                         | Type    | Default                                | Description                                                        |
+| ------------------------------------------------- | ------- | -------------------------------------- | ------------------------------------------------------------------ |
+| `backup.enabled`                                  | boolean | `false`                                | Enable scheduled S3 backup CronJob.                                |
+| `backup.schedule`                                 | string  | `"0 3 * * *"`                          | Cron schedule for backups.                                         |
+| `backup.suspend`                                  | boolean | `false`                                | Suspend the CronJob without deleting it.                           |
+| `backup.concurrencyPolicy`                        | string  | `Forbid`                               | CronJob concurrency policy.                                        |
+| `backup.successfulJobsHistoryLimit`               | integer | `3`                                    | Number of successful Job records to keep.                          |
+| `backup.failedJobsHistoryLimit`                   | integer | `3`                                    | Number of failed Job records to keep.                              |
+| `backup.backoffLimit`                             | integer | `1`                                    | Job retry limit.                                                   |
+| `backup.archivePrefix`                            | string  | `metabase`                             | Prefix for backup archive filenames.                               |
+| `backup.images.postgresql`                        | string  | `docker.io/library/postgres:18-alpine` | Image used for `pg_dump`.                                          |
+| `backup.images.uploader`                          | string  | `docker.io/helmforge/mc:1.0.0`         | Image used for S3 upload.                                          |
+| `backup.resources`                                | object  | `{}`                                   | Resources for backup containers.                                   |
+| `backup.podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault`                       | Backup pod seccomp profile.                                        |
+| `backup.securityContext.allowPrivilegeEscalation` | boolean | `false`                                | Block privilege escalation in backup containers.                   |
+| `backup.securityContext.capabilities.drop`        | array   | `[ALL]`                                | Drop Linux capabilities in backup containers.                      |
+| `backup.s3.endpoint`                              | string  | `""`                                   | S3-compatible endpoint URL.                                        |
+| `backup.s3.bucket`                                | string  | `""`                                   | Target bucket name.                                                |
+| `backup.s3.prefix`                                | string  | `metabase`                             | Key prefix within the bucket.                                      |
+| `backup.s3.createBucketIfNotExists`               | boolean | `true`                                 | Create the bucket automatically if it does not exist.              |
+| `backup.s3.existingSecret`                        | string  | `""`                                   | Existing secret containing S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey`            | string  | `access-key`                           | Key in the existing secret for the S3 access key.                  |
+| `backup.s3.existingSecretSecretKeyKey`            | string  | `secret-key`                           | Key in the existing secret for the S3 secret key.                  |
+| `backup.s3.accessKey`                             | string  | `""`                                   | Inline S3 access key (ignored when `existingSecret` is set).       |
+| `backup.s3.secretKey`                             | string  | `""`                                   | Inline S3 secret key (ignored when `existingSecret` is set).       |
+| `backup.database.host`                            | string  | `""`                                   | Override database host for backup (uses app credentials if empty). |
+| `backup.database.port`                            | string  | `""`                                   | Override database port for backup.                                 |
+| `backup.database.name`                            | string  | `""`                                   | Override database name for backup.                                 |
+| `backup.database.username`                        | string  | `""`                                   | Override database username for backup.                             |
+| `backup.database.password`                        | string  | `""`                                   | Override database password for backup.                             |
+| `backup.database.existingSecret`                  | string  | `""`                                   | Existing secret containing backup database credentials.            |
+| `backup.database.existingSecretPasswordKey`       | string  | `password`                             | Key in the existing secret for the backup database password.       |
+| `backup.database.postgresDumpArgs`                | string  | `""`                                   | Extra arguments passed to `pg_dump`.                               |
 
 ### External Secrets
 
@@ -430,19 +447,66 @@ externalSecrets:
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                     | Type    | Default          | Description                                   |
+| --------------------------------------------- | ------- | ---------------- | --------------------------------------------- |
+| `resources.requests.cpu`                      | string  | `250m`           | Application CPU request.                      |
+| `resources.requests.memory`                   | string  | `512Mi`          | Application memory request.                   |
+| `resources.limits.cpu`                        | string  | `1000m`          | Application CPU limit.                        |
+| `resources.limits.memory`                     | string  | `2Gi`            | Application memory limit.                     |
+| `podSecurityContext.runAsNonRoot`             | boolean | `true`           | Require a non-root runtime identity.          |
+| `podSecurityContext.runAsUser`                | integer | `2000`           | UID supported by the official image.          |
+| `podSecurityContext.runAsGroup`               | integer | `2000`           | Primary runtime group.                        |
+| `podSecurityContext.fsGroup`                  | integer | `2000`           | Writable volume group ownership.              |
+| `podSecurityContext.fsGroupChangePolicy`      | string  | `OnRootMismatch` | Avoid unnecessary ownership changes.          |
+| `podSecurityContext.seccompProfile.type`      | string  | `RuntimeDefault` | Apply the runtime's default seccomp profile.  |
+| `securityContext.allowPrivilegeEscalation`    | boolean | `false`          | Block privilege escalation.                   |
+| `securityContext.readOnlyRootFilesystem`      | boolean | `true`           | Make the root filesystem immutable.           |
+| `securityContext.capabilities.drop`           | array   | `[ALL]`          | Drop all Linux capabilities.                  |
+| `runtimeStorage.pluginsSizeLimit`             | string  | `512Mi`          | Limit the writable `/plugins` volume.         |
+| `runtimeStorage.tmpSizeLimit`                 | string  | `512Mi`          | Limit the writable `/tmp` volume.             |
+| `runtimeStorage.targetSizeLimit`              | string  | `256Mi`          | Limit the writable `/target` volume.          |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`          | Keep the Kubernetes API token out of the pod. |
+
+The reserved `runtime-plugins` volume can be mounted by `extraInitContainers` to install JDBC drivers without making
+the application root filesystem writable.
+
+An `extraVolumeMounts` entry at `/plugins`, `/tmp`, or `/target` replaces the corresponding chart-managed mount. The
+reserved `emptyDir` remains declared but unmounted, so its `runtimeStorage.*SizeLimit` no longer applies to that path.
+An `extraVolumes` entry named `runtime-plugins`, `runtime-tmp`, or `runtime-target` replaces the chart-managed volume
+with that name and remains safe for override mounts that reference the reserved name.
+
+### NetworkPolicy and PodDisruptionBudget
+
+`networkPolicy.enabled` adds ingress isolation. Same-namespace traffic is allowed by default; ingress controllers in
+other namespaces must be listed in `networkPolicy.ingress.extraFrom`. Enabling `networkPolicy.egress.enabled` also
+requires rules for every analytical database, SMTP server, webhook, and external API. Use
+`database.external.networkPolicyPeers` for an external metadata database and `networkPolicy.egress.extraEgress` for
+all other destinations.
+
+The optional `pdb.enabled` template serializes voluntary disruptions. It does not provide high availability for the
+single default application replica.
+
+| Parameter                                  | Type       | Default | Description                                     |
+| ------------------------------------------ | ---------- | ------- | ----------------------------------------------- |
+| `pdb.enabled`                              | boolean    | `false` | Render a PodDisruptionBudget.                   |
+| `pdb.minAvailable`                         | string/int | `""`    | Minimum available pods; takes precedence.       |
+| `pdb.maxUnavailable`                       | string/int | `1`     | Maximum unavailable pods when minimum is empty. |
+| `pdb.unhealthyPodEvictionPolicy`           | string     | `""`    | Optional unhealthy pod eviction policy.         |
+| `networkPolicy.enabled`                    | boolean    | `false` | Render ingress traffic isolation.               |
+| `networkPolicy.ingress.allowSameNamespace` | boolean    | `true`  | Allow callers in the release namespace.         |
+| `networkPolicy.ingress.extraFrom`          | array      | `[]`    | Additional ingress peers.                       |
+| `networkPolicy.egress.enabled`             | boolean    | `false` | Enforce outbound traffic isolation.             |
+| `networkPolicy.egress.allowDNS`            | boolean    | `true`  | Permit DNS when egress is enforced.             |
+| `networkPolicy.egress.extraEgress`         | array      | `[]`    | Complete rules for external destinations.       |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                         |
+| --------------------------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token.     |
 
 ### Scheduling
 
@@ -466,7 +530,7 @@ externalSecrets:
 | `extraInitContainers` | array | `[]`    | Additional init containers rendered after `wait-for-db`. |
 | `extraManifests`      | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
-## Common Issues
+## Troubleshooting
 
 <Callout type="danger" title="Pod stuck in CrashLoopBackOff — OOMKilled">
   Metabase is a JVM application and requires adequate memory. If the pod is killed without a clear error, check
@@ -487,6 +551,9 @@ externalSecrets:
 </Callout>
 
 ## Upgrade Notes
+
+Metabase `v0.64.2` is a patch release with analytics fixes and query optimizations. Back up the application database
+and preserve the encryption key before upgrading.
 
 Metabase v0.64.1 is the first public maintenance release in the 0.64 line. Back up the Metabase
 application database, keep the encryption key stable, and review the
