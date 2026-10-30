@@ -1102,6 +1102,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'false',
           description: 'Enable the private VNC maintenance Service',
         },
+        {
+          label: 'Disruption budget',
+          key: 'podDisruptionBudget.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Block voluntary eviction of the singleton; can stop node drains',
+        },
       ],
     },
     {
