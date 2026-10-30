@@ -228,7 +228,7 @@ extraManifests:
 | Parameter          | Type   | Default                            | Description                          |
 | ------------------ | ------ | ---------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/countly/countly-server` | Countly container image.             |
-| `image.tag`        | string | `"25.03.41"`                       | Image tag.                           |
+| `image.tag`        | string | `"25.05.4"`                        | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                     | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                               | Pull secrets for private registries. |
 
@@ -266,30 +266,32 @@ Used when `mongodb.enabled: false`.
 
 ### Backup
 
-| Parameter                              | Type    | Default                        | Description                                                  |
-| -------------------------------------- | ------- | ------------------------------ | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                        | Enable scheduled MongoDB S3 backup CronJob.                  |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                  | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                        | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                       | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                            | Number of successful Job records to keep.                    |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                            | Number of failed Job records to keep.                        |
-| `backup.backoffLimit`                  | integer | `1`                            | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `countly`                      | Prefix for backup archive filenames.                         |
-| `backup.images.mongodb`                | string  | `docker.io/library/mongo:8.0`  | Image for `mongodump`.                                       |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0` | Image for S3 upload.                                         |
-| `backup.resources`                     | object  | `{}`                           | Resources for backup containers.                             |
-| `backup.database.uri`                  | string  | `""`                           | Override MongoDB URI for backup (uses app URI if empty).     |
-| `backup.database.mongodumpArgs`        | string  | `""`                           | Extra arguments passed to `mongodump`.                       |
-| `backup.s3.endpoint`                   | string  | `""`                           | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                           | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `countly`                      | Key prefix within the bucket.                                |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                         | Create the bucket automatically if it does not exist.        |
-| `backup.s3.existingSecret`             | string  | `""`                           | Existing secret with S3 access and secret keys.              |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                   | Key in the existing secret for the S3 access key.            |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                   | Key in the existing secret for the S3 secret key.            |
-| `backup.s3.accessKey`                  | string  | `""`                           | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                           | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                              | Type    | Default                          | Description                                                  |
+| -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean | `false`                          | Enable scheduled MongoDB S3 backup CronJob.                  |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                              | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                              | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer | `1`                              | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string  | `countly`                        | Prefix for backup archive filenames.                         |
+| `backup.images.mongodb`                | string  | `docker.io/library/mongo:8.0.34` | Image for `mongodump`.                                       |
+| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image for S3 upload.                                         |
+| `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
+| `backup.database.uri`                  | string  | `""`                             | Override MongoDB URI for backup (uses app URI if empty).     |
+| `backup.database.existingSecret`       | string  | `""`                             | Existing Secret containing the backup MongoDB URI.           |
+| `backup.database.existingSecretUriKey` | string  | `mongodb-uri`                    | URI key in the backup MongoDB Secret.                        |
+| `backup.database.mongodumpArgs`        | array   | `[]`                             | Extra arguments passed without shell evaluation.             |
+| `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string  | `countly`                        | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string  | `""`                             | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
 
 ### Service
 
@@ -332,19 +334,28 @@ Used when `mongodb.enabled: false`.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter            | Type   | Default                 | Description                         |
+| -------------------- | ------ | ----------------------- | ----------------------------------- |
+| `resources`          | object | `{}`                    | CPU and memory requests and limits. |
+| `podSecurityContext` | object | RuntimeDefault          | Pod-level security context.         |
+| `securityContext`    | object | hardened root exception | Main container security context.    |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                         |
+| --------------------------------------------- | ------- | ------- | ----------------------------------- |
+| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.  |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.   |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount. |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token.       |
+
+### Network Policy
+
+| Parameter                   | Type    | Default | Description                                       |
+| --------------------------- | ------- | ------- | ------------------------------------------------- |
+| `networkPolicy.enabled`     | boolean | `true`  | Create an ingress and egress NetworkPolicy.       |
+| `networkPolicy.ingressFrom` | array   | `[]`    | Sources allowed to reach both Countly listeners.  |
+| `networkPolicy.egress`      | array   | `[{}]`  | Egress rules for MongoDB and plugin integrations. |
 
 ### Scheduling
 
@@ -366,6 +377,28 @@ Used when `mongodb.enabled: false`.
 | `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Security and Production Operations
+
+The chart disables Kubernetes API token mounting, applies
+`RuntimeDefault` seccomp, creates a NetworkPolicy, and runs the MongoDB wait
+and backup containers as non-root. The pinned upstream combined image starts
+`/sbin/my_init` as root and then drops the API and dashboard processes to the
+`countly` user. This upstream entrypoint constraint is why the main container
+does not force `runAsNonRoot` or a read-only root filesystem.
+
+For production:
+
+- keep MongoDB and S3 credentials in existing Secrets or External Secrets;
+- replace the permissive default egress with the exact MongoDB, DNS, mail,
+  webhook, push-provider, and plugin destinations you need;
+- expose the dashboard and SDK API only through TLS and apply edge controls;
+- use a replicated or managed MongoDB service and test a restore;
+- size ephemeral storage for one compressed backup archive;
+- verify both listeners after upgrades, especially when using custom ports.
+
+The default Ingress and HTTPRoute expose the dashboard only. SDK clients outside
+the cluster require a deliberate route or load balancer for `service.apiPort`.
 
 ## More Information
 
