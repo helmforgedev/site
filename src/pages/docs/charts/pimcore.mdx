@@ -413,6 +413,28 @@ deployment.
 
 ## Configuration reference
 
+### Application listeners
+
+The chart configures nginx, PHP-FPM, and Mercure process listeners separately from Kubernetes Service ports. Changing
+these values updates the rendered process configuration, container declarations, and applicable NetworkPolicy rules;
+named Service target ports preserve routing.
+
+```yaml
+containerPorts:
+  http: 18080
+  phpFpm: 19000
+  mercure: 13000
+```
+
+| Value                    | Default | Description                                                  |
+| ------------------------ | ------- | ------------------------------------------------------------ |
+| `containerPorts.http`    | `8080`  | nginx HTTP listener in the web pod.                          |
+| `containerPorts.phpFpm`  | `9000`  | PHP-FPM listener used by the colocated nginx sidecar.        |
+| `containerPorts.mercure` | `3000`  | Mercure listener configured through the image `SERVER_NAME`. |
+
+`service.port` remains the public web Service port and may differ from `containerPorts.http`. The internal Mercure
+Service remains on port `80` and targets the named Mercure container port.
+
 ### Naming
 
 | Value               | Default         | Description                                       |

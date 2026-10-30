@@ -5507,6 +5507,48 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Listeners',
+      collapsible: true,
+      fields: [
+        {
+          label: 'nginx HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          min: 1,
+          max: 65535,
+          default: '8080',
+          description: 'Actual nginx process listener',
+        },
+        {
+          label: 'PHP-FPM Port',
+          key: 'containerPorts.phpFpm',
+          type: 'number',
+          min: 1,
+          max: 65535,
+          default: '9000',
+          description: 'Actual PHP-FPM process listener',
+        },
+        {
+          label: 'Mercure Port',
+          key: 'containerPorts.mercure',
+          type: 'number',
+          min: 1,
+          max: 65535,
+          default: '3000',
+          description: 'Actual Mercure process listener',
+        },
+        {
+          label: 'Public Service Port',
+          key: 'service.port',
+          type: 'number',
+          min: 1,
+          max: 65535,
+          default: '80',
+          description: 'Stable Kubernetes Service port for web traffic',
+        },
+      ],
+    },
+    {
       name: 'Project bootstrap',
       fields: [
         {
