@@ -12,7 +12,7 @@ Deploy [NetBird](https://github.com/netbirdio/netbird) on Kubernetes as a self-h
 
 The HelmForge NetBird chart follows the current upstream combined self-hosted architecture:
 
-- `netbirdio/netbird-server:0.80.0` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
+- `netbirdio/netbird-server:0.81.3` for the management API, gRPC endpoint, signal, relay, metrics, health, and UDP STUN service
 - `netbirdio/dashboard:v2.90.10` for the web dashboard
 - Secret-backed `config.yaml`, either generated from values or supplied through `server.config.existingSecret`
 - HelmForge PostgreSQL subchart as the default production store
@@ -30,6 +30,7 @@ Server:
 - `server.replicaCount`: server pod count. Keep `1` with the default sqlite store.
 - `server.publicUrl`: externally reachable URL for dashboard, API, gRPC, signal, and relay traffic.
 - `server.authSecret`: shared server auth secret. Replace the default before production use.
+- `server.containerPorts.http`, `server.containerPorts.stun`, `server.containerPorts.metrics`, `server.containerPorts.health`: actual combined-server listeners. These are independent from Service-facing ports.
 - `server.disableAnonymousMetrics`, `server.disableGeoliteUpdate`: upstream telemetry and GeoLite controls.
 - `server.config.existingSecret`, `server.config.existingSecretKey`, `server.config.extraYaml`: generated or externally supplied `config.yaml`.
 - `server.auth.issuer`, `server.auth.localAuthDisabled`, `server.auth.signKeyRefreshEnabled`: embedded or external OIDC settings.
@@ -51,6 +52,7 @@ Dashboard:
 - `dashboard.enabled`: deploy the dashboard UI.
 - `dashboard.image.repository`, `dashboard.image.tag`, `dashboard.image.pullPolicy`: official pinned dashboard image.
 - `dashboard.replicaCount`: dashboard pod count.
+- `dashboard.containerPorts.http`: actual dashboard nginx listener. The chart rewrites the upstream nginx configuration when this differs from `80`.
 - `dashboard.auth.clientId`, `dashboard.auth.audience`, `dashboard.auth.supportedScopes`: dashboard OIDC identity and scopes.
 - `dashboard.auth.redirectUri`, `dashboard.auth.silentRedirectUri`: interactive and silent dashboard callbacks.
 - `dashboard.auth.tokenSource`, `dashboard.auth.useAuth0`: dashboard token and provider mode.
@@ -60,16 +62,45 @@ Dashboard:
 Shared operations:
 
 - `imagePullSecrets`, `commonLabels`, `nameOverride`, `fullnameOverride`.
-- `persistence.enabled`, `persistence.size`, `persistence.storageClass`, `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`.
+- `persistence.enabled`, `persistence.size`, `persistence.storageClass`, `persistence.accessModes`, `persistence.existingClaim`, `persistence.mountPath`, `persistence.emptyDirSizeLimit`.
 - `serviceAccount.create`, `serviceAccount.name`, `serviceAccount.annotations`, `serviceAccount.automountServiceAccountToken`.
 - `ingress.enabled`, `ingress.ingressClassName`, `ingress.annotations`, `ingress.hosts`, `ingress.tls`.
 - `gatewayAPI.enabled`, `gatewayAPI.httpRoutes`.
 - `externalSecrets.enabled`, `externalSecrets.items`.
-- `pdb.enabled`, `pdb.minAvailable`.
-- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.extraEgress`.
-- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `pdb.enabled`, `pdb.minAvailable`, `pdb.maxUnavailable`.
+- `networkPolicy.enabled`, `networkPolicy.ingressFrom`, `networkPolicy.stunIngressFrom`, `networkPolicy.extraEgress`.
+- `resources`, `runtimeStorage`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
 - `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+### Process Ports and Runtime Safeguards
+
+Process listeners are separate from Service-facing ports. Changing a `server.containerPorts` value updates the NetBird
+listener when the chart generates `config.yaml`. When `server.config.existingSecret` supplies that file, set the matching
+listener port in the Secret. `dashboard.containerPorts.http` updates the nginx listener. Named Service target ports keep
+routing synchronized with the pod declaration. STUN is the exception: `server.service.stunPort` must equal
+`server.containerPorts.stun` because NetBird advertises that listener port directly to peers.
+
+| Parameter                           | Type    | Default | Description                                                      |
+| ----------------------------------- | ------- | ------- | ---------------------------------------------------------------- |
+| `server.containerPorts.http`        | integer | `80`    | Combined server HTTP and gRPC listener.                          |
+| `server.containerPorts.stun`        | integer | `3478`  | Combined server UDP STUN listener.                               |
+| `server.containerPorts.metrics`     | integer | `9090`  | Combined server Prometheus listener.                             |
+| `server.containerPorts.health`      | integer | `9000`  | Combined server health listener.                                 |
+| `dashboard.containerPorts.http`     | integer | `80`    | Dashboard nginx listener.                                        |
+| `persistence.emptyDirSizeLimit`     | string  | `1Gi`   | Server data limit when persistent storage is disabled.           |
+| `runtimeStorage.nginxVarSizeLimit`  | string  | `32Mi`  | Dashboard `/var/lib/nginx` ephemeral-storage limit.              |
+| `runtimeStorage.nginxLogsSizeLimit` | string  | `64Mi`  | Dashboard `/var/log/nginx` ephemeral-storage limit.              |
+| `runtimeStorage.nginxTmpSizeLimit`  | string  | `64Mi`  | Dashboard `/var/cache/nginx` ephemeral-storage limit.            |
+| `runtimeStorage.nginxRunSizeLimit`  | string  | `8Mi`   | Dashboard `/run` ephemeral-storage limit.                        |
+| `resources.requests.cpu`            | string  | `50m`   | Default CPU request for each application container.              |
+| `resources.requests.memory`         | string  | `64Mi`  | Default memory request for each application container.           |
+| `resources.limits.cpu`              | string  | `500m`  | Default CPU limit for each application container.                |
+| `resources.limits.memory`           | string  | `256Mi` | Default memory limit for each application container.             |
+| `pdb.enabled`                       | boolean | `false` | Render disruption budgets for the server and dashboard.          |
+| `pdb.minAvailable`                  | integer | `1`     | Minimum available pods when disruption budgets are enabled.      |
+| `pdb.maxUnavailable`                | integer | `null`  | Alternative maximum unavailable pods; mutually exclusive above.  |
+| `networkPolicy.stunIngressFrom`     | array   | `[]`    | Optional direct UDP STUN peers, separate from HTTP-facing peers. |
 
 ## Installation
 
@@ -186,6 +217,19 @@ network. The chart's existing TCP probe policy is unchanged.
 
 ## Upgrade Notes
 
+NetBird `0.81.3` is the current server default. This release contains upstream features, bug fixes, and stability
+improvements without a chart value migration. Review the
+[0.81.3 release](https://github.com/netbirdio/netbird/releases/tag/v0.81.3), back up the configured database, config
+Secret, and `/var/lib/netbird`, then validate peer enrollment, routes, OIDC, relay, and STUN in staging.
+
+The chart now supports independent process and Service ports. `server.containerPorts.*` updates the generated NetBird
+configuration and pod listeners, while `dashboard.containerPorts.http` updates nginx before startup. Service ports
+remain stable unless changed separately. The defaults are unchanged. Resource requests and limits plus bounded
+ephemeral storage are now enabled by default; review those limits against observed production usage.
+
+The PostgreSQL dependency moves from `2.1.0` to `2.1.1`. Existing database credentials and persistent volumes remain
+unchanged.
+
 NetBird `0.80.0` strengthens account boundaries for agent-network gateways and
 proxy clusters, rejects IdP redirects, revokes embedded IdP sessions after
 password changes, and adds upload and reverse-proxy rate limiting. Management
@@ -231,7 +275,7 @@ helm upgrade netbird helmforge/netbird \
 ```
 
 Using `--reuse-values` alone retains the previous image tag and does not deploy
-NetBird `0.80.0`.
+NetBird `0.81.3`.
 
 This v1 hardening release changes the default store from sqlite to PostgreSQL
 subchart mode. Existing sqlite installs that want to keep sqlite must preserve
