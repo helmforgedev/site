@@ -7682,6 +7682,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '2', description: 'Proxy pod count' },
         {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '4180',
+          min: 1,
+          max: 65535,
+          description: 'Real OAuth2 Proxy HTTP listener and pod port',
+        },
+        {
           label: 'Provider',
           key: 'config.provider',
           type: 'text',
