@@ -94,6 +94,10 @@ Runtime flow:
 4. The machine-learning service stores model files on its own cache volume.
 5. Optional External Secrets wire external database or cache credentials.
 
+Bundled dependencies are pinned to HelmForge PostgreSQL `2.1.1` and Redis
+`3.1.0`. The PostgreSQL chart keeps the Immich VectorChord image override, and
+the Redis chart is exposed to the application under the `valkey` alias.
+
 ## Production Values
 
 Use durable uploads, durable dependencies, stable credentials, and explicit routing:
@@ -217,6 +221,31 @@ Back up at least:
 The cache is usually rebuildable, but persistent cache storage can reduce cold-start impact. Do not treat the cache as
 the source of truth for photos or videos.
 
+## Security And Observability
+
+The server and machine-learning pods disable ServiceAccount token automounting,
+drop Linux capabilities, prevent privilege escalation, and use the
+RuntimeDefault seccomp profile. Credentials should be supplied through existing
+Secrets or External Secrets in production. NetworkPolicy is opt-in; its
+compatibility defaults allow namespace ingress and unrestricted egress, so
+replace those rules with workload-specific selectors before using it as a
+security boundary.
+
+Readiness and liveness probes cover both application workloads, and the Helm
+test checks Service reachability. The chart emits structured server logs but
+does not create ServiceMonitor, PodMonitor, PrometheusRule, log collector, or
+alerting resources. Monitor restarts, probe failures, PVC capacity, PostgreSQL
+health, queue backlog, and migration failures through the platform
+observability stack.
+
+Known operational limits:
+
+- Bundled PostgreSQL is single-instance; use an external service for HA or
+  cross-region recovery.
+- Scaling server or machine-learning replicas requires ReadWriteMany storage.
+- External database extension management, backup jobs, and restore
+  orchestration remain operator responsibilities.
+
 ### Extra Server Volumes
 
 Mount additional ConfigMaps, Secrets, or PVCs into the Immich server container with `extraVolumes` and
@@ -274,6 +303,7 @@ test library.
 | `machineLearning.enabled`   | `true`                             | Deploy the machine learning service.      |
 | `postgresql.enabled`        | `true`                             | Deploy HelmForge PostgreSQL dependency.   |
 | `valkey.internal.enabled`   | `true`                             | Deploy Redis-compatible cache dependency. |
+| `service.targetPort`        | `2283`                             | Immich process and Service target port.   |
 | `database.external.host`    | `""`                               | External PostgreSQL hostname.             |
 | `service.ipFamilyPolicy`    | `null`                             | Optional Service dual-stack policy.       |
 | `ingress.enabled`           | `false`                            | Render Ingress.                           |
