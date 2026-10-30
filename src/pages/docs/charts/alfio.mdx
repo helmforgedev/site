@@ -13,10 +13,10 @@ Open-source event management and ticketing platform. alf.io handles event creati
 online ticket sales, payment gateway integration, attendee management, and QR code-based check-in. Built with
 Spring Boot and PostgreSQL.
 
-<Callout type="danger" title="Change profiles to spring-boot for production">
-  The default `alfio.profiles` value is `dev`. The `dev` Spring profile enables development-mode settings including
-  verbose logging and relaxed security checks. Always set `alfio.profiles: spring-boot` for any non-development
-  deployment before going live.
+<Callout type="warning" title="Security and profile default changed">
+  Chart releases containing alf.io `2.0-M5-2609` include upstream authorization and SSRF security fixes and change
+  `alfio.profiles` from `dev` to the upstream container default, `jdbc-session`. The image launcher activates
+  `spring-boot` automatically. Review custom profile overrides before upgrading and never enable `dev` in production.
 </Callout>
 
 ## Key Features
@@ -60,7 +60,6 @@ helm install alfio oci://ghcr.io/helmforgedev/helm/alfio
 # values.yaml — Production alf.io with PostgreSQL and TLS
 alfio:
   baseUrl: 'https://tickets.example.com'
-  profiles: 'spring-boot'
 
 postgresql:
   enabled: true
@@ -99,7 +98,6 @@ ingress:
 # values.yaml — alf.io with external PostgreSQL
 alfio:
   baseUrl: 'https://tickets.example.com'
-  profiles: 'spring-boot'
 
 postgresql:
   enabled: false
@@ -131,7 +129,6 @@ ingress:
 # values.yaml — alf.io with Stripe payment integration
 alfio:
   baseUrl: 'https://tickets.example.com'
-  profiles: 'spring-boot'
   extraEnv:
     # Stripe integration
     - name: STRIPE_SECRET_KEY
@@ -193,17 +190,18 @@ ingress:
 | Parameter          | Type   | Default                  | Description                          |
 | ------------------ | ------ | ------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/alfio/alf.io` | alf.io container image.              |
-| `image.tag`        | string | `"2.0-M5-2606"`          | Image tag.                           |
+| `image.tag`        | string | `"2.0-M5-2609"`          | Pinned alf.io image tag.             |
 | `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
 
 ### alf.io Configuration
 
-| Parameter        | Type   | Default | Description                                                                  |
-| ---------------- | ------ | ------- | ---------------------------------------------------------------------------- |
-| `alfio.baseUrl`  | string | `""`    | Public URL of the alf.io instance (e.g. `https://tickets.example.com`).      |
-| `alfio.profiles` | string | `dev`   | Spring profiles to activate. Use `spring-boot` for production.               |
-| `alfio.extraEnv` | array  | `[]`    | Extra environment variables for payment gateways and advanced configuration. |
+| Parameter             | Type    | Default        | Description                                                                  |
+| --------------------- | ------- | -------------- | ---------------------------------------------------------------------------- |
+| `alfio.containerPort` | integer | `8080`         | Port used by the actual Spring Boot listener.                                |
+| `alfio.baseUrl`       | string  | `""`           | Public URL of the alf.io instance (e.g. `https://tickets.example.com`).      |
+| `alfio.profiles`      | string  | `jdbc-session` | Additional Spring profiles; the launcher activates `spring-boot`.            |
+| `alfio.extraEnv`      | array   | `[]`           | Extra environment variables for payment gateways and advanced configuration. |
 
 <Callout type="warning" title="baseUrl affects QR codes on issued tickets">
   alf.io embeds `baseUrl` in the QR codes printed on tickets. If this value is incorrect, attendees who have already
@@ -247,6 +245,9 @@ ingress:
 | `service.port`        | integer | `80`        | Service port exposed to the cluster. |
 | `service.annotations` | object  | `{}`        | Annotations for the Service.         |
 
+`service.port` is independent from `alfio.containerPort`. The Service targets
+the named `http` port, while `SERVER_PORT` configures the actual process.
+
 ### Ingress
 
 | Parameter                  | Type    | Default   | Description                                              |
@@ -281,19 +282,35 @@ Probes use the `/healthz` endpoint.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                                        |
-| -------------------- | ------ | ------- | -------------------------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. Min 512Mi RAM. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.                        |
-| `securityContext`    | object | `{}`    | Container-level security context.                  |
+| Parameter            | Type   | Default                                      | Description                                        |
+| -------------------- | ------ | -------------------------------------------- | -------------------------------------------------- |
+| `resources`          | object | `{}`                                         | CPU and memory requests and limits. Min 512Mi RAM. |
+| `podSecurityContext` | object | `seccompProfile.type: RuntimeDefault`        | Pod-level security context.                        |
+| `securityContext`    | object | non-root, read-only, no privilege escalation | Container-level security context.                  |
+
+The application runs as UID/GID `1001`, drops all capabilities, uses a
+read-only root filesystem with an ephemeral `/tmp`, and does not receive a
+Kubernetes API token. These defaults are validated against the official image.
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                              |
+| --------------------------------------------- | ------- | ------- | ---------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.       |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.        |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.      |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token in the pod. |
+
+### Network Policy
+
+| Parameter                    | Type    | Default | Description                                          |
+| ---------------------------- | ------- | ------- | ---------------------------------------------------- |
+| `networkPolicy.enabled`      | boolean | `true`  | Restrict inbound traffic to the named HTTP listener. |
+| `networkPolicy.extraIngress` | array   | `[]`    | Additional inbound rules.                            |
+
+The chart does not restrict egress because alf.io can contact payment, email,
+webhook, and external database endpoints. Add a platform policy when those
+destinations are known. NetworkPolicy requires support from the cluster CNI.
 
 ### Scheduling
 
@@ -319,9 +336,9 @@ Probes use the `/healthz` endpoint.
 ## Common Issues
 
 <Callout type="danger" title="Application using dev profile in production">
-  If `alfio.profiles` is left as `dev` in production, the application logs excessively, may expose stack traces in error
-  responses, and can have relaxed security settings. Always set `alfio.profiles: spring-boot` before any event goes live
-  or any tickets are sold.
+  The chart no longer enables `dev` by default. If an existing values file explicitly sets `alfio.profiles: dev`, remove
+  that override before any event goes live or tickets are sold. Use `jdbc-session` unless upstream documentation
+  requires another additional profile.
 </Callout>
 
 <Callout type="tip" title="Enable HTTPS before processing payments">
