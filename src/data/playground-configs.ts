@@ -8181,6 +8181,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'OpenCut pod count' },
         {
+          label: 'HTTP Container Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '3000',
+          description: 'OpenCut process HTTP listener',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'OpenCut Kubernetes Service port',
+        },
+        {
           label: 'PostgreSQL Subchart',
           key: 'postgresql.enabled',
           type: 'toggle',
@@ -8193,6 +8207,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'true',
           description: 'Deploy HelmForge Redis',
+        },
+        {
+          label: 'Redis HTTP Container Port',
+          key: 'redisHttp.containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Redis HTTP bridge process listener',
+        },
+        {
+          label: 'Redis HTTP Service Port',
+          key: 'redisHttp.service.port',
+          type: 'number',
+          default: '80',
+          description: 'Redis HTTP bridge Kubernetes Service port',
         },
       ],
     },

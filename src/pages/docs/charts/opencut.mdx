@@ -56,7 +56,11 @@ database:
     host: postgres.example.com
     existingSecret: opencut-db
 redisHttp:
-  externalUrl: http://redis-http.example.com
+  enabled: false
+  external:
+    url: https://redis-http.example.com
+    existingSecret: opencut-redis-rest
+    existingSecretTokenKey: token
 ```
 
 ## Operations
@@ -156,7 +160,29 @@ redis:
 ```
 
 Keep the Redis HTTP bridge enabled unless your deployment provides a compatible external bridge through
-`redisHttp.externalUrl`.
+`redisHttp.external.url` and a token through `redisHttp.external.existingSecret`.
+
+## Process And Service Ports
+
+OpenCut and its Redis HTTP bridge keep their process listeners independent from
+their Kubernetes Service ports:
+
+```yaml
+containerPorts:
+  http: 3080
+service:
+  port: 9080
+
+redisHttp:
+  containerPorts:
+    http: 8080
+  service:
+    port: 9081
+```
+
+The chart sets OpenCut `PORT` and bridge `SRH_PORT` from these values. Services
+continue to target the named `http` ports, so changing a Service port alone does
+not reconfigure either process.
 
 ## Networking And Scaling
 
@@ -225,30 +251,34 @@ reachable from the OpenCut pod.
 
 ## Common Issues
 
-| Symptom                                  | Likely Cause                                   | Fix                                                         |
-| ---------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
-| Login or callbacks use the wrong URL     | `opencut.siteUrl` does not match public route  | Set the exact external HTTPS URL.                           |
-| App starts before dependencies are ready | External DB/Redis DNS or credentials are wrong | Check connection Secrets and service reachability.          |
-| Redis HTTP bridge errors                 | Bridge disabled or external URL wrong          | Keep `redisHttp.enabled=true` or set a valid `externalUrl`. |
-| Sessions break after redeploy            | Auth secret changed                            | Store `betterAuthSecret` in a stable Secret.                |
+| Symptom                                  | Likely Cause                                   | Fix                                                                      |
+| ---------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| Login or callbacks use the wrong URL     | `opencut.siteUrl` does not match public route  | Set the exact external HTTPS URL.                                        |
+| App starts before dependencies are ready | External DB/Redis DNS or credentials are wrong | Check connection Secrets and service reachability.                       |
+| Redis HTTP bridge errors                 | Bridge disabled or external URL wrong          | Keep `redisHttp.enabled=true` or set `redisHttp.external.url` and token. |
+| Sessions break after redeploy            | Auth secret changed                            | Store `betterAuthSecret` in a stable Secret.                             |
 
 <a id="values"></a>
 
 ## Values
 
-| Parameter                   | Default                       | Description                                          |
-| --------------------------- | ----------------------------- | ---------------------------------------------------- |
-| `replicaCount`              | `1`                           | Number of OpenCut pods when autoscaling is disabled. |
-| `image.repository`          | `docker.io/helmforge/opencut` | HelmForge OpenCut image.                             |
-| `postgresql.enabled`        | `true`                        | Deploy HelmForge PostgreSQL dependency.              |
-| `redis.enabled`             | `true`                        | Deploy HelmForge Redis dependency.                   |
-| `database.external.host`    | `""`                          | External PostgreSQL host.                            |
-| `redisHttp.enabled`         | `true`                        | Deploy Redis-over-HTTP bridge.                       |
-| `service.ipFamilyPolicy`    | `null`                        | Optional Service dual-stack policy.                  |
-| `ingress.enabled`           | `false`                       | Render Ingress.                                      |
-| `gateway.enabled`           | `false`                       | Render Gateway API HTTPRoute.                        |
-| `networkPolicy.extraEgress` | `[]`                          | Append full custom web egress rules.                 |
-| `externalSecrets.enabled`   | `false`                       | Render ExternalSecret resources.                     |
+| Parameter                       | Default                       | Description                                          |
+| ------------------------------- | ----------------------------- | ---------------------------------------------------- |
+| `replicaCount`                  | `1`                           | Number of OpenCut pods when autoscaling is disabled. |
+| `image.repository`              | `docker.io/helmforge/opencut` | HelmForge OpenCut image.                             |
+| `containerPorts.http`           | `3000`                        | OpenCut process HTTP listener (`PORT`).              |
+| `service.port`                  | `80`                          | OpenCut Service port.                                |
+| `postgresql.enabled`            | `true`                        | Deploy HelmForge PostgreSQL dependency.              |
+| `redis.enabled`                 | `true`                        | Deploy HelmForge Redis dependency.                   |
+| `database.external.host`        | `""`                          | External PostgreSQL host.                            |
+| `redisHttp.enabled`             | `true`                        | Deploy Redis-over-HTTP bridge.                       |
+| `redisHttp.containerPorts.http` | `80`                          | Redis HTTP bridge process listener (`SRH_PORT`).     |
+| `redisHttp.service.port`        | `80`                          | Redis HTTP bridge Service port.                      |
+| `service.ipFamilyPolicy`        | `null`                        | Optional Service dual-stack policy.                  |
+| `ingress.enabled`               | `false`                       | Render Ingress.                                      |
+| `gateway.enabled`               | `false`                       | Render Gateway API HTTPRoute.                        |
+| `networkPolicy.extraEgress`     | `[]`                          | Append full custom web egress rules.                 |
+| `externalSecrets.enabled`       | `false`                       | Render ExternalSecret resources.                     |
 
 ## Links
 
