@@ -15,7 +15,7 @@ client-level settings, and optional multi-instance synchronization.
 
 <Callout type="info" title="Two deployment modes: wizard (default) vs pre-configured — each uses a different web UI port">
   - **Wizard mode** (`config.adGuardHome: {}`): AdGuard Home starts on **port 3000** for the
-    initial setup wizard. After completing setup, the UI moves to port 80.
+    initial setup wizard and remains on that listener after setup, keeping the Service target stable.
   - **Pre-configured mode** (`config.adGuardHome` populated): Setup wizard is skipped entirely.
     The UI starts directly on **port 80**, ready for production use.
 
@@ -64,7 +64,7 @@ helm install adguard-home oci://ghcr.io/helmforgedev/helm/adguard-home -f values
 ```yaml
 # values.yaml — AdGuard Home in wizard mode (default)
 # Web UI starts on port 3000 for first-time setup
-# After wizard completion, UI moves to port 80
+# The chart keeps the listener on port 3000 after setup
 
 service:
   dns:
@@ -287,6 +287,22 @@ ingress:
 | `config.adGuardHome`    | object | `{}`    | Pre-seed config rendered as `AdGuardHome.yaml`. Empty = wizard mode.       |
 | `config.existingSecret` | string | `""`    | Existing secret with `AdGuardHome.yaml` content (key: `AdGuardHome.yaml`). |
 
+### Application Listeners
+
+| Parameter              | Type    | Default | Description                                                  |
+| ---------------------- | ------- | ------- | ------------------------------------------------------------ |
+| `containerPorts.setup` | integer | `3000`  | Wizard listener passed to AdGuard Home through `--web-addr`. |
+| `containerPorts.http`  | integer | `80`    | Configured admin UI listener passed through `--web-addr`.    |
+| `containerPorts.dns`   | integer | `53`    | DNS listener written into chart-managed `AdGuardHome.yaml`.  |
+
+Application listeners and public Service ports are independent. Services target named Pod ports,
+so `service.web.port` and `service.dns.port` can differ from the process listeners. When using
+`config.existingSecret` or an already initialized configuration PVC, ensure its `dns.port` matches
+`containerPorts.dns`; Helm cannot inspect or rewrite that persisted configuration.
+In wizard mode, select `containerPorts.dns` as the DNS listener before completing
+setup. The wizard otherwise proposes port `53`, which will not match a custom
+Service target.
+
 <Callout type="tip" title="Generate bcrypt password hashes for config.adGuardHome.users">
   AdGuard Home requires bcrypt-hashed passwords in the configuration file. Generate with:
 
@@ -324,6 +340,19 @@ Use the output (starting with `$2y$10$...`) as the `password` value.
 When `securityContext.runAsUser` or `podSecurityContext.runAsUser` is configured for a non-root runtime, pre-seed `AdGuardHome.yaml` with
 `config.adGuardHome` or `config.existingSecret`. The interactive setup wizard requires administrator privileges on first launch;
 pre-seeded mode runs with non-root UID and `podSecurityContext.fsGroup`.
+
+Kubernetes API token automount is disabled by default for the server, sync, and backup workloads.
+The optional NetworkPolicy admits only the active web and DNS listener ports. An empty
+`networkPolicy.ingressFrom` preserves access from all sources, including external DNS clients;
+set explicit peers to restrict sources. Egress remains unrestricted unless `extraEgress` is non-empty.
+
+| Parameter                                     | Type    | Default | Description                                                |
+| --------------------------------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into chart workloads.         |
+| `networkPolicy.enabled`                       | boolean | `false` | Render the server NetworkPolicy.                           |
+| `networkPolicy.ingressFrom`                   | array   | `[]`    | Optional peers allowed to reach the declared listeners.    |
+| `networkPolicy.extraIngress`                  | array   | `[]`    | Additional complete ingress rules.                         |
+| `networkPolicy.extraEgress`                   | array   | `[]`    | Complete egress rules; non-empty enables egress isolation. |
 
 ### Services
 
