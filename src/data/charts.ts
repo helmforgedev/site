@@ -782,7 +782,8 @@ export const charts: Chart[] = [
   {
     name: 'Open WebUI',
     slug: 'open-webui',
-    description: 'Self-hosted AI chat platform with Ollama/OpenAI, RAG, PostgreSQL, and Redis.',
+    description:
+      'Self-hosted AI chat with Ollama/OpenAI, safe datastore modes, secret-backed Redis, NetworkPolicy, and S3 backup.',
     maturity: 'stable',
     backup: true,
   },
