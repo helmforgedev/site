@@ -40,7 +40,7 @@ presets, and automated gravity database management.
 - **Prometheus metrics** — `pihole-exporter` sidecar with ServiceMonitor
 - **S3 backup** — gravity.db, custom DNS records, and dnsmasq config
 - **Immutable images** — Pi-hole, sidecars, and backup helpers are pinned by tag and digest
-- **Configurable listeners** — DNS and web container ports configure Pi-hole FTL end to end
+- **Configurable listeners** — DNS and primary HTTP ports configure Pi-hole FTL end to end, with full IPv4, IPv6, HTTP, and HTTPS web listener support
 - **Default ingress policy** — NetworkPolicy limits pod ingress to the enabled service ports
 
 ## Security Scan
@@ -346,7 +346,8 @@ identity, so a tag-only override does not select a different image.
 | `serviceDns.type`           | string  | `LoadBalancer` | DNS service type. Use `LoadBalancer` for external network exposure.             |
 | `serviceDns.loadBalancerIP` | string  | —              | **Fixed IP for the DNS service.** Reserve before deploying and never change.    |
 | `containerPorts.dns`        | integer | `53`           | Pi-hole FTL DNS listener for both TCP and UDP.                                  |
-| `containerPorts.http`       | integer | `80`           | Pi-hole FTL web listener.                                                       |
+| `containerPorts.http`       | integer | `80`           | Primary FTL HTTP listener used by the Service, probes, and metrics.             |
+| `pihole.webserverPort`      | string  | `""`           | Full FTL web listener value; empty derives from `containerPorts.http`.          |
 | `serviceWeb.type`           | string  | `ClusterIP`    | Web admin service type.                                                         |
 | `ingress.enabled`           | boolean | `false`        | Enable Ingress for the web admin interface.                                     |
 | `hostNetwork`               | boolean | `false`        | Use host network stack. Required for DHCP.                                      |
@@ -385,8 +386,19 @@ When `dhcp.hostNetwork: true`, NetworkPolicy enforcement for the pod's host-netw
 on the cluster network plugin. Verify that behavior in the target cluster and use node firewall or other
 node-level controls when access to those listeners must be restricted.
 
-`containerPorts.dns` and `containerPorts.http` change the actual Pi-hole FTL listeners. Service ports remain an
-independent cluster-facing contract, and each Service targets the named container port.
+`containerPorts.dns` changes the actual Pi-hole FTL DNS listener. `containerPorts.http` is the primary
+unencrypted FTL web listener targeted by the Web Service, HTTP probes, and metrics exporter. For multiple IPv4,
+IPv6, HTTP, or HTTPS listeners, set `pihole.webserverPort` to the complete FTL value and include
+`containerPorts.http` as an unencrypted listener:
+
+```yaml
+containerPorts:
+  http: 9090
+pihole:
+  webserverPort: '9090o,[::]:9090o,9091os,[::]:9091os'
+```
+
+Service ports remain an independent cluster-facing contract, and each Service targets the named container port.
 
 ### Gravity and Unbound
 
@@ -434,6 +446,12 @@ Secret passwords from appearing in shell traces and makes FTL and release
 downloads fail closed. Back up `/etc/pihole` and `/etc/dnsmasq.d`, review the
 upstream release notes, and verify DNS, admin login, gravity updates, and any
 DHCP workflow after upgrading production deployments.
+
+Chart 2.2.0 changed `securityContext.capabilities` to drop all capabilities before adding the complete set required
+by the official image. Helm replaces custom arrays during upgrades. Remove any
+`securityContext.capabilities.add` override copied from chart 2.1.x before upgrading, or it will replace the new
+required defaults and prevent Pi-hole from starting. The chart automatically adds `NET_ADMIN` when
+`dhcp.enabled: true`.
 
 ## More Information
 
