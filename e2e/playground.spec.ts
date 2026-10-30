@@ -430,8 +430,22 @@ test.describe('Playground', () => {
     await expect(page.locator('input[data-field-key="storage.s3.existingSecret"]')).toHaveValue('');
     await expect(page.locator('#playground-code')).not.toContainText('storage.s3.existingSecret');
 
-    await page.locator('.playground-scenario-btn:has-text("Application HA")').click();
+    const listenerPort = page.locator('input[data-field-key="museum.containerPorts.http"]');
     const code = page.locator('#playground-code');
+    await listenerPort.fill('2112');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
+    await expect(code).not.toContainText('museum.containerPorts.http=2112');
+    await listenerPort.fill('65536');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
+    await expect(code).not.toContainText('museum.containerPorts.http=65536');
+    await listenerPort.fill('18080.5');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'true');
+    await expect(code).not.toContainText('museum.containerPorts.http=18080.5');
+    await listenerPort.fill('18080');
+    await expect(listenerPort).toHaveAttribute('aria-invalid', 'false');
+    await expect(code).toContainText('museum.containerPorts.http=18080');
+
+    await page.locator('.playground-scenario-btn:has-text("Application HA")').click();
     await expect(code).toContainText('museum.api.replicaCount=3');
     await expect(code).toContainText('museum.api.skipBackgroundJobs=true');
     await expect(code).toContainText('museum.worker.enabled=true');

@@ -50,7 +50,8 @@ topology, and validates insecure production placeholders before installation.
 
 Ente has four durable or runtime responsibilities:
 
-1. Museum serves the API on port 8080 and Prometheus metrics on port 2112.
+1. Museum serves the API on a configurable listener that defaults to 8080 and
+   Prometheus metrics on the upstream-fixed port 2112.
 2. The web image serves separate static applications on ports 3000 through 3010.
 3. PostgreSQL stores account metadata, encryption metadata, and application
    state.
@@ -88,6 +89,32 @@ The chart intentionally does not set `ENVIRONMENT=production`. Upstream's
 production configuration enables internal TLS and file logging. Kubernetes
 deployments should use HTTP inside the cluster, TLS at the Ingress or Gateway,
 and logs on stdout.
+
+### Listener and Service ports
+
+`museum.containerPorts.http` configures Museum's real `http.port` listener,
+the named Pod port, probes, migration gate, and NetworkPolicy. The independent
+`museum.service.port` value controls the Kubernetes Service port, which targets
+the named `http` port.
+
+```yaml
+museum:
+  containerPorts:
+    http: 18080
+  service:
+    port: 18081
+```
+
+Museum's Prometheus listener is hard-coded to 2112 in the pinned upstream
+binary. `museum.service.metricsPort` can expose it through a different Service
+port, while the named target remains the fixed process listener. Port 2112 is
+reserved and rejected for `museum.containerPorts.http`.
+
+Museum runs as a non-root container with all Linux capabilities dropped. A
+listener below the runtime's `net.ipv4.ip_unprivileged_port_start` requires the
+runtime to permit non-root binds. For portable deployments, keep the process
+listener on an unprivileged port and use `museum.service.port` for a lower
+Kubernetes Service port.
 
 ### Health checks
 
@@ -566,7 +593,8 @@ database version dirty.
 
 For HA and HPA topologies, the chart adds a hardened PostgreSQL client sidecar
 to every Museum pod. It polls `pg_try_advisory_lock` without holding an active
-transaction, starts one local Museum process, waits for port 8080, and then
+transaction, starts one local Museum process, waits for
+`museum.containerPorts.http`, and then
 releases the next pod. The chart rejects concurrent Museum processes when
 `museum.migrationGate.enabled=false`.
 
@@ -686,7 +714,8 @@ namespace/pod selectors, or a controlled egress gateway.
 
 ## 13. Observability
 
-Museum exposes native Prometheus metrics at `/metrics` on port 2112.
+Museum exposes native Prometheus metrics at `/metrics` on the upstream-fixed
+port 2112.
 
 ```yaml
 metrics:
@@ -1040,6 +1069,7 @@ backup:
 | `museum.config.webauthn.rpid`         | example Accounts host          | Passkey RP ID                    |
 | `museum.config.webauthn.rporigins`    | example Accounts origin        | Passkey origins                  |
 | `museum.config.extraYaml`             | `""`                           | Advanced raw Museum YAML         |
+| `museum.containerPorts.http`          | `8080`                         | Museum application listener      |
 | `museum.service.type`                 | `ClusterIP`                    | API Service type                 |
 | `museum.service.port`                 | `8080`                         | API Service port                 |
 | `museum.service.metricsPort`          | `2112`                         | Metrics Service port             |
