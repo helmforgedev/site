@@ -94,6 +94,14 @@ changedetection:
 browser:
   enabled: true
   port: 3000
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
   resources:
     requests:
       cpu: 250m
@@ -234,6 +242,10 @@ Enable `browser.enabled=true` only for pages that require JavaScript rendering. 
 `changedetection.fetchWorkers` and set `browser.resources`, because every concurrent browser-backed fetch can hold a
 Chromium process in memory.
 
+The pinned browser image declares the non-root `chrome` user. Its independent
+security context disables privilege escalation and drops all Linux capabilities
+by default, without changing the main application container.
+
 Set `changedetection.baseUrl` when exposing the service publicly. Notification links depend on this value and should
 match the Ingress or Gateway hostname.
 
@@ -306,15 +318,20 @@ service:
 
 ### Browser
 
-| Parameter                  | Default                                                                   | Description                                        |
-| -------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| `browser.enabled`          | `false`                                                                   | Enable the Browserless Chromium sidecar.           |
-| `browser.port`             | `3000`                                                                    | Sockpuppet listener passed to the real process.    |
-| `browser.image.repository` | `docker.io/dgtlmoon/sockpuppetbrowser`                                    | Browser sidecar image.                             |
-| `browser.image.tag`        | `0.0.3`                                                                   | Browser sidecar tag.                               |
-| `browser.image.digest`     | `sha256:1d8f72d2ce2085faed4232e5ae1e65c02efe5b831a18e127829b267c260b4fb2` | Immutable image index digest.                      |
-| `browser.image.pullPolicy` | `IfNotPresent`                                                            | Browser image pull policy.                         |
-| `browser.resources`        | `{}`                                                                      | Resource requests and limits for the sidecar only. |
+| Parameter                                          | Default                                                                   | Description                                        |
+| -------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
+| `browser.enabled`                                  | `false`                                                                   | Enable the Browserless Chromium sidecar.           |
+| `browser.port`                                     | `3000`                                                                    | Sockpuppet listener passed to the real process.    |
+| `browser.image.repository`                         | `docker.io/dgtlmoon/sockpuppetbrowser`                                    | Browser sidecar image.                             |
+| `browser.image.tag`                                | `0.0.3`                                                                   | Browser sidecar tag.                               |
+| `browser.image.digest`                             | `sha256:1d8f72d2ce2085faed4232e5ae1e65c02efe5b831a18e127829b267c260b4fb2` | Immutable image index digest.                      |
+| `browser.image.pullPolicy`                         | `IfNotPresent`                                                            | Browser image pull policy.                         |
+| `browser.resources`                                | `{}`                                                                      | Resource requests and limits for the sidecar only. |
+| `browser.securityContext.runAsUser`                | `1000`                                                                    | Run the browser as the image's `chrome` UID.       |
+| `browser.securityContext.runAsGroup`               | `1000`                                                                    | Run the browser as the image's `chrome` GID.       |
+| `browser.securityContext.runAsNonRoot`             | `true`                                                                    | Require the browser image's non-root user.         |
+| `browser.securityContext.allowPrivilegeEscalation` | `false`                                                                   | Prevent browser-sidecar privilege escalation.      |
+| `browser.securityContext.capabilities.drop`        | `[ALL]`                                                                   | Drop browser-sidecar Linux capabilities.           |
 
 ### Persistence
 
