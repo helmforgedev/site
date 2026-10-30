@@ -11,7 +11,7 @@ encryption identity.
 
 ## Operating contract
 
-- Official `twentycrm/twenty:v2.46.0` image pinned by immutable manifest digest.
+- Official `twentycrm/twenty:v2.49.0` image pinned by immutable manifest digest.
 - One Recreate Pod serializes migrations and shares local files between server and worker. This chart does not claim
   application HA or horizontal scaling.
 - Native first-administrator and workspace activation before public startup, followed by explicit closure of public
@@ -138,7 +138,7 @@ The default HelmForge Redis dependency uses authentication, standalone storage, 
 `maxmemory-policy noeviction`. Redis holds native cache, PubSub and BullMQ job state; treating it as an expendable cache
 loses work. Size memory and disk for queue depth, retention and application caches.
 
-The pinned Redis 2.0.1 dependency requires its default port 6379 for health probes. The chart rejects a custom bundled
+The pinned Redis 3.1.0 dependency requires its default port 6379 for health probes. The chart rejects a custom bundled
 port; external Redis supports a custom port.
 
 For external Redis, disable `redis.enabled` and configure `cache.host`, password Secret and optional username/database
@@ -556,7 +556,7 @@ image:
   # -- Official container image repository.
   repository: docker.io/twentycrm/twenty
   # -- Pinned upstream image tag or immutable digest.
-  tag: v2.46.0@sha256:bb4e94f0215cbd14c7356b0324d9b7ac10ccd077042cd6d5058ad02ef2080605
+  tag: v2.49.0@sha256:80e1b33b0b4b9dc292e776c64c320be2ae9467677ce639ba9bde1cffca68a3b0
   # -- Kubernetes image pull policy.
   pullPolicy: IfNotPresent
 # -- Native public origin and fixed proxy port.
@@ -924,6 +924,16 @@ metrics:
     additionalRules: []
 ```
 
+## Upgrading to 2.49.0
+
+Twenty 2.49.0 includes upstream performance improvements, bug fixes, and updated workspace drivers. Native database
+migrations run automatically during startup; no chart values migration is required. Take a coordinated PostgreSQL,
+Redis, files, and identity backup, then validate enrollment, authentication, attachments, and worker jobs in staging.
+Review the [2.49.0 release](https://github.com/twentyhq/twenty/releases/tag/twenty%2Fv2.49.0).
+
+The bundled dependency defaults move to HelmForge PostgreSQL 2.1.1 and Redis 3.1.0. Their authentication, standalone
+storage, and network contracts are unchanged. Existing Secrets and persistent volumes remain in place.
+
 ## Upgrading to 2.46.0
 
 Twenty 2.46 includes the 2.44-2.46 native migrations and breaking API changes.
@@ -944,8 +954,8 @@ hostnames or IP literals and corresponding NetworkPolicy peers. The deprecated
 `OUTBOUND_HTTP_SAFE_MODE_ENABLED=false` still overrides the allowlist and should
 be removed when migrating; link-local metadata addresses remain blocked.
 
-The bundled Redis chart remains on 3.0.0, retaining the existing
-authentication and storage contract while improving authenticated health probes.
+The bundled Redis chart was updated within the 3.x series while retaining the existing
+authentication and storage contract and authenticated health probes.
 The image also fixes SMTP retry propagation, upload size enforcement, SDK job
 initialization and migration-time repository updates. Ports, retained volumes,
 private enrollment and the colocated native worker remain unchanged.

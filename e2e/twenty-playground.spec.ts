@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test';
 test('Twenty preserves native ownership and dependency credential references', async ({ page }) => {
   await page.goto('/playground');
   await page.locator('.playground-chart-btn[data-slug="twenty"]').click();
+  await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue(
+    'v2.49.0@sha256:80e1b33b0b4b9dc292e776c64c320be2ae9467677ce639ba9bde1cffca68a3b0',
+  );
   await page.locator('input[data-field-key="bootstrap.existingSecret"]').fill('crm-owner');
   await page.locator('input[data-field-key="identity.existingSecret"]').fill('crm-identity');
   await page.locator('input[data-field-key="postgresql.auth.existingSecret"]').fill('crm-database');
