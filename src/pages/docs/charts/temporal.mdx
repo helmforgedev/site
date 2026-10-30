@@ -256,6 +256,29 @@ are disabled by default.
 
 ## Configuration Reference
 
+### Application listeners
+
+Application listeners are separate from Kubernetes Service ports. Changing a
+listener value updates the real upstream process; Services continue to target
+the corresponding named container port.
+
+| Value                    | Default | Purpose                                         |
+| ------------------------ | ------: | ----------------------------------------------- |
+| `containerPorts.web`     |  `8080` | Temporal Web UI listener via `TEMPORAL_UI_PORT` |
+| `webService.port`        |  `8080` | Web UI Kubernetes Service port                  |
+| `containerPorts.metrics` |  `9090` | Temporal Server Prometheus listener             |
+| `monitoring.servicePort` |  `9090` | Headless Service metrics port                   |
+
+```yaml
+containerPorts:
+  web: 18080
+  metrics: 19090
+webService:
+  port: 8080
+monitoring:
+  servicePort: 9090
+```
+
 ### Server and schema
 
 | Value                                            | Default                       | Purpose                                  |
@@ -315,6 +338,7 @@ Secret is supplied. Back up the databases and credential Secret together.
 | `pdb.enabled`                                 | `false`     | Per-component disruption budgets          |
 | `networkPolicy.enabled`                       | `false`     | Workload NetworkPolicy                    |
 | `networkPolicy.egress.enabled`                | `false`     | Restrictive egress rules                  |
+| `monitoring.servicePort`                      | `9090`      | Headless metrics Service port             |
 | `monitoring.serviceMonitor.enabled`           | `false`     | Per-role ServiceMonitor resources         |
 | `serviceAccount.automountServiceAccountToken` | `false`     | Disable token mounting                    |
 | `extraManifests`                              | `[]`        | Additional Kubernetes objects             |
@@ -327,11 +351,12 @@ Use the [playground](/playground) to generate a focused starting values file.
 
 ## Observability
 
-Each server role publishes Prometheus metrics on port 9090 through its headless
-Service. Enable ServiceMonitor only after installing the Prometheus Operator
-CRDs. Alert on service and persistence errors, request latency, unavailable
-hosts, task queue latency, and database saturation. Retain the component label
-so frontend, history, matching, and worker can be diagnosed independently.
+Each server role publishes Prometheus metrics on `containerPorts.metrics`
+through `monitoring.servicePort` on its headless Service. Enable ServiceMonitor
+only after installing the Prometheus Operator CRDs. Alert on service and
+persistence errors, request latency, unavailable hosts, task queue latency, and
+database saturation. Retain the component label so frontend, history,
+matching, and worker can be diagnosed independently.
 
 ## Network Policy
 
