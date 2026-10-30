@@ -22,8 +22,9 @@ a venue or submit an order until an operator supplies strategy code and explicit
 - optional PostgreSQL and Redis dependencies or external service coordinates;
 - native External Secrets Operator resources;
 - optional PVCs for catalogs, event stores, and backtest results;
-- non-root execution, read-only root filesystem, dropped capabilities, and no API token;
+- non-root execution, read-only root filesystem, dropped capabilities, and no API token automount by default for runner workloads;
 - NetworkPolicy, dual-stack Service, scheduling controls, ServiceMonitor, and PrometheusRule.
+- an optional PodDisruptionBudget for the live singleton and bounded writable temporary storage for every runner workload.
 
 NautilusTrader is not an HTTP application. The Service is private and exists only for runner health and metrics, so the
 chart does not create Ingress or Gateway API resources.
@@ -115,8 +116,9 @@ prevents overlapping runs. Without a factory, the Job only validates the runtime
 
 ## Configure PostgreSQL and Redis
 
-Set `database.mode=postgresql` with `postgresql.enabled=true` for the bundled dependency. Set
-`messageBus.mode=redis` with `redis.enabled=true` for bundled Redis. These topologies are useful for evaluation.
+Set `database.mode=postgresql` with `postgresql.enabled=true` for the bundled HelmForge PostgreSQL `2.1.1`
+dependency. Set `messageBus.mode=redis` with `redis.enabled=true` for bundled HelmForge Redis `3.1.0`. These
+topologies are useful for evaluation.
 
 For production, use `database.mode=external` or `messageBus.mode=external`, configure host and TLS values, and reference
 password Secrets. The chart exposes connection metadata to strategy code; it does not silently enable an upstream
@@ -148,6 +150,50 @@ secrets:
 ```
 
 Never put venue, database, or Redis credentials directly in Helm values.
+
+## Architecture and security boundaries
+
+The chart-managed runner wraps the official package with Kubernetes lifecycle,
+health, and metrics behavior. Live mode creates one singleton Deployment;
+backtests use a Job or CronJob. Catalog, event-store, and result paths have
+independent PVC contracts. PostgreSQL and Redis provide coordinates to strategy
+code and do not silently activate upstream adapters.
+
+The chart-managed Nautilus runner Deployment, Job, and CronJob workloads run as
+UID/GID 10001 with runtime-default seccomp, no privilege escalation, dropped
+capabilities, a read-only root filesystem, and no API token automount by
+default. Their writable `/tmp` uses a bounded `emptyDir`. These claims do not
+describe the optional PostgreSQL or Redis dependency workloads, whose security
+contracts are owned by their respective charts. The optional PodDisruptionBudget
+reduces voluntary disruption of the live singleton but does not make a live
+trading node highly available.
+
+## Configuration reference
+
+| Parameter                                     | Default    | Purpose                                               |
+| --------------------------------------------- | ---------- | ----------------------------------------------------- |
+| `live.enabled`                                | `true`     | Deploy the singleton live runtime.                    |
+| `live.mode`                                   | `validate` | Select safe validation or live factory mode.          |
+| `live.factory`                                | `""`       | Python `module:callable` strategy factory.            |
+| `runner.port`                                 | `8080`     | Internal health and metrics listener.                 |
+| `backtest.enabled`                            | `false`    | Render a one-shot backtest Job.                       |
+| `scheduledBacktest.enabled`                   | `false`    | Render the backtest CronJob.                          |
+| `database.mode`                               | `none`     | None, bundled PostgreSQL, or external PostgreSQL.     |
+| `messageBus.mode`                             | `none`     | None, bundled Redis, or external Redis.               |
+| `persistence.catalog.enabled`                 | `false`    | Persist market-data catalogs.                         |
+| `persistence.eventStore.enabled`              | `false`    | Persist event-store state.                            |
+| `persistence.results.enabled`                 | `false`    | Persist backtest results.                             |
+| `externalSecrets.enabled`                     | `false`    | Render ExternalSecret resources.                      |
+| `monitoring.serviceMonitor.enabled`           | `false`    | Render a ServiceMonitor.                              |
+| `monitoring.prometheusRule.enabled`           | `false`    | Render runner availability alerts.                    |
+| `networkPolicy.enabled`                       | `false`    | Restrict access to the runner pod.                    |
+| `networkPolicy.egressEnabled`                 | `false`    | Enable explicit egress isolation.                     |
+| `podDisruptionBudget.enabled`                 | `false`    | Protect the live singleton from voluntary disruption. |
+| `runtimeStorage.tmpSizeLimit`                 | `256Mi`    | Bound writable temporary storage.                     |
+| `serviceAccount.automountServiceAccountToken` | `false`    | Mount the Kubernetes API token.                       |
+
+When enabling egress isolation, allow DNS and every venue, market-data provider,
+external state service, and telemetry endpoint required by the strategy.
 
 ## Observe the runner
 
