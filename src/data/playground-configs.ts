@@ -8503,6 +8503,24 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'SonarQube pod count' },
         {
+          label: 'HTTP Listener Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '9000',
+          min: 1,
+          max: 65535,
+          description: 'Real SonarQube listener configured through SONAR_WEB_PORT',
+        },
+        {
+          label: 'HTTP Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '9000',
+          min: 1,
+          max: 65535,
+          description: 'Client-facing Service port targeting the named HTTP listener',
+        },
+        {
           label: 'Database Mode',
           key: 'sonarqube.databaseMode',
           type: 'select',
@@ -8536,6 +8554,33 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'false',
           description: 'Enable community branch plugin',
+        },
+      ],
+    },
+    {
+      name: 'Persistence',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Data PVC',
+          key: 'persistence.data.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Persist SonarQube data and embedded search state',
+        },
+        {
+          label: 'Extensions PVC',
+          key: 'persistence.extensions.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Persist installed plugins and extensions',
+        },
+        {
+          label: 'Logs PVC',
+          key: 'persistence.logs.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Optionally persist logs; logs are not recovery state',
         },
       ],
     },
