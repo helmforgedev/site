@@ -2107,6 +2107,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Server behavior',
       fields: [
         {
+          label: 'Application HTTP port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '8888',
+          min: 1024,
+          max: 65535,
+          description: 'Configures the real Atuin listener; service.port remains independent',
+        },
+        {
           label: 'Open registration',
           key: 'atuin.openRegistration',
           type: 'toggle',
