@@ -40,7 +40,7 @@ All traffic goes through a single Ingress on port 80 and is forwarded to the non
 1. **`wait-for-db`** — polls until PostgreSQL is reachable
 2. **`migrate`** — runs `pnpm exec prisma migrate deploy` to apply schema migrations
 3. **`bootstrap-infra-config`** — initializes the server configuration when needed
-4. **`prepare-runtime-files`** — copies the writable AIO runtime files
+4. **`prepare-site-files`** — copies only the writable web assets required for runtime environment injection; the backend runs directly from the immutable image
 
 ## Prerequisites
 
@@ -65,7 +65,6 @@ helm install hoppscotch helmforge/hoppscotch --namespace hoppscotch --create-nam
 
 ```bash
 helm install hoppscotch oci://ghcr.io/helmforgedev/helm/hoppscotch \
-  --version 0.1.0 \
   --namespace hoppscotch --create-namespace
 ```
 
@@ -130,7 +129,7 @@ postgresql:
     database: hoppscotch
     username: hoppscotch
     password: '' # auto-generated
-  primary:
+  standalone:
     persistence:
       size: 10Gi
 ```
@@ -397,30 +396,31 @@ helm test hoppscotch -n hoppscotch
 
 ## Parameters
 
-| Parameter                        | Description                                              | Default    |
-| -------------------------------- | -------------------------------------------------------- | ---------- |
-| `mode`                           | Chart mode: `dev` or `production`                        | `dev`      |
-| `namespaceOverride`              | Override namespace for chart-managed resources           | `""`       |
-| `image.tag`                      | Hoppscotch image tag                                     | `2026.9.0` |
-| `replicaCount`                   | Number of replicas                                       | `1`        |
-| `ingress.enabled`                | Enable Ingress                                           | `false`    |
-| `ingress.host`                   | Hostname (auto-derives all VITE\_\* URLs)                | `""`       |
-| `postgresql.enabled`             | Enable PostgreSQL subchart                               | `true`     |
-| `database.external.enabled`      | Use external PostgreSQL                                  | `false`    |
-| `encryption.key`                 | 32-char encryption key (auto-generated)                  | `""`       |
-| `encryption.existingSecret`      | Existing secret with encryption key                      | `""`       |
-| `auth.providers`                 | Comma-separated enabled auth providers                   | `EMAIL`    |
-| `auth.github.enabled`            | Enable GitHub OAuth                                      | `false`    |
-| `auth.google.enabled`            | Enable Google OAuth                                      | `false`    |
-| `auth.microsoft.enabled`         | Enable Microsoft OAuth                                   | `false`    |
-| `mailer.enabled`                 | Enable SMTP                                              | `false`    |
-| `gatewayAPI.enabled`             | Enable HTTPRoute                                         | `false`    |
-| `externalSecrets.enabled`        | Enable ExternalSecret                                    | `false`    |
-| `networkPolicy.enabled`          | Enable NetworkPolicy                                     | `false`    |
-| `networkPolicy.extraEgress`      | Additional egress rules after DNS and database           | `[]`       |
-| `podDisruptionBudget.enabled`    | Enable PDB                                               | `false`    |
-| `extraManifests`                 | Additional Kubernetes manifests rendered with Helm `tpl` | `[]`       |
-| `metrics.serviceMonitor.enabled` | Enable ServiceMonitor                                    | `false`    |
+| Parameter                                | Description                                              | Default    |
+| ---------------------------------------- | -------------------------------------------------------- | ---------- |
+| `mode`                                   | Chart mode: `dev` or `production`                        | `dev`      |
+| `namespaceOverride`                      | Override namespace for chart-managed resources           | `""`       |
+| `image.tag`                              | Hoppscotch image tag                                     | `2026.9.0` |
+| `replicaCount`                           | Number of replicas                                       | `1`        |
+| `ingress.enabled`                        | Enable Ingress                                           | `false`    |
+| `ingress.host`                           | Hostname (auto-derives all VITE\_\* URLs)                | `""`       |
+| `postgresql.enabled`                     | Enable PostgreSQL subchart                               | `true`     |
+| `postgresql.standalone.persistence.size` | Persistent volume size for bundled PostgreSQL            | `10Gi`     |
+| `database.external.enabled`              | Use external PostgreSQL                                  | `false`    |
+| `encryption.key`                         | 32-char encryption key (auto-generated)                  | `""`       |
+| `encryption.existingSecret`              | Existing secret with encryption key                      | `""`       |
+| `auth.providers`                         | Comma-separated enabled auth providers                   | `EMAIL`    |
+| `auth.github.enabled`                    | Enable GitHub OAuth                                      | `false`    |
+| `auth.google.enabled`                    | Enable Google OAuth                                      | `false`    |
+| `auth.microsoft.enabled`                 | Enable Microsoft OAuth                                   | `false`    |
+| `mailer.enabled`                         | Enable SMTP                                              | `false`    |
+| `gatewayAPI.enabled`                     | Enable HTTPRoute                                         | `false`    |
+| `externalSecrets.enabled`                | Enable ExternalSecret                                    | `false`    |
+| `networkPolicy.enabled`                  | Enable NetworkPolicy                                     | `false`    |
+| `networkPolicy.extraEgress`              | Additional egress rules after DNS and database           | `[]`       |
+| `podDisruptionBudget.enabled`            | Enable PDB                                               | `false`    |
+| `extraManifests`                         | Additional Kubernetes manifests rendered with Helm `tpl` | `[]`       |
+| `metrics.serviceMonitor.enabled`         | Enable ServiceMonitor                                    | `false`    |
 
 ## Links
 

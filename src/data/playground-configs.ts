@@ -20135,7 +20135,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
         {
           label: 'Storage Size',
-          key: 'postgresql.primary.persistence.size',
+          key: 'postgresql.standalone.persistence.size',
           type: 'text',
           default: '10Gi',
           description: 'Persistent volume size for bundled PostgreSQL',
