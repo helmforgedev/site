@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Homarr Chart
-description: Homarr Helm chart for Kubernetes dashboards with Redis, SQLite/PostgreSQL/MySQL, integration secrets, workload discovery, TLS ingress, and S3 backup.
+description: Homarr Helm chart for Kubernetes dashboards with Redis, SQLite/PostgreSQL, integration secrets, workload discovery, TLS ingress, and S3 backup.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -26,11 +26,11 @@ servers (Plex, Jellyfin), \*arr apps (Sonarr, Radarr), and many other services.
 ## Key Features
 
 - **Embedded Redis** — no separate Redis required (external Redis optional for multi-instance)
-- **Three database backends** — SQLite (default), PostgreSQL, MySQL with auto-detection
+- **Supported database backends** — SQLite (default) or PostgreSQL with deterministic auto-detection
 - **Integration encryption** — all service credentials encrypted via `SECRET_ENCRYPTION_KEY`
 - **Kubernetes workload discovery** — optional live workload status in the dashboard
 - **Auth providers** — local credentials, LDAP, and OIDC
-- **Database-aware backup** — `tar` for SQLite (`/appdata`), `pg_dump`/`mysqldump` for SQL databases
+- **Database-aware backup** — `tar` for SQLite (`/appdata`) or `pg_dump` for PostgreSQL
 
 ## Installation
 
@@ -50,12 +50,17 @@ helm install homarr oci://ghcr.io/helmforgedev/helm/homarr -f values.yaml
 
 ## Upgrade Notes
 
-The chart defaults to stable Homarr `v1.77.2`. Upstream published this patch
-without migration notes. It keeps the v1 deployment contract, with no new
-required environment variables. Review the
-[upstream v1.77.2 release](https://github.com/homarr-labs/homarr/releases/tag/v1.77.2)
-and back up the SQLite or external database before upgrading production
-environments.
+The chart defaults to Homarr `v2.6.0`. Back up `/appdata` and any external
+database before upgrading. Homarr v2 supports SQLite and PostgreSQL, but not
+MySQL. Existing MySQL installations must complete Homarr's official
+[MySQL-to-SQLite conversion](https://homarr.dev/docs/advanced/mysql-to-sqlite/)
+and deploy and validate the resulting SQLite database before completing this
+chart upgrade. The converter does not populate PostgreSQL; switching afterward
+requires a separate, operator-controlled and validated migration. The chart
+deliberately rejects the obsolete MySQL configuration instead of starting an
+incompatible application image. Review the
+[upstream v2.6.0 release](https://github.com/homarr-labs/homarr/releases/tag/v2.6.0)
+before a production rollout.
 
 ## Deployment Examples
 
@@ -118,7 +123,7 @@ postgresql:
     database: homarr
     username: homarr
     password: 'strong-db-password'
-  primary:
+  standalone:
     persistence:
       enabled: true
       size: 10Gi
@@ -155,6 +160,9 @@ ingress:
 homarr:
   enableKubernetes: true # live workload status in the dashboard
   authProviders: credentials
+
+serviceAccount:
+  automountServiceAccountToken: true
 
 encryption:
   existingSecret: homarr-encryption-key
@@ -230,7 +238,7 @@ ingress:
 | Parameter          | Type   | Default                      | Description        |
 | ------------------ | ------ | ---------------------------- | ------------------ |
 | `image.repository` | string | `ghcr.io/homarr-labs/homarr` | Homarr image.      |
-| `image.tag`        | string | `"v1.77.2"`                  | Image tag.         |
+| `image.tag`        | string | `"v2.6.0"`                   | Image tag.         |
 | `image.pullPolicy` | string | `IfNotPresent`               | Image pull policy. |
 
 ### Homarr Configuration
@@ -241,6 +249,9 @@ ingress:
 | `homarr.authProviders`    | string  | `credentials` | Auth providers (comma-separated): `credentials`, `ldap`, `oidc`. |
 | `homarr.enableKubernetes` | boolean | `false`       | Enable Kubernetes workload discovery (requires cluster RBAC).    |
 | `homarr.extraEnv`         | array   | `[]`          | Extra environment variables (OIDC settings, custom certs, etc.). |
+
+Kubernetes discovery also requires
+`serviceAccount.automountServiceAccountToken=true` and deliberately scoped RBAC.
 
 ### Encryption Key
 
@@ -258,32 +269,31 @@ ingress:
 | -------- | ----------------------------------------------------- | ------------------- |
 | 1        | `database.external.host` or `external.existingSecret` | External DB         |
 | 2        | `postgresql.enabled: true`                            | PostgreSQL subchart |
-| 3        | `mysql.enabled: true`                                 | MySQL subchart      |
-| 4        | None of the above                                     | SQLite (default)    |
+| 3        | None of the above                                     | SQLite (default)    |
 
-| Parameter                          | Type   | Default                 | Description                                                         |
-| ---------------------------------- | ------ | ----------------------- | ------------------------------------------------------------------- |
-| `database.mode`                    | string | `auto`                  | Database mode: `auto`, `sqlite`, `external`, `postgresql`, `mysql`. |
-| `database.sqlite.path`             | string | `/appdata/db/db.sqlite` | SQLite file path inside the data volume.                            |
-| `database.external.vendor`         | string | `postgres`              | External DB vendor: `postgres` or `mysql`.                          |
-| `database.external.host`           | string | `""`                    | External database hostname.                                         |
-| `database.external.existingSecret` | string | `""`                    | Existing secret with database password.                             |
+| Parameter                          | Type   | Default                 | Description                                                   |
+| ---------------------------------- | ------ | ----------------------- | ------------------------------------------------------------- |
+| `database.mode`                    | string | `auto`                  | Database mode: `auto`, `sqlite`, `external`, or `postgresql`. |
+| `database.sqlite.path`             | string | `/appdata/db/db.sqlite` | SQLite file path inside the data volume.                      |
+| `database.external.vendor`         | string | `postgres`              | External database vendor. Homarr v2 supports `postgres`.      |
+| `database.external.host`           | string | `""`                    | External database hostname.                                   |
+| `database.external.existingSecret` | string | `""`                    | Existing secret with database password.                       |
 
 ### Subcharts
 
-| Parameter                             | Type    | Default | Description                             |
-| ------------------------------------- | ------- | ------- | --------------------------------------- |
-| `postgresql.enabled`                  | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
-| `postgresql.auth.password`            | string  | `""`    | Password. Auto-generated if empty.      |
-| `postgresql.primary.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
-| `mysql.enabled`                       | boolean | `false` | Deploy the bundled MySQL subchart.      |
-| `mysql.primary.persistence.size`      | string  | `8Gi`   | PVC size for MySQL.                     |
+| Parameter                                       | Type    | Default         | Description                             |
+| ----------------------------------------------- | ------- | --------------- | --------------------------------------- |
+| `postgresql.enabled`                            | boolean | `false`         | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.password`                      | string  | `""`            | Password. Auto-generated if empty.      |
+| `postgresql.auth.existingSecret`                | string  | `""`            | Existing PostgreSQL password Secret.    |
+| `postgresql.auth.existingSecretUserPasswordKey` | string  | `user-password` | Application password key.               |
+| `postgresql.standalone.persistence.size`        | string  | `8Gi`           | PVC size for PostgreSQL.                |
 
 ### Redis
 
 <Callout type="tip" title="Homarr includes embedded Redis — no external Redis required for single-instance deployments">
   Homarr ships with an embedded Redis process. External Redis is only needed if you are running multiple Homarr replicas
-  sharing a common cache (requires PostgreSQL or MySQL, not SQLite).
+  sharing a common cache (requires PostgreSQL, not SQLite).
 </Callout>
 
 | Parameter                 | Type    | Default          | Description                                        |
@@ -317,14 +327,28 @@ ingress:
 | `ingress.hosts`            | array   | `[]`        | Host and path rules.         |
 | `ingress.tls`              | array   | `[]`        | TLS configuration.           |
 
+The official Homarr image listens on fixed container port `7575`.
+`service.port` may expose a different Kubernetes Service port, but the named
+target port continues to route to that fixed application listener.
+
+### Health Probes and ServiceAccount
+
+| Parameter                                     | Type    | Default             | Description                                       |
+| --------------------------------------------- | ------- | ------------------- | ------------------------------------------------- |
+| `startupProbe.path`                           | string  | `/api/health/ready` | Startup health endpoint.                          |
+| `livenessProbe.path`                          | string  | `/api/health/live`  | Liveness health endpoint.                         |
+| `readinessProbe.path`                         | string  | `/api/health/ready` | Readiness health endpoint.                        |
+| `serviceAccount.create`                       | boolean | `false`             | Create a dedicated ServiceAccount.                |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`             | Mount an API token for scoped workload discovery. |
+
 ### Gateway API
 
-Use `gatewayAPI.enabled` to render a native Kubernetes
+Use `gateway.enabled` to render a native Kubernetes
 [Gateway API](https://gateway-api.sigs.k8s.io/) `HTTPRoute` for Homarr. Ingress stays disabled by default and can coexist
 with the route when a migration needs both objects.
 
 ```yaml
-gatewayAPI:
+gateway:
   enabled: true
   parentRefs:
     - name: shared-gateway
@@ -332,18 +356,18 @@ gatewayAPI:
       sectionName: https
   hostnames:
     - dash.example.com
-  paths:
-    - type: PathPrefix
-      value: /
+  path: /
+  pathType: PathPrefix
 ```
 
-| Parameter                | Type    | Default | Description                |
-| ------------------------ | ------- | ------- | -------------------------- |
-| `gatewayAPI.enabled`     | boolean | `false` | Render an HTTPRoute.       |
-| `gatewayAPI.parentRefs`  | array   | `[]`    | Parent Gateway references. |
-| `gatewayAPI.hostnames`   | array   | `[]`    | HTTPRoute hostnames.       |
-| `gatewayAPI.paths`       | array   | `/`     | HTTPRoute path matches.    |
-| `gatewayAPI.annotations` | object  | `{}`    | HTTPRoute annotations.     |
+| Parameter             | Type    | Default      | Description                |
+| --------------------- | ------- | ------------ | -------------------------- |
+| `gateway.enabled`     | boolean | `false`      | Render an HTTPRoute.       |
+| `gateway.parentRefs`  | array   | `[]`         | Parent Gateway references. |
+| `gateway.hostnames`   | array   | `[]`         | HTTPRoute hostnames.       |
+| `gateway.path`        | string  | `/`          | HTTPRoute path match.      |
+| `gateway.pathType`    | string  | `PathPrefix` | HTTPRoute path type.       |
+| `gateway.annotations` | object  | `{}`         | HTTPRoute annotations.     |
 
 ### Dual-Stack Networking
 
@@ -359,20 +383,19 @@ service:
 
 ### Backup
 
-Database-aware backup: SQLite archives the full `/appdata` directory (tar). PostgreSQL uses `pg_dump`.
-MySQL uses `mysqldump`.
+Database-aware backup: SQLite archives the full `/appdata` directory with `tar`.
+PostgreSQL uses `pg_dump`.
 
-| Parameter                          | Type    | Default                    | Description                          |
-| ---------------------------------- | ------- | -------------------------- | ------------------------------------ |
-| `backup.enabled`                   | boolean | `false`                    | Enable scheduled S3 backup CronJob.  |
-| `backup.schedule`                  | string  | `"0 3 * * *"`              | Cron schedule.                       |
-| `backup.archivePrefix`             | string  | `homarr`                   | Prefix for backup archive filenames. |
-| `backup.s3.endpoint`               | string  | `""`                       | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`                 | string  | `""`                       | Target bucket name.                  |
-| `backup.s3.existingSecret`         | string  | `""`                       | Existing secret with S3 credentials. |
-| `backup.database.postgresDumpArgs` | string  | `""`                       | Extra arguments for `pg_dump`.       |
-| `backup.database.mysqlDumpArgs`    | string  | `--single-transaction ...` | Extra arguments for `mysqldump`.     |
-| `extraManifests`                   | array   | `[]`                       | Extra Kubernetes manifests.          |
+| Parameter                          | Type    | Default       | Description                          |
+| ---------------------------------- | ------- | ------------- | ------------------------------------ |
+| `backup.enabled`                   | boolean | `false`       | Enable scheduled S3 backup CronJob.  |
+| `backup.schedule`                  | string  | `"0 3 * * *"` | Cron schedule.                       |
+| `backup.archivePrefix`             | string  | `homarr`      | Prefix for backup archive filenames. |
+| `backup.s3.endpoint`               | string  | `""`          | S3-compatible endpoint URL.          |
+| `backup.s3.bucket`                 | string  | `""`          | Target bucket name.                  |
+| `backup.s3.existingSecret`         | string  | `""`          | Existing secret with S3 credentials. |
+| `backup.database.postgresDumpArgs` | string  | `""`          | Extra arguments for `pg_dump`.       |
+| `extraManifests`                   | array   | `[]`          | Extra Kubernetes manifests.          |
 
 ### External Secrets
 

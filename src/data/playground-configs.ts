@@ -14586,6 +14586,27 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '2Gi',
           description: 'App data storage size',
         },
+        {
+          label: 'Bundled PostgreSQL',
+          key: 'postgresql.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Deploy PostgreSQL instead of using the default SQLite database',
+        },
+        {
+          label: 'Kubernetes Discovery',
+          key: 'homarr.enableKubernetes',
+          type: 'toggle',
+          default: 'false',
+          description: 'Allow Homarr to discover Kubernetes workloads',
+        },
+        {
+          label: 'Mount ServiceAccount Token',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Required with scoped RBAC when Kubernetes discovery is enabled',
+        },
       ],
     },
     {
