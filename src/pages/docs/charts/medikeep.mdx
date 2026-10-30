@@ -24,6 +24,23 @@ reads and attachment filenames. It does not change the service port, uploads
 path or authentication environment contract.
 Back up PostgreSQL and uploaded records before upgrading.
 
+The chart no longer accepts the legacy `app.port` value. The pinned upstream
+entrypoint always starts Uvicorn on container port `8000`, so that value changed
+only Kubernetes metadata and could break traffic. Do not use `--reuse-values`
+for this migration because it can retain the removed default. Export the
+user-supplied values, remove `app.port` from that file, and upgrade with
+`--reset-values`:
+
+```bash
+helm get values medikeep --namespace medikeep -o yaml > medikeep-user-values.yaml
+# Remove app.port from medikeep-user-values.yaml if it is present.
+helm upgrade medikeep helmforge/medikeep --namespace medikeep \
+  --reset-values -f medikeep-user-values.yaml
+```
+
+Configure `service.port` when clients need a different Kubernetes Service port;
+the Service targets the fixed named `http` listener.
+
 Configure `SSO_ONLY_MODE` and `SSO_AUTO_REDIRECT` through `app.env`; they require
 `medikeep.sso.enabled=true` and complete provider settings. Accepted boolean
 values are `true/false`, `1/0`, `yes/no` and `on/off`. Invalid values stop startup.
@@ -38,7 +55,7 @@ Core runtime:
 
 - `image.repository`, `image.tag`, `image.pullPolicy`: official pinned MediKeep image and pull behavior.
 - `replicaCount`: pod count. The chart rejects values greater than `1` because MediKeep writes to local mounted paths.
-- `app.port`, `app.timezone`, `app.logLevel`, `app.debug`, `app.enableApiDocs`, `app.enableSsl`.
+- `app.timezone`, `app.logLevel`, `app.debug`, `app.enableApiDocs`, `app.enableSsl`.
 - `app.command`, `app.args`, `app.env`, `app.envFrom`.
 - `commonLabels`, `nameOverride`, `fullnameOverride`.
 
@@ -73,6 +90,15 @@ Exposure and operations:
 - `resources`, `podSecurityContext`, `securityContext`, `waitForDatabase`.
 - `serviceAccount`, `pdb`, `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`.
 - `priorityClassName`, `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
+
+MediKeep's application listener is fixed at container port `8000` by the
+upstream image. `service.port` is independent; for example, this exposes
+Service port `8080` without changing the application process:
+
+```yaml
+service:
+  port: 8080
+```
 
 ## Installation
 
@@ -135,7 +161,12 @@ stringData:
   admin-password: replace-with-a-strong-initial-password
 ```
 
-Upstream creates `admin/admin123` on fresh installs if `ADMIN_DEFAULT_PASSWORD` is not set before first startup. Set a stronger initial password for production and rotate it after first login.
+Upstream creates `admin/admin123` on fresh installs if `ADMIN_DEFAULT_PASSWORD`
+is not set before first startup. Set a stronger initial password for production
+and rotate it after first login. The chart rejects an inline `admin123` value
+for public exposure. Helm cannot inspect an existing Secret, so ensure the key
+configured by `secrets.adminDefaultPasswordKey` exists and contains a strong
+value. A publicly exposed pod will fail to start when the key is absent.
 
 ## External PostgreSQL
 
