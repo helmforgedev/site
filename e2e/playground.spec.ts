@@ -222,8 +222,12 @@ test.describe('Playground', () => {
     await expect(servicePort).toHaveAttribute('max', '65535');
 
     await listenerPort.fill('8088');
-    await servicePort.fill('9080');
+    await servicePort.fill('65536');
     const code = page.locator('#playground-code');
+    expect(await servicePort.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
+    await expect(code).not.toContainText('service.port=65536');
+
+    await servicePort.fill('9080');
     await expect(code).toContainText('containerPorts.http=8088');
     await expect(code).toContainText('service.port=9080');
   });
