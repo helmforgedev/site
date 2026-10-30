@@ -10,12 +10,12 @@ description: JMAP-native webmail for Stalwart with controlled bootstrap, persist
 [Stalwart Mail Server](https://stalw.art/). It uses JMAP for mail, calendar,
 contacts, files, account security and message submission instead of connecting
 directly to IMAP or SMTP. This chart deploys the official
-`ghcr.io/bulwarkmail/webmail:1.11.2-always` image as a single hardened web
+`ghcr.io/bulwarkmail/webmail:1.15.0-always` image as a single hardened web
 application with persistent runtime state.
 
 ## Requirements
 
-- Kubernetes 1.29 or newer and Helm 3.
+- Kubernetes 1.30 or newer and Helm 3.
 - A separately operated Stalwart Mail Server 0.16.6 or newer with JMAP enabled.
 - One canonical JMAP URL that is reachable by both browsers and the Bulwark Pod.
 - CORS allowed by Stalwart when Bulwark and JMAP use different origins, or
@@ -173,10 +173,14 @@ invalidates encrypted settings and existing sessions.
 
 ## Ingress and Gateway API
 
-Ingress and Gateway API HTTPRoutes expose the application Service on port 3000.
+Ingress and Gateway API HTTPRoutes expose `service.port`, which defaults to
+`3000`. The Service targets the named `http` container port. Set
+`containerPorts.http` to change the real Next.js listener through the upstream
+`PORT` environment variable without changing the client-facing Service port.
+Ports below `1024` require the runtime to permit non-root binds for UID `1001`.
 Use the root path `/`; the published image cannot be moved under a subpath at
 runtime because Next.js bakes `NEXT_PUBLIC_BASE_PATH` into the build.
-The `1.11.2-always` image redirects `/` to the locale-prefixed `/en` route, so
+The `1.15.0-always` image redirects `/` to the locale-prefixed `/en` route, so
 use `Prefix`/`PathPrefix` matching rather than an exact root-only rule. Hosting
 at `/webmail` requires a custom image built with `NEXT_PUBLIC_BASE_PATH` and is
 outside the stock chart contract.
@@ -333,7 +337,7 @@ The values below are the chart's complete public configuration surface.
 | `commonLabels`                                | `{}`                            | Extra labels applied to every resource.                                                        |
 | `commonAnnotations`                           | `{}`                            | Extra annotations applied to the primary workload.                                             |
 | `image.repository`                            | `"ghcr.io/bulwarkmail/webmail"` | Official Bulwark image repository.                                                             |
-| `image.tag`                                   | `"1.11.2-always"`               | Deterministic Bulwark 1.11.2 tag with a clean multi-architecture index.                        |
+| `image.tag`                                   | `"1.15.0-always"`               | Deterministic Bulwark 1.15.0 tag with a clean multi-architecture index.                        |
 | `image.pullPolicy`                            | `"IfNotPresent"`                | Image pull policy.                                                                             |
 | `imagePullSecrets`                            | `[]`                            | Registry credentials for private mirrors.                                                      |
 | `replicaCount`                                | `1`                             | Single supported writer; other values are rejected.                                            |
@@ -405,8 +409,9 @@ The values below are the chart's complete public configuration surface.
 | `serviceAccount.name`                         | `""`                            | Existing or custom ServiceAccount name.                                                        |
 | `serviceAccount.annotations`                  | `{}`                            | ServiceAccount annotations.                                                                    |
 | `serviceAccount.automountServiceAccountToken` | `false`                         | Mount a Kubernetes API token in the Pod.                                                       |
+| `containerPorts.http`                         | `3000`                          | Real Next.js listener configured through `PORT`.                                               |
 | `service.type`                                | `"ClusterIP"`                   | Kubernetes Service type.                                                                       |
-| `service.port`                                | `3000`                          | HTTP Service port.                                                                             |
+| `service.port`                                | `3000`                          | Independent HTTP Service port targeting the named listener.                                    |
 | `service.annotations`                         | `{}`                            | Service annotations.                                                                           |
 | `service.ipFamilyPolicy`                      | `""`                            | Optional single- or dual-stack IP family policy.                                               |
 | `service.ipFamilies`                          | `[]`                            | Optional ordered `IPv4`/`IPv6` families.                                                       |

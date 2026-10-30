@@ -462,6 +462,23 @@ test.describe('Playground', () => {
     await expect(code).toContainText('backup.enabled=true');
   });
 
+  test('bulwark-mail emits independent listener and Service ports', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="bulwark-mail"]').click();
+
+    const listener = page.locator('input[data-field-key="containerPorts.http"]');
+    const service = page.locator('input[data-field-key="service.port"]');
+    await expect(listener).toHaveValue('3000');
+    await expect(service).toHaveValue('3000');
+
+    await listener.fill('18080');
+    await service.fill('18081');
+
+    const code = page.locator('#playground-code');
+    await expect(code).toContainText('containerPorts.http=18080');
+    await expect(code).toContainText('service.port=18081');
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
