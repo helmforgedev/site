@@ -24,7 +24,7 @@ Prometheus metrics, S3-compatible database backup, and dual-stack Service fields
 - **HA-ready controls** — JDBC_PING cache stack, multi-replica scheduling defaults, PDB, rollout strategy, and capacity profiles.
 - **Explicit cluster transport** — one configurable non-privileged embedded-cache bind port is applied from the first replica and drives Keycloak, pod ports, and NetworkPolicy; failure detection follows the upstream +50000 offset, and port changes use a Recreate rollout.
 - **Routing options** — separate public/admin Ingress resources plus optional Gateway API `HTTPRoute` resources.
-- **Security integration** — non-root defaults, configurable ServiceAccount token mount, truststore controls, NetworkPolicy ingress and egress, and External Secrets Operator opt-in.
+- **Security integration** — non-root defaults for Keycloak and its database wait init container, configurable ServiceAccount token mount, truststore controls, NetworkPolicy ingress and egress, and External Secrets Operator opt-in.
 - **Observability** — health probes, management service, metrics endpoint, ServiceMonitor, telemetry, tracing, and structured logging controls.
 - **Backup** — database-only PostgreSQL/MySQL dump CronJob uploaded to S3-compatible storage.
 
@@ -518,37 +518,37 @@ externalSecrets:
 
 ### Security, Scheduling, and Extension Points
 
-| Parameter                                     | Type    | Default           | Description                                                    |
-| --------------------------------------------- | ------- | ----------------- | -------------------------------------------------------------- |
-| `pdb.enabled`                                 | boolean | `false`           | Create PodDisruptionBudget.                                    |
-| `pdb.minAvailable`                            | integer | `1`               | Minimum available pods.                                        |
-| `pdb.maxUnavailable`                          | string  | `""`              | Maximum unavailable pods.                                      |
-| `networkPolicy.enabled`                       | boolean | `false`           | Create NetworkPolicy for Keycloak pods.                        |
-| `networkPolicy.ingress.allowSameNamespace`    | boolean | `true`            | Allow app traffic from the same namespace.                     |
-| `networkPolicy.management.allowSameNamespace` | boolean | `true`            | Allow management traffic from the same namespace.              |
-| `networkPolicy.clustering.enabled`            | boolean | `true`            | Allow Keycloak pod-to-pod cache transport when multi-replica.  |
-| `networkPolicy.egress.enabled`                | boolean | `false`           | Add egress rules.                                              |
-| `networkPolicy.egress.allowDns`               | boolean | `true`            | Allow TCP/UDP DNS egress.                                      |
-| `networkPolicy.egress.allowDatabase`          | boolean | `true`            | Allow DB egress when `databaseTo` is configured.               |
-| `networkPolicy.egress.databaseTo`             | array   | `[]`              | Egress destination peers for database traffic.                 |
-| `networkPolicy.egress.extraEgress`            | array   | `[]`              | Additional egress rules.                                       |
-| `serviceAccount.create`                       | boolean | `false`           | Create a ServiceAccount.                                       |
-| `serviceAccount.name`                         | string  | `""`              | ServiceAccount name override.                                  |
-| `serviceAccount.automountServiceAccountToken` | boolean | `true`            | Mount the Kubernetes ServiceAccount token and CA into the pod. |
-| `podSecurityContext`                          | object  | non-root defaults | Pod-level security context.                                    |
-| `securityContext`                             | object  | non-root defaults | Container-level security context.                              |
-| `nodeSelector`                                | object  | `{}`              | Node selector.                                                 |
-| `tolerations`                                 | array   | `[]`              | Pod tolerations.                                               |
-| `affinity`                                    | object  | `{}`              | Custom affinity.                                               |
-| `topologySpreadConstraints`                   | array   | `[]`              | Custom topology spread constraints.                            |
-| `priorityClassName`                           | string  | `""`              | PriorityClass name.                                            |
-| `terminationGracePeriodSeconds`               | integer | `120`             | Pod termination grace period.                                  |
-| `extraEnv`                                    | array   | `[]`              | Extra environment variables.                                   |
-| `extraEnvFrom`                                | array   | `[]`              | Extra envFrom sources.                                         |
-| `initContainers`                              | array   | `[]`              | Extra init containers.                                         |
-| `extraContainers`                             | array   | `[]`              | Extra sidecars.                                                |
-| `extraVolumes`                                | array   | `[]`              | Extra pod volumes.                                             |
-| `extraVolumeMounts`                           | array   | `[]`              | Extra Keycloak volume mounts.                                  |
+| Parameter                                     | Type    | Default           | Description                                                                        |
+| --------------------------------------------- | ------- | ----------------- | ---------------------------------------------------------------------------------- |
+| `pdb.enabled`                                 | boolean | `false`           | Create PodDisruptionBudget.                                                        |
+| `pdb.minAvailable`                            | integer | `1`               | Minimum available pods.                                                            |
+| `pdb.maxUnavailable`                          | string  | `""`              | Maximum unavailable pods.                                                          |
+| `networkPolicy.enabled`                       | boolean | `false`           | Create NetworkPolicy for Keycloak pods.                                            |
+| `networkPolicy.ingress.allowSameNamespace`    | boolean | `true`            | Allow app traffic from the same namespace.                                         |
+| `networkPolicy.management.allowSameNamespace` | boolean | `true`            | Allow management traffic from the same namespace.                                  |
+| `networkPolicy.clustering.enabled`            | boolean | `true`            | Allow Keycloak pod-to-pod cache transport when multi-replica.                      |
+| `networkPolicy.egress.enabled`                | boolean | `false`           | Add egress rules.                                                                  |
+| `networkPolicy.egress.allowDns`               | boolean | `true`            | Allow TCP/UDP DNS egress.                                                          |
+| `networkPolicy.egress.allowDatabase`          | boolean | `true`            | Allow DB egress when `databaseTo` is configured.                                   |
+| `networkPolicy.egress.databaseTo`             | array   | `[]`              | Egress destination peers for database traffic.                                     |
+| `networkPolicy.egress.extraEgress`            | array   | `[]`              | Additional egress rules.                                                           |
+| `serviceAccount.create`                       | boolean | `false`           | Create a ServiceAccount.                                                           |
+| `serviceAccount.name`                         | string  | `""`              | ServiceAccount name override.                                                      |
+| `serviceAccount.automountServiceAccountToken` | boolean | `true`            | Mount the Kubernetes ServiceAccount token and CA into the pod.                     |
+| `podSecurityContext`                          | object  | non-root defaults | Pod-level security context.                                                        |
+| `securityContext`                             | object  | non-root defaults | Security context shared by Keycloak and the built-in database wait init container. |
+| `nodeSelector`                                | object  | `{}`              | Node selector.                                                                     |
+| `tolerations`                                 | array   | `[]`              | Pod tolerations.                                                                   |
+| `affinity`                                    | object  | `{}`              | Custom affinity.                                                                   |
+| `topologySpreadConstraints`                   | array   | `[]`              | Custom topology spread constraints.                                                |
+| `priorityClassName`                           | string  | `""`              | PriorityClass name.                                                                |
+| `terminationGracePeriodSeconds`               | integer | `120`             | Pod termination grace period.                                                      |
+| `extraEnv`                                    | array   | `[]`              | Extra environment variables.                                                       |
+| `extraEnvFrom`                                | array   | `[]`              | Extra envFrom sources.                                                             |
+| `initContainers`                              | array   | `[]`              | Extra init containers.                                                             |
+| `extraContainers`                             | array   | `[]`              | Extra sidecars.                                                                    |
+| `extraVolumes`                                | array   | `[]`              | Extra pod volumes.                                                                 |
+| `extraVolumeMounts`                           | array   | `[]`              | Extra Keycloak volume mounts.                                                      |
 
 ### External Secrets Operator
 
