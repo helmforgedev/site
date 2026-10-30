@@ -38,7 +38,7 @@ localhost is an exception for testing.
 
 ## Deployment contract
 
-The official image is `ghcr.io/alam00000/bentopdf:2.8.8`, verified for Linux amd64 and arm64. Deploy at the domain root.
+The official image is `ghcr.io/alam00000/bentopdf:2.8.10`, verified for Linux amd64 and arm64. Deploy at the domain root.
 BASE_URL, branding and CSP build arguments cannot be changed through runtime environment variables.
 
 NGINX starts directly with configuration derived from the tagged upstream nginx.conf. Image-owned security-header
@@ -47,6 +47,13 @@ because individual files use subPath mounts.
 
 No database, Secret, ExternalSecret or PVC is required. There is no native login. Protect private installations through
 edge authentication. Disabling tools is presentation control, not an authorization boundary.
+
+## Architecture
+
+One or more non-root NGINX pods serve the official static application. PDF processing runs in the user's browser, so no
+document database or application PVC exists. Optional NGINX exporter sidecars expose serving metrics through a separate
+Service without publishing the loopback status endpoint. The chart keeps release-specific upstream redirects and cache
+rules synchronized with the pinned application image.
 
 ## Privacy and network boundary
 
@@ -140,6 +147,16 @@ use maxUnavailable zero and maxSurge one; reserve extra pod capacity.
 Keep values, edge configuration and image pins in version control. Reinstall the same chart/image/configuration to
 recover server state. Client documents require client backups; Kubernetes snapshots cannot recover them.
 
+## Troubleshooting
+
+- If a tool fails only through a remote hostname, verify HTTPS and inspect the browser console for secure-context, CSP
+  or WASM errors.
+- If a tool cannot load a CDN asset, inspect browser network requests; changing pod egress cannot repair a request
+  originating from the client.
+- If probes fail, inspect the `bentopdf` container logs and confirm `server.port` is not `8081` or the metrics port.
+- If Prometheus reports no target, match ServiceMonitor labels to the Prometheus selector and authorize its namespace
+  through `metrics.ingressFrom`.
+
 ## Validation
 
 Install dependencies with `npm ci --prefix charts/bentopdf/scripts` and Chromium with
@@ -204,7 +221,7 @@ image:
   # -- Repository.
   repository: ghcr.io/alam00000/bentopdf
   # -- Verified stable image tag.
-  tag: 2.8.8
+  tag: 2.8.10
   # -- Kubernetes pull policy.
   pullPolicy: IfNotPresent
 # -- Registry credentials for a private mirror.
