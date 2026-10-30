@@ -382,14 +382,22 @@ Changing `service.port` does not change where Flowise listens. Use
 
 Backup runs `pg_dump` on PostgreSQL only. SQLite and local storage blobs are not included.
 
-| Parameter                    | Type    | Default       | Description                                                |
-| ---------------------------- | ------- | ------------- | ---------------------------------------------------------- |
-| `backup.enabled`             | boolean | `false`       | Enable scheduled `pg_dump` S3 backup.                      |
-| `backup.schedule`            | string  | `"0 3 * * *"` | Cron schedule.                                             |
-| `backup.s3.endpoint`         | string  | `""`          | S3-compatible endpoint URL.                                |
-| `backup.s3.bucket`           | string  | `""`          | Target bucket name.                                        |
-| `backup.s3.existingSecret`   | string  | `""`          | Existing secret with S3 credentials.                       |
-| `backup.database.pgDumpArgs` | array   | `[]`          | Extra `pg_dump` arguments passed without shell evaluation. |
+| Parameter                    | Type            | Default       | Description                                                                                            |
+| ---------------------------- | --------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `backup.enabled`             | boolean         | `false`       | Enable scheduled `pg_dump` S3 backup.                                                                  |
+| `backup.schedule`            | string          | `"0 3 * * *"` | Cron schedule.                                                                                         |
+| `backup.s3.endpoint`         | string          | `""`          | S3-compatible endpoint URL.                                                                            |
+| `backup.s3.bucket`           | string          | `""`          | Target bucket name.                                                                                    |
+| `backup.s3.existingSecret`   | string          | `""`          | Existing secret with S3 credentials.                                                                   |
+| `backup.database.pgDumpArgs` | array or string | `[]`          | Extra `pg_dump` arguments. Arrays are preferred; legacy whitespace-delimited strings remain supported. |
+
+### Upgrade compatibility
+
+Installations created before the backup argument contract changed may continue
+to use a whitespace-delimited string for `backup.database.pgDumpArgs`. The
+chart normalizes that legacy form to an argument list. Prefer a YAML array for
+new configuration so each argument remains explicit and is passed without
+shell evaluation.
 
 ## Security Defaults
 
