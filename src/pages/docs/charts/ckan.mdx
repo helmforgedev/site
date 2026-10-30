@@ -19,20 +19,21 @@ data hubs worldwide.
   Always set it to the full public URL before deployment.
 </Callout>
 
-<Callout type="info" title="CKAN requires two PostgreSQL databases: ckan (main) and datastore (DataStore API)">
-  The DataStore extension (used by DataPusher for CSV/Excel ingestion) requires a separate `datastore` database with a
-  dedicated read-only user (`datastore_ro`). When using the bundled PostgreSQL subchart, both databases are created
-  automatically. For external PostgreSQL, create both databases and the read-only user manually before deploying.
+<Callout type="info" title="DataStore requires an externally prepared PostgreSQL database">
+  The optional DataStore extension requires a separate `datastore` database with a dedicated read-only role. The bundled
+  PostgreSQL topology supports the CKAN catalog only. Create the DataStore database and roles externally with the
+  upstream permission script before enabling `datastore` and `datapusher`.
 </Callout>
 
 ## Key Features
 
-- **uWSGI application** — CKAN web app on port 5000 behind a ClusterIP service
-- **DataPusher** — automatic CSV/Excel resource loading into the DataStore API
+- **Configurable uWSGI application** — the real listener and probes follow `ckan.containerPort`
+- **Optional DataPusher** — CSV/Excel loading when an external DataStore is prepared
 - **CKAN-specific Solr** — `ckan/ckan-solr` StatefulSet with bundled search schema
-- **Dual PostgreSQL databases** — `ckan` (metadata) + `datastore` (DataStore API)
+- **PostgreSQL and Redis contracts** — bundled or structured external connections with Secret-backed passwords
 - **Three secrets** — sysadmin password, Beaker session secret, JWT secret
 - **pg_dump backup** — daily PostgreSQL S3 backup CronJob
+- **Secure defaults** — dedicated ServiceAccount, no API token mount, hardened contexts, and NetworkPolicy
 
 ## Installation
 
@@ -64,8 +65,9 @@ helm install ckan oci://ghcr.io/helmforgedev/helm/ckan -f values.yaml
 <div data-tab-panel="basic">
 
 ```yaml
-# values.yaml — CKAN with bundled PostgreSQL, Redis, Solr, and DataPusher
+# values.yaml — CKAN catalog with bundled PostgreSQL, Redis, and Solr
 ckan:
+  containerPort: 5000
   siteUrl: 'https://data.example.com' # required; wrong value breaks all links
   siteTitle: 'My Open Data Portal'
   sysadminName: admin
@@ -93,7 +95,7 @@ solr:
     size: 10Gi
 
 datapusher:
-  enabled: true # auto-imports CSV/Excel files into DataStore API
+  enabled: false # requires an external, pre-provisioned DataStore
 
 persistence:
   enabled: true
@@ -133,6 +135,10 @@ ingress:
 ckan:
   siteUrl: 'https://data.example.com'
   existingSecret: ckan-secrets
+  plugins: 'envvars image_view text_view datatables_view datastore datapusher'
+  extraEnv:
+    - name: PGSSLROOTCERT
+      value: /etc/ckan/postgresql-ca/ca.crt
 
 postgresql:
   enabled: false
@@ -151,14 +157,34 @@ database:
     datastoreReadUsername: datastore_ro
     existingSecret: ckan-db-credentials
     existingSecretPasswordKey: password
+    existingSecretDatastoreReadPasswordKey: datastore-read-password
+    sslMode: verify-full
 
 redisConfig:
   mode: external
   external:
-    url: 'redis://:strong-redis-password@redis.cache.svc.cluster.local:6379/0'
+    host: redis.cache.svc.cluster.local
+    port: 6379
+    database: 0
+    tls: true
+    sslCertReqs: required
+    existingSecret: ckan-redis-credentials
+    existingSecretPasswordKey: redis-password
+
+datapusher:
+  enabled: true
 
 solr:
   enabled: true # always use the bundled CKAN-specific Solr image
+
+extraVolumes:
+  - name: postgresql-ca
+    secret:
+      secretName: postgresql-ca
+extraVolumeMounts:
+  - name: postgresql-ca
+    mountPath: /etc/ckan/postgresql-ca
+    readOnly: true
 
 ingress:
   enabled: true
@@ -175,18 +201,15 @@ ingress:
 <div data-tab-panel="plugins">
 
 ```yaml
-# values.yaml — CKAN with additional plugins
+# values.yaml — CKAN listener tuning and image-provided plugins
 ckan:
   siteUrl: 'https://data.example.com'
   existingSecret: ckan-secrets
-  # Default plugins (keep all for full functionality):
-  # envvars image_view text_view datatables_view
-  plugins: 'envvars image_view text_view datatables_view datastore resource_proxy geo_view'
-  extraEnv:
-    - name: CKAN__DATAPUSHER__URL
-      value: 'http://ckan-datapusher:8800'
-    - name: CKAN__DATAPUSHER__CALLBACK_URL_BASE
-      value: 'http://ckan-ckan:5000'
+  containerPort: 5500
+  uwsgiProcesses: 4
+  uwsgiHarakiri: 120
+  # Only enable plugins installed in the selected image.
+  plugins: 'envvars image_view text_view datatables_view'
 
 postgresql:
   enabled: true
@@ -197,6 +220,9 @@ redis:
   enabled: true
   auth:
     password: 'strong-redis-password'
+
+datapusher:
+  enabled: false
 ```
 
 </div>
@@ -256,6 +282,9 @@ ingress:
 
 | Parameter                        | Type    | Default                            | Description                                                |
 | -------------------------------- | ------- | ---------------------------------- | ---------------------------------------------------------- |
+| `ckan.containerPort`             | integer | `5000`                             | Real uWSGI listener port.                                  |
+| `ckan.uwsgiProcesses`            | integer | `2`                                | uWSGI worker processes.                                    |
+| `ckan.uwsgiHarakiri`             | integer | `60`                               | Maximum request duration in seconds.                       |
 | `ckan.siteUrl`                   | string  | `http://localhost:5000`            | **Required.** Full public URL (breaks all links if wrong). |
 | `ckan.siteTitle`                 | string  | `CKAN`                             | Portal display name.                                       |
 | `ckan.sysadminName`              | string  | `admin`                            | Sysadmin username.                                         |
@@ -271,11 +300,11 @@ ingress:
 
 ### DataPusher
 
-| Parameter                 | Type    | Default | Description                                            |
-| ------------------------- | ------- | ------- | ------------------------------------------------------ |
-| `datapusher.enabled`      | boolean | `true`  | Deploy the DataPusher service (CSV/Excel → DataStore). |
-| `datapusher.replicaCount` | integer | `1`     | DataPusher pod replicas.                               |
-| `datapusher.port`         | integer | `8800`  | DataPusher service port.                               |
+| Parameter                 | Type    | Default | Description                                              |
+| ------------------------- | ------- | ------- | -------------------------------------------------------- |
+| `datapusher.enabled`      | boolean | `true`  | Deploy DataPusher; external DataStore is still required. |
+| `datapusher.replicaCount` | integer | `1`     | DataPusher pod replicas.                                 |
+| `datapusher.port`         | integer | `8800`  | DataPusher service port.                                 |
 
 ### Solr
 
@@ -287,32 +316,43 @@ ingress:
 | Parameter               | Type    | Default | Description                                        |
 | ----------------------- | ------- | ------- | -------------------------------------------------- |
 | `solr.enabled`          | boolean | `true`  | Deploy the bundled CKAN-specific Solr StatefulSet. |
+| `solr.port`             | integer | `8983`  | Real Solr listener and Service port.               |
 | `solr.persistence.size` | string  | `5Gi`   | Solr PVC size.                                     |
 | `solr.externalUrl`      | string  | `""`    | External Solr URL (when `solr.enabled: false`).    |
 
 ### Database
 
-| Parameter                                       | Type    | Default        | Description                                                                        |
-| ----------------------------------------------- | ------- | -------------- | ---------------------------------------------------------------------------------- |
-| `database.mode`                                 | string  | `subchart`     | Mode: `subchart` or `external`.                                                    |
-| `database.external.host`                        | string  | `""`           | External PostgreSQL hostname.                                                      |
-| `database.external.ckanDatabase`                | string  | `ckan`         | CKAN main database name.                                                           |
-| `database.external.datastoreDatabase`           | string  | `datastore`    | DataStore extension database name.                                                 |
-| `database.external.datastoreReadUsername`       | string  | `datastore_ro` | Read-only user for the DataStore API.                                              |
-| `database.external.existingSecret`              | string  | `""`           | Existing secret with database passwords.                                           |
-| `postgresql.enabled`                            | boolean | `true`         | Deploy the bundled PostgreSQL subchart.                                            |
-| `postgresql.startupProbe.initialDelaySeconds`   | integer | `30`           | Delay startup checks until PostgreSQL completes its temporary init server cycle.   |
-| `postgresql.readinessProbe.initialDelaySeconds` | integer | `30`           | Delay readiness checks until PostgreSQL completes its temporary init server cycle. |
-| `postgresql.auth.password`                      | string  | `""`           | Password. Auto-generated if empty.                                                 |
+| Parameter                                                  | Type    | Default                   | Description                                                                                    |
+| ---------------------------------------------------------- | ------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `database.mode`                                            | string  | `subchart`                | Mode: `subchart` or `external`.                                                                |
+| `database.external.host`                                   | string  | `""`                      | External PostgreSQL hostname.                                                                  |
+| `database.external.ckanDatabase`                           | string  | `ckan`                    | CKAN main database name.                                                                       |
+| `database.external.datastoreDatabase`                      | string  | `datastore`               | DataStore extension database name.                                                             |
+| `database.external.datastoreReadUsername`                  | string  | `datastore_ro`            | Read-only user for the DataStore API.                                                          |
+| `database.external.existingSecret`                         | string  | `""`                      | Existing secret with database passwords.                                                       |
+| `database.external.existingSecretPasswordKey`              | string  | `password`                | CKAN/DataStore write-role password key.                                                        |
+| `database.external.existingSecretDatastoreReadPasswordKey` | string  | `datastore-read-password` | DataStore read-role password key.                                                              |
+| `database.external.sslMode`                                | string  | `require`                 | libpq SSL mode; use `verify-full` with a trusted CA for certificate and hostname verification. |
+| `postgresql.enabled`                                       | boolean | `true`                    | Deploy the bundled PostgreSQL subchart.                                                        |
+| `postgresql.startupProbe.initialDelaySeconds`              | integer | `30`                      | Delay startup checks until PostgreSQL completes its temporary init server cycle.               |
+| `postgresql.readinessProbe.initialDelaySeconds`            | integer | `30`                      | Delay readiness checks until PostgreSQL completes its temporary init server cycle.             |
+| `postgresql.auth.password`                                 | string  | `""`                      | Password. Auto-generated if empty.                                                             |
 
 ### Redis
 
-| Parameter                  | Type    | Default    | Description                                      |
-| -------------------------- | ------- | ---------- | ------------------------------------------------ |
-| `redisConfig.mode`         | string  | `subchart` | Mode: `subchart` or `external`.                  |
-| `redisConfig.external.url` | string  | `""`       | Full Redis URL: `redis://:password@host:6379/0`. |
-| `redis.enabled`            | boolean | `true`     | Deploy the bundled Redis subchart.               |
-| `redis.auth.password`      | string  | `""`       | Password. Auto-generated if empty.               |
+| Parameter                                        | Type    | Default          | Description                        |
+| ------------------------------------------------ | ------- | ---------------- | ---------------------------------- |
+| `redisConfig.mode`                               | string  | `subchart`       | Mode: `subchart` or `external`.    |
+| `redisConfig.external.host`                      | string  | `""`             | External Redis hostname.           |
+| `redisConfig.external.port`                      | integer | `6379`           | External Redis port.               |
+| `redisConfig.external.database`                  | integer | `0`              | Redis logical database.            |
+| `redisConfig.external.tls`                       | boolean | `true`           | Use `rediss://`.                   |
+| `redisConfig.external.sslCertReqs`               | string  | `required`       | TLS certificate verification mode. |
+| `redisConfig.external.sslCaCerts`                | string  | `""`             | Mounted CA bundle path.            |
+| `redisConfig.external.existingSecret`            | string  | `""`             | Secret containing the password.    |
+| `redisConfig.external.existingSecretPasswordKey` | string  | `redis-password` | Password key in the Secret.        |
+| `redis.enabled`                                  | boolean | `true`           | Deploy the bundled Redis subchart. |
+| `redis.auth.password`                            | string  | `""`             | Password. Auto-generated if empty. |
 
 ### Persistence and Service
 
@@ -323,6 +363,19 @@ ingress:
 | `service.port`             | integer | `80`      | Service port.                                        |
 | `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                          |
 | `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                                  |
+
+`service.port` is independent from the process listener. Change
+`ckan.containerPort` to move uWSGI itself.
+
+### Network and identity
+
+| Parameter                                     | Type    | Default | Description                                         |
+| --------------------------------------------- | ------- | ------- | --------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.                  |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount Kubernetes API credentials.                   |
+| `networkPolicy.enabled`                       | boolean | `true`  | Create component-aware NetworkPolicy rules.         |
+| `networkPolicy.ingressFrom`                   | array   | `[]`    | Sources allowed to access the CKAN listener.        |
+| `networkPolicy.egress`                        | array   | `[{}]`  | Complete egress rule list; replace per environment. |
 
 ### Backup
 
@@ -348,6 +401,11 @@ persistent storage, review the
 [upstream 2.12.0 release](https://github.com/ckan/ckan/releases/tag/ckan-2.12.0),
 and test extensions against CKAN 2.12 before production rollout. Keep Solr,
 PostgreSQL, and Redis available while CKAN performs its upgrade steps.
+The former `redisConfig.external.url` value was replaced with structured
+connection fields and a Secret-backed password. The structured external Redis
+configuration enables TLS by default. Operators migrating a plaintext
+`redis://` endpoint must set `redisConfig.external.tls: false`; TLS-enabled
+endpoints can retain the default.
 
 ## More Information
 

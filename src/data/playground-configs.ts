@@ -16534,6 +16534,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'CKAN site title',
         },
         {
+          label: 'Container Port',
+          key: 'ckan.containerPort',
+          type: 'number',
+          default: '5000',
+          description: 'Real uWSGI listener port',
+        },
+        {
           label: 'Sysadmin Name',
           key: 'ckan.sysadminName',
           type: 'text',
@@ -16560,6 +16567,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'toggle',
           default: 'true',
           description: 'Enable DataPusher',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Enable component-aware network isolation',
         },
       ],
     },
@@ -16598,7 +16612,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'ckan.example.com',
           description: 'Ingress hostname',
