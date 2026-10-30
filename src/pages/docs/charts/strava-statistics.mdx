@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: Dreeve (Statistics for Strava) Chart
-description: Dreeve Helm chart for Kubernetes fitness dashboards with SQLite storage, optional Strava imports, activity visualizations, persistence, Ingress, Gateway API, External Secrets, and dual-stack Services.
+description: Production-ready Dreeve Helm chart with the web application and daemon, SQLite persistence, hardened containers, file or Strava imports, Ingress, Gateway API, and External Secrets.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -9,57 +9,39 @@ import Callout from '../../../components/Callout.astro';
 
 # Dreeve (Statistics for Strava)
 
-Self-hosted fitness dashboard for [Dreeve](https://github.com/dreeveapp/dreeve), formerly Statistics for Strava.
-Pulls your complete activity history from the Strava API using OAuth and presents it as a rich, personal dashboard
-with heatmaps, pace charts, gear tracking, and year-over-year comparisons — all stored locally in SQLite, with no
-external database required.
+[Dreeve](https://github.com/dreeveapp/dreeve), formerly Statistics for Strava, is a self-hosted fitness dashboard for
+FIT, TCX, and GPX files or activities imported through the Strava API. The chart deploys the official image with a web
+container and the mandatory background daemon sharing one SQLite-backed persistent volume.
 
-<Callout type="info" title="Personal dashboard — single athlete">
-  Statistics for Strava is designed for a single Strava athlete account. All three Strava credentials (`clientId`,
-  `clientSecret`, `refreshToken`) are required before the application will start syncing.
+<Callout type="warning" title="Upgrade security requirement">
+  Dreeve `v5.6.2` includes the upstream fix for the October 2026 critical PHP remote-code-execution vulnerability.
+  Earlier versions should be upgraded. The former `robiningelbrecht/strava-statistics:v5.0.0` tag now serves only a
+  rename notice and is no longer the application image.
 </Callout>
 
 ## Key Features
 
-- **Complete activity history** — imports all past and future Strava activities automatically
-- **Rich visualizations** — heatmaps, pace/HR charts, segment leaderboards, gear tracking
-- **SQLite storage** — embedded database, no external database dependency
-- **OAuth integration** — syncs with a single Strava athlete account via OAuth2
-- **Persistent storage** — PVC-backed data directory for SQLite database and cached files
-- **Ingress and Gateway API** — expose the dashboard with classic Ingress or HTTPRoute
-- **External Secrets Operator** — render ExternalSecret resources for Strava credentials
-- **Dual-stack Services** — optional `ipFamilyPolicy` and `ipFamilies` controls
+- Official `docker.io/robiningelbrecht/dreeve:v5.6.2` image
+- Web and daemon containers co-located for safe RWO SQLite access
+- Shared persistent database, file, build-cache, gear-maintenance, and watch paths
+- File-import and Strava API modes
+- Chart-managed, existing, or External Secrets for runtime and OAuth credentials
+- Non-root UID/GID 82, read-only root filesystems, RuntimeDefault seccomp, and disabled token automounting
+- Optional Ingress, Gateway API, NetworkPolicy, PodDisruptionBudget, and dual-stack Service controls
+- Probes based on the upstream FrankenPHP metrics endpoint and migrated database
 
-## Strava OAuth Setup
+## Architecture
 
-Before deploying, you need a Strava API application and a refresh token. Follow these steps:
-
-**1. Create a Strava API Application**
-
-1. Go to [strava.com/settings/api](https://www.strava.com/settings/api)
-2. Fill in the application name, category, and website
-3. Set **Authorization Callback Domain** to your deployment hostname (e.g. `strava.example.com`)
-4. Note your **Client ID** and **Client Secret**
-
-**2. Obtain a Refresh Token**
-
-Replace `<YOUR_CLIENT_ID>` and authorize in your browser:
-
-```
-https://www.strava.com/oauth/authorize?client_id=<YOUR_CLIENT_ID>&response_type=code&redirect_uri=http://localhost/callback&scope=read,activity:read_all
+```text
+User -> Ingress or HTTPRoute -> Service -> Dreeve web container
+                                             |
+                                   shared RWO PVC (SQLite/data)
+                                             |
+                                      Dreeve daemon
 ```
 
-After authorization, exchange the code for tokens:
-
-```bash
-curl -X POST https://www.strava.com/api/v3/oauth/token \
-  -d client_id=<YOUR_CLIENT_ID> \
-  -d client_secret=<YOUR_CLIENT_SECRET> \
-  -d code=<AUTHORIZATION_CODE> \
-  -d grant_type=authorization_code
-```
-
-The response contains `refresh_token` — use this value for `strava.refreshToken`.
+The Deployment is intentionally one replica with `Recreate`. SQLite is single-writer, and the mandatory daemon must
+share the same filesystem and node attachment as the web process.
 
 ## Installation
 
@@ -68,112 +50,163 @@ The response contains `refresh_token` — use this value for `strava.refreshToke
 ```bash
 helm repo add helmforge https://repo.helmforge.dev
 helm repo update
-helm install strava-statistics helmforge/strava-statistics
+helm install dreeve helmforge/strava-statistics -f values.yaml
 ```
 
 **OCI registry:**
 
 ```bash
-helm install strava-statistics oci://ghcr.io/helmforgedev/helm/strava-statistics
+helm install dreeve oci://ghcr.io/helmforgedev/helm/strava-statistics -f values.yaml
 ```
+
+## Prepare the Admin Password
+
+`ADMIN_PASSWORD_HASH` must contain a bcrypt hash, not a plaintext password. Generate it with the same image version:
+
+```bash
+docker run --rm -it --entrypoint bin/console robiningelbrecht/dreeve:v5.6.2 security:hash-password
+```
+
+Helm values preserve `$` characters as written; do not apply Docker Compose's double-dollar escaping.
+
+When `dreeve.appSecret` is empty, the chart generates a 64-character value and reuses the value stored in the live
+Secret during upgrades. Set `dreeve.appSecret` or `dreeve.existingSecret` explicitly for reproducible GitOps and offline
+rendering.
 
 ## Deployment Examples
 
 <DocsTabs
   tabs={[
-    { id: 'basic', label: 'Basic' },
-    { id: 'existing-secret', label: 'With Existing Secret' },
-    { id: 'tls', label: 'With TLS' },
-    { id: 'gateway-api', label: 'Gateway API' },
+    { id: 'strava', label: 'Strava API' },
+    { id: 'files', label: 'File Import' },
+    { id: 'existing-secrets', label: 'Existing Secrets' },
     { id: 'external-secrets', label: 'External Secrets' },
+    { id: 'gateway-api', label: 'Gateway API' },
   ]}
 >
 
-<div data-tab-panel="basic">
+<div data-tab-panel="strava">
 
 ```yaml
-# values.yaml — Statistics for Strava with inline credentials
+dreeve:
+  appUrl: https://dreeve.example.com
+  appSecret: replace-with-a-long-random-value
+  adminUsername: admin
+  adminPasswordHash: '$2y$13$replace-with-the-generated-bcrypt-hash'
+  importMode: stravaApi
+
 strava:
   clientId: '12345'
-  clientSecret: 'your-strava-client-secret'
-  refreshToken: 'your-strava-refresh-token'
+  clientSecret: replace-me
+  refreshToken: replace-me
   timezone: America/Sao_Paulo
 
 persistence:
-  enabled: true
-  size: 5Gi
+  size: 10Gi
 
 ingress:
   enabled: true
   ingressClassName: traefik
   hosts:
-    - host: strava.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-```
-
-</div>
-
-<div data-tab-panel="existing-secret">
-
-```yaml
-# values.yaml — Strava credentials stored in a Kubernetes Secret
-# kubectl create secret generic strava-credentials \
-#   --from-literal=client-id=12345 \
-#   --from-literal=client-secret=your-secret \
-#   --from-literal=refresh-token=your-token
-strava:
-  timezone: America/Sao_Paulo
-  existingSecret: strava-credentials
-  existingSecretClientIdKey: client-id
-  existingSecretClientSecretKey: client-secret
-  existingSecretRefreshTokenKey: refresh-token
-
-persistence:
-  enabled: true
-  size: 5Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  hosts:
-    - host: strava.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-```
-
-</div>
-
-<div data-tab-panel="tls">
-
-```yaml
-# values.yaml — Statistics for Strava with TLS via cert-manager
-strava:
-  clientId: '12345'
-  clientSecret: 'your-strava-client-secret'
-  refreshToken: 'your-strava-refresh-token'
-  timezone: America/Sao_Paulo
-
-persistence:
-  enabled: true
-  size: 5Gi
-
-ingress:
-  enabled: true
-  ingressClassName: traefik
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: strava.example.com
+    - host: dreeve.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: strava-statistics-tls
+    - secretName: dreeve-tls
       hosts:
-        - strava.example.com
+        - dreeve.example.com
+```
+
+</div>
+
+<div data-tab-panel="files">
+
+```yaml
+dreeve:
+  appUrl: https://dreeve.example.com
+  appSecret: replace-with-a-long-random-value
+  adminPasswordHash: '$2y$13$replace-with-the-generated-bcrypt-hash'
+  importMode: files
+
+strava:
+  clientId: ''
+  clientSecret: ''
+  refreshToken: ''
+
+persistence:
+  size: 10Gi
+```
+
+Both containers mount the file watch directory at `/var/www/watch`.
+
+</div>
+
+<div data-tab-panel="existing-secrets">
+
+```yaml
+dreeve:
+  appUrl: https://dreeve.example.com
+  existingSecret: dreeve-runtime
+  existingSecretAppSecretKey: app-secret
+  existingSecretAdminPasswordHashKey: admin-password-hash
+  existingSecretApiKeyKey: api-key
+
+strava:
+  existingSecret: strava-credentials
+  existingSecretClientIdKey: client-id
+  existingSecretClientSecretKey: client-secret
+  existingSecretRefreshTokenKey: refresh-token
+```
+
+The `api-key` key is optional; without it the upload API remains closed.
+
+</div>
+
+<div data-tab-panel="external-secrets">
+
+```yaml
+externalSecrets:
+  enabled: true
+  items:
+    - name: runtime
+      storeRef:
+        name: platform-secrets
+        kind: ClusterSecretStore
+      targetName: dreeve-runtime
+      data:
+        - secretKey: app-secret
+          remoteRef:
+            key: dreeve/runtime
+            property: app-secret
+        - secretKey: admin-password-hash
+          remoteRef:
+            key: dreeve/runtime
+            property: admin-password-hash
+    - name: strava
+      storeRef:
+        name: platform-secrets
+        kind: ClusterSecretStore
+      targetName: strava-credentials
+      data:
+        - secretKey: client-id
+          remoteRef:
+            key: dreeve/strava
+            property: client-id
+        - secretKey: client-secret
+          remoteRef:
+            key: dreeve/strava
+            property: client-secret
+        - secretKey: refresh-token
+          remoteRef:
+            key: dreeve/strava
+            property: refresh-token
+
+dreeve:
+  existingSecret: dreeve-runtime
+
+strava:
+  existingSecret: strava-credentials
 ```
 
 </div>
@@ -181,69 +214,22 @@ ingress:
 <div data-tab-panel="gateway-api">
 
 ```yaml
-# values.yaml — expose Statistics for Strava through Gateway API
+dreeve:
+  appUrl: https://dreeve.example.com
+  existingSecret: dreeve-runtime
+
 strava:
   existingSecret: strava-credentials
-  existingSecretClientIdKey: client-id
-  existingSecretClientSecretKey: client-secret
-  existingSecretRefreshTokenKey: refresh-token
-  timezone: America/Sao_Paulo
 
 gatewayAPI:
   enabled: true
   httpRoutes:
-    - name: strava-statistics
-      spec:
-        parentRefs:
-          - name: public-gateway
-            namespace: gateway-system
-        hostnames:
-          - strava.example.com
-        rules:
-          - matches:
-              - path:
-                  type: PathPrefix
-                  value: /
-```
-
-</div>
-
-<div data-tab-panel="external-secrets">
-
-```yaml
-# values.yaml — Strava credentials managed by External Secrets Operator
-strava:
-  timezone: America/Sao_Paulo
-  existingSecret: strava-credentials
-  existingSecretClientIdKey: client-id
-  existingSecretClientSecretKey: client-secret
-  existingSecretRefreshTokenKey: refresh-token
-
-externalSecrets:
-  enabled: true
-  apiVersion: external-secrets.io/v1
-  items:
-    - name: strava-credentials
-      spec:
-        secretStoreRef:
-          name: platform-secrets
-          kind: ClusterSecretStore
-        target:
-          name: strava-credentials
-          creationPolicy: Owner
-        data:
-          - secretKey: client-id
-            remoteRef:
-              key: strava/oauth
-              property: clientId
-          - secretKey: client-secret
-            remoteRef:
-              key: strava/oauth
-              property: clientSecret
-          - secretKey: refresh-token
-            remoteRef:
-              key: strava/oauth
-              property: refreshToken
+    - name: web
+      parentRefs:
+        - name: public-gateway
+          namespace: gateway-system
+      hostnames:
+        - dreeve.example.com
 ```
 
 </div>
@@ -252,190 +238,139 @@ externalSecrets:
 
 ## Configuration Reference
 
-### Core
+### Image and Runtime
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter                  | Type    | Default                             | Description                                                 |
+| -------------------------- | ------- | ----------------------------------- | ----------------------------------------------------------- |
+| `image.repository`         | string  | `docker.io/robiningelbrecht/dreeve` | Official Dreeve image.                                      |
+| `image.tag`                | string  | `v5.6.2`                            | Pinned release with the critical PHP fix.                   |
+| `image.pullPolicy`         | string  | `IfNotPresent`                      | Kubernetes image pull policy.                               |
+| `dreeve.appUrl`            | string  | `http://localhost:8080`             | Public root URL.                                            |
+| `dreeve.importMode`        | string  | `stravaApi`                         | `stravaApi` or `files`.                                     |
+| `dreeve.appSecret`         | string  | `""`                                | Session-signing secret; generated and preserved when empty. |
+| `dreeve.adminUsername`     | string  | `admin`                             | Admin panel username.                                       |
+| `dreeve.adminPasswordHash` | string  | `""`                                | Bcrypt admin password hash.                                 |
+| `dreeve.apiKey`            | string  | `""`                                | Optional activity-upload API key.                           |
+| `dreeve.existingSecret`    | string  | `""`                                | Existing Secret for Dreeve runtime secrets.                 |
+| `daemon.enabled`           | boolean | `true`                              | Run the mandatory Dreeve background daemon.                 |
 
-### Image
-
-| Parameter          | Type   | Default                                        | Description                          |
-| ------------------ | ------ | ---------------------------------------------- | ------------------------------------ |
-| `image.repository` | string | `docker.io/robiningelbrecht/strava-statistics` | Container image.                     |
-| `image.tag`        | string | `"v5.0.0"`                                     | Image tag.                           |
-| `image.pullPolicy` | string | `IfNotPresent`                                 | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                                           | Pull secrets for private registries. |
-
-### Strava Configuration
-
-| Parameter                              | Type    | Default         | Description                                                    |
-| -------------------------------------- | ------- | --------------- | -------------------------------------------------------------- |
-| `strava.port`                          | integer | `8080`          | Internal HTTP port for the container.                          |
-| `strava.clientId`                      | string  | `""`            | Strava OAuth application Client ID.                            |
-| `strava.clientSecret`                  | string  | `""`            | Strava OAuth application Client Secret.                        |
-| `strava.refreshToken`                  | string  | `""`            | Strava OAuth Refresh Token for the athlete account.            |
-| `strava.existingSecret`                | string  | `""`            | Existing Kubernetes Secret containing Strava credentials.      |
-| `strava.existingSecretClientIdKey`     | string  | `client-id`     | Key in the existing secret for the Client ID.                  |
-| `strava.existingSecretClientSecretKey` | string  | `client-secret` | Key in the existing secret for the Client Secret.              |
-| `strava.existingSecretRefreshTokenKey` | string  | `refresh-token` | Key in the existing secret for the Refresh Token.              |
-| `strava.timezone`                      | string  | `UTC`           | Timezone for activity time display (e.g. `America/Sao_Paulo`). |
-| `strava.extraEnv`                      | array   | `[]`            | Extra environment variables injected into the container.       |
-
-<Callout type="danger" title="All three Strava credentials are required">
-  The application will not start without `strava.clientId`, `strava.clientSecret`, and `strava.refreshToken`. Do not
-  deploy without completing the [Strava OAuth Setup](#strava-oauth-setup) steps above.
+<Callout type="danger" title="Replace the validation credentials">
+  The `mock-*` defaults allow deterministic chart rendering and runtime tests. They are not safe production credentials.
+  Set unique values or reference existing Secrets before exposing Dreeve.
 </Callout>
 
-<Callout type="warning" title="Store credentials in a Kubernetes Secret">
-  Avoid setting `clientId`, `clientSecret`, and `refreshToken` as plain-text values in your values file if it is
-  committed to a repository. Use `strava.existingSecret` to reference a pre-created Kubernetes Secret instead.
-</Callout>
+### Strava API
 
-<Callout type="tip" title="Set your local timezone">
-  Activity start times are displayed in the configured timezone. Set `strava.timezone` to your local timezone (e.g.
-  `America/Sao_Paulo`, `Europe/London`, `Asia/Tokyo`) so workout times match your local clock.
-</Callout>
+| Parameter               | Type   | Default              | Description                                         |
+| ----------------------- | ------ | -------------------- | --------------------------------------------------- |
+| `strava.clientId`       | string | `mock-client-id`     | Validation-only OAuth client ID.                    |
+| `strava.clientSecret`   | string | `mock-client-secret` | Validation-only OAuth client secret.                |
+| `strava.refreshToken`   | string | `mock-refresh-token` | Validation-only refresh token.                      |
+| `strava.existingSecret` | string | `""`                 | Existing Secret containing OAuth credentials.       |
+| `strava.timezone`       | string | `UTC`                | Runtime timezone.                                   |
+| `strava.config`         | string | legacy YAML          | One-time v4 migration input.                        |
+| `strava.extraEnv`       | array  | `[]`                 | Additional environment entries for both containers. |
+
+Strava credentials are required only when `dreeve.importMode=stravaApi`.
 
 ### Persistence
 
-| Parameter                   | Type    | Default             | Description                                                  |
-| --------------------------- | ------- | ------------------- | ------------------------------------------------------------ |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/data` (SQLite database and cached files). |
-| `persistence.size`          | string  | `2Gi`               | PVC size.                                                    |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                                    |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                            |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                 |
+| Parameter                       | Type    | Default           | Description                                           |
+| ------------------------------- | ------- | ----------------- | ----------------------------------------------------- |
+| `persistence.enabled`           | boolean | `true`            | Create or mount persistent shared storage.            |
+| `persistence.size`              | string  | `2Gi`             | PVC request.                                          |
+| `persistence.storageClass`      | string  | `""`              | StorageClass; empty uses the cluster default.         |
+| `persistence.accessModes`       | array   | `[ReadWriteOnce]` | PVC access modes.                                     |
+| `persistence.existingClaim`     | string  | `""`              | Existing PVC name.                                    |
+| `persistence.bootstrap.enabled` | boolean | `true`            | Prepare Dreeve directories and legacy database links. |
 
-<Callout type="warning" title="SQLite data lives on the PVC — back it up separately">
-  Unlike other charts, there is no built-in S3 backup CronJob. The SQLite database and all downloaded activity data are
-  stored in the PVC. Use your storage provider's snapshot functionality or a Velero-based backup policy to protect this
-  data.
-</Callout>
-
-### Service
-
-| Parameter                | Type    | Default     | Description                          |
-| ------------------------ | ------- | ----------- | ------------------------------------ |
-| `service.type`           | string  | `ClusterIP` | Kubernetes service type.             |
-| `service.port`           | integer | `80`        | Service port exposed to the cluster. |
-| `service.annotations`    | object  | `{}`        | Annotations for the Service.         |
-| `service.ipFamilyPolicy` | string  | omitted     | Service IP family policy.            |
-| `service.ipFamilies`     | array   | omitted     | Ordered Service IP families.         |
-
-### Ingress
-
-| Parameter                  | Type    | Default   | Description                                      |
-| -------------------------- | ------- | --------- | ------------------------------------------------ |
-| `ingress.enabled`          | boolean | `false`   | Enable an Ingress resource.                      |
-| `ingress.ingressClassName` | string  | `traefik` | Ingress class name.                              |
-| `ingress.annotations`      | object  | `{}`      | Annotations for the Ingress (e.g. cert-manager). |
-| `ingress.hosts`            | array   | `[]`      | Ingress host and path rules.                     |
-| `ingress.tls`              | array   | `[]`      | TLS configuration (secret name and hosts).       |
-
-### Probes
-
-| Parameter                              | Type    | Default | Description                        |
-| -------------------------------------- | ------- | ------- | ---------------------------------- |
-| `probes.startup.enabled`               | boolean | `true`  | Enable startup probe.              |
-| `probes.startup.initialDelaySeconds`   | integer | `10`    | Startup probe initial delay.       |
-| `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
-| `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
-| `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
-| `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
-| `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
-| `probes.liveness.timeoutSeconds`       | integer | `5`     | Liveness probe timeout.            |
-| `probes.liveness.failureThreshold`     | integer | `3`     | Liveness probe failure threshold.  |
-| `probes.readiness.enabled`             | boolean | `true`  | Enable readiness probe.            |
-| `probes.readiness.initialDelaySeconds` | integer | `0`     | Readiness probe initial delay.     |
-| `probes.readiness.periodSeconds`       | integer | `10`    | Readiness probe period.            |
-| `probes.readiness.timeoutSeconds`      | integer | `5`     | Readiness probe timeout.           |
-| `probes.readiness.failureThreshold`    | integer | `3`     | Readiness probe failure threshold. |
+The shared volume stores the SQLite database, application files, build cache, gear-maintenance assets, and watched
+imports. Snapshot or back up the PVC before every upgrade.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                     | Type    | Default | Description                                       |
+| --------------------------------------------- | ------- | ------- | ------------------------------------------------- |
+| `resources.requests.cpu`                      | string  | `100m`  | Web CPU request.                                  |
+| `resources.requests.memory`                   | string  | `256Mi` | Web memory request.                               |
+| `resources.limits.cpu`                        | string  | `2`     | Web CPU limit.                                    |
+| `resources.limits.memory`                     | string  | `5Gi`   | Web memory limit.                                 |
+| `daemon.resources.requests.cpu`               | string  | `100m`  | Daemon CPU request.                               |
+| `daemon.resources.requests.memory`            | string  | `256Mi` | Daemon memory request.                            |
+| `daemon.resources.limits.cpu`                 | string  | `2`     | Daemon CPU limit.                                 |
+| `daemon.resources.limits.memory`              | string  | `5Gi`   | Daemon memory limit.                              |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token.                     |
+| `networkPolicy.enabled`                       | boolean | `false` | Render supplied ingress and egress rules.         |
+| `podDisruptionBudget.enabled`                 | boolean | `false` | Protect the single pod from voluntary disruption. |
 
-### Service Account
+The web container adds only `NET_BIND_SERVICE`, required by the upstream FrankenPHP binary capability. The daemon drops
+all capabilities. Both run as UID/GID 82 with read-only root filesystems and bounded writable volumes.
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+### Exposure
 
-### Scheduling
+| Parameter                 | Type    | Default | Description                               |
+| ------------------------- | ------- | ------- | ----------------------------------------- |
+| `service.port`            | integer | `80`    | Service port targeting named port `http`. |
+| `service.ipFamilyPolicy`  | string  | omitted | Optional single/dual-stack policy.        |
+| `service.ipFamilies`      | array   | omitted | Ordered IP families.                      |
+| `ingress.enabled`         | boolean | `false` | Render Ingress.                           |
+| `gatewayAPI.enabled`      | boolean | `false` | Render HTTPRoutes.                        |
+| `externalSecrets.enabled` | boolean | `false` | Render ExternalSecrets.                   |
 
-| Parameter                       | Type    | Default | Description                    |
-| ------------------------------- | ------- | ------- | ------------------------------ |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.  |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.    |
-| `affinity`                      | object  | `{}`    | Affinity rules.                |
-| `topologySpreadConstraints`     | array   | `[]`    | Topology spread constraints.   |
-| `priorityClassName`             | string  | `""`    | PriorityClass for the pod.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.      |
-| `podLabels`                     | object  | `{}`    | Extra labels for the pod.      |
-| `podAnnotations`                | object  | `{}`    | Extra annotations for the pod. |
+## NetworkPolicy
 
-### Extra
+When enabled, empty rule lists deny that traffic direction. Declare DNS plus every Strava, map, notification, or AI
+destination used by the installation:
 
-| Parameter           | Type  | Default | Description                                              |
-| ------------------- | ----- | ------- | -------------------------------------------------------- |
-| `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
-| `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
-| `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - {}
+```
 
-### Gateway API
+Replace unrestricted egress with cluster-specific destinations where the CNI supports them.
 
-| Parameter               | Type    | Default | Description                      |
-| ----------------------- | ------- | ------- | -------------------------------- |
-| `gatewayAPI.enabled`    | boolean | `false` | Enable HTTPRoute resources.      |
-| `gatewayAPI.httpRoutes` | array   | `[]`    | HTTPRoute definitions to render. |
-| `gatewayApi.enabled`    | boolean | `false` | Deprecated compatibility alias.  |
-| `gatewayApi.httpRoutes` | array   | `[]`    | Deprecated compatibility alias.  |
+## Upgrading from v4
 
-<Callout type="info" title="Use gatewayAPI for new values">
-  `gatewayApi` remains as a compatibility alias for older values files. New deployments should use `gatewayAPI`.
-</Callout>
+Dreeve v5 moves YAML settings into SQLite and adds the mandatory daemon. Keep `strava.config` during the first successful
+v5 startup so supported settings can migrate, then verify them in the admin panel. Images and gear purchase prices are
+not migrated upstream. Back up the PVC and read the
+[official v4-to-v5 guide](https://docs.dreeve.app/getting-started/migrating-from-v4/).
 
-### External Secrets
+## Troubleshooting
 
-| Parameter                    | Type    | Default                  | Description                           |
-| ---------------------------- | ------- | ------------------------ | ------------------------------------- |
-| `externalSecrets.enabled`    | boolean | `false`                  | Enable ExternalSecret resources.      |
-| `externalSecrets.apiVersion` | string  | `external-secrets.io/v1` | ExternalSecret API version.           |
-| `externalSecrets.items`      | array   | `[]`                     | ExternalSecret definitions to render. |
+### Daemon waits for schema
 
-## Common Issues
+The web container owns database migrations; the daemon waits for them. Inspect both logs:
 
-<Callout type="danger" title="Dashboard empty — invalid or expired refresh token">
-  If the dashboard shows no activities after deployment, verify your Strava refresh token is valid. Refresh tokens from
-  the authorization flow are long-lived but can be revoked from the Strava application settings. Re-run the OAuth flow
-  to obtain a new token and update your values.
-</Callout>
+```bash
+kubectl logs deploy/<release>-strava-statistics -c strava-statistics
+kubectl logs deploy/<release>-strava-statistics -c daemon
+```
 
-<Callout type="tip" title="Initial sync takes time for large histories">
-  On first deployment, the application imports your entire Strava activity history. For athletes with hundreds or
-  thousands of activities, this can take several minutes. The dashboard will be empty or partial until the sync
-  completes.
-</Callout>
+### Pod reports permission errors
+
+The PVC must be writable by UID/GID 82. Confirm that the CSI driver honors `fsGroup` and repair ownership out of band for
+existing volumes rather than disabling non-root execution.
+
+### Import is OOMKilled
+
+Large histories can consume substantial memory. Increase the web and daemon memory limits together. The chart configures
+PHP for `4G` and defaults each container limit to `5Gi`.
+
+### Admin login fails
+
+Verify the stored value is a bcrypt hash and that `dreeve.appUrl` exactly matches the browser's public root URL. Helm
+values use literal `$` characters; Compose escaping is not required.
 
 ## More Information
 
-## Upgrading to Dreeve 5
-
-Dreeve 5 is a major upgrade that moves YAML settings into the database and
-introduces a built-in admin panel. Before upgrading from v4, back up both
-`storage/database` and the `config` directory, then follow the
-[upstream migration guide](https://docs.dreeve.app/#/getting-started/migrating-from-v4).
-
-- [Dreeve GitHub Repository](https://github.com/dreeveapp/dreeve)
-- [Strava Developers Portal](https://developers.strava.com)
-- [HelmForge Statistics for Strava Chart Source](https://github.com/helmforgedev/charts/tree/main/charts/strava-statistics)
+- [Dreeve documentation](https://docs.dreeve.app)
+- [Dreeve v5.6.2 release](https://github.com/dreeveapp/dreeve/releases/tag/v5.6.2)
+- [Dreeve source](https://github.com/dreeveapp/dreeve)
+- [HelmForge chart source](https://github.com/helmforgedev/charts/tree/main/charts/strava-statistics)
