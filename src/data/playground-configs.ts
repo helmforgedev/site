@@ -1699,6 +1699,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Application',
       fields: [
         {
+          label: 'Application HTTP port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '3333',
+          min: 1024,
+          max: 65535,
+          description: 'Configures the real Ghostfolio listener; service.port remains independent',
+        },
+        {
           label: 'Public URL',
           key: 'ghostfolio.rootUrl',
           type: 'text',
