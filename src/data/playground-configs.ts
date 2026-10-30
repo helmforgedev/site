@@ -9277,6 +9277,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '',
           description: 'Comma-separated modules',
         },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          min: 1,
+          max: 65535,
+          description: 'Apache listener and pod HTTP port',
+        },
       ],
     },
     {
@@ -9366,6 +9375,26 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '768Mi',
           description: 'Memory limit',
+        },
+      ],
+    },
+    {
+      name: 'Security',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict ingress to the Dolibarr HTTP port',
+        },
+        {
+          label: 'Mount Service Account Token',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Expose Kubernetes API credentials to the application pod',
         },
       ],
     },
