@@ -30,6 +30,9 @@ SQLite mode and scalable queue mode with PostgreSQL, Redis, and S3 shared storag
 - **BullMQ queue mode** — separate main pod (UI + API) and worker pods (execution) for scale-out
 - **PostgreSQL bootstrap** — `uuid-ossp` extension injected automatically on first run
 - **S3 shared storage required in queue mode** — local PVC is incompatible with multiple replicas
+- **Hardened runtime defaults** — non-root UID/GID 1000, read-only root filesystem, seccomp, dropped capabilities, and no API token
+- **Component-scoped NetworkPolicy** — the public listener selects only main pods while worker ingress is denied
+- **Independent listener and Service ports** — `flowise.containerPort` configures the process and `service.port` configures Kubernetes exposure
 
 ## Installation
 
@@ -258,16 +261,19 @@ persistence:
 
 ### Flowise Configuration
 
-| Parameter                     | Type    | Default | Description                                             |
-| ----------------------------- | ------- | ------- | ------------------------------------------------------- |
-| `flowise.replicaCount`        | integer | `1`     | Main pod replicas. Use `queue` mode for more than 1.    |
-| `flowise.startupDelaySeconds` | integer | `3`     | Delay before starting the main Flowise server.          |
-| `flowise.appUrl`              | string  | `""`    | Full public URL. Auto-detected from Ingress if empty.   |
-| `flowise.logLevel`            | string  | `info`  | Log level: `error`, `warn`, `info`, `verbose`, `debug`. |
-| `flowise.fileSizeLimit`       | string  | `50mb`  | Maximum file upload size accepted by Flowise.           |
-| `flowise.corsOrigins`         | string  | `*`     | Allowed CORS origins.                                   |
-| `flowise.disableTelemetry`    | boolean | `true`  | Disable telemetry reporting.                            |
-| `flowise.extraEnv`            | array   | `[]`    | Extra environment variables for the main container.     |
+| Parameter                     | Type    | Default                    | Description                                             |
+| ----------------------------- | ------- | -------------------------- | ------------------------------------------------------- |
+| `flowise.replicaCount`        | integer | `1`                        | Main pod replicas. Use `queue` mode for more than 1.    |
+| `flowise.containerPort`       | integer | `3000`                     | HTTP port listened on by the Flowise process.           |
+| `flowise.startupDelaySeconds` | integer | `3`                        | Delay before starting the main Flowise server.          |
+| `flowise.appUrl`              | string  | `""`                       | Full public URL. Auto-detected from Ingress if empty.   |
+| `flowise.logLevel`            | string  | `info`                     | Log level: `error`, `warn`, `info`, `verbose`, `debug`. |
+| `flowise.logPath`             | string  | `/home/node/.flowise/logs` | Writable application log directory.                     |
+| `flowise.secretKeyPath`       | string  | `/home/node/.flowise`      | Writable local secret-key directory.                    |
+| `flowise.fileSizeLimit`       | string  | `50mb`                     | Maximum file upload size accepted by Flowise.           |
+| `flowise.corsOrigins`         | string  | `*`                        | Allowed CORS origins.                                   |
+| `flowise.disableTelemetry`    | boolean | `true`                     | Disable telemetry reporting.                            |
+| `flowise.extraEnv`            | array   | `[]`                       | Extra environment variables for the main container.     |
 
 ### Auth Secrets
 
@@ -283,14 +289,14 @@ persistence:
 
 ### Database
 
-| Parameter                          | Type    | Default                          | Description                                          |
-| ---------------------------------- | ------- | -------------------------------- | ---------------------------------------------------- |
-| `database.mode`                    | string  | `auto`                           | Mode: `auto`, `sqlite`, `external`, or `postgresql`. |
-| `database.sqlite.path`             | string  | `/root/.flowise/database.sqlite` | SQLite file path inside the data volume.             |
-| `database.external.vendor`         | string  | `postgres`                       | External DB vendor: `postgres` or `mysql`.           |
-| `database.external.host`           | string  | `""`                             | External database hostname.                          |
-| `database.external.existingSecret` | string  | `""`                             | Existing secret with database password.              |
-| `database.external.ssl`            | boolean | `false`                          | Enable SSL for external database connections.        |
+| Parameter                          | Type    | Default                               | Description                                          |
+| ---------------------------------- | ------- | ------------------------------------- | ---------------------------------------------------- |
+| `database.mode`                    | string  | `auto`                                | Mode: `auto`, `sqlite`, `external`, or `postgresql`. |
+| `database.sqlite.path`             | string  | `/home/node/.flowise/database.sqlite` | SQLite file path inside the data volume.             |
+| `database.external.vendor`         | string  | `postgres`                            | External DB vendor: `postgres` or `mysql`.           |
+| `database.external.host`           | string  | `""`                                  | External database hostname.                          |
+| `database.external.existingSecret` | string  | `""`                                  | Existing secret with database password.              |
+| `database.external.ssl`            | boolean | `false`                               | Enable SSL for external database connections.        |
 
 <Callout type="info" title="External PostgreSQL requires uuid-ossp extension">
   Flowise 3.1.3 migrations use `uuid_generate_v4()`, which requires `uuid-ossp`. The bundled
@@ -334,36 +340,72 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 ### Storage
 
-| Parameter                   | Type    | Default                  | Description                                      |
-| --------------------------- | ------- | ------------------------ | ------------------------------------------------ |
-| `storage.type`              | string  | `local`                  | Storage type: `local` or `s3`.                   |
-| `storage.local.path`        | string  | `/root/.flowise/storage` | Local blob storage path.                         |
-| `storage.s3.bucketName`     | string  | `""`                     | S3 bucket name.                                  |
-| `storage.s3.region`         | string  | `us-east-1`              | S3 region.                                       |
-| `storage.s3.endpointUrl`    | string  | `""`                     | Custom S3 endpoint URL.                          |
-| `storage.s3.forcePathStyle` | boolean | `false`                  | Force path-style requests. Set `true` for MinIO. |
-| `storage.s3.existingSecret` | string  | `""`                     | Existing secret with S3 credentials.             |
+| Parameter                   | Type    | Default                       | Description                                      |
+| --------------------------- | ------- | ----------------------------- | ------------------------------------------------ |
+| `storage.type`              | string  | `local`                       | Storage type: `local` or `s3`.                   |
+| `storage.local.path`        | string  | `/home/node/.flowise/storage` | Local blob storage path.                         |
+| `storage.s3.bucketName`     | string  | `""`                          | S3 bucket name.                                  |
+| `storage.s3.region`         | string  | `us-east-1`                   | S3 region.                                       |
+| `storage.s3.endpointUrl`    | string  | `""`                          | Custom S3 endpoint URL.                          |
+| `storage.s3.forcePathStyle` | boolean | `false`                       | Force path-style requests. Set `true` for MinIO. |
+| `storage.s3.existingSecret` | string  | `""`                          | Existing secret with S3 credentials.             |
 
 ### Persistence
 
-| Parameter                   | Type    | Default | Description                                                     |
-| --------------------------- | ------- | ------- | --------------------------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`  | Enable PVC for `/root/.flowise`. **Set `false` in queue mode.** |
-| `persistence.size`          | string  | `10Gi`  | PVC size.                                                       |
-| `persistence.storageClass`  | string  | `""`    | StorageClass for the PVC.                                       |
-| `persistence.existingClaim` | string  | `""`    | Use an existing PVC.                                            |
+| Parameter                   | Type    | Default               | Description                                                          |
+| --------------------------- | ------- | --------------------- | -------------------------------------------------------------------- |
+| `persistence.enabled`       | boolean | `true`                | Enable PVC for Flowise writable data. **Set `false` in queue mode.** |
+| `persistence.size`          | string  | `10Gi`                | PVC size.                                                            |
+| `persistence.storageClass`  | string  | `""`                  | StorageClass for the PVC.                                            |
+| `persistence.existingClaim` | string  | `""`                  | Use an existing PVC.                                                 |
+| `persistence.mountPath`     | string  | `/home/node/.flowise` | Writable data mount for the non-root image user.                     |
+
+When changing `persistence.mountPath`, also place `flowise.logPath`,
+`flowise.secretKeyPath`, `database.sqlite.path`, and `storage.local.path` under
+the new writable mount as applicable. The root filesystem remains read-only.
+
+### Service and Network Policy
+
+| Parameter                                     | Type    | Default | Description                                     |
+| --------------------------------------------- | ------- | ------- | ----------------------------------------------- |
+| `service.port`                                | integer | `3000`  | Kubernetes Service port.                        |
+| `networkPolicy.enabled`                       | boolean | `true`  | Create main and worker NetworkPolicies.         |
+| `networkPolicy.ingressFrom`                   | array   | `[]`    | Optional peers allowed to reach main pods.      |
+| `networkPolicy.egress`                        | array   | `[{}]`  | Egress rules shared by main and worker pods.    |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into Flowise pods. |
+
+Changing `service.port` does not change where Flowise listens. Use
+`flowise.containerPort` for the process listener; the Service uses the named
+`http` targetPort and can expose a different port.
 
 ### Backup
 
 Backup runs `pg_dump` on PostgreSQL only. SQLite and local storage blobs are not included.
 
-| Parameter                  | Type    | Default       | Description                           |
-| -------------------------- | ------- | ------------- | ------------------------------------- |
-| `backup.enabled`           | boolean | `false`       | Enable scheduled `pg_dump` S3 backup. |
-| `backup.schedule`          | string  | `"0 3 * * *"` | Cron schedule.                        |
-| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
-| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
-| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
+| Parameter                    | Type    | Default       | Description                                                |
+| ---------------------------- | ------- | ------------- | ---------------------------------------------------------- |
+| `backup.enabled`             | boolean | `false`       | Enable scheduled `pg_dump` S3 backup.                      |
+| `backup.schedule`            | string  | `"0 3 * * *"` | Cron schedule.                                             |
+| `backup.s3.endpoint`         | string  | `""`          | S3-compatible endpoint URL.                                |
+| `backup.s3.bucket`           | string  | `""`          | Target bucket name.                                        |
+| `backup.s3.existingSecret`   | string  | `""`          | Existing secret with S3 credentials.                       |
+| `backup.database.pgDumpArgs` | array   | `[]`          | Extra `pg_dump` arguments passed without shell evaluation. |
+
+## Security Defaults
+
+The official 3.1.3 image does not declare a default user, but contains the
+`node` account as UID/GID 1000. This chart runs the main server, workers, and
+backup jobs as non-root with RuntimeDefault seccomp, a read-only root
+filesystem, no privilege escalation, and all Linux capabilities dropped.
+Writable data is mounted at `/home/node/.flowise`, and `/tmp` is a separate
+`emptyDir`.
+
+Flowise can execute user-configured tools and custom MCP commands. Keep upstream
+HTTP, path traversal, and custom MCP security checks enabled, restrict
+administrative access, and do not inject cluster-admin or broad cloud
+credentials. Egress is open by default because model providers and tool targets
+are installation-specific; replace `networkPolicy.egress` with a tested
+allowlist when destinations are known.
 
 ## More Information
 
