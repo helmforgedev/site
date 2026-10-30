@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/DocsLayout.astro
 title: ntfy Chart
-description: ntfy Helm chart for Kubernetes push notifications with PostgreSQL, Secret integration, metrics, attachments, persistence, ingress, and Gateway API.
+description: Production-ready ntfy Helm chart with secure defaults, SQLite or PostgreSQL, backups, OIDC, SMTP, NetworkPolicy, Ingress, and Gateway API.
 ---
 
 import DocsTabs from '../../../components/DocsTabs.astro';
@@ -15,8 +15,8 @@ third-party service — all traffic stays on your infrastructure.
 
 <Callout type="danger" title="Default access is open — secure before exposing publicly">
   `ntfy.authDefaultAccess` defaults to `read-write`, meaning any unauthenticated user can publish and subscribe to any
-  topic. If you expose ntfy to the internet, set `authDefaultAccess: deny-all` and configure authentication via
-  `ntfy.extraConfig` to prevent unauthorized access and notification spam.
+  topic. If you expose ntfy to the internet, set `ntfy.authDefaultAccess: deny-all` and configure users or OIDC to
+  prevent unauthorized access and notification spam.
 </Callout>
 
 ## Key Features
@@ -32,6 +32,21 @@ third-party service — all traffic stays on your infrastructure.
 - **PostgreSQL** — external database URL loaded from a Kubernetes Secret
 - **External Secrets** — optional credential reconciliation from provider-backed stores
 - **Gateway API** — optional HTTPRoute rendering for modern ingress controllers
+- **Secure runtime** — non-root execution, read-only root filesystem, dropped capabilities, seccomp, and no API token
+- **Production controls** — resource bounds, bounded temporary storage, optional NetworkPolicy and PodDisruptionBudget
+- **S3 backup** — optional scheduled archive of the ntfy data volume
+
+## Architecture and Boundaries
+
+The chart runs one ntfy Deployment behind a ClusterIP Service. ntfy listens on the configurable
+`containerPorts.http` port (2586 by default), while `service.port` remains the stable client-facing port. The ConfigMap
+is mounted read-only at `/etc/ntfy`; `/tmp` is a bounded `emptyDir`; and `/var/cache/ntfy` is backed by a PVC or a
+bounded ephemeral volume.
+
+SQLite is the default store. PostgreSQL can come from the HelmForge subchart or an external service, but it does not
+make this single-replica chart highly available and does not provide shared attachment storage. Ingress and Gateway API
+are optional edge routes. The chart does not install an edge controller, cert-manager, Prometheus Operator, External
+Secrets Operator, an SMTP server, an OIDC provider, or an S3 service.
 
 ## Installation
 
@@ -51,20 +66,26 @@ helm install ntfy oci://ghcr.io/helmforgedev/helm/ntfy
 
 ### Upgrade guidance
 
-The current chart defaults to ntfy 2.30.0. This release links attachments in
-email notifications, supports SMTP LOGIN authentication, and fixes PostgreSQL
-memory growth introduced in 2.29.0. Experimental clustering is not considered
-production-ready upstream, and this chart remains single-replica. Back up
-persistent state and validate publishing, cache replay, email delivery and
-attachment workflows. Existing values remain compatible. The
+The current chart defaults to ntfy 2.32.0. The chart remains single-replica because upstream clustering and local
+attachment sharing are outside its production boundary. Back up persistent state and any PostgreSQL database, then
+validate publishing, cache replay, authentication, email delivery, web push, and attachment workflows. Existing values
+remain compatible. The
 `--reset-then-reuse-values` flag retains an explicit `image.tag` from the current release; remove or update that override
-if you want to adopt the chart's `v2.30.0` default. Review the
-[2.30.0 release](https://github.com/binwiederhier/ntfy/releases/tag/v2.30.0):
+if you want to adopt the chart's `v2.32.0` default. Review the
+[2.32.0 release](https://github.com/binwiederhier/ntfy/releases/tag/v2.32.0):
 
 ```bash
 helm upgrade ntfy helmforge/ntfy \
   --reset-then-reuse-values
 ```
+
+ntfy 2.31.1 migrated the message database schema from version 16 to 17. After upgrading an instance from ntfy 2.30.0
+or earlier to 2.32.0, rolling back to 2.31.0 or earlier requires manually resetting the recorded message schema version
+before starting the older server. For PostgreSQL, run `UPDATE schema_version SET version = 16 WHERE store = 'message';`.
+For the SQLite cache file, run `UPDATE schemaVersion SET version = 16 WHERE id = 1;`. Rolling back to 2.31.1 or later
+does not require this adjustment because those releases tolerate newer message schemas. Review the upstream
+[2.31.1 migration and rollback notes](https://github.com/binwiederhier/ntfy/blob/main/docs/releases.md#ntfy-server-v2311)
+before downgrading.
 
 ## Deployment Examples
 
@@ -303,17 +324,21 @@ gateway:
 | `nameOverride`     | string | `""`    | Override the chart name.             |
 | `fullnameOverride` | string | `""`    | Override the full release name.      |
 | `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| `global`           | object | `{}`    | Reserved global values contract.     |
 
 ### Image
 
 | Parameter          | Type   | Default                        | Description                          |
 | ------------------ | ------ | ------------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/binwiederhier/ntfy` | ntfy container image.                |
-| `image.tag`        | string | `"v2.30.0"`                    | Image tag.                           |
+| `image.tag`        | string | `"v2.32.0"`                    | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                 | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                           | Pull secrets for private registries. |
 
 ### ntfy Configuration
+
+The listener is controlled only by `containerPorts.http`; attempts to override `listen-http` through `extraConfig` or
+`NTFY_LISTEN_HTTP` through `extraEnv` are rejected so the process, Service, and probes remain aligned.
 
 | Parameter                         | Type    | Default                   | Description                                                                                    |
 | --------------------------------- | ------- | ------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -335,6 +360,7 @@ gateway:
 | `ntfy.database.existingSecretKey` | string  | `database-url`            | Secret key exposed to ntfy as `NTFY_DATABASE_URL`.                                             |
 | `ntfy.extraConfig`                | string  | `""`                      | Raw `server.yml` configuration appended to the generated ConfigMap.                            |
 | `ntfy.extraEnv`                   | array   | `[]`                      | Extra environment variables injected into the container.                                       |
+| `containerPorts.http`             | integer | `2586`                    | Port on which the ntfy process listens.                                                        |
 
 <Callout type="info" title="Append arbitrary configuration with extraConfig">
   The `ntfy.extraConfig` field appends raw `server.yml` lines to the generated ConfigMap. Use it for any ntfy server
@@ -383,13 +409,14 @@ By default, ntfy stores its SQLite cache and authentication databases in `/var/c
 restarts. With PostgreSQL, the PVC may be disabled only when attachments, the ban-feed, and custom file-backed options
 do not require durable local storage.
 
-| Parameter                   | Type    | Default             | Description                                  |
-| --------------------------- | ------- | ------------------- | -------------------------------------------- |
-| `persistence.enabled`       | boolean | `true`              | Enable a PVC for `/var/cache/ntfy`.          |
-| `persistence.size`          | string  | `2Gi`               | PVC size. Increase if using attachments.     |
-| `persistence.storageClass`  | string  | `""`                | StorageClass for the PVC.                    |
-| `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                            |
-| `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one. |
+| Parameter                       | Type    | Default             | Description                                     |
+| ------------------------------- | ------- | ------------------- | ----------------------------------------------- |
+| `persistence.enabled`           | boolean | `true`              | Enable a PVC for `/var/cache/ntfy`.             |
+| `persistence.size`              | string  | `2Gi`               | PVC size. Increase if using attachments.        |
+| `persistence.storageClass`      | string  | `""`                | StorageClass for the PVC.                       |
+| `persistence.accessModes`       | array   | `["ReadWriteOnce"]` | PVC access modes.                               |
+| `persistence.existingClaim`     | string  | `""`                | Use an existing PVC instead of creating one.    |
+| `persistence.emptyDirSizeLimit` | string  | `1Gi`               | Data-volume limit when persistence is disabled. |
 
 ### Service
 
@@ -452,19 +479,94 @@ Probes use the `/v1/health` endpoint.
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter            | Type   | Default                                      | Description                         |
+| -------------------- | ------ | -------------------------------------------- | ----------------------------------- |
+| `resources`          | object | requests `50m`/`64Mi`, limits `500m`/`256Mi` | CPU and memory requests and limits. |
+| `podSecurityContext` | object | non-root UID/GID `1000`, `RuntimeDefault`    | Pod-level security context.         |
+| `securityContext`    | object | read-only, no escalation, drop `ALL`         | Container-level security context.   |
 
 ### Service Account
 
-| Parameter                    | Type    | Default | Description                         |
-| ---------------------------- | ------- | ------- | ----------------------------------- |
-| `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
-| `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
-| `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+| Parameter                                     | Type    | Default | Description                                             |
+| --------------------------------------------- | ------- | ------- | ------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                      |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                       |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                     |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into ntfy and backup pods. |
+
+### Runtime Security and Availability
+
+The defaults run as UID/GID 1000 with `RuntimeDefault` seccomp, a read-only root filesystem, no privilege escalation,
+and all capabilities dropped. CPU and memory requests and limits are set by default; tune them from observed usage.
+
+| Parameter                                  | Type    | Default          | Description                                                                                                                    |
+| ------------------------------------------ | ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `resources.requests.cpu`                   | string  | `50m`            | Default CPU request.                                                                                                           |
+| `resources.requests.memory`                | string  | `64Mi`           | Default memory request.                                                                                                        |
+| `resources.limits.cpu`                     | string  | `500m`           | Default CPU limit.                                                                                                             |
+| `resources.limits.memory`                  | string  | `256Mi`          | Default memory limit.                                                                                                          |
+| `podSecurityContext.runAsNonRoot`          | boolean | `true`           | Require non-root execution.                                                                                                    |
+| `podSecurityContext.runAsUser`             | integer | `1000`           | Pod user ID.                                                                                                                   |
+| `podSecurityContext.runAsGroup`            | integer | `1000`           | Pod group ID.                                                                                                                  |
+| `podSecurityContext.fsGroup`               | integer | `1000`           | Writable-volume group ID.                                                                                                      |
+| `podSecurityContext.fsGroupChangePolicy`   | string  | `OnRootMismatch` | Avoid unnecessary recursive ownership changes.                                                                                 |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Container syscall profile.                                                                                                     |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Deny privilege escalation.                                                                                                     |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `true`           | Keep the image filesystem read-only.                                                                                           |
+| `securityContext.capabilities.drop`        | array   | `["ALL"]`        | Drop Linux capabilities.                                                                                                       |
+| `runtimeStorage.tmpSizeLimit`              | string  | `128Mi`          | Bound writable `/tmp` storage.                                                                                                 |
+| `podDisruptionBudget.enabled`              | boolean | `false`          | Render a disruption budget for the singleton pod.                                                                              |
+| `podDisruptionBudget.minAvailable`         | integer | `1`              | Keep one pod available; on a singleton, voluntary eviction and node drain wait until this value changes or the PDB is removed. |
+| `podDisruptionBudget.maxUnavailable`       | integer | `null`           | Alternative maximum unavailable pod count.                                                                                     |
+
+### Network Policy
+
+Ingress isolation can be enabled independently. When egress isolation is enabled, list every external dependency.
+External PostgreSQL requires an explicit database CIDR; SMTP, OIDC, web push, and S3 need suitable `extraEgress` rules.
+
+| Parameter                                   | Type    | Default       | Description                                                 |
+| ------------------------------------------- | ------- | ------------- | ----------------------------------------------------------- |
+| `networkPolicy.enabled`                     | boolean | `false`       | Render a NetworkPolicy.                                     |
+| `networkPolicy.ingressFrom`                 | array   | `[]`          | Peers allowed to reach the ntfy and optional metrics ports. |
+| `networkPolicy.egress.enabled`              | boolean | `false`       | Apply egress isolation.                                     |
+| `networkPolicy.egress.allowDNS`             | boolean | `true`        | Permit DNS when egress isolation is active.                 |
+| `networkPolicy.egress.dnsPeers`             | array   | `kube-system` | Peers allowed to serve DNS; override for custom DNS.        |
+| `networkPolicy.egress.externalDatabaseCIDR` | string  | `""`          | CIDR allowed for external PostgreSQL.                       |
+| `networkPolicy.egress.extraEgress`          | array   | `[]`          | Complete additional egress rules for external integrations. |
+
+### Backup
+
+The optional CronJob archives `/var/cache/ntfy` and uploads it to S3-compatible storage. It requires persistent storage
+and does not dump PostgreSQL. Use an existing Secret containing `access-key` and `secret-key` in production.
+
+| Parameter                  | Type    | Default     | Description                                    |
+| -------------------------- | ------- | ----------- | ---------------------------------------------- |
+| `backup.enabled`           | boolean | `false`     | Enable scheduled data-volume backup.           |
+| `backup.schedule`          | string  | `0 3 * * *` | Cron schedule in UTC.                          |
+| `backup.scratchSizeLimit`  | string  | `3Gi`       | Bound temporary archive storage with headroom. |
+| `backup.tmpSizeLimit`      | string  | `64Mi`      | Bound backup container `/tmp`.                 |
+| `backup.s3.endpoint`       | string  | `""`        | S3-compatible endpoint.                        |
+| `backup.s3.bucket`         | string  | `""`        | Destination bucket.                            |
+| `backup.s3.prefix`         | string  | `ntfy`      | Object-key prefix.                             |
+| `backup.s3.existingSecret` | string  | `""`        | Existing S3 credential Secret.                 |
+
+### OpenID Connect and SMTP
+
+OIDC client secrets and SMTP passwords are injected from Secrets through environment variables and never written to
+the ConfigMap. Restart the Deployment after rotating an existing Secret.
+
+| Parameter                        | Type    | Default         | Description                           |
+| -------------------------------- | ------- | --------------- | ------------------------------------- |
+| `oidc.enabled`                   | boolean | `false`         | Enable OpenID Connect authentication. |
+| `oidc.issuerUrl`                 | string  | `""`            | Identity-provider issuer URL.         |
+| `oidc.clientId`                  | string  | `""`            | Registered client ID.                 |
+| `oidc.existingSecret`            | string  | `""`            | Secret containing the client secret.  |
+| `oidc.existingSecretKey`         | string  | `client-secret` | Key containing the client secret.     |
+| `smtp.enabled`                   | boolean | `false`         | Enable outbound email notifications.  |
+| `smtp.senderAddr`                | string  | `""`            | SMTP server in `host:port` form.      |
+| `smtp.senderFrom`                | string  | `""`            | Sender email address.                 |
+| `smtp.existingSecret`            | string  | `""`            | Secret containing the SMTP password.  |
+| `smtp.existingSecretPasswordKey` | string  | `smtp-password` | Key containing the SMTP password.     |
 
 ### Scheduling
 
