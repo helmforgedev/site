@@ -11839,8 +11839,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v1.70.0',
-          description: 'Homarr image tag',
+          default: '2.5.6',
+          description: 'Uptime Kuma image tag',
         },
         {
           label: 'Storage Size',
@@ -11886,7 +11886,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'status.example.com',
           description: 'Ingress hostname',
@@ -11899,7 +11899,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
         },
-        { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
       ],
     },
     {
@@ -11913,6 +11912,47 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: '0 2 * * *',
           description: 'Cron schedule for backups',
+        },
+        {
+          label: 'S3 Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: 'https://s3.example.com',
+          description: 'S3-compatible endpoint required by the backup job',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'uptime-kuma-backups',
+          description: 'Destination bucket required by the backup job',
+        },
+        {
+          label: 'Credential Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: 'uptime-kuma-s3',
+          description: 'Existing Secret with access-key and secret-key',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      collapsible: true,
+      fields: [
+        {
+          label: 'PodDisruptionBudget',
+          key: 'podDisruptionBudget.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Protect the single pod from voluntary disruption',
+        },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create a policy after configuring required ingress and egress rules',
         },
       ],
     },
