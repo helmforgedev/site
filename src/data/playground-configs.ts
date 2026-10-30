@@ -5908,7 +5908,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Server Tag',
           key: 'server.image.tag',
           type: 'text',
-          default: '0.81.3',
+          default: '0.81.5',
           description: 'Pinned NetBird server image tag',
         },
         {

@@ -4,7 +4,7 @@ test('NetBird exposes process ports and production safeguards', async ({ page })
   await page.goto('/playground');
   await page.locator('.playground-chart-btn[data-slug="netbird"]').click();
 
-  await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.81.3');
+  await expect(page.locator('input[data-field-key="server.image.tag"]')).toHaveValue('0.81.5');
   await page.locator('input[data-field-key="server.containerPorts.http"]').fill('8080');
   await page.locator('input[data-field-key="server.containerPorts.metrics"]').fill('9191');
   await page.locator('input[data-field-key="dashboard.containerPorts.http"]').fill('8088');
