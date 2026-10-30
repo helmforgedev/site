@@ -15,6 +15,9 @@ Deploy Drupal on Kubernetes using the Docker Official [drupal](https://hub.docke
 - **Built-in backup automation** — archives Drupal `sites/` plus either MySQL or SQLite to S3-compatible storage
 - **Safe horizontal scaling** — HPA is supported only when the storage and database combination is actually safe
 - **Installer-first workflow** — the chart prepares runtime, storage, ingress, and database connectivity, then guides setup through `NOTES.txt`
+- **Real application listener** — `containerPorts.http` changes both the Pod declaration and Apache on the official image
+- **Secure defaults** — Kubernetes API token automount is disabled, privilege escalation is blocked, and `RuntimeDefault` seccomp is enabled
+- **Optional network isolation** — ingress and egress policy can be tailored to the ingress controller, database, update, and mail paths
 
 ## Image Decision
 
@@ -22,7 +25,7 @@ This chart uses `docker.io/library/drupal` because Drupal does not currently pub
 
 HelmForge pins:
 
-- `docker.io/library/drupal:11.4.7-php8.5-apache-bookworm`
+- `docker.io/library/drupal:11.4.10-php8.5-apache-bookworm`
 
 That choice is intentional:
 
@@ -38,16 +41,31 @@ That choice is intentional:
 
 ## Release Notes
 
-Drupal `11.4.7` is the SA-CORE-2026-013 security release and contains no other
-fixes. Review the
-[official release notes](https://www.drupal.org/project/drupal/releases/11.4.7).
+Drupal `11.4.10` fixes SA-CORE-2026-014, SA-CORE-2026-015, and
+SA-CORE-2026-016; no other fixes are included. Review the
+[official release notes](https://www.drupal.org/project/drupal/releases/11.4.10).
 
-The bundled HelmForge MySQL dependency is aligned to the current `2.0.3` chart
+The bundled HelmForge MySQL dependency is aligned to the current `2.1.1` chart
 while preserving the same Drupal installer values for the default bundled
 database path. Before upgrading production workloads, test the site in staging
 with the same PHP extensions, Composer dependency set, storage class, and
-database mode used in production. Review the Drupal 11.4.7 release notes before
+database mode used in production. Review the Drupal 11.4.10 release notes before
 running database updates.
+
+## Architecture And Security Boundary
+
+An optional Ingress routes to a Service whose named target resolves to the
+configurable Apache listener in the Drupal Deployment. Only
+`/var/www/html/sites` is persistent, so mutable site state survives while core
+continues to come from the pinned image. The database can be the bundled MySQL
+2.1.1 subchart, an external MySQL-compatible service, or SQLite for one replica.
+
+The pod does not receive a Kubernetes API token by default, uses
+`RuntimeDefault` seccomp, and blocks privilege escalation. The Docker Official
+Apache image still starts its master process as root to bind port 80 before
+delegating requests to unprivileged workers; the chart therefore does not claim
+a fully non-root or read-only-root-filesystem boundary. NetworkPolicy support is
+opt-in and requires a CNI that enforces it.
 
 ## Installation
 
@@ -222,19 +240,21 @@ The chart still has an installer-oriented surface, but it now covers production 
 
 ### Runtime And Installer Values
 
-| Key                     | Default                          | Description                                     |
-| ----------------------- | -------------------------------- | ----------------------------------------------- |
-| `replicaCount`          | `1`                              | Number of Drupal replicas                       |
-| `image.repository`      | `docker.io/library/drupal`       | Docker Official Drupal image repository         |
-| `image.tag`             | `11.4.7-php8.5-apache-bookworm`  | Pinned Drupal image tag                         |
-| `image.pullPolicy`      | `IfNotPresent`                   | Container pull policy                           |
-| `imagePullSecrets`      | `[]`                             | Optional image pull secrets                     |
-| `drupal.siteName`       | `Drupal`                         | Suggested site name shown in install guidance   |
-| `drupal.installProfile` | `standard`                       | Suggested Drupal install profile                |
-| `drupal.locale`         | `en`                             | Suggested locale for the installer              |
-| `drupal.sqlitePath`     | `sites/default/files/.ht.sqlite` | Suggested SQLite path for the web installer     |
-| `drupal.extraEnv`       | `[]`                             | Extra container environment variables           |
-| `php.ini`               | `""`                             | Extra PHP configuration mounted as `custom.ini` |
+| Key                         | Default                          | Description                                                     |
+| --------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| `replicaCount`              | `1`                              | Number of Drupal replicas                                       |
+| `image.repository`          | `docker.io/library/drupal`       | Docker Official Drupal image repository                         |
+| `image.tag`                 | `11.4.10-php8.5-apache-bookworm` | Pinned Drupal image tag                                         |
+| `image.pullPolicy`          | `IfNotPresent`                   | Container pull policy                                           |
+| `image.configureApachePort` | `null`                           | Auto-configure a non-default Apache port for the official image |
+| `containerPorts.http`       | `80`                             | Actual Apache listener and Pod container port                   |
+| `imagePullSecrets`          | `[]`                             | Optional image pull secrets                                     |
+| `drupal.siteName`           | `Drupal`                         | Suggested site name shown in install guidance                   |
+| `drupal.installProfile`     | `standard`                       | Suggested Drupal install profile                                |
+| `drupal.locale`             | `en`                             | Suggested locale for the installer                              |
+| `drupal.sqlitePath`         | `sites/default/files/.ht.sqlite` | Suggested SQLite path for the web installer                     |
+| `drupal.extraEnv`           | `[]`                             | Extra container environment variables                           |
+| `php.ini`                   | `""`                             | Extra PHP configuration mounted as `custom.ini`                 |
 
 ### Database And Persistence Values
 
@@ -285,44 +305,48 @@ The chart still has an installer-oriented surface, but it now covers production 
 
 ### Service, Ingress, Probes, And Platform Values
 
-| Key                             | Default     | Description                                                                                                  |
-| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
-| `service.type`                  | `ClusterIP` | Drupal service type                                                                                          |
-| `service.port`                  | `80`        | Drupal service port                                                                                          |
-| `service.annotations`           | `{}`        | Annotations applied to the service                                                                           |
-| `service.ipFamilyPolicy`        | _omitted_   | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. Omit for cluster default. |
-| `service.ipFamilies`            | _omitted_   | Ordered list of IP families (`IPv4`, `IPv6`). Omit for cluster default.                                      |
-| `ingress.enabled`               | `false`     | Enable ingress resources                                                                                     |
-| `ingress.ingressClassName`      | `""`        | Ingress class name                                                                                           |
-| `ingress.annotations`           | `{}`        | Ingress annotations                                                                                          |
-| `ingress.hosts`                 | `[]`        | Ingress host and path definitions                                                                            |
-| `ingress.tls`                   | `[]`        | TLS secret mappings for ingress                                                                              |
-| `startupProbe.enabled`          | `true`      | Enable the startup probe                                                                                     |
-| `startupProbe.path`             | `/`         | Startup probe HTTP path                                                                                      |
-| `livenessProbe.enabled`         | `true`      | Enable the liveness probe                                                                                    |
-| `livenessProbe.path`            | `/`         | Liveness probe HTTP path                                                                                     |
-| `readinessProbe.enabled`        | `true`      | Enable the readiness probe                                                                                   |
-| `readinessProbe.path`           | `/`         | Readiness probe HTTP path                                                                                    |
-| `resources.requests.cpu`        | `250m`      | Default CPU request for the Drupal container                                                                 |
-| `resources.requests.memory`     | `512Mi`     | Default memory request for the Drupal container                                                              |
-| `resources.limits.cpu`          | `1`         | Default CPU limit for the Drupal container                                                                   |
-| `resources.limits.memory`       | `1Gi`       | Default memory limit for the Drupal container                                                                |
-| `podSecurityContext.fsGroup`    | `33`        | Group ownership applied to the mounted Drupal files volume                                                   |
-| `securityContext`               | `{}`        | Container-level security context                                                                             |
-| `serviceAccount.create`         | `false`     | Create a dedicated service account                                                                           |
-| `serviceAccount.name`           | `""`        | Existing or custom service account name                                                                      |
-| `serviceAccount.annotations`    | `{}`        | Service account annotations                                                                                  |
-| `nodeSelector`                  | `{}`        | Node selector rules                                                                                          |
-| `tolerations`                   | `[]`        | Pod tolerations                                                                                              |
-| `affinity`                      | `{}`        | Pod affinity and anti-affinity                                                                               |
-| `topologySpreadConstraints`     | `[]`        | Topology spread constraints                                                                                  |
-| `priorityClassName`             | `""`        | Priority class for the pod                                                                                   |
-| `terminationGracePeriodSeconds` | `30`        | Pod termination grace period                                                                                 |
-| `podLabels`                     | `{}`        | Extra pod labels                                                                                             |
-| `podAnnotations`                | `{}`        | Extra pod annotations                                                                                        |
-| `extraVolumes`                  | `[]`        | Additional volumes injected into the pod                                                                     |
-| `extraVolumeMounts`             | `[]`        | Additional volume mounts injected into the Drupal container                                                  |
-| `extraManifests`                | `[]`        | Extra Kubernetes manifests rendered by the chart                                                             |
+| Key                                           | Default          | Description                                                                                                  |
+| --------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| `service.type`                                | `ClusterIP`      | Drupal service type                                                                                          |
+| `service.port`                                | `80`             | Drupal service port                                                                                          |
+| `service.annotations`                         | `{}`             | Annotations applied to the service                                                                           |
+| `service.ipFamilyPolicy`                      | _omitted_        | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. Omit for cluster default. |
+| `service.ipFamilies`                          | _omitted_        | Ordered list of IP families (`IPv4`, `IPv6`). Omit for cluster default.                                      |
+| `ingress.enabled`                             | `false`          | Enable ingress resources                                                                                     |
+| `ingress.ingressClassName`                    | `""`             | Ingress class name                                                                                           |
+| `ingress.annotations`                         | `{}`             | Ingress annotations                                                                                          |
+| `ingress.hosts`                               | `[]`             | Ingress host and path definitions                                                                            |
+| `ingress.tls`                                 | `[]`             | TLS secret mappings for ingress                                                                              |
+| `startupProbe.enabled`                        | `true`           | Enable the startup probe                                                                                     |
+| `startupProbe.path`                           | `/`              | Startup probe HTTP path                                                                                      |
+| `livenessProbe.enabled`                       | `true`           | Enable the liveness probe                                                                                    |
+| `livenessProbe.path`                          | `/`              | Liveness probe HTTP path                                                                                     |
+| `readinessProbe.enabled`                      | `true`           | Enable the readiness probe                                                                                   |
+| `readinessProbe.path`                         | `/`              | Readiness probe HTTP path                                                                                    |
+| `resources.requests.cpu`                      | `250m`           | Default CPU request for the Drupal container                                                                 |
+| `resources.requests.memory`                   | `512Mi`          | Default memory request for the Drupal container                                                              |
+| `resources.limits.cpu`                        | `1`              | Default CPU limit for the Drupal container                                                                   |
+| `resources.limits.memory`                     | `1Gi`            | Default memory limit for the Drupal container                                                                |
+| `podSecurityContext.fsGroup`                  | `33`             | Group ownership applied to the mounted Drupal files volume                                                   |
+| `podSecurityContext.seccompProfile.type`      | `RuntimeDefault` | Pod seccomp profile                                                                                          |
+| `securityContext.allowPrivilegeEscalation`    | `false`          | Prevent the container from gaining privileges                                                                |
+| `serviceAccount.create`                       | `false`          | Create a dedicated service account                                                                           |
+| `serviceAccount.name`                         | `""`             | Existing or custom service account name                                                                      |
+| `serviceAccount.annotations`                  | `{}`             | Service account annotations                                                                                  |
+| `serviceAccount.automountServiceAccountToken` | `false`          | Mount a Kubernetes API token in Drupal pods                                                                  |
+| `networkPolicy.enabled`                       | `false`          | Create ingress isolation for Drupal pods                                                                     |
+| `networkPolicy.egress.enabled`                | `false`          | Enable explicit egress rules                                                                                 |
+| `nodeSelector`                                | `{}`             | Node selector rules                                                                                          |
+| `tolerations`                                 | `[]`             | Pod tolerations                                                                                              |
+| `affinity`                                    | `{}`             | Pod affinity and anti-affinity                                                                               |
+| `topologySpreadConstraints`                   | `[]`             | Topology spread constraints                                                                                  |
+| `priorityClassName`                           | `""`             | Priority class for the pod                                                                                   |
+| `terminationGracePeriodSeconds`               | `30`             | Pod termination grace period                                                                                 |
+| `podLabels`                                   | `{}`             | Extra pod labels                                                                                             |
+| `podAnnotations`                              | `{}`             | Extra pod annotations                                                                                        |
+| `extraVolumes`                                | `[]`             | Additional volumes injected into the pod                                                                     |
+| `extraVolumeMounts`                           | `[]`             | Additional volume mounts injected into the Drupal container                                                  |
+| `extraManifests`                              | `[]`             | Extra Kubernetes manifests rendered by the chart                                                             |
 
 ## Dual-stack Networking
 
@@ -337,6 +361,56 @@ service:
 ```
 
 `PreferDualStack` is the safer choice for clusters that may be single- or dual-stack: omit `ipFamilies` and the cluster auto-populates whatever it supports. Set `ipFamilies` explicitly only when the cluster is configured for both families — the Kubernetes API rejects an explicit family the cluster does not advertise. `RequireDualStack` enforces both.
+
+## Application Port And NetworkPolicy
+
+`service.port` is client-facing. `containerPorts.http` changes the actual Apache
+listener and remains the target of the named Service port:
+
+```yaml
+containerPorts:
+  http: 8080
+service:
+  port: 80
+```
+
+The official image is configured automatically. A custom image must use the
+same `/etc/apache2` layout and explicitly set `image.configureApachePort=true`,
+otherwise the chart rejects a non-default listener.
+
+NetworkPolicy is disabled by default to avoid silently blocking Drupal updates,
+mail, databases, or integrations. When enabled, declare the actual ingress
+controller and every egress path required by the site:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    allowSameNamespace: false
+    extraFrom:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-nginx
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+            app.kubernetes.io/component: controller
+  egress:
+    enabled: true
+    allowDNS: true
+    allowSameNamespaceDatabase: true
+    allowHTTPS: true
+```
+
+## Troubleshooting
+
+Use `kubectl logs deploy/<release>-drupal -c drupal` for Apache and PHP output.
+For a non-default port, inspect the one-time configuration step with `kubectl
+logs deploy/<release>-drupal -c configure-apache-port` and confirm the live
+virtual host with `kubectl exec deploy/<release>-drupal -c drupal --
+apache2ctl -S`. If isolation blocks traffic, inspect the rendered policy and
+verify its namespace and pod selectors against the ingress controller and
+database placement.
 
 ## More Information
 
