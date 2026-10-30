@@ -313,6 +313,47 @@ Redis has room for client buffers, persistence buffers, Lua, and allocator overh
 Secrets for credentials, enable TLS when traffic crosses a trust boundary, and enable PodDisruptionBudget for Sentinel
 or clustered deployments.
 
+### Listener and Service ports
+
+Redis process listeners are independent from client-facing Service ports. Use
+`containerPorts.redis`, `containerPorts.sentinel`,
+`containerPorts.clusterBus`, and `containerPorts.metrics` to configure the
+actual processes. Use `service.ports.*` to configure the Kubernetes Services,
+which route through named target ports.
+
+```yaml
+containerPorts:
+  redis: 6380
+  sentinel: 26380
+  clusterBus: 16380
+  metrics: 9122
+
+service:
+  ports:
+    redis: 6379
+    sentinel: 26379
+    metrics: 9121
+```
+
+Headless peer discovery uses the container listeners directly because it does
+not translate ports. Cluster mode explicitly configures and announces the
+client and bus listeners. The chart rejects listener directives in
+`config.redis` and `config.sentinel` so appended configuration cannot silently
+desynchronize probes, Services, replication, or cluster discovery.
+
+### Network isolation
+
+Set `networkPolicy.enabled=true` when the cluster network plugin enforces
+NetworkPolicy. The policies target only Redis and Sentinel workload pods and
+always preserve required topology peer traffic. Same-namespace client access
+is enabled by default; use `networkPolicy.ingress.extraFrom` for clients in
+other namespaces.
+
+In cluster mode without TLS, restrict the cluster bus port to trusted Redis
+peers. Redis does not authenticate the plaintext cluster bus protocol. When
+metrics isolation is enabled, configure the allowed scraper sources under
+`networkPolicy.metrics`.
+
 ## Configuration Reference
 
 ### Image
@@ -392,6 +433,24 @@ assume that enabling TLS alone enables mutual TLS for every architecture.
 | `cluster.initJob.enabled`   | boolean | `true`  | Run `redis-cli --cluster create` Job after pods are ready. |
 | `cluster.persistence.size`  | string  | `8Gi`   | PVC size per cluster node.                                 |
 
+### Networking
+
+| Parameter                                  | Type    | Default | Description                                           |
+| ------------------------------------------ | ------- | ------- | ----------------------------------------------------- |
+| `containerPorts.redis`                     | integer | `6379`  | Redis process listener.                               |
+| `containerPorts.sentinel`                  | integer | `26379` | Sentinel process listener.                            |
+| `containerPorts.clusterBus`                | integer | `16379` | Redis Cluster bus listener.                           |
+| `containerPorts.metrics`                   | integer | `9121`  | redis_exporter listener.                              |
+| `service.ports.redis`                      | integer | `6379`  | Client-facing Redis Service port.                     |
+| `service.ports.sentinel`                   | integer | `26379` | Client-facing Sentinel Service port.                  |
+| `service.ports.metrics`                    | integer | `9121`  | Client-facing metrics Service port.                   |
+| `networkPolicy.enabled`                    | boolean | `false` | Render ingress policies for Redis and Sentinel pods.  |
+| `networkPolicy.ingress.allowSameNamespace` | boolean | `true`  | Allow application clients from the release namespace. |
+| `networkPolicy.ingress.extraFrom`          | array   | `[]`    | Additional client ingress sources.                    |
+| `networkPolicy.metrics.enabled`            | boolean | `false` | Allow metrics traffic through the Redis policy.       |
+| `networkPolicy.metrics.allowSameNamespace` | boolean | `true`  | Allow metrics scrapers from the release namespace.    |
+| `networkPolicy.metrics.extraFrom`          | array   | `[]`    | Additional metrics ingress sources.                   |
+
 ### Configuration and Metrics
 
 | Parameter                        | Type    | Default   | Description                                                                        |
@@ -402,8 +461,6 @@ assume that enabling TLS alone enables mutual TLS for every architecture.
 | `metrics.image.tag`              | string  | `v1.69.0` | `redis_exporter` image tag.                                                        |
 | `metrics.serviceMonitor.enabled` | boolean | `false`   | Create Prometheus ServiceMonitor resource.                                         |
 | `pdb.enabled`                    | boolean | `false`   | Enable PodDisruptionBudget.                                                        |
-| `service.ports.redis`            | integer | `6379`    | Redis client port.                                                                 |
-| `service.ports.sentinel`         | integer | `26379`   | Sentinel client port.                                                              |
 | `service.ipFamilyPolicy`         | string  | _omitted_ | Service IP family policy: `SingleStack`, `PreferDualStack`, or `RequireDualStack`. |
 | `service.ipFamilies`             | array   | `[]`      | Ordered Service IP families (`IPv4`, `IPv6`). Empty uses cluster default.          |
 | `extraManifests`                 | array   | `[]`      | Extra Kubernetes manifests.                                                        |

@@ -778,6 +778,7 @@ export const scenarios: Record<string, { label: string; description: string; val
         'tls.existingSecret': 'redis-tls',
         'config.redis': 'maxmemory 1700mb',
         'pdb.enabled': 'true',
+        'networkPolicy.enabled': 'true',
         'service.ipFamilyPolicy': 'PreferDualStack',
       },
     },
