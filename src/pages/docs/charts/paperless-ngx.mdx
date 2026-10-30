@@ -13,14 +13,14 @@ system that scans, OCRs, indexes, and archives paper documents. The HelmForge
 chart runs the official `ghcr.io/paperless-ngx/paperless-ngx` image `3.3.2`
 with bundled PostgreSQL and Valkey subcharts, or external services.
 
-<Callout type="warning" title="Experimental chart">
-  Paperless-ngx is published with experimental maturity. Back up the database and media volume and verify restores
-  before relying on it for important documents.
+<Callout type="warning" title="Alpha chart">
+  Paperless-ngx is published with alpha maturity. Back up the database and media volume and verify restores before
+  relying on it for important documents.
 </Callout>
 
 ## Key features
 
-- Bundled HelmForge PostgreSQL `2.0.5` and Valkey `2.0.4` subcharts, or SQLite for small installs
+- Bundled HelmForge PostgreSQL `2.1.1` and Valkey `2.0.5` subcharts, or SQLite for small installs
 - External PostgreSQL and Valkey/Redis with existing Secret support
 - Separate PVCs for data, media, consume, and export, each with `existingClaim`
 - Optional Apache Tika and Gotenberg for office documents and emails
@@ -133,6 +133,25 @@ Gotenberg runs with JavaScript disabled and only local files allowed, matching
 the upstream compose files, so tracking pixels and scripts in emails are not
 fetched.
 
+The chart keeps process listeners separate from the public Service port. A
+listener override updates the real process, its named container port, the
+internal Service, and the Paperless conversion endpoints together:
+
+```yaml
+containerPorts:
+  http: 8080
+
+tika:
+  enabled: true
+  containerPorts:
+    http: 10098
+
+gotenberg:
+  enabled: true
+  containerPorts:
+    http: 3100
+```
+
 ## Gateway API
 
 ```yaml
@@ -179,6 +198,7 @@ metadata to the export directory.
 | `replicaCount`                       | `1`                                   | `0` or `1`                                    |
 | `image.repository`                   | `ghcr.io/paperless-ngx/paperless-ngx` | Application image                             |
 | `image.tag`                          | `3.3.2`                               | Application image tag                         |
+| `containerPorts.http`                | `8000`                                | Paperless process listener                    |
 | `paperless.url`                      | empty                                 | Public URL, derived from ingress/gateway host |
 | `paperless.timeZone`                 | `UTC`                                 | Time zone                                     |
 | `paperless.ocrLanguage`              | `eng`                                 | Default OCR language, for example `deu+eng`   |
@@ -189,6 +209,8 @@ metadata to the export directory.
 | `valkey.enabled`                     | `true`                                | Deploy the Valkey subchart                    |
 | `persistence.media.size`             | `10Gi`                                | Document storage size                         |
 | `tika.enabled`, `gotenberg.enabled`  | `false`                               | Office document and email processing          |
+| `tika.containerPorts.http`           | `9998`                                | Tika process and Service listener             |
+| `gotenberg.containerPorts.http`      | `3000`                                | Gotenberg process and Service listener        |
 | `ingress.enabled`                    | `false`                               | Ingress                                       |
 | `gateway.enabled`                    | `false`                               | Gateway API HTTPRoute                         |
 | `externalSecrets.enabled`            | `false`                               | ExternalSecret for the external database      |

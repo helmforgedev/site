@@ -146,6 +146,15 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'Application',
       fields: [
         {
+          label: 'HTTP container port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: 8000,
+          min: 1,
+          max: 65535,
+          description: 'Paperless process listener configured through PAPERLESS_PORT',
+        },
+        {
           label: 'Public URL',
           key: 'docuseal.appUrl',
           type: 'text',
