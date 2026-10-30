@@ -16653,8 +16653,22 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.80.0',
+          default: '6.121.0',
           description: 'Pinned Poznote image tag',
+        },
+        {
+          label: 'Container HTTP Port',
+          key: 'containerPorts.http',
+          type: 'number',
+          default: '80',
+          description: 'Nginx listener inside the Poznote container',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing Kubernetes Service port',
         },
         {
           label: 'Storage Size',
