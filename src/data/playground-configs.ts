@@ -14676,6 +14676,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: 'true',
           description: 'Enable MQTT over WebSocket',
         },
+        {
+          label: 'MQTT Listener Port',
+          key: 'broker.listeners.mqtt',
+          type: 'number',
+          default: '1883',
+          description: 'Real Mosquitto TCP listener port',
+        },
+        {
+          label: 'WebSocket Listener Port',
+          key: 'broker.listeners.websocket',
+          type: 'number',
+          default: '9001',
+          description: 'Real Mosquitto WebSocket listener port',
+        },
       ],
     },
     {
@@ -14782,6 +14796,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '9001',
           description: 'MQTT over WebSocket Service port',
         },
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict ingress to enabled named listener ports',
+        },
       ],
     },
     {
@@ -14789,6 +14810,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
       collapsible: true,
       gateField: 'mqttxWeb.enabled',
       fields: [
+        {
+          label: 'HTTP Listener Port',
+          key: 'mqttxWeb.containerPort',
+          type: 'number',
+          default: '8080',
+          description: 'Real MQTTX Web http-server listener',
+        },
+        {
+          label: 'HTTP Service Port',
+          key: 'mqttxWeb.service.port',
+          type: 'number',
+          default: '80',
+          description: 'Independent Kubernetes Service port',
+        },
         {
           label: 'Broker Scheme',
           key: 'mqttxWeb.broker.scheme',
