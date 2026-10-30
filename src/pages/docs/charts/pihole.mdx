@@ -398,6 +398,11 @@ pihole:
   webserverPort: '9090o,[::]:9090o,9091os,[::]:9091os'
 ```
 
+The chart Web Service and default NetworkPolicy expose only `containerPorts.http`; they do not route the additional
+HTTPS listener on 9091. With `hostNetwork`, reach additional listeners directly through the node and enforce access
+with the node firewall. For ordinary pod networking, terminate TLS at an Ingress or Gateway that targets the primary
+HTTP listener.
+
 Service ports remain an independent cluster-facing contract, and each Service targets the named container port.
 
 ### Gravity and Unbound
@@ -448,10 +453,11 @@ upstream release notes, and verify DNS, admin login, gravity updates, and any
 DHCP workflow after upgrading production deployments.
 
 Chart 2.2.0 changed `securityContext.capabilities` to drop all capabilities before adding the complete set required
-by the official image. Helm replaces custom arrays during upgrades. Remove any
-`securityContext.capabilities.add` override copied from chart 2.1.x before upgrading, or it will replace the new
-required defaults and prevent Pi-hole from starting. The chart automatically adds `NET_ADMIN` when
-`dhcp.enabled: true`.
+by the official image. Helm replaces custom arrays during upgrades. Inspect stored overrides with
+`helm get values <release> -n <namespace>`, remove any `securityContext.capabilities.add` override copied from chart
+2.1.x, then upgrade with `--reset-values` and pass the other intended overrides again. Do not use `--reuse-values` or
+`--reset-then-reuse-values` for this migration because both retain the stored capability override and prevent the new
+defaults from taking effect. The chart automatically adds `NET_ADMIN` when `dhcp.enabled: true`.
 
 ## More Information
 
