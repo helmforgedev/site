@@ -13436,6 +13436,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Application Port',
+          key: 'heimdall.containerPort',
+          type: 'number',
+          default: '80',
+          description: 'HTTP port used by the Heimdall NGINX process',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Cluster-facing Service port',
+        },
+        {
           label: 'Timezone',
           key: 'heimdall.timezone',
           type: 'text',
