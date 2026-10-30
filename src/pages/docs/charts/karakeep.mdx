@@ -317,7 +317,7 @@ ingress:
 | `meilisearch.image.digest`     | string  | pinned SHA-256                   | Immutable multi-architecture digest.                 |
 | `meilisearch.image.pullPolicy` | string  | `IfNotPresent`                   | Meilisearch image pull policy.                       |
 | `meilisearch.port`             | integer | `7700`                           | Meilisearch process listener port.                   |
-| `meilisearch.environment`      | string  | `production`                     | Meilisearch runtime environment.                     |
+| `meilisearch.environment`      | string  | `development`                    | Meilisearch runtime environment.                     |
 | `meilisearch.upgradeDb`        | boolean | `true`                           | Upgrade an older on-disk database at startup.        |
 | `meilisearch.extraEnv`         | array   | `[]`                             | Extra non-reserved environment variables.            |
 | `meilisearch.securityContext`  | object  | hardened defaults                | Sidecar container security context.                  |
@@ -337,8 +337,11 @@ ingress:
 | `chromium.resources`        | object  | `{}`                                   | CPU and memory requests and limits for Chromium.           |
 
 <Callout type="info" title="Chromium port 9222 is fixed upstream">
-  The official image entrypoint owns public port 9222 and its internal debugging port. Do not override them. Karakeep
-  reaches the sidecar at `127.0.0.1`; using `localhost` can select IPv6 even though Chrome listens on IPv4.
+  The official image entrypoint runs an unauthenticated socat proxy on port 9222 and Chrome's internal debugging
+  endpoint on port 9223. Chrome binds 9223 to IPv4 loopback, while the proxy binds 9222 to all pod IPv4 interfaces.
+  Karakeep reaches the proxy at `127.0.0.1`; using `localhost` can select IPv6. Keep the NetworkPolicy enabled or
+  provide another access boundary for port 9222. Do not override either port. When Chromium is enabled, remove
+  `BROWSER_WEB_URL` and `BROWSER_CONNECT_ONDEMAND` from `karakeep.extraEnv`; the chart rejects duplicate definitions.
   `containerPorts.http` and `meilisearch.port` are configurable because those values are passed to the actual
   application processes.
 </Callout>
@@ -545,8 +548,10 @@ sessions and API keys are unaffected. Verify login, search, and a new screenshot
 <Callout type="warning" title="Back up Meilisearch before upgrading">
   The default `meilisearch.upgradeDb: true` lets the pinned Meilisearch image migrate an older database on the shared
   PVC, including databases created by the previously pinned 1.41 release. Upstream migrations are not atomic. Take a PVC
-  snapshot before upgrading, then verify search after rollout. You may disable the option after successful migration,
-  but keep it enabled when restored volumes may contain an older database.
+  snapshot before upgrading. Confirm that the Meilisearch `UpgradeDatabase` task reached `succeeded`, then verify search
+  after rollout. Only then may you disable the option; keep it enabled when task success is unconfirmed or restored
+  volumes may contain an older database. The development environment remains the default for compatibility with existing
+  short master keys. Rotate keys to at least 16 bytes before opting into `production`.
 </Callout>
 
 <Callout type="tip" title="Bookmarks saved but no screenshots appearing">
