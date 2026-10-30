@@ -11828,14 +11828,42 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   appwrite: [
     {
-      name: 'General',
+      name: 'Application',
       fields: [
         {
-          label: 'Replica Count',
-          key: 'replicaCount',
+          label: 'API Replicas',
+          key: 'api.replicaCount',
           type: 'number',
           default: '1',
-          description: 'Number of replicas',
+          description: 'Number of Appwrite API replicas',
+        },
+        {
+          label: 'API Listener Port',
+          key: 'api.containerPort',
+          type: 'number',
+          default: '80',
+          description: 'Port listened on by the API process',
+        },
+        {
+          label: 'Console Listener Port',
+          key: 'console.containerPort',
+          type: 'number',
+          default: '3000',
+          description: 'Port listened on by the Console process',
+        },
+        {
+          label: 'Realtime Replicas',
+          key: 'realtime.replicaCount',
+          type: 'number',
+          default: '1',
+          description: 'Number of realtime WebSocket replicas',
+        },
+        {
+          label: 'Realtime Listener Port',
+          key: 'realtime.containerPort',
+          type: 'number',
+          default: '80',
+          description: 'Port listened on by the realtime process',
         },
         {
           label: 'Storage Size',
@@ -11852,22 +11880,28 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'CPU Request',
-          key: 'resources.requests.cpu',
+          key: 'api.resources.requests.cpu',
           type: 'text',
           default: '500m',
           description: 'CPU request',
         },
         {
           label: 'Memory Request',
-          key: 'resources.requests.memory',
+          key: 'api.resources.requests.memory',
           type: 'text',
           default: '512Mi',
           description: 'Memory request',
         },
-        { label: 'CPU Limit', key: 'resources.limits.cpu', type: 'text', default: '2000m', description: 'CPU limit' },
+        {
+          label: 'CPU Limit',
+          key: 'api.resources.limits.cpu',
+          type: 'text',
+          default: '2000m',
+          description: 'API CPU limit',
+        },
         {
           label: 'Memory Limit',
-          key: 'resources.limits.memory',
+          key: 'api.resources.limits.memory',
           type: 'text',
           default: '1Gi',
           description: 'Memory limit',
@@ -11881,7 +11915,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         {
           label: 'Hostname',
-          key: 'ingress.hostname',
+          key: 'ingress.hosts[0].host',
           type: 'text',
           default: 'appwrite.example.com',
           description: 'Ingress hostname',
@@ -11894,7 +11928,61 @@ export const chartConfigs: Record<string, ChartConfig> = {
           options: ['traefik', 'nginx'],
           description: 'Ingress controller class',
         },
-        { label: 'TLS', key: 'ingress.tls', type: 'toggle', default: 'false', description: 'Enable TLS' },
+      ],
+    },
+    {
+      name: 'Security',
+      collapsible: true,
+      fields: [
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Enable workload isolation and listener policies',
+        },
+        {
+          label: 'ServiceAccount Token',
+          key: 'serviceAccount.automountServiceAccountToken',
+          type: 'toggle',
+          default: 'false',
+          description: 'Mount the Kubernetes API token into Appwrite pods',
+        },
+      ],
+    },
+    {
+      name: 'S3 Backup',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Schedule',
+          key: 'backup.schedule',
+          type: 'text',
+          default: '0 3 * * *',
+          description: 'Cron schedule for MariaDB backups',
+        },
+        {
+          label: 'S3 Endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: 'https://s3.amazonaws.com',
+          description: 'S3-compatible endpoint URL',
+        },
+        {
+          label: 'S3 Bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'appwrite-backups',
+          description: 'Bucket for MariaDB backup archives',
+        },
+        {
+          label: 'S3 Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: 'appwrite-s3-backup-credentials',
+          description: 'Secret containing access-key and secret-key',
+        },
       ],
     },
   ],
