@@ -29,6 +29,21 @@ with Redis-backed queue mode for horizontal scaling of workflow executions.
 - **Encryption key protection** — all workflow credentials encrypted at rest
 - **Webhook URL required** — must match the external-facing URL for triggers to work
 - **Database-aware backup** — `tar` for SQLite, `pg_dump` for PostgreSQL
+- **Explicit listener contracts** — configurable HTTP, task broker, and runner health ports
+- **Least-privilege pod identity** — Kubernetes API token mounting is disabled by default
+
+## Architecture and Listener Contracts
+
+The main Deployment serves the editor and webhooks through
+`containerPorts.http`. In external task-runner mode, each n8n process hosts a
+broker on `containerPorts.runnerBroker`; the same-pod runner sidecar exposes its
+health server on `containerPorts.runnerHealth`. The chart wires the supported
+n8n environment variables and runner URI to these values, while `service.port`
+remains the independent Kubernetes-facing port.
+
+SQLite is a single-main-pod deployment. PostgreSQL is required before enabling
+Redis queue mode and worker Deployments. Main and worker pods share the same
+encryption key and task-runner authentication Secret.
 
 ## Installation
 
@@ -225,7 +240,7 @@ backup:
 | Parameter          | Type   | Default               | Description          |
 | ------------------ | ------ | --------------------- | -------------------- |
 | `image.repository` | string | `docker.io/n8nio/n8n` | n8n container image. |
-| `image.tag`        | string | `"2.43.4"`            | Image tag.           |
+| `image.tag`        | string | `"2.44.4"`            | Image tag.           |
 | `image.pullPolicy` | string | `IfNotPresent`        | Image pull policy.   |
 
 ### Task Runners
@@ -234,7 +249,7 @@ backup:
 | ---------------------------------- | ------ | ------------------------- | ------------------------------------------------------------------------ |
 | `taskRunners.mode`                 | string | `external`                | Run the dedicated task-runner sidecar.                                   |
 | `taskRunners.image.repository`     | string | `docker.io/n8nio/runners` | External task-runner image repository.                                   |
-| `taskRunners.image.tag`            | string | `""`                      | Runner tag; empty inherits `image.tag` (`2.43.4`).                       |
+| `taskRunners.image.tag`            | string | `""`                      | Runner tag; empty inherits `image.tag` (`2.44.4`).                       |
 | `taskRunners.image.pullPolicy`     | string | `IfNotPresent`            | External task-runner image pull policy.                                  |
 | `taskRunners.extraEnv`             | array  | `[]`                      | Extra environment variables for runner sidecars in main and worker pods. |
 | `taskRunners.nativePython.enabled` | bool   | `false`                   | Enable native Python support with a compatible external runner image.    |
@@ -260,6 +275,15 @@ In external mode, Code node module allowlists such as `NODE_FUNCTION_ALLOW_BUILT
 | `n8n.logLevel`      | string | `info`    | Log level: `silent`, `error`, `warn`, `info`, `debug`, `verbose`.                 |
 | `n8n.logOutput`     | string | `console` | Log output destination: `console` or `file`.                                      |
 | `n8n.extraEnv`      | array  | `[]`      | Extra environment variables (e.g. `GENERIC_TIMEZONE`, `N8N_DIAGNOSTICS_ENABLED`). |
+
+### Listener Ports
+
+| Parameter                     | Type    | Default | Description                                      |
+| ----------------------------- | ------- | ------- | ------------------------------------------------ |
+| `containerPorts.http`         | integer | `5678`  | Main n8n process HTTP listener.                  |
+| `containerPorts.runnerBroker` | integer | `5679`  | Broker listener used by external task runners.   |
+| `containerPorts.runnerHealth` | integer | `5680`  | External runner sidecar health-check listener.   |
+| `service.port`                | integer | `80`    | Kubernetes Service port; does not alter runtime. |
 
 ### Encryption Key
 
@@ -300,13 +324,13 @@ In external mode, Code node module allowlists such as `NODE_FUNCTION_ALLOW_BUILT
 
 ### Subcharts
 
-| Parameter                             | Type    | Default | Description                             |
-| ------------------------------------- | ------- | ------- | --------------------------------------- |
-| `postgresql.enabled`                  | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
-| `postgresql.auth.password`            | string  | `""`    | Password. Auto-generated if empty.      |
-| `postgresql.primary.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
-| `redis.enabled`                       | boolean | `false` | Deploy the bundled Redis subchart.      |
-| `redis.primary.persistence.size`      | string  | `1Gi`   | PVC size for Redis.                     |
+| Parameter                                | Type    | Default | Description                             |
+| ---------------------------------------- | ------- | ------- | --------------------------------------- |
+| `postgresql.enabled`                     | boolean | `false` | Deploy the bundled PostgreSQL subchart. |
+| `postgresql.auth.password`               | string  | `""`    | Password. Auto-generated if empty.      |
+| `postgresql.standalone.persistence.size` | string  | `8Gi`   | PVC size for PostgreSQL.                |
+| `redis.enabled`                          | boolean | `false` | Deploy the bundled Redis subchart.      |
+| `redis.standalone.persistence.size`      | string  | `1Gi`   | PVC size for Redis.                     |
 
 ### Persistence
 
@@ -333,20 +357,50 @@ Backup mode is automatically selected based on the active database vendor.
 
 ### Service, Ingress, Probes
 
-| Parameter                  | Type    | Default     | Description                     |
-| -------------------------- | ------- | ----------- | ------------------------------- |
-| `service.type`             | string  | `ClusterIP` | Service type.                   |
-| `ingress.enabled`          | boolean | `false`     | Enable an Ingress resource.     |
-| `ingress.ingressClassName` | string  | `""`        | Ingress class name.             |
-| `startupProbe.enabled`     | boolean | `true`      | Startup probe on `/healthz`.    |
-| `livenessProbe.enabled`    | boolean | `true`      | Liveness probe on `/healthz`.   |
-| `readinessProbe.enabled`   | boolean | `true`      | Readiness probe on `/healthz`.  |
-| `resources`                | object  | `{}`        | CPU and memory requests/limits. |
-| `extraManifests`           | array   | `[]`        | Extra Kubernetes manifests.     |
+| Parameter                                     | Type    | Default     | Description                                               |
+| --------------------------------------------- | ------- | ----------- | --------------------------------------------------------- |
+| `service.type`                                | string  | `ClusterIP` | Service type.                                             |
+| `ingress.enabled`                             | boolean | `false`     | Enable an Ingress resource.                               |
+| `ingress.ingressClassName`                    | string  | `""`        | Ingress class name.                                       |
+| `startupProbe.enabled`                        | boolean | `true`      | Startup probe on `/healthz`.                              |
+| `livenessProbe.enabled`                       | boolean | `true`      | Liveness probe on `/healthz`.                             |
+| `readinessProbe.enabled`                      | boolean | `true`      | Readiness probe on `/healthz/readiness`.                  |
+| `resources`                                   | object  | `{}`        | CPU and memory requests/limits.                           |
+| `extraManifests`                              | array   | `[]`        | Extra Kubernetes manifests.                               |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount the Kubernetes API token into main and worker pods. |
+
+## Security and Production Boundaries
+
+The workload runs as the upstream non-root user, drops all Linux capabilities,
+denies privilege escalation, uses RuntimeDefault seccomp, and does not mount a
+Kubernetes API token by default. Preserve the encryption key across every
+upgrade and restore. Namespace administrators and readers of Helm release state
+remain inside the credential trust boundary.
+
+The chart does not provision DNS, TLS issuers, routing controllers, external
+PostgreSQL or Redis, object storage, NetworkPolicy, or monitoring controllers.
+If the task broker is reachable outside its pod, restrict the broker Service
+port configured by `containerPorts.runnerBroker` (`5679` by default) to trusted
+runner clients with platform-managed network policy. `service.port` controls
+the separate HTTP Service port.
+
+## Troubleshooting
+
+- If the editor or readiness probe fails after a port change, verify that
+  `containerPorts.http` matches `N8N_PORT` in the rendered main container.
+- If Code nodes cannot reach their runner, compare
+  `containerPorts.runnerBroker`, `N8N_RUNNERS_BROKER_PORT`, and
+  `N8N_RUNNERS_TASK_BROKER_URI` in the same pod.
+- If the runner is unhealthy, compare `containerPorts.runnerHealth` with
+  `N8N_RUNNERS_LAUNCHER_HEALTH_CHECK_PORT` and inspect the runner logs.
+- If workers wait indefinitely, inspect PostgreSQL, Redis, and `wait-for-main`
+  init-container logs together.
+- If restored credentials cannot be decrypted, restore the original encryption
+  key before starting n8n.
 
 ## Upgrade Notes
 
-n8n `2.43.4` includes the 2.42 and 2.43 maintenance lines and fixes duplicate
+n8n `2.44.4` includes the 2.42 through 2.44 maintenance lines and fixes duplicate
 Chat Hub segment handling in queue mode and deferred tool-call resumption for
 tools loaded by a skill. Agents remain enabled by default; this does not add a
 Kubernetes workload or RBAC requirement. Back
@@ -354,7 +408,7 @@ up the database and data volume, preserve the encryption key, and validate
 workflows and credentials in staging before upgrading. Keep the app and external
 runner tags aligned; an empty `taskRunners.image.tag` inherits `image.tag`.
 
-Use `helm upgrade --reset-then-reuse-values` with `image.tag=2.43.4` and update
+Use `helm upgrade --reset-then-reuse-values` with `image.tag=2.44.4` and update
 any separately pinned runner tag. Existing generated encryption keys and runner
 tokens are retained through Helm lookup; use existing Secrets for offline
 rendering or GitOps. Automatic database migrations require a recoverable backup.
@@ -364,10 +418,9 @@ version opens the same database. Plan for brief downtime. The Python toggle
 `taskRunners.nativePython.enabled` now controls the n8n 2.x variable
 `N8N_PYTHON_ENABLED`; it remains disabled by default and requires external runners.
 
-The Redis dependency moves to 3.0.0 with unchanged image, storage and
-authentication defaults and corrected TLS/custom-port probes. Review each
+The dependency set uses PostgreSQL `2.1.1` and Redis `3.1.0`. Review each
 intervening release from [2.39.0](https://github.com/n8n-io/n8n/releases/tag/n8n%402.39.0)
-through [2.43.4](https://github.com/n8n-io/n8n/releases/tag/n8n%402.43.4).
+through [2.44.4](https://github.com/n8n-io/n8n/releases/tag/n8n%402.44.4).
 For source-control HTTPS remotes with a private CA, `GIT_SSL_CAINFO` is now
 honored; mount the trust file and pass its path through the existing environment
 extension when needed.
