@@ -10858,6 +10858,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Meilisearch process listener port',
         },
         {
+          label: 'Upgrade Search Database',
+          key: 'meilisearch.upgradeDb',
+          type: 'toggle',
+          default: 'true',
+          description: 'Migrate an older Meilisearch database at startup',
+        },
+        {
           label: 'Chromium',
           key: 'chromium.enabled',
           type: 'toggle',
