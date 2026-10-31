@@ -266,32 +266,32 @@ Used when `mongodb.enabled: false`.
 
 ### Backup
 
-| Parameter                              | Type    | Default                          | Description                                                  |
-| -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                          | Enable scheduled MongoDB S3 backup CronJob.                  |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                              | Number of successful Job records to keep.                    |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                              | Number of failed Job records to keep.                        |
-| `backup.backoffLimit`                  | integer | `1`                              | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `countly`                        | Prefix for backup archive filenames.                         |
-| `backup.images.mongodb`                | string  | `docker.io/library/mongo:8.0.34` | Image for `mongodump`.                                       |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image for S3 upload.                                         |
-| `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
-| `backup.database.uri`                  | string  | `""`                             | Override MongoDB URI for backup (uses app URI if empty).     |
-| `backup.database.existingSecret`       | string  | `""`                             | Existing Secret containing the backup MongoDB URI.           |
-| `backup.database.existingSecretUriKey` | string  | `mongodb-uri`                    | URI key in the backup MongoDB Secret.                        |
-| `backup.database.mongodumpArgs`        | array   | `[]`                             | Extra arguments passed without shell evaluation.             |
-| `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `countly`                        | Key prefix within the bucket.                                |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
-| `backup.s3.existingSecret`             | string  | `""`                             | Existing secret with S3 access and secret keys.              |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
-| `backup.s3.accessKey`                  | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                              | Type                   | Default                          | Description                                                  |
+| -------------------------------------- | ---------------------- | -------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                       | boolean                | `false`                          | Enable scheduled MongoDB S3 backup CronJob.                  |
+| `backup.schedule`                      | string                 | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
+| `backup.suspend`                       | boolean                | `false`                          | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`             | string                 | `Forbid`                         | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`    | integer                | `3`                              | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`        | integer                | `3`                              | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                  | integer                | `1`                              | Job retry limit.                                             |
+| `backup.archivePrefix`                 | string                 | `countly`                        | Prefix for backup archive filenames.                         |
+| `backup.images.mongodb`                | string                 | `docker.io/library/mongo:8.0.34` | Image for `mongodump`.                                       |
+| `backup.images.uploader`               | string                 | `docker.io/helmforge/mc:1.0.0`   | Image for S3 upload.                                         |
+| `backup.resources`                     | object                 | `{}`                             | Resources for backup containers.                             |
+| `backup.database.uri`                  | string                 | `""`                             | Override MongoDB URI for backup (uses app URI if empty).     |
+| `backup.database.existingSecret`       | string                 | `""`                             | Existing Secret containing the backup MongoDB URI.           |
+| `backup.database.existingSecretUriKey` | string                 | `mongodb-uri`                    | URI key in the backup MongoDB Secret.                        |
+| `backup.database.mongodumpArgs`        | array or legacy string | `[]`                             | Extra arguments passed without shell evaluation.             |
+| `backup.s3.endpoint`                   | string                 | `""`                             | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                     | string                 | `""`                             | Target bucket name.                                          |
+| `backup.s3.prefix`                     | string                 | `countly`                        | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`    | boolean                | `true`                           | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`             | string                 | `""`                             | Existing secret with S3 access and secret keys.              |
+| `backup.s3.existingSecretAccessKeyKey` | string                 | `access-key`                     | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey` | string                 | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                  | string                 | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                  | string                 | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
 
 ### Service
 
@@ -399,6 +399,14 @@ For production:
 
 The default Ingress and HTTPRoute expose the dashboard only. SDK clients outside
 the cluster require a deliberate route or load balancer for `service.apiPort`.
+
+## Upgrade Compatibility
+
+Older Countly chart releases accepted a space-delimited string in
+`backup.database.mongodumpArgs`. Existing releases can upgrade without resetting
+their values: the chart converts that legacy string into individual arguments.
+New and updated configurations should use an array so argument boundaries remain
+explicit.
 
 ## More Information
 
