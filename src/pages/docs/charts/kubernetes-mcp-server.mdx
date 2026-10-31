@@ -20,8 +20,8 @@ Defaults are inspection-oriented:
 - `mcp.stateless=true`
 - `mcp.clusterProvider=in-cluster`
 - RBAC bound to the built-in `view` ClusterRole
-- upstream UID/GID `65532`, `RuntimeDefault` seccomp, dropped capabilities,
-  disabled privilege escalation, and a read-only root filesystem
+- non-root execution without fixed IDs, `RuntimeDefault` seccomp, dropped
+  capabilities, disabled privilege escalation, and a read-only root filesystem
 
 ## Configuration Reference
 
@@ -87,10 +87,11 @@ helm install kubernetes-mcp-server oci://ghcr.io/helmforgedev/helm/kubernetes-mc
 
 The P2 quality release preserves the complete existing values contract: no key
 was removed, renamed, or given a different type. A normal Helm upgrade adopts
-the new restrictive security defaults, which match the UID/GID already declared
-by the pinned upstream image. Releases upgraded with `--reuse-values` keep their
-previous security-context values and remain supported. Both paths were validated
-from chart `1.0.8` with retained port and label overrides.
+the new restrictive security defaults. Numeric IDs remain unset so OpenShift
+SCCs can assign namespace-specific ranges; the pinned image otherwise supplies
+its own non-root UID/GID. Releases upgraded with `--reuse-values` keep their
+previous security-context values and remain supported. Both paths were
+validated from chart `1.0.8` with retained port and label overrides.
 
 Custom TOML changes now trigger a Deployment rollout through a ConfigMap
 checksum. This does not change the mounted path or configuration format.
