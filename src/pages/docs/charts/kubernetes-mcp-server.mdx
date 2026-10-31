@@ -93,6 +93,12 @@ its own non-root UID/GID. Releases upgraded with `--reuse-values` keep their
 previous security-context values and remain supported. Both paths were
 validated from chart `1.0.8` with retained port and label overrides.
 
+For compatibility with existing deployments, `podSecurityContext.runAsUser: 0`
+without an explicit `runAsNonRoot` suppresses the automatic non-root flag. This
+prevents Helm from combining a legacy root override with a conflicting new
+default. New installations remain non-root by default, and an explicitly set
+`runAsNonRoot` value is always preserved.
+
 Custom TOML changes now trigger a Deployment rollout through a ConfigMap
 checksum. This does not change the mounted path or configuration format.
 
