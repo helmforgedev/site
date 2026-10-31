@@ -55,6 +55,11 @@ Redis session storage. Native health and metrics listeners follow
 `containerPorts`, while the ingress-only NetworkPolicy limits reachable Pod
 ports without blocking external identity, mail or storage dependencies.
 
+Upgrades from releases before 1.5.18 may retain `config.server.address` and
+`config.telemetry.metrics.address`. Those legacy values remain supported and
+take precedence over the new default ports. Migrate them to `containerPorts`
+when editing the configuration.
+
 ## Installation
 
 **HTTPS repository:**
@@ -463,7 +468,8 @@ HTTP and optional metrics listeners. Configure explicit
 - If the Pod does not become ready, inspect `/api/health`, application logs and
   database or Redis endpoints before restarting it.
 - If a custom port fails, confirm `containerPorts.http` or
-  `containerPorts.metrics`; listener addresses under `config` are chart-managed.
+  `containerPorts.metrics`; legacy listener addresses under `config` take
+  precedence when retained from an older release.
 - If login redirects or cookies fail, verify the public Authelia URL, cookie
   domain, TLS scheme and reverse-proxy forwarded headers.
 - If MFA data cannot be decrypted, restore the matching database and original
