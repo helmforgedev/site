@@ -482,18 +482,24 @@ must support `ReadWriteMany`.
 
 ### Backup
 
-| Parameter                       | Type    | Default                                                | Description                                                  |
-| ------------------------------- | ------- | ------------------------------------------------------ | ------------------------------------------------------------ |
-| `backup.enabled`                | boolean | `false`                                                | Enable scheduled `mysqldump` S3 backup.                      |
-| `backup.schedule`               | string  | `"0 3 * * *"`                                          | Cron schedule.                                               |
-| `backup.s3.endpoint`            | string  | `""`                                                   | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`              | string  | `""`                                                   | Target bucket name.                                          |
-| `backup.s3.existingSecret`      | string  | `""`                                                   | Existing secret with S3 credentials.                         |
-| `backup.database.mysqldumpArgs` | array   | `['--single-transaction', '--routines', '--triggers']` | Arguments passed to `mariadb-dump` without shell evaluation. |
-| `backup.images.mariadb`         | string  | `docker.io/library/mariadb:11.8.9-noble`               | Exact MariaDB client image.                                  |
+| Parameter                       | Type            | Default                                                | Description                                                                                                 |
+| ------------------------------- | --------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `backup.enabled`                | boolean         | `false`                                                | Enable scheduled `mysqldump` S3 backup.                                                                     |
+| `backup.schedule`               | string          | `"0 3 * * *"`                                          | Cron schedule.                                                                                              |
+| `backup.s3.endpoint`            | string          | `""`                                                   | S3-compatible endpoint URL.                                                                                 |
+| `backup.s3.bucket`              | string          | `""`                                                   | Target bucket name.                                                                                         |
+| `backup.s3.existingSecret`      | string          | `""`                                                   | Existing secret with S3 credentials.                                                                        |
+| `backup.database.mysqldumpArgs` | array or string | `['--single-transaction', '--routines', '--triggers']` | Extra `mariadb-dump` arguments. Arrays are preferred; legacy whitespace-delimited strings remain supported. |
+| `backup.images.mariadb`         | string          | `docker.io/library/mariadb:11.8.9-noble`               | Exact MariaDB client image.                                                                                 |
 
 The CronJob backs up MariaDB only. Back up uploads, functions, builds, sites,
 certificates, the application Secret, and any external ClickHouse separately.
+
+Installations created before the backup argument contract changed may retain a
+whitespace-delimited string for `backup.database.mysqldumpArgs`. The chart
+normalizes that legacy form to an argument list. Prefer a YAML array for new
+configuration so each argument remains explicit and is passed without shell
+evaluation.
 
 ### Security and network policy
 
