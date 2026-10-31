@@ -85,6 +85,13 @@ For production, prefer a managed or platform-operated MySQL or MariaDB service a
 
 ## Upgrades
 
+Before upgrading from chart 2.4.x or earlier, move every retained value under
+`mysql.primary` to the equivalent `mysql.standalone` path. The bundled MySQL
+dependency no longer reads `mysql.primary`; the chart now fails with an
+explicit migration message instead of silently ignoring persistence settings.
+For example, migrate `mysql.primary.persistence.size` to
+`mysql.standalone.persistence.size`.
+
 The official image stores release code under `/usr/src/matomo` and only initializes `/var/www/html` when no installation exists. Because the chart persists `/var/www/html`, the chart enables `persistence.codeSync` by default. A `sync-matomo-code` init container copies image-managed files into the PVC before the web container starts, while retaining PVC-only configuration, marketplace plugins, and user content.
 
 The sync preserves metadata on directories that already exist in the volume and does not archive the source directory entry itself. Images running as a non-root UID can therefore synchronize code when `podSecurityContext.fsGroup` makes the volume writable, without needing permission to change the mode or timestamps of the volume root.
