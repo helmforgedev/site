@@ -836,7 +836,7 @@ export const charts: Chart[] = [
   {
     name: 'Kubernetes MCP Server',
     slug: 'kubernetes-mcp-server',
-    description: 'Kubernetes MCP server with in-cluster RBAC, read-only defaults, and HTTP/SSE transport.',
+    description: 'Kubernetes MCP server with in-cluster RBAC, read-only defaults, and Streamable HTTP transport.',
     maturity: 'stable',
     backup: false,
   },
