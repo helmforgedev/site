@@ -22,6 +22,8 @@ alerts, and review job history. Job data and state are stored in flat JSON files
 - **Job memory limits** — configurable per-job memory cap
 - **Concurrency control** — configurable maximum concurrent jobs per server
 - **Persistent storage** — PVC for job data, history, and state JSON files
+- **Compatible hardening** — opt-in seccomp, capability, privilege-escalation, and token controls
+- **Network policy** — optional ingress and egress policy with upgrade-safe defaults
 
 ## Security Scan
 
@@ -287,11 +289,40 @@ Cronicle stores all job definitions, schedules, history, and state in flat JSON 
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                      | Type    | Default           | Description                                                                |
+| ---------------------------------------------- | ------- | ----------------- | -------------------------------------------------------------------------- |
+| `resources`                                    | object  | `{}`              | CPU and memory requests and limits.                                        |
+| `podSecurityContext`                           | object  | `{}`              | Pod-level security context.                                                |
+| `securityContext`                              | object  | `{}`              | Container-level security context.                                          |
+| `securityProfile.enabled`                      | boolean | `false`           | Enable the opt-in compatible hardening profile.                            |
+| `securityProfile.automountServiceAccountToken` | boolean | `false`           | Token automount behavior while the profile is enabled.                     |
+| `securityProfile.podSecurityContext`           | object  | RuntimeDefault    | Profile pod defaults; explicit `podSecurityContext` keys take priority.    |
+| `securityProfile.containerSecurityContext`     | object  | drop capabilities | Profile container defaults; explicit `securityContext` keys take priority. |
+
+The pinned community image initializes as root and writes outside the data
+volume. The chart therefore does not force `runAsNonRoot` or a read-only root
+filesystem. Enable the profile only after testing existing scheduled commands:
+
+```yaml
+securityProfile:
+  enabled: true
+```
+
+The profile uses RuntimeDefault seccomp, drops all Linux capabilities, blocks
+privilege escalation, and disables ServiceAccount token automount. A job that
+needs a capability or Kubernetes API token requires an explicit, reviewed
+override.
+
+### Network Policy
+
+| Parameter               | Type    | Default | Description                                     |
+| ----------------------- | ------- | ------- | ----------------------------------------------- |
+| `networkPolicy.enabled` | boolean | `false` | Create a NetworkPolicy for the Cronicle pod.    |
+| `networkPolicy.ingress` | array   | `[]`    | Custom ingress rules; empty allows all ingress. |
+| `networkPolicy.egress`  | array   | `[]`    | Custom egress rules; empty leaves egress open.  |
+
+Inventory DNS, SMTP, webhook, package repository, and job-specific destinations
+before adding restrictive egress rules.
 
 ### Service Account
 
@@ -323,6 +354,22 @@ Cronicle stores all job definitions, schedules, history, and state in flat JSON 
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Common Issues
+
+### Upgrade compatibility
+
+The P2 baseline keeps the `1.1.11` runtime contract by default. Both
+`securityProfile.enabled` and `networkPolicy.enabled` are `false`, and upgrades
+preserve the previous empty security contexts and ServiceAccount token
+behavior. The templates also tolerate these new maps being entirely absent,
+which is required by Helm upgrades using `--reuse-values`.
+
+```bash
+helm upgrade cronicle helmforge/cronicle --namespace cronicle --reuse-values
+kubectl rollout status deployment/cronicle-cronicle --namespace cronicle --timeout=300s
+```
+
+Enable either opt-in feature only in a separate, tested upgrade after the
+baseline release is healthy.
 
 <Callout type="danger" title="Jobs not running after pod restart">
   If scheduled jobs stop running after a pod restart, verify that `persistence.enabled: true` and that the PVC is
