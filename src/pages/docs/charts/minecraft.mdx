@@ -487,13 +487,20 @@ upload — ensuring the world is in a consistent state before the backup is take
 
 ### Resources and Security
 
-| Parameter                       | Type    | Default | Description                                                                |
-| ------------------------------- | ------- | ------- | -------------------------------------------------------------------------- |
-| `resources`                     | object  | `{}`    | CPU and memory requests and limits.                                        |
-| `podSecurityContext.fsGroup`    | integer | `1000`  | Filesystem group for the pod.                                              |
-| `securityContext.runAsUser`     | integer | `1000`  | UID for the server process.                                                |
-| `securityContext.runAsGroup`    | integer | `1000`  | GID for the server process.                                                |
-| `terminationGracePeriodSeconds` | integer | `120`   | Grace period for shutdown. Allows `save-all` to complete before pod exits. |
+| Parameter                                  | Type    | Default          | Description                                                                 |
+| ------------------------------------------ | ------- | ---------------- | --------------------------------------------------------------------------- |
+| `resources`                                | object  | `{}`             | CPU and memory requests and limits.                                         |
+| `automountServiceAccountToken`             | boolean | `false`          | Mount a Kubernetes API token in the server pod.                             |
+| `podSecurityContext.fsGroup`               | integer | `1000`           | Filesystem group for the pod.                                               |
+| `podSecurityContext.fsGroupChangePolicy`   | string  | `OnRootMismatch` | Avoid recursive ownership changes when the PVC already has the right group. |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Seccomp profile for the pod.                                                |
+| `securityContext.runAsUser`                | integer | `1000`           | UID for the server process.                                                 |
+| `securityContext.runAsGroup`               | integer | `1000`           | GID for the server process.                                                 |
+| `securityContext.runAsNonRoot`             | boolean | `true`           | Require a non-root server process.                                          |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Prevent privilege escalation.                                               |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `true`           | Keep the image filesystem read-only; `/data` and `/tmp` remain writable.    |
+| `securityContext.capabilities.drop`        | array   | `[ALL]`          | Linux capabilities removed from the server process.                         |
+| `terminationGracePeriodSeconds`            | integer | `120`            | Grace period for shutdown. Allows `save-all` to complete before pod exits.  |
 
 ### Scheduling
 
@@ -516,6 +523,13 @@ upload — ensuring the world is in a consistent state before the backup is take
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
 ## Upgrade Notes
+
+The hardened pod defaults support upgrades from older chart releases with both
+`--reset-values` and `--reuse-values`. Missing security keys are merged by the
+chart while explicit per-key overrides remain authoritative. The RCON Secret,
+world PVC, and data are retained. Custom images must support UID/GID 1000 and a
+read-only root filesystem, or set compatible `podSecurityContext` and
+`securityContext` overrides before upgrading.
 
 The 2026.10.0 image updates the bundled helper and monitor components, improves archive extraction, and fixes GTNH handling. Existing defaults remain unchanged. It retains the behavior that stops startup after failed custom-server, BuildTools, Sponge, modpack or FTB installer downloads instead of continuing with incomplete artifacts. Confirm modpack downloads and installer success before rolling out. Review the [2026.10.0 release](https://github.com/itzg/docker-minecraft-server/releases/tag/2026.10.0). The dated image pins the container distribution, not the game: pin `server.version` separately to keep an image update from downloading a newer Minecraft release.
 
