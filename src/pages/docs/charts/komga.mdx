@@ -30,21 +30,23 @@ before upgrading.
 
 The chart preserves the root UID/GID behavior from previous releases so
 root-owned SQLite databases on existing `/config` PVCs remain writable. The
-new compatible security defaults drop Linux capabilities, prevent privilege
-escalation, use RuntimeDefault seccomp, and disable Kubernetes API token mounts
-without changing file ownership.
+new compatible security defaults prevent privilege escalation, use
+RuntimeDefault seccomp, and disable Kubernetes API token mounts without changing
+file ownership or filesystem access.
 
 Back up `/config`, then use either a normal upgrade with your values file or
 reuse the values stored in the release:
 
 ```bash
 helm upgrade komga helmforge/komga --namespace komga -f values.yaml
-helm upgrade komga helmforge/komga --namespace komga --reuse-values
+helm upgrade komga helmforge/komga --namespace komga --reset-then-reuse-values
 ```
 
+`--reset-then-reuse-values` applies new chart defaults while retaining explicit
+values from the previous release; those explicit values still take precedence.
 Both paths retain the existing `/config` and `/data` claims. Custom non-root
-UID/GID settings remain supported, but operators must verify PVC ownership
-before enabling them.
+UID/GID settings remain supported, but operators must verify PVC ownership and
+access before enabling them.
 
 ## Chart References
 
@@ -401,14 +403,14 @@ out-of-band; this chart only renders `ExternalSecret` resources when enabled. Se
 
 ### Resources and Scheduling
 
-| Parameter                       | Type    | Default                                                         | Description                     |
-| ------------------------------- | ------- | --------------------------------------------------------------- | ------------------------------- |
-| `resources`                     | object  | `{}`                                                            | CPU and memory requests/limits. |
-| `podSecurityContext`            | object  | `{ seccompProfile: { type: RuntimeDefault } }`                  | Pod-level security context.     |
-| `securityContext`               | object  | `{ allowPrivilegeEscalation: false, capabilities.drop: [ALL] }` | Container security context.     |
-| `nodeSelector`                  | object  | `{}`                                                            | Node selector for scheduling.   |
-| `tolerations`                   | array   | `[]`                                                            | Tolerations for scheduling.     |
-| `terminationGracePeriodSeconds` | integer | `30`                                                            | Termination grace period.       |
+| Parameter                       | Type    | Default                                        | Description                     |
+| ------------------------------- | ------- | ---------------------------------------------- | ------------------------------- |
+| `resources`                     | object  | `{}`                                           | CPU and memory requests/limits. |
+| `podSecurityContext`            | object  | `{ seccompProfile: { type: RuntimeDefault } }` | Pod-level security context.     |
+| `securityContext`               | object  | `{ allowPrivilegeEscalation: false }`          | Container security context.     |
+| `nodeSelector`                  | object  | `{}`                                           | Node selector for scheduling.   |
+| `tolerations`                   | array   | `[]`                                           | Tolerations for scheduling.     |
+| `terminationGracePeriodSeconds` | integer | `30`                                           | Termination grace period.       |
 
 ### Extra
 
@@ -420,12 +422,13 @@ out-of-band; this chart only renders `ExternalSecret` resources when enabled. Se
 
 ## Security
 
-Komga and its optional backup containers use RuntimeDefault seccomp, drop all
-Linux capabilities, block privilege escalation, and do not receive a Kubernetes
-API token. The official image currently starts as root; the chart intentionally
-does not change that UID by default because databases created by earlier chart
-versions can be root-owned. A read-only root filesystem is not enabled because
-the SQLite JDBC driver extracts a native library while starting.
+Komga and its optional backup containers use RuntimeDefault seccomp, block
+privilege escalation, and do not receive a Kubernetes API token. The official
+image currently starts as root; the chart intentionally preserves that UID and
+its discretionary filesystem access because earlier installations may contain
+root-owned files or restrictive files written by a custom UID. A read-only root
+filesystem is not enabled because the SQLite JDBC driver extracts a native
+library while starting.
 
 Use TLS for external routes and an existing Secret or ExternalSecret for S3
 credentials. NetworkPolicy, encrypted storage, image admission, log retention,
