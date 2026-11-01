@@ -269,6 +269,9 @@ credentials.
 
 The PVC stores the entire `/data` directory: SQLite database, all archived files (HTML, PDFs, screenshots, WARCs,
 media), and ArchiveBox configuration. Size it generously — archived pages with media can consume gigabytes quickly.
+Chart-created claims carry `helm.sh/resource-policy: keep`, so `helm uninstall` retains the dataset. Namespace deletion
+and storage-provider retention policy can still remove it; use an existing claim when lifecycle must remain fully
+outside Helm.
 
 | Parameter                   | Type    | Default             | Description                                                 |
 | --------------------------- | ------- | ------------------- | ----------------------------------------------------------- |
@@ -288,6 +291,9 @@ media), and ArchiveBox configuration. Size it generously — archived pages with
 
 The S3 backup archives the full `/data` directory — including the SQLite database and all archived files. This is a
 complete backup of the entire ArchiveBox dataset, unlike other charts where only media files are backed up.
+
+`backup.enabled` requires `persistence.enabled: true`; the chart rejects an ephemeral backup configuration because the
+CronJob must mount the durable data claim.
 
 | Parameter                              | Type    | Default                         | Description                                                  |
 | -------------------------------------- | ------- | ------------------------------- | ------------------------------------------------------------ |
@@ -371,6 +377,9 @@ pages.
 | `serviceAccount.create`      | boolean | `false` | Create a dedicated ServiceAccount.  |
 | `serviceAccount.name`        | string  | `""`    | Override the ServiceAccount name.   |
 | `serviceAccount.annotations` | object  | `{}`    | Annotations for the ServiceAccount. |
+
+The chart creates no RBAC permissions. Kubernetes ServiceAccount token automount policy still applies to the selected
+ServiceAccount and namespace.
 
 ### Scheduling
 
