@@ -14,10 +14,10 @@ Supports standalone single-instance, replica set for high availability, and shar
 horizontal scalability.
 
 <Callout type="danger" title="Replica set keyFile must not change — rotating it breaks internal member authentication">
-  Replica set members authenticate each other using a shared keyFile (`auth.replicaSetKey`). If the key is not persisted
-  via `auth.existingKeySecret`, it is auto-generated on first deployment. **Rotating or regenerating this key after
-  initialization will cause all replica set members to reject each other**, resulting in a split-brain or total replica
-  set failure. Always persist it via `auth.existingKeySecret` before the first replica set deployment.
+  Replica set members authenticate each other using a shared keyFile (`auth.replicaSetKey`). When the chart generates
+  it, the Secret is retained and reused across upgrades and persistent-release removal. **Rotating or regenerating this
+  key after initialization will cause all replica set members to reject each other.** Back up the generated Secret with
+  the PVCs, or use `auth.existingKeySecret` when credentials are externally managed.
 </Callout>
 
 <Callout
@@ -36,11 +36,12 @@ horizontal scalability.
 - **Replica set HA** — `rs0` with configurable member count and optional arbiter
 - **Sharded cluster** — mongos routers, config servers, and data shards
 - **Internal keyFile auth** — replica set member authentication via shared secret
+- **Upgrade-safe generated credentials** — root credentials and keyFiles are retained with persistent data
 - **Init scripts** — `.js` and `.sh` files via `/docker-entrypoint-initdb.d/`
 - **WiredTiger tuning** — custom `mongod.conf` via `config` block
 - **Prometheus exporter** — `percona/mongodb_exporter` sidecar with ServiceMonitor
 - **`mongodump` backup** — scheduled S3 backup CronJob
-- **Pinned upstream image** — official MongoDB `9.0.2` patch release
+- **Pinned upstream image** — official MongoDB `9.0.4` patch release
 
 ## Installation
 
@@ -228,19 +229,19 @@ config:
 | Parameter          | Type   | Default                   | Description    |
 | ------------------ | ------ | ------------------------- | -------------- |
 | `image.repository` | string | `docker.io/library/mongo` | MongoDB image. |
-| `image.tag`        | string | `"9.0.2"`                 | Image tag.     |
+| `image.tag`        | string | `"9.0.4"`                 | Image tag.     |
 
 ### Authentication
 
-| Parameter                | Type    | Default | Description                                                                                                    |
-| ------------------------ | ------- | ------- | -------------------------------------------------------------------------------------------------------------- |
-| `auth.enabled`           | boolean | `true`  | Enable MongoDB `--auth` flag.                                                                                  |
-| `auth.rootUser`          | string  | `root`  | Root username (`MONGO_INITDB_ROOT_USERNAME`).                                                                  |
-| `auth.rootPassword`      | string  | `""`    | Root password. Auto-generated if empty. **Set only on first deployment.**                                      |
-| `auth.existingSecret`    | string  | `""`    | Existing secret. Keys: `mongodb-root-username`, `mongodb-root-password`.                                       |
-| `auth.replicaSetKey`     | string  | `""`    | KeyFile for internal replica set auth. Auto-generated if empty.                                                |
-| `auth.existingKeySecret` | string  | `""`    | Existing secret with keyFile. Key: `mongodb-replica-set-key`. **Persist before first replica set deployment.** |
-| `auth.users`             | array   | `[]`    | Additional users to create on first startup.                                                                   |
+| Parameter                | Type    | Default | Description                                                                            |
+| ------------------------ | ------- | ------- | -------------------------------------------------------------------------------------- |
+| `auth.enabled`           | boolean | `true`  | Enable MongoDB `--auth` flag.                                                          |
+| `auth.rootUser`          | string  | `root`  | Root username (`MONGO_INITDB_ROOT_USERNAME`).                                          |
+| `auth.rootPassword`      | string  | `""`    | Root password. Auto-generated and retained if empty. **Set only on first deployment.** |
+| `auth.existingSecret`    | string  | `""`    | Existing secret. Keys: `mongodb-root-username`, `mongodb-root-password`.               |
+| `auth.replicaSetKey`     | string  | `""`    | KeyFile for internal replica set auth. Auto-generated and retained if empty.           |
+| `auth.existingKeySecret` | string  | `""`    | Existing secret with keyFile. Key: `mongodb-replica-set-key`.                          |
+| `auth.users`             | array   | `[]`    | Additional users to create on first startup.                                           |
 
 ### Architecture
 
@@ -315,6 +316,14 @@ When `auth.enabled: false`, the exporter now connects without root credentials u
 `mongodb://localhost:27017/admin`. With authentication enabled, it keeps using the root
 credentials from the chart-managed or existing secret.
 
+### Pod Security
+
+| Parameter                                | Type    | Default          | Description                                       |
+| ---------------------------------------- | ------- | ---------------- | ------------------------------------------------- |
+| `automountServiceAccountToken`           | boolean | `false`          | Mount a Kubernetes API token in pods and jobs.    |
+| `podSecurityContext.fsGroup`             | integer | `999`            | Filesystem group used for MongoDB data volumes.   |
+| `podSecurityContext.seccompProfile.type` | string  | `RuntimeDefault` | Seccomp profile applied to MongoDB pods and jobs. |
+
 ### Backup
 
 Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
@@ -331,14 +340,23 @@ Backup uses `mongodump` (not `pg_dump`). All databases are dumped and archived.
 
 ## Upgrade Notes
 
-MongoDB `9.0.2` is a patch in the `9.0` rapid-release line. Before upgrading
+MongoDB `9.0.4` is a patch in the `9.0` rapid-release line. Before upgrading
 from `8.3`, take a tested backup and confirm every member reports
 `featureCompatibilityVersion: "8.3"`. Follow the topology-specific upstream
 procedure, then raise FCV to `9.0` only after all members are healthy and
 rollback is no longer required. Review the
 [MongoDB 9.0 release notes](https://www.mongodb.com/docs/manual/release-notes/9.0/).
-Keep replica set keyFiles and root credentials stable across `helm upgrade`;
-rotate them with MongoDB administrative commands instead of changing chart values.
+The chart reuses generated root credentials and replica set keyFiles across
+`helm upgrade --reset-values` and `helm upgrade --reuse-values`, and retains
+them when a persistent release is removed. Back up the Secrets together with
+the PVCs. Rotate credentials with MongoDB administrative commands and a
+coordinated Secret update instead of changing initialization values.
+
+StatefulSet claim-template sizes are immutable. The chart preserves each
+installed template size during upgrades, including `--reset-values`, so a
+custom-size installation does not fail when defaults are reapplied. Resize the
+bound PVC through the storage class workflow; changing `persistence.size` alone
+does not resize an existing claim.
 
 <Callout type="warning" title="Switching from standalone to replicaset requires a full dump and restore">
   MongoDB cannot automatically convert a standalone instance to a replica set with data. You must:
