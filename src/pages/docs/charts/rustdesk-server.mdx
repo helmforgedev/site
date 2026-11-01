@@ -98,9 +98,11 @@ backup. See [backup, restore and upgrades](https://github.com/helmforgedev/chart
 
 ## Safe upgrades
 
-Take a quiesced backup before an application-version change. Prefer
-`helm upgrade --reset-values -f production-values.yaml` so new defaults are
-applied together with reviewed operator settings. Plain `--reuse-values` remains
+Take a quiesced backup before an application-version change. Before using
+`--reset-values`, export the current user overrides with `helm get values`, review
+them into a complete upgrade file, and preserve every required non-default setting,
+especially `persistence.existingClaim`, identity Secret references, public ports,
+storage class and security-context ownership. Plain `--reuse-values` remains
 compatible, but it retains a previously overridden `image.tag`; set the intended
 pinned tag explicitly when the application image changes. After upgrading, verify
 the live image, PVC claim, public server key and a real client registration/relay
