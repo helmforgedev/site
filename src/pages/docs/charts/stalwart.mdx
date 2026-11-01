@@ -64,6 +64,10 @@ DataStore. The chart rejects local RocksDB/SQLite and a local data PVC in that
 mode. Use the CLI plan for shared BlobStore, SearchStore, InMemoryStore,
 Coordinator, roles, and listeners.
 
+Set `podManagementPolicy: OrderedReady` for the first start against an empty
+shared database. This lets one replica initialize the schema before Kubernetes
+starts the next replica and avoids concurrent bootstrap races.
+
 | Concern       | Common production choices                           |
 | ------------- | --------------------------------------------------- |
 | DataStore     | PostgreSQL, MySQL/MariaDB, FoundationDB             |
@@ -121,6 +125,20 @@ CLI plan and credentials recoverable, and verify health, SMTP behavior, events,
 logs, and effective image digests after the StatefulSet rolls. StatefulSet
 updates have no Deployment-style surge.
 
+Keep the release name, `fullnameOverride`, storage settings, and selected
+`config.source` stable so the upgrade retains StatefulSet identity and PVCs.
+Use an explicit values file with the normal Helm merge as the safe baseline:
+
+```bash
+helm upgrade stalwart helmforge/stalwart \
+  --namespace stalwart --values values.yaml
+```
+
+`--reuse-values` preserves every value stored by the previous release and can
+also hide new safe defaults. Use it only after comparing the old release values
+with the new schema. Do not scale above one replica while the generated local
+RocksDB configuration or a local PVC is active.
+
 ## Security scan
 
 The chart runs as UID/GID 2000 with a read-only root filesystem, RuntimeDefault
@@ -133,6 +151,7 @@ mail ports below 1024. Kubescape results are published in the chart README.
 | Value                               | Default     | Purpose                                           |
 | ----------------------------------- | ----------- | ------------------------------------------------- |
 | `replicaCount`                      | `1`         | StatefulSet replicas                              |
+| `podManagementPolicy`               | `Parallel`  | Pod startup order; use `OrderedReady` for HA boot |
 | `config.source`                     | `generated` | Generated, existing ConfigMap, or existing Secret |
 | `persistence.enabled`               | `true`      | Per-pod local DataStore PVC                       |
 | `extraEnv`, `extraEnvFrom`          | `[]`        | Plain and Secret/ConfigMap-referenced environment |
