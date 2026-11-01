@@ -135,6 +135,12 @@ gateway:
 This is useful during migration from external hosting into the cluster, or when consumers need a stable Kubernetes DNS
 name for a service that remains outside Kubernetes.
 
+ExternalName changes only the Service into a DNS alias. The chart still renders
+its local Deployment and Helm test, but the Service no longer selects those
+pods. `helm test` follows the alias and expects the external target to provide
+OpenReel's `/healthz`, landing page, and COEP response header; the test fails
+when the external service does not satisfy that contract.
+
 ## Gateway API
 
 Gateway API is first-class and uses the shared HelmForge `gateway` shape:
