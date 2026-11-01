@@ -90,6 +90,17 @@ cookie. This prevents Helm `--reset-values` from making the Secret disagree with
 database. Changing the `auth.*` values does not rotate an existing RabbitMQ user; perform live rotation with RabbitMQ
 administration tooling, then synchronize an existing Secret or External Secrets provider.
 
+The supported in-place path from earlier public chart versions uses the official image identity `100:101`. If a
+release used a custom image, inspect the existing cookie before upgrading:
+
+```bash
+kubectl exec -n <namespace> <rabbitmq-pod> -- stat -c '%u:%g %a' /var/lib/rabbitmq/.erlang.cookie
+```
+
+Keep `podSecurityContext.runAsUser`, `runAsGroup`, and `fsGroup` aligned with that image's numeric identity. To move a
+PVC to `100:101`, stop RabbitMQ and perform an explicitly authorized one-time ownership migration first. The hardened
+chart does not silently run a root volume-permissions container.
+
 ## Installation
 
 **HTTPS repository:**
