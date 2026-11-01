@@ -96,6 +96,16 @@ persistence is only for disposable trials. Back up the complete stopped data
 directory and any separately managed identity source; a retained PVC is not a
 backup. See [backup, restore and upgrades](https://github.com/helmforgedev/charts/blob/main/charts/rustdesk-server/docs/backup-restore.md).
 
+## Safe upgrades
+
+Take a quiesced backup before an application-version change. Prefer
+`helm upgrade --reset-values -f production-values.yaml` so new defaults are
+applied together with reviewed operator settings. Plain `--reuse-values` remains
+compatible, but it retains a previously overridden `image.tag`; set the intended
+pinned tag explicitly when the application image changes. After upgrading, verify
+the live image, PVC claim, public server key and a real client registration/relay
+path. A successful Helm revision alone does not prove identity or data continuity.
+
 ## Resources and operations
 
 Each binary requests 100m CPU and 64Mi memory and has a 1 CPU/256Mi ceiling.
