@@ -29,6 +29,14 @@ a responsive web dashboard and persistent update history.
 - **Configurable IP detection** — HTTP, DNS, or combined public IP fetching strategies
 - **Restricted runtime** — non-root container, read-only root filesystem, dropped capabilities, and ServiceAccount token automount disabled
 
+## Architecture
+
+The chart runs one DDNS writer with a `Recreate` deployment strategy. It reads
+`config.json` from a chart-managed or existing Secret, polls public IP sources,
+updates provider APIs, stores update history on the PVC, and serves the status
+UI through a ClusterIP Service. Horizontal replicas are intentionally avoided
+because concurrent writers can race DNS updates and history writes.
+
 ## Installation
 
 **HTTPS repository:**
@@ -319,6 +327,32 @@ ingress:
 | `extraVolumes`      | array | `[]`    | Extra volumes to attach to the pod.                      |
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
+
+## Upgrade Safety
+
+Keep the release name, `fullnameOverride`, configuration Secret reference, and
+`persistence.existingClaim` stable so upgrades retain workload, Service, and
+PVC identity. Prefer an explicit values file with the normal Helm merge:
+
+```bash
+helm upgrade ddns-updater helmforge/ddns-updater \
+  --namespace ddns-updater --values values.yaml
+```
+
+`--reuse-values` preserves every value stored by the previous release and can
+hide new defaults. Compare the old release values with the new schema before
+using it. Back up `config.json` and update history, then confirm both the UI and
+a real provider update after the pod becomes Ready.
+
+## Troubleshooting
+
+- For startup failures, validate `config.json` and `existingSecretKey`.
+- For stale records, inspect provider errors in the logs and verify outbound
+  DNS, public IP checker, and provider API connectivity.
+- For an unavailable proxied UI, align `ddns.rootUrl`, the Service port, and the
+  Ingress path.
+- For PVC mount failures, verify the existing claim, access mode, and
+  StorageClass before changing persistence settings.
 
 ## More Information
 
