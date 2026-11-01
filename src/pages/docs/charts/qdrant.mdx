@@ -102,10 +102,10 @@ Operations:
 - `pdb.enabled`, `pdb.minAvailable`: disruption budget for multi-pod deployments.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`: resource requests and limits.
-- `podSecurityContext`, `securityContext`: complete pod and container security-context overrides. When left empty and snapshots are under
-  the persistent data path, the chart applies a verified non-root baseline with UID/GID `1000`, `RuntimeDefault` seccomp, a read-only
-  root filesystem, disabled privilege escalation, and all Linux capabilities dropped. A non-empty override replaces the corresponding
-  baseline rather than merging with it.
+- `podSecurityContext`, `securityContext`: complete pod and container security-context overrides. When left empty and effective storage
+  paths are under the persistent data path, the chart applies a verified non-root baseline with UID/GID `1000`, recursive PVC permission
+  repair, `RuntimeDefault` seccomp, a read-only root filesystem, disabled privilege escalation, and all Linux capabilities dropped. A
+  non-empty override replaces the corresponding baseline rather than merging with it.
 - `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `priorityClassName`.
 - `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`.
 - `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
@@ -154,9 +154,10 @@ separately managed ServiceMonitor with an authenticated scrape configuration.
 ## Security Compatibility
 
 An explicit container `securityContext.runAsUser: 0` suppresses the pod-level identity fallback so an existing root override does not
-conflict with `runAsNonRoot`. When `snapshots.path` is outside `persistence.mountPath`, the empty-context fallback preserves the image's
-root identity and writable filesystem so existing root-owned paths and snapshot workflows continue to function. Put snapshots under the
-persistent data mount when possible so the normal non-root, read-only image-filesystem baseline remains active.
+conflict with `runAsNonRoot`. When an effective storage, snapshot, temporary or initialization path is outside `persistence.mountPath`,
+the empty-context fallback preserves the image's root identity and writable filesystem so existing root-owned paths and workflows remain
+functional. Effective paths include `app.env` and `app.extraEnv` overrides. Keep all paths under the persistent data mount when possible
+so the normal non-root, read-only image-filesystem baseline remains active.
 
 ## Backup
 
