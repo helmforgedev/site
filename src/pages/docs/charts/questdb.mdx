@@ -162,6 +162,22 @@ consistent backup. Restore into the same major version before upgrading.
 
 Read the upstream release notes and verify a backup before upgrading. Startup
 can migrate on-disk metadata, so rollback may require the pre-upgrade volume.
+Pin the target chart version and inspect the rendered change before applying it:
+
+```bash
+helm repo update
+helm upgrade questdb helmforge/questdb \
+  --namespace questdb \
+  --version <target-chart-version> \
+  --reuse-values
+```
+
+Preserve `persistence.existingClaim` or the chart-managed PVC,
+`questdb.existingSecret`, both Secret key names, UID/GID ownership, and enabled
+protocols. Use `--reuse-values` only after auditing old overrides. If you choose
+`--reset-values`, restate every non-default persistence, Secret, storage,
+NetworkPolicy, and exposure setting. Never replace a retained PVC or generated
+Secret merely to make an upgrade complete.
 
 The chart is deliberately a singleton. Enabling its PodDisruptionBudget with
 `minAvailable: 1` blocks voluntary node drains. Leave it disabled when planned
