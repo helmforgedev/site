@@ -63,6 +63,8 @@ Exposure and operations:
   Setting `networkPolicy.extraEgress` adds egress isolation with built-in DNS and HTTPS allowances before appending the supplied rules.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `securityProfile.enabled`: opt-in compatible hardening profile, disabled by default.
+- `securityProfile.podSecurityContext`, `securityProfile.containerSecurityContext`: profile defaults; explicit security contexts take priority.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
 - `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
 
@@ -129,6 +131,36 @@ ingress:
         - path: /
           pathType: Prefix
 ```
+
+## Security Profile
+
+The optional profile adds RuntimeDefault seccomp, a read-only root filesystem,
+disabled privilege escalation, and dropped Linux capabilities:
+
+```yaml
+securityProfile:
+  enabled: true
+```
+
+The official image metadata declares UID 0, so the chart does not force a
+fixed or non-root identity. Explicit `podSecurityContext` and
+`securityContext` keys override the profile. Test extra commands, volumes, and
+custom integrations before enabling it.
+
+## Upgrade Compatibility
+
+The P2 baseline preserves the `1.0.4` default render. The security profile is
+disabled, and the template tolerates its map being absent when Helm reuses old
+release values.
+
+```bash
+helm upgrade github-mcp-server helmforge/github-mcp-server --reuse-values
+kubectl rollout status deployment/github-mcp-server-github-mcp-server --timeout=300s
+```
+
+Nonempty `app.args` remains a complete upstream argument override. It bypasses
+generated read-only, tool-selection, GitHub host, and port flags, so review the
+full command line when using it.
 
 ## Additional Resources
 
