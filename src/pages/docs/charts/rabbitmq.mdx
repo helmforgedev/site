@@ -13,10 +13,10 @@ Production-ready RabbitMQ message broker for Kubernetes. Supports single-node an
 architectures, quorum queues (default), management UI with dedicated Ingress, Prometheus metrics, and
 TLS listeners.
 
-<Callout type="warning" title="Fix the Erlang cookie before scaling to a cluster">
-  The Erlang cookie (`auth.erlangCookie`) is used for node-to-node authentication. If it changes between deployments,
-  cluster nodes will refuse to connect to each other. Set an explicit value in `auth.erlangCookie` or use
-  `auth.existingSecret` — never rely on auto-generation in cluster mode.
+<Callout type="warning" title="Keep the Erlang cookie stable">
+  The Erlang cookie (`auth.erlangCookie`) is used for node-to-node authentication. The chart preserves an auto-generated
+  cookie from its existing managed Secret during upgrades. For production ownership and planned rotation, prefer
+  `auth.existingSecret` or External Secrets and keep the value identical on every cluster node.
 </Callout>
 
 ## Key Features
@@ -34,6 +34,10 @@ TLS listeners.
 - **TLS listeners** — configurable AMQP/S and management TLS from an existing Secret
 - **Prometheus metrics** — built-in metrics plugin with optional ServiceMonitor
 - **Low idle CPU defaults** — disables Erlang scheduler busy-wait and uses lightweight TCP probes
+- **Hardened pod defaults** — numeric non-root identity, RuntimeDefault seccomp, read-only root filesystem,
+  no privilege escalation, no Linux capabilities, and no mounted ServiceAccount token
+- **Upgrade-safe credentials** — chart-managed username, password, and Erlang cookie survive both
+  `--reset-values` and `--reuse-values`
 
 ## Port Reference
 
@@ -70,6 +74,21 @@ RabbitMQ 4.3.5 fixed quorum queue recovery, rolling-upgrade queries, direct repl
 and STOMP frame-size limits.
 The chart renders `management.headers.referrer_policy = no-referrer` by default. Set
 `management.referrerPolicy: ""` only when you intentionally want the browser's default policy.
+
+## Security and Upgrades
+
+The default pod runs as RabbitMQ UID `100` and GID `101` with RuntimeDefault seccomp. Privilege escalation is
+disabled, all Linux capabilities are dropped, and the root filesystem is read-only. The data PVC and an ephemeral
+`/tmp` volume are the only writable paths. A non-root init container restores the Erlang cookie to owner-only mode
+after Kubernetes applies the volume filesystem group, which keeps PVCs created by older chart versions compatible.
+
+RabbitMQ 4.1 and later discovers Kubernetes peers from StatefulSet ordinals without querying the Kubernetes API, so
+`automountServiceAccountToken` defaults to `false`.
+
+During an upgrade, the chart reuses all three values from its existing managed Secret: username, password, and Erlang
+cookie. This prevents Helm `--reset-values` from making the Secret disagree with users stored in the persistent broker
+database. Changing the `auth.*` values does not rotate an existing RabbitMQ user; perform live rotation with RabbitMQ
+administration tooling, then synchronize an existing Secret or External Secrets provider.
 
 ## Installation
 
@@ -376,10 +395,9 @@ management:
 
 ### Cluster Mode
 
-<Callout type="danger" title="Set a fixed Erlang cookie before creating a cluster">
-  Never use auto-generated Erlang cookies in cluster mode. If a pod is replaced and the cookie changes, the new node
-  will be rejected by the existing cluster members. Store the cookie in a Kubernetes Secret and reference it via
-  `auth.existingSecret`.
+<Callout type="danger" title="Do not rotate the Erlang cookie during a cluster upgrade">
+  Every node must use the same cookie. The chart retains its managed cookie across upgrades, but production operators
+  should use `auth.existingSecret` or External Secrets for explicit ownership and coordinated rotation.
 </Callout>
 
 | Parameter                          | Type    | Default          | Description                                                        |
@@ -520,11 +538,18 @@ Use External Secrets for RabbitMQ credentials when passwords and Erlang cookies 
 
 ### Resources and Security
 
-| Parameter            | Type   | Default | Description                         |
-| -------------------- | ------ | ------- | ----------------------------------- |
-| `resources`          | object | `{}`    | CPU and memory requests and limits. |
-| `podSecurityContext` | object | `{}`    | Pod-level security context.         |
-| `securityContext`    | object | `{}`    | Container-level security context.   |
+| Parameter                                  | Type    | Default          | Description                               |
+| ------------------------------------------ | ------- | ---------------- | ----------------------------------------- |
+| `resources`                                | object  | `{}`             | CPU and memory requests and limits.       |
+| `automountServiceAccountToken`             | boolean | `false`          | Mount a Kubernetes API token in the pod.  |
+| `podSecurityContext.runAsUser`             | integer | `100`            | RabbitMQ process UID.                     |
+| `podSecurityContext.runAsGroup`            | integer | `101`            | RabbitMQ process GID.                     |
+| `podSecurityContext.fsGroup`               | integer | `101`            | Group applied to persistent data.         |
+| `podSecurityContext.seccompProfile.type`   | string  | `RuntimeDefault` | Pod seccomp profile.                      |
+| `securityContext.runAsNonRoot`             | boolean | `true`           | Require a non-root container process.     |
+| `securityContext.allowPrivilegeEscalation` | boolean | `false`          | Block privilege escalation.               |
+| `securityContext.readOnlyRootFilesystem`   | boolean | `true`           | Keep the image root filesystem read-only. |
+| `securityContext.capabilities.drop`        | array   | `[ALL]`          | Drop all Linux capabilities.              |
 
 ### Scheduling
 
