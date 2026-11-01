@@ -12,6 +12,17 @@ OpenCloud file collaboration with the official `opencloudeu/opencloud:7.2.4` ima
 extended-attribute storage checks and retained configuration. The chart runs one monolithic instance with planned
 downtime during upgrades.
 
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install opencloud helmforge/opencloud \
+  --set bootstrap.password='replace-with-at-least-16-bytes'
+```
+
+For production, use `bootstrap.existingSecret` and an externally managed TLS Secret instead of an inline password.
+
 ## Production configuration
 
 ```yaml
@@ -73,6 +84,20 @@ and exact file-content comparison before accepting a recovery procedure.
 
 NetworkPolicy requires an enforcing CNI. Open required integration destinations explicitly and configure the public
 issuer before users begin storing files or enrolling clients.
+
+## Upgrade compatibility
+
+Chart upgrades preserve resource names, the generated claim, native identity configuration and explicit Secret
+references. Back up the complete workspace with xattrs, ownership and modes before upgrading. HelmForge validates both
+normal upgrades and `--reuse-values`; with Helm 3.14 or later, use `--reset-then-reuse-values` to adopt new defaults while
+retaining explicit release values.
+
+```bash
+helm repo update
+helm upgrade opencloud helmforge/opencloud --reset-then-reuse-values
+```
+
+The optional `global` map is accepted for parent-chart compatibility and has no direct runtime effect.
 
 ## Validation
 
@@ -348,6 +373,9 @@ metrics:
 
 ```yaml
 # SPDX-License-Identifier: Apache-2.0
+# -- Global values accepted for parent-chart compatibility.
+global: {}
+
 # -- nameOverride.
 nameOverride: ''
 # -- fullnameOverride.
