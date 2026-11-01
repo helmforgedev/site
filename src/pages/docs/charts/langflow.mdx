@@ -75,6 +75,7 @@ Core runtime:
 
 - `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Langflow image and pull behavior.
 - `imagePullSecrets`: optional registry pull secrets.
+- `global`: reserved map for parent-chart and platform-wide values. It does not change the standalone deployment.
 - `replicaCount`: web/API replica count. Values greater than `1` require a shared external database.
 - `app.port`: Langflow HTTP port.
 - `app.command`, `app.args`: optional container command and argument overrides.
@@ -110,7 +111,11 @@ Exposure and operations:
   `networkPolicy.dnsEgressPeers` defaults to kube-system/kube-dns and can be changed for clusters with different DNS labels.
   `networkPolicy.extraEgress` appends database, provider, or proxy rules after the built-in allowances.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags, HTTP health-check paths, and timing values.
-- `resources`, `podSecurityContext`, `securityContext`, `nodeSelector`, `tolerations`, `affinity`.
+- `securityProfile.enabled`: opt in to the image-verified non-root and read-only-root profile. It defaults to `false` for upgrade compatibility.
+- `securityProfile.podSecurityContext`: profile defaults for UID `1000`, group `0`, non-root execution, and `RuntimeDefault` seccomp.
+- `securityProfile.containerSecurityContext`: profile defaults that disable privilege escalation, make the root filesystem read-only, and drop all capabilities.
+- `podSecurityContext`, `securityContext`: explicit workload overrides. These take precedence over the optional profile defaults.
+- `resources`, `nodeSelector`, `tolerations`, `affinity`.
 - `topologySpreadConstraints`, `priorityClassName`, `terminationGracePeriodSeconds`.
 - `podLabels`, `podAnnotations`, `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
 
@@ -154,6 +159,35 @@ networkPolicy:
       podSelector:
         matchLabels:
           k8s-app: kube-dns
+
+securityProfile:
+  enabled: true
+```
+
+## Optional Security Profile
+
+The official image runs as UID `1000` with primary group `0`. Set
+`securityProfile.enabled=true` to apply the verified non-root, seccomp,
+capability-drop, and read-only-root defaults. The chart supplies writable
+runtime mounts for `/tmp`, `/app/.npm`, and `/opt/app-root/src/.npm`; persistent
+Langflow state continues to use the configured `/app/langflow` volume.
+
+The profile is deliberately disabled by default. Upgrading an existing release
+therefore does not silently change its UID, group, filesystem, or security
+contexts. Explicit `podSecurityContext` and `securityContext` values continue to
+win over profile defaults when the profile is enabled.
+
+The chart was validated from `2.0.4` through both a normal Helm upgrade and an
+upgrade with `--reuse-values`. In both paths, the generated authentication
+Secret and PVC identity were preserved, the Deployment became Ready, and the
+default security contexts remained unchanged.
+
+To enable the profile during a controlled upgrade:
+
+```bash
+helm upgrade langflow helmforge/langflow \
+  --reuse-values \
+  --set securityProfile.enabled=true
 ```
 
 ## Secrets
