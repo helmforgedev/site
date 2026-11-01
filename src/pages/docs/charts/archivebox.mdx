@@ -28,6 +28,21 @@ content and the SQLite database are stored on a single large persistent volume.
 - **S3 backup** — full `/data` directory backup (SQLite + all archived files) to S3-compatible storage
 - **Persistent storage** — single large PVC for all archived content and database
 
+## Architecture and boundaries
+
+One Recreate Deployment owns the complete `/data` dataset: SQLite, indexes,
+configuration, and captured artifacts. The optional backup CronJob reads that
+same claim and uploads a volume archive to S3-compatible storage. Never run two
+writers against the claim, even when the StorageClass supports ReadWriteMany.
+
+The chart owns Kubernetes workload, storage, routing, credentials, and optional
+backup resources. TLS policy, capture-egress controls, malicious-content
+isolation, storage lifecycle, off-cluster retention, and monitoring remain
+platform responsibilities. Review the
+[complete design](https://github.com/helmforgedev/charts/blob/main/charts/archivebox/DESIGN.md)
+for the Mermaid topology, security and observability boundaries, gaps, and
+explicit non-goals.
+
 ## Installation
 
 **HTTPS repository:**
@@ -214,7 +229,7 @@ credentials.
 | Parameter          | Type   | Default                           | Description                          |
 | ------------------ | ------ | --------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/archivebox/archivebox` | ArchiveBox container image.          |
-| `image.tag`        | string | `"0.9.70"`                        | Image tag.                           |
+| `image.tag`        | string | `"0.9.73"`                        | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries. |
 
@@ -325,7 +340,7 @@ Probes use the `/health/` endpoint.
 | `probes.startup.initialDelaySeconds`   | integer | `15`    | Startup probe initial delay.       |
 | `probes.startup.periodSeconds`         | integer | `5`     | Startup probe period.              |
 | `probes.startup.timeoutSeconds`        | integer | `3`     | Startup probe timeout.             |
-| `probes.startup.failureThreshold`      | integer | `30`    | Startup probe failure threshold.   |
+| `probes.startup.failureThreshold`      | integer | `120`   | Startup probe failure threshold.   |
 | `probes.liveness.enabled`              | boolean | `true`  | Enable liveness probe.             |
 | `probes.liveness.initialDelaySeconds`  | integer | `0`     | Liveness probe initial delay.      |
 | `probes.liveness.periodSeconds`        | integer | `15`    | Liveness probe period.             |
