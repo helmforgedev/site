@@ -169,6 +169,35 @@ pdb:
 Keep `tmpVolume.enabled=true` unless your custom image does not need writable temporary storage. The root filesystem can
 remain read-only while `/tmp` stays writable.
 
+## Security Contract
+
+The pinned image declares user `101`, exposes port `8080`, and starts
+unprivileged NGINX. The chart runs it with RuntimeDefault seccomp, no Service
+Account token, no privilege escalation, a read-only root filesystem, and all
+Linux capabilities dropped. A bounded emptyDir at `/tmp` is the only writable
+runtime path required by the image.
+
+The NGINX listener is fixed at `8080`. Keep `service.targetPort=8080`; changing
+the Kubernetes port value alone does not reconfigure the process and causes
+probes and traffic to fail. Preserve the image's COOP and COEP response headers
+through any Ingress, Gateway, CDN, or reverse proxy.
+
+## Upgrade Compatibility
+
+The quality update preserves the rendered workload defaults. Upgrades from
+chart `1.0.4` were validated through both a normal Helm upgrade and an upgrade
+with `--reuse-values`. Both paths preserved the image, pod and container
+security contexts, `/tmp` volume, Service ports, and Ready replica count.
+
+Review stored values before upgrading:
+
+```bash
+helm get values openreel-video -n openreel-video
+helm upgrade openreel-video helmforge/openreel-video \
+  --namespace openreel-video \
+  --reuse-values
+```
+
 ## Validation
 
 After deployment:
@@ -195,19 +224,56 @@ For public routes, validate that static assets load with the same host, scheme, 
 
 ## Values
 
-| Parameter                   | Default                              | Description                                  |
-| --------------------------- | ------------------------------------ | -------------------------------------------- |
-| `replicaCount`              | `1`                                  | Number of pods when autoscaling is disabled. |
-| `image.repository`          | `docker.io/helmforge/openreel-video` | HelmForge OpenReel Video image.              |
-| `service.type`              | `ClusterIP`                          | Kubernetes Service type.                     |
-| `service.ipFamilyPolicy`    | `null`                               | Optional Service dual-stack policy.          |
-| `ingress.enabled`           | `false`                              | Render Ingress.                              |
-| `gateway.enabled`           | `false`                              | Render Gateway API HTTPRoute.                |
-| `autoscaling.enabled`       | `false`                              | Render HPA.                                  |
-| `pdb.enabled`               | `false`                              | Render PodDisruptionBudget.                  |
-| `networkPolicy.enabled`     | `false`                              | Render NetworkPolicy.                        |
-| `networkPolicy.extraEgress` | `[]`                                 | Append full custom egress rules.             |
-| `tmpVolume.enabled`         | `true`                               | Mount writable temporary storage.            |
+| Parameter                                       | Default                              | Description                                           |
+| ----------------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `global`                                        | `{}`                                 | Parent-chart and platform integration values.         |
+| `nameOverride`, `fullnameOverride`              | `""`                                 | Resource naming overrides.                            |
+| `commonLabels`                                  | `{}`                                 | Labels added to chart resources.                      |
+| `replicaCount`                                  | `1`                                  | Pod count when autoscaling is disabled.               |
+| `revisionHistoryLimit`                          | `3`                                  | Retained Deployment revisions.                        |
+| `image.repository`                              | `docker.io/helmforge/openreel-video` | HelmForge OpenReel Video image.                       |
+| `image.tag`                                     | `v0.5.0`                             | Pinned image tag.                                     |
+| `image.pullPolicy`                              | `IfNotPresent`                       | Container image pull policy.                          |
+| `imagePullSecrets`                              | `[]`                                 | Private registry credentials.                         |
+| `serviceAccount.create`                         | `true`                               | Create a dedicated ServiceAccount.                    |
+| `serviceAccount.name`                           | `""`                                 | Existing or generated ServiceAccount name.            |
+| `serviceAccount.annotations`                    | `{}`                                 | ServiceAccount annotations.                           |
+| `serviceAccount.automountServiceAccountToken`   | `false`                              | Mount Kubernetes API credentials.                     |
+| `service.type`                                  | `ClusterIP`                          | Kubernetes Service type.                              |
+| `service.externalName`                          | `""`                                 | Required DNS name for ExternalName mode.              |
+| `service.port`                                  | `80`                                 | Client-facing Service port.                           |
+| `service.targetPort`                            | `8080`                               | Fixed NGINX target; keep this at `8080`.              |
+| `service.annotations`                           | `{}`                                 | Service annotations.                                  |
+| `service.ipFamilyPolicy`                        | `""`                                 | Optional dual-stack policy.                           |
+| `service.ipFamilies`                            | `[]`                                 | Optional IP family list.                              |
+| `ingress.enabled`                               | `false`                              | Render Ingress.                                       |
+| `ingress.ingressClassName`                      | `""`                                 | Ingress controller class.                             |
+| `ingress.annotations`, `ingress.tls`            | `{}`, `[]`                           | Ingress metadata and TLS entries.                     |
+| `ingress.hosts`                                 | `openreel.local`                     | Ingress hosts and paths.                              |
+| `gateway.enabled`                               | `false`                              | Render a Gateway API HTTPRoute.                       |
+| `gateway.parentRefs`, `gateway.hostnames`       | `[]`, `[]`                           | HTTPRoute parents and hostnames.                      |
+| `gateway.path`, `gateway.pathType`              | `/`, `PathPrefix`                    | HTTPRoute path match.                                 |
+| `networkPolicy.enabled`                         | `false`                              | Restrict ingress and deny egress by default.          |
+| `networkPolicy.ingress`                         | `[]`                                 | Custom inbound rules.                                 |
+| `networkPolicy.egress`                          | `[]`                                 | Custom egress rules.                                  |
+| `networkPolicy.extraEgress`                     | `[]`                                 | Additional full egress rules.                         |
+| `autoscaling.enabled`                           | `false`                              | Render HPA.                                           |
+| `autoscaling.minReplicas`, `maxReplicas`        | `1`, `4`                             | Autoscaling range.                                    |
+| `autoscaling.targetCPUUtilizationPercentage`    | `70`                                 | CPU utilization target.                               |
+| `autoscaling.targetMemoryUtilizationPercentage` | `80`                                 | Memory utilization target.                            |
+| `pdb.enabled`, `pdb.minAvailable`               | `true`, `1`                          | Disruption protection.                                |
+| `probes.liveness`, `probes.readiness`           | enabled                              | `/healthz` probe flags, paths, and timing.            |
+| `resources`                                     | small requests and limits            | Container CPU and memory budget.                      |
+| `podSecurityContext`                            | UID/GID `101`                        | Verified non-root pod identity and seccomp.           |
+| `securityContext`                               | hardened                             | Read-only root, no escalation, drop all capabilities. |
+| `podAnnotations`, `podLabels`                   | `{}`, `{}`                           | Pod metadata.                                         |
+| `priorityClassName`                             | `""`                                 | PriorityClass name.                                   |
+| `terminationGracePeriodSeconds`                 | `30`                                 | Graceful shutdown period.                             |
+| `nodeSelector`, `tolerations`, `affinity`       | `{}`, `[]`, `{}`                     | Pod placement controls.                               |
+| `topologySpreadConstraints`                     | `[]`                                 | Topology distribution rules.                          |
+| `tmpVolume.enabled`, `tmpVolume.sizeLimit`      | `true`, `64Mi`                       | Writable NGINX temporary volume.                      |
+| `test.image`                                    | `busybox:1.37.0`                     | Helm test image and pull policy.                      |
+| `extraObjects`                                  | `[]`                                 | Additional templated Kubernetes manifests.            |
 
 ## Links
 
