@@ -67,6 +67,7 @@ networkPolicy:
 
 Core runtime:
 
+- `global`: optional parent-chart compatibility map; it has no direct runtime effect in this chart.
 - `image.repository`, `image.tag`, `image.pullPolicy`: official pinned Qdrant image and pull behavior.
 - `imagePullSecrets`: optional registry pull secrets.
 - `replicaCount`: StatefulSet replica count. Keep `1` unless `cluster.enabled=true` is planned.
@@ -100,7 +101,10 @@ Operations:
 - `metrics.serviceMonitor.*`: optional Prometheus Operator ServiceMonitor for `/metrics`.
 - `pdb.enabled`, `pdb.minAvailable`: disruption budget for multi-pod deployments.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
-- `resources`, `podSecurityContext`, `securityContext`: resource and pod/container hardening knobs.
+- `resources`: resource requests and limits.
+- `podSecurityContext`, `securityContext`: complete pod and container security-context overrides. When left empty, the chart applies a
+  verified non-root baseline with UID/GID `1000`, `RuntimeDefault` seccomp, a read-only root filesystem, disabled privilege escalation,
+  and all Linux capabilities dropped. A non-empty override replaces the corresponding baseline rather than merging with it.
 - `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `priorityClassName`.
 - `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`.
 - `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
@@ -149,6 +153,18 @@ Back up the Qdrant PVC and snapshot directory. For distributed clusters, capture
 procedures before relying on the backup policy.
 
 ## Upgrade Notes
+
+The hardened defaults are compatible with the persistent data layout created by chart `1.0.7`. HelmForge validated both a normal
+upgrade and an upgrade with `--reuse-values` from `1.0.7`, including an existing root-owned PVC and a stored vector payload. Qdrant
+started as UID `1000`, Kubernetes adjusted the mounted volume through `fsGroup`, and the stored vector remained queryable.
+
+Review custom non-empty `podSecurityContext` or `securityContext` values before upgrading because they intentionally replace the chart
+fallback. Existing custom contexts continue to render unchanged.
+
+```bash
+helm repo update
+helm upgrade qdrant helmforge/qdrant --reuse-values
+```
 
 Qdrant `1.19.2` improves sparse-vector upserts, proxy-segment persistence and
 recovery, Raft snapshot concurrency, and several search paths. It also fixes
