@@ -64,9 +64,10 @@ DataStore. The chart rejects local RocksDB/SQLite and a local data PVC in that
 mode. Use the CLI plan for shared BlobStore, SearchStore, InMemoryStore,
 Coordinator, roles, and listeners.
 
-Set `podManagementPolicy: OrderedReady` for the first start against an empty
-shared database. This lets one replica initialize the schema before Kubernetes
-starts the next replica and avoids concurrent bootstrap races.
+For an empty shared database, first install the HA configuration with
+`replicaCount: 1`. After that pod is ready, upgrade the same release to the
+desired replica count. Keep `podManagementPolicy` unchanged because Kubernetes
+treats that StatefulSet field as immutable.
 
 | Concern       | Common production choices                           |
 | ------------- | --------------------------------------------------- |
@@ -151,7 +152,7 @@ mail ports below 1024. Kubescape results are published in the chart README.
 | Value                               | Default     | Purpose                                           |
 | ----------------------------------- | ----------- | ------------------------------------------------- |
 | `replicaCount`                      | `1`         | StatefulSet replicas                              |
-| `podManagementPolicy`               | `Parallel`  | Pod startup order; use `OrderedReady` for HA boot |
+| `podManagementPolicy`               | `Parallel`  | Immutable StatefulSet pod startup policy          |
 | `config.source`                     | `generated` | Generated, existing ConfigMap, or existing Secret |
 | `persistence.enabled`               | `true`      | Per-pod local DataStore PVC                       |
 | `extraEnv`, `extraEnvFrom`          | `[]`        | Plain and Secret/ConfigMap-referenced environment |
