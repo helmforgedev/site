@@ -26,6 +26,26 @@ default UI, and persistent HTTP sessions in a dedicated SQLite database. The
 chart's `/config` PVC persists both the main and session databases; back it up
 before upgrading.
 
+## Upgrade Compatibility
+
+The chart preserves the root UID/GID behavior from previous releases so
+root-owned SQLite databases on existing `/config` PVCs remain writable. The
+new compatible security defaults drop Linux capabilities, prevent privilege
+escalation, use RuntimeDefault seccomp, and disable Kubernetes API token mounts
+without changing file ownership.
+
+Back up `/config`, then use either a normal upgrade with your values file or
+reuse the values stored in the release:
+
+```bash
+helm upgrade komga helmforge/komga --namespace komga -f values.yaml
+helm upgrade komga helmforge/komga --namespace komga --reuse-values
+```
+
+Both paths retain the existing `/config` and `/data` claims. Custom non-root
+UID/GID settings remain supported, but operators must verify PVC ownership
+before enabling them.
+
 ## Chart References
 
 - [Chart source](https://github.com/helmforgedev/charts/tree/main/charts/komga)
@@ -381,12 +401,14 @@ out-of-band; this chart only renders `ExternalSecret` resources when enabled. Se
 
 ### Resources and Scheduling
 
-| Parameter                       | Type    | Default | Description                     |
-| ------------------------------- | ------- | ------- | ------------------------------- |
-| `resources`                     | object  | `{}`    | CPU and memory requests/limits. |
-| `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.   |
-| `tolerations`                   | array   | `[]`    | Tolerations for scheduling.     |
-| `terminationGracePeriodSeconds` | integer | `30`    | Termination grace period.       |
+| Parameter                       | Type    | Default                                                         | Description                     |
+| ------------------------------- | ------- | --------------------------------------------------------------- | ------------------------------- |
+| `resources`                     | object  | `{}`                                                            | CPU and memory requests/limits. |
+| `podSecurityContext`            | object  | `{ seccompProfile: { type: RuntimeDefault } }`                  | Pod-level security context.     |
+| `securityContext`               | object  | `{ allowPrivilegeEscalation: false, capabilities.drop: [ALL] }` | Container security context.     |
+| `nodeSelector`                  | object  | `{}`                                                            | Node selector for scheduling.   |
+| `tolerations`                   | array   | `[]`                                                            | Tolerations for scheduling.     |
+| `terminationGracePeriodSeconds` | integer | `30`                                                            | Termination grace period.       |
 
 ### Extra
 
@@ -396,13 +418,28 @@ out-of-band; this chart only renders `ExternalSecret` resources when enabled. Se
 | `extraVolumeMounts` | array | `[]`    | Extra volume mounts for the container.                   |
 | `extraManifests`    | array | `[]`    | Extra Kubernetes manifests deployed alongside the chart. |
 
+## Security
+
+Komga and its optional backup containers use RuntimeDefault seccomp, drop all
+Linux capabilities, block privilege escalation, and do not receive a Kubernetes
+API token. The official image currently starts as root; the chart intentionally
+does not change that UID by default because databases created by earlier chart
+versions can be root-owned. A read-only root filesystem is not enabled because
+the SQLite JDBC driver extracts a native library while starting.
+
+Use TLS for external routes and an existing Secret or ExternalSecret for S3
+credentials. NetworkPolicy, encrypted storage, image admission, log retention,
+and alerting remain responsibilities of the cluster platform.
+
 ## Security Scan
 
 | Framework          | Score   |
 | ------------------ | ------- |
 | MITRE + NSA + SOC2 | **73%** |
 
-Security posture: acceptable. Follow-up hardening candidates are tracked in the chart design.
+Security posture: compatible hardening is enabled by default. The remaining
+root-user and writable-root-filesystem constraints are documented in the chart
+design with their upgrade and runtime rationale.
 
 ## More Information
 
