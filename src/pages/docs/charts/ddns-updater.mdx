@@ -330,19 +330,24 @@ ingress:
 
 ## Upgrade Safety
 
-Keep the release name, `fullnameOverride`, configuration Secret reference, and
-`persistence.existingClaim` stable so upgrades retain workload, Service, and
-PVC identity. Prefer an explicit values file with the normal Helm merge:
+Keep the release name, `nameOverride`, `fullnameOverride`, configuration Secret
+reference, and `persistence.existingClaim` stable so upgrades retain workload,
+Service, and PVC identity. Export the stored overrides, review them against the
+new schema, and use a complete values file with the normal Helm merge:
 
 ```bash
+helm get values ddns-updater --namespace ddns-updater -o yaml > values.yaml
 helm upgrade ddns-updater helmforge/ddns-updater \
   --namespace ddns-updater --values values.yaml
 ```
 
-`--reuse-values` preserves every value stored by the previous release and can
-hide new defaults. Compare the old release values with the new schema before
-using it. Back up `config.json` and update history, then confirm both the UI and
-a real provider update after the pod becomes Ready.
+The file must retain every non-default setting, especially
+`config.existingSecret` or `config.settings`; omitting both can replace the
+active configuration with an empty chart-managed Secret. `--reuse-values`
+preserves stored overrides but also preserves old defaults, so compare the
+stored values with the new schema before using it. Back up `config.json` and
+update history, then confirm both the UI and a real provider update after the
+pod becomes Ready.
 
 ## Troubleshooting
 
