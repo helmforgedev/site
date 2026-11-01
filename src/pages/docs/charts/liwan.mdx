@@ -13,9 +13,10 @@ Liwan is a lightweight, privacy-focused web analytics application with embedded 
 deploys it as one Kubernetes workload with durable `/data` storage, explicit public URL wiring, and production-oriented
 security defaults.
 
-## Upgrade to 1.7
+## Upgrade to 1.8
 
-Liwan 1.7 trusts only loopback proxies and `X-Forwarded-For` by default.
+Liwan 1.8 retains the secure proxy contract introduced in 1.7: only loopback
+proxies and `X-Forwarded-For` are trusted by default.
 Behind an Ingress or Gateway, set `LIWAN_TRUSTED_PROXIES` through
 `liwan.extraEnv` to the actual proxy IPs or CIDRs. Multiple entries are
 comma-separated, for example `127.0.0.1/8,10.42.0.0/16` only when those ranges
@@ -24,12 +25,12 @@ uses a different header. Avoid unrestricted `*` proxy trust.
 
 Remove `LIWAN_USE_FORWARD_HEADERS`; upstream removed it and the chart now
 rejects it with a migration message. Back up `/data` and review the
-[official release](https://github.com/explodingcamera/liwan/releases/tag/liwan-v1.7.0)
+[official release](https://github.com/explodingcamera/liwan/releases/tag/liwan-v1.8.0)
 before upgrading.
 
 ## Key Features
 
-- **Official image** - pinned `ghcr.io/explodingcamera/liwan:1.7.0`
+- **Official image** - pinned `ghcr.io/explodingcamera/liwan:1.8.0`
 - **Embedded DuckDB** - no external database dependency
 - **PVC-backed data** - analytics and runtime assets stored under `/data`
 - **Recreate rollout** - avoids overlapping DuckDB writers during upgrades
@@ -37,6 +38,7 @@ before upgrading.
 - **Ingress support** - host, path, class, annotations, and TLS
 - **Gateway API support** - optional HTTPRoute
 - **Dual-stack ready Service** - optional `ipFamilyPolicy` and `ipFamilies`
+- **Opt-in ingress isolation** - NetworkPolicy with explicit edge peer selectors
 - **Hardened defaults** - non-root user, dropped capabilities, `RuntimeDefault` seccomp, and no ServiceAccount token
 
 ## Installation
@@ -156,6 +158,14 @@ Service exposes port `80`.
 The Deployment uses `strategy.type: Recreate`. DuckDB is embedded and single-writer oriented, so the chart avoids a
 rolling update that could briefly run two pods against the same data volume.
 
+The chart owns the single workload, Service, claim, optional route, and optional
+ingress NetworkPolicy. TLS termination, edge authentication, trusted proxy
+addresses, storage lifecycle, off-cluster backups, monitoring, and privacy or
+retention policy remain operator responsibilities. Review the
+[complete design](https://github.com/helmforgedev/charts/blob/main/charts/liwan/DESIGN.md)
+for the Mermaid topology, security and observability boundaries, gaps, and
+explicit non-goals.
+
 <Callout type="warning" title="Set the public URL before installing trackers">
   Without `liwan.baseUrl`, generated script URLs can point at an internal or incomplete endpoint. Keep `liwan.baseUrl`,
   Ingress hosts, Gateway API hostnames, and TLS hosts aligned.
@@ -176,7 +186,7 @@ rolling update that could briefly run two pods against the same data volume.
 | Parameter          | Type   | Default                         | Description                          |
 | ------------------ | ------ | ------------------------------- | ------------------------------------ |
 | `image.repository` | string | `ghcr.io/explodingcamera/liwan` | Liwan container image.               |
-| `image.tag`        | string | `"1.7.0"`                       | Image tag.                           |
+| `image.tag`        | string | `"1.8.0"`                       | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                  | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                            | Pull secrets for private registries. |
 
@@ -219,6 +229,29 @@ service:
     - IPv4
     - IPv6
 ```
+
+### NetworkPolicy
+
+NetworkPolicy is disabled by default so upgrades preserve established ingress
+paths. Enable it after identifying the namespace and Pod selectors used by the
+Ingress or Gateway controller:
+
+```yaml
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-system
+```
+
+| Parameter                   | Type    | Default | Description                                                 |
+| --------------------------- | ------- | ------- | ----------------------------------------------------------- |
+| `networkPolicy.enabled`     | boolean | `false` | Enable ingress isolation for the Liwan Pod.                 |
+| `networkPolicy.ingressFrom` | array   | `[]`    | Allowed peers; empty permits Pods in the release namespace. |
+
+Enforcement requires a compatible CNI. Validate the selectors before enabling
+the policy in production.
 
 ### Ingress
 
@@ -294,6 +327,11 @@ intentional and avoids overlapping writers on the same DuckDB files.
   If `persistence.enabled` is `false`, Liwan data is stored on `emptyDir` and is lost when the pod restarts. Keep
   persistence enabled in production.
 </Callout>
+
+If the application becomes unreachable after enabling NetworkPolicy, compare the
+edge Pod and namespace labels with `networkPolicy.ingressFrom`. If tracking
+records proxy addresses, configure only the actual proxy CIDRs through
+`LIWAN_TRUSTED_PROXIES`; never use unrestricted proxy trust.
 
 <Callout type="tip" title="Right-size the PVC from the start">
   DuckDB compresses analytics data efficiently, but retention and traffic vary. Start at `5Gi` for public sites and use
