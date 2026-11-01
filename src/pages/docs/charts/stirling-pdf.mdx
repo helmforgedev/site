@@ -21,6 +21,7 @@ the Community edition's embedded H2 deployment.
 - One retained PVC containing H2 authentication state, configuration, custom files and pipelines.
 - Non-root, read-only filesystem, dropped capabilities, seccomp and no Kubernetes API token.
 - Preserved full OCR and office toolchain with seeded writable tool links and bounded temporary volumes.
+- Startup, readiness and liveness checks against the native application endpoint.
 - Authenticated native Prometheus on a separate Service, with a Secret-backed additional scrape job.
 - Ingress class, Gateway API, dual-stack Service and explicit network isolation.
 - Single-writer guards and Recreate upgrades; no unsupported shared-H2 replicas.
@@ -40,6 +41,27 @@ Bootstrap credentials initialize a new database; rotate existing passwords throu
 
 See [production values](#production-example), [operations](#operations), [monitoring](#monitoring),
 [recovery](#recovery) and [design](https://github.com/helmforgedev/charts/blob/main/charts/stirling-pdf/DESIGN.md).
+
+## Configuration
+
+The defaults are production-oriented but intentionally single-instance. Do not set more than one replica, even with an
+RWX volume: the embedded H2 database and workspace are one writer. Inspect the complete contract with
+`helm show values helmforge/stirling-pdf` before installation.
+
+| Parameter               | Default | Purpose                                           |
+| ----------------------- | ------- | ------------------------------------------------- |
+| `auth.existingSecret`   | `""`    | Existing Secret containing the bootstrap password |
+| `server.port`           | `8080`  | Real application listener and container port      |
+| `server.maxUploadSize`  | `100MB` | Native per-file upload limit                      |
+| `server.maxRequestSize` | `200MB` | Native multipart request limit                    |
+| `persistence.enabled`   | `true`  | Persist H2 and workspace state                    |
+| `persistence.size`      | `10Gi`  | Generated claim request                           |
+| `persistence.retain`    | `true`  | Keep the generated claim on Helm uninstall        |
+| `metrics.enabled`       | `false` | Enable the private native management listener     |
+| `runtime.temporarySize` | `4Gi`   | Bound temporary document storage                  |
+
+Credential sources are mutually exclusive. Initial credentials bootstrap a new database and do not reset an account
+already stored in H2. Prefer an externally managed Secret for production installations.
 
 ## Capacity and availability
 
@@ -69,7 +91,8 @@ make validate-chart CHART=stirling-pdf
 
 Runtime checks exercise native login, anonymous conversion rejection, a real two-document merge with independent
 page-text extraction, API-key persistence and Secret retention. Dedicated profiles cover OCR, recovery and authenticated
-Prometheus.
+Prometheus. Release validation also covers LibreOffice conversion and upgrades from the published chart with normal
+value merging and with `--reuse-values`.
 
 ## Security Scan
 
@@ -181,6 +204,27 @@ For GNU tar without root, archive the complete `configs`, `customFiles` and `pip
 permissions; attempting to restore its metadata fails even when file extraction succeeds. Preserve provider-owned root
 metadata and verify ownership and content of restored files. Include any operator-added state directories explicitly.
 
+## Upgrade compatibility
+
+Chart upgrades preserve the workload, Service, credential Secret and workspace claim names. Before upgrading, quiesce
+active conversions and back up the complete claim plus credential Secrets. The current chart is validated from the
+published 1.0.1 release with both ordinary value merging and `--reuse-values`; login, API-key state and authenticated PDF
+conversion remain functional after rollout. A Helm rollback changes manifests only and cannot reverse H2 migrations.
+
+## Troubleshooting
+
+Check the rollout and application logs before changing probes or security settings:
+
+```bash
+kubectl -n documents get pods,pvc,service
+kubectl -n documents logs deployment/stirling-pdf-stirling-pdf -c stirling-pdf
+kubectl -n documents describe pod -l app.kubernetes.io/instance=stirling-pdf
+```
+
+Probe failures commonly indicate slow JVM startup or a mismatched `server.basePath`. Conversion failures should be
+checked against memory limits, temporary-volume capacity and the seeded `/usr/local/bin` tools. Authentication failures
+after restore usually mean the credential Secret and H2 workspace came from different recovery points.
+
 ## Production example
 
 ```yaml
@@ -212,6 +256,8 @@ networkPolicy:
 
 ```yaml
 # SPDX-License-Identifier: Apache-2.0
+# -- Global values accepted for parent-chart compatibility.
+global: {}
 # -- Name Override.
 nameOverride: ''
 # -- Fullname Override.
