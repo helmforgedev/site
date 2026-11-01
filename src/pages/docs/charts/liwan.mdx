@@ -243,6 +243,9 @@ networkPolicy:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: ingress-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-controller
 ```
 
 | Parameter                   | Type    | Default | Description                                                 |
@@ -250,8 +253,9 @@ networkPolicy:
 | `networkPolicy.enabled`     | boolean | `false` | Enable ingress isolation for the Liwan Pod.                 |
 | `networkPolicy.ingressFrom` | array   | `[]`    | Allowed peers; empty permits Pods in the release namespace. |
 
-Enforcement requires a compatible CNI. Validate the selectors before enabling
-the policy in production.
+Enforcement requires a compatible CNI. Set `podSelector` labels to match the
+actual edge controller. NetworkPolicies are additive, so inspect every policy
+selecting the Liwan Pod before relying on this policy for isolation.
 
 ### Ingress
 
