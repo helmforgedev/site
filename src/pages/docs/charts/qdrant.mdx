@@ -102,9 +102,10 @@ Operations:
 - `pdb.enabled`, `pdb.minAvailable`: disruption budget for multi-pod deployments.
 - `probes.startup`, `probes.liveness`, `probes.readiness`: enable flags and timing values.
 - `resources`: resource requests and limits.
-- `podSecurityContext`, `securityContext`: complete pod and container security-context overrides. When left empty, the chart applies a
-  verified non-root baseline with UID/GID `1000`, `RuntimeDefault` seccomp, a read-only root filesystem, disabled privilege escalation,
-  and all Linux capabilities dropped. A non-empty override replaces the corresponding baseline rather than merging with it.
+- `podSecurityContext`, `securityContext`: complete pod and container security-context overrides. When left empty and snapshots are under
+  the persistent data path, the chart applies a verified non-root baseline with UID/GID `1000`, `RuntimeDefault` seccomp, a read-only
+  root filesystem, disabled privilege escalation, and all Linux capabilities dropped. A non-empty override replaces the corresponding
+  baseline rather than merging with it.
 - `nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `priorityClassName`.
 - `terminationGracePeriodSeconds`, `podLabels`, `podAnnotations`.
 - `extraVolumes`, `extraVolumeMounts`, `extraManifests`.
@@ -132,7 +133,8 @@ namespaces when no peers are set. Cluster p2p ingress is allowed from Qdrant pod
 
 Setting `networkPolicy.extraEgress` also enables egress isolation. The chart keeps DNS and broad HTTPS egress to any IPv4/IPv6
 destination available before appending custom egress rules. In distributed mode, it also keeps Qdrant p2p egress between pods so cluster
-bootstrap and peer communication remain available.
+bootstrap and peer communication remain available. Additional rules cannot narrow the broad HTTPS rule; replace the chart-generated
+NetworkPolicy when HTTPS destinations must be restricted.
 
 ## Monitoring
 
@@ -146,6 +148,15 @@ metrics:
 ```
 
 Enable `metrics.serviceMonitor` only when the Prometheus Operator CRDs exist in the cluster.
+The generated ServiceMonitor sends no API-key credentials. If authentication protects `/metrics`, leave it disabled and provide a
+separately managed ServiceMonitor with an authenticated scrape configuration.
+
+## Security Compatibility
+
+An explicit container `securityContext.runAsUser: 0` suppresses the pod-level identity fallback so an existing root override does not
+conflict with `runAsNonRoot`. When `snapshots.path` is outside `persistence.mountPath`, the empty-context fallback preserves the image's
+root identity and writable filesystem so existing root-owned paths and snapshot workflows continue to function. Put snapshots under the
+persistent data mount when possible so the normal non-root, read-only image-filesystem baseline remains active.
 
 ## Backup
 
