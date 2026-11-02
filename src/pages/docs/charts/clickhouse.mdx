@@ -16,8 +16,8 @@ ClickHouse is a fast column-oriented OLAP database. The HelmForge chart deploys 
 - Headless Service for stable pod DNS
 - Optional persistent `/var/log/clickhouse-server`
 - Built-in Prometheus metrics endpoint and ServiceMonitor support
-- External Secrets Operator support for the initial user password
-- NetworkPolicy, dual-stack Service fields, PDB, and Helm tests
+- External Secrets Operator support for the chart-configured user's password
+- NetworkPolicy, dual-stack Service fields, and Helm tests
 - Validation guard that blocks `replicaCount > 1`
 
 <a id="install"></a>
@@ -115,7 +115,7 @@ networkPolicy:
 
 ## Authentication
 
-The official image initializes the configured database and user on an empty data directory. Use an existing Secret or External Secrets Operator for production passwords:
+The official image initializes the configured database on an empty data directory and rewrites the chart-configured user file on every container start. Use an existing Secret or External Secrets Operator for production passwords:
 
 ```yaml
 clickhouse:
@@ -125,7 +125,7 @@ clickhouse:
   existingSecretPasswordKey: clickhouse-password
 ```
 
-Leaving `clickhouse.password` empty leaves the initial user passwordless. That is acceptable only for isolated local evaluation.
+Leaving `clickhouse.password` empty leaves the chart-configured user passwordless. That is acceptable only for isolated local evaluation. To rotate this user's password, update the referenced Secret, wait for any ExternalSecret refresh, restart the StatefulSet, and test authentication. Users managed separately through SQL retain their own lifecycle.
 
 ## External Secrets
 
@@ -259,7 +259,7 @@ Also validate persistence across restart, metrics scraping, password authenticat
 | Symptom                                    | Likely Cause                                           | Fix                                                                   |
 | ------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------- |
 | Helm render fails with replica count error | `replicaCount` is greater than `1`                     | Use `replicaCount=1` or move to ClickHouse Operator.                  |
-| Password change does not apply             | Existing data directory already initialized            | Manage users with SQL after first initialization.                     |
+| Password change does not apply             | Pod has not restarted after the Secret changed         | Restart the StatefulSet and test the chart-configured user.           |
 | Metrics are missing                        | Native endpoint or ServiceMonitor disabled             | Set `metrics.enabled=true` and `metrics.serviceMonitor.enabled=true`. |
 | Pod cannot write data                      | Storage class permissions or security context mismatch | Check PVC binding and volume ownership for UID/GID `101`.             |
 | Port override remains unready              | Client, policy, or rendered ports do not match         | Use one consistent set of `service.ports.*` values.                   |
@@ -274,11 +274,11 @@ Also validate persistence across restart, metrics scraping, password authenticat
 | `image.tag`                            | `26.9.21`                                | Official full-version image tag.                           |
 | `replicaCount`                         | `1`                                      | ClickHouse pod count. Values greater than `1` are blocked. |
 | `clickhouse.database`                  | `default`                                | Initial database on an empty data directory.               |
-| `clickhouse.user`                      | `default`                                | Initial user on an empty data directory.                   |
-| `clickhouse.password`                  | `""`                                     | Initial user password.                                     |
-| `clickhouse.existingSecret`            | `""`                                     | Existing Secret containing the initial password.           |
+| `clickhouse.user`                      | `default`                                | User managed by the image entrypoint on every start.       |
+| `clickhouse.password`                  | `""`                                     | Password managed by the image entrypoint.                  |
+| `clickhouse.existingSecret`            | `""`                                     | Existing Secret containing that user's password.           |
 | `clickhouse.existingSecretPasswordKey` | `clickhouse-password`                    | Key in the existing Secret containing the password.        |
-| `clickhouse.defaultAccessManagement`   | `true`                                   | Enables SQL-driven access management for the initial user. |
+| `clickhouse.defaultAccessManagement`   | `true`                                   | Enables SQL-driven access management for that user.        |
 | `service.ports.http`                   | `8123`                                   | Real HTTP listener and Service target port.                |
 | `service.ports.tcp`                    | `9000`                                   | Real native TCP listener and Service target port.          |
 | `service.ports.interserver`            | `9009`                                   | Real interserver listener and headless Service port.       |
