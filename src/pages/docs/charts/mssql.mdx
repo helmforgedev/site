@@ -27,10 +27,13 @@ Pod replacement causes an interruption while the same instance recovers its data
 ## Architecture and operational boundaries
 
 Authorized clients connect through one TCP Service to a singleton SQL Server
-StatefulSet backed by a retained data PVC. Optional backup and metrics workloads
-use separate selectors, service accounts and least-privilege SQL logins. The
-backup CronJob stages native full backups on its own PVC before uploading them to
-S3-compatible storage; Prometheus reaches a separate SQL exporter Service.
+StatefulSet. By default, a retained data PVC stores the databases; with
+`persistence.enabled: false`, ephemeral `emptyDir` storage loses data when the
+Pod is recreated or rescheduled. Optional backup and metrics workloads use
+separate selectors, service accounts and least-privilege SQL logins. When backup
+is enabled, its CronJob stages native full backups on a dedicated PVC before
+uploading them to S3-compatible storage. Prometheus reaches a separate optional
+SQL exporter Service.
 
 This topology provides stable storage identity, not database high availability.
 StatefulSet updates require downtime, full backups do not provide point-in-time
