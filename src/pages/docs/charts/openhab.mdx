@@ -15,7 +15,7 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **StatefulSet workload** for stable, predictable PVC attachment on every restart
 - **Three persistent volumes** (`userdata`, `conf`, `addons`) with independent sizing and storage class configuration
 - **ConfigMap startup sync** for sitemaps, things, and items into the writable `conf` PVC with checksum-driven rollouts
-- **Compatible security hardening** — `fsGroup: 9001`, `RuntimeDefault` seccomp, disabled ServiceAccount token automount, and no forced `runAsUser` so the official entrypoint can bootstrap before dropping privileges via `gosu`
+- **Compatible security hardening** — `fsGroup: 9001`, `RuntimeDefault` seccomp, disabled ServiceAccount token automount, and capability-free helper containers with read-only root filesystems while the official entrypoint retains its required bootstrap path
 - **Smart health probes** via `/rest/uuid` (available in openHAB 4.x, no auth required) with a 10-minute startup window for OSGi bundle loading
 - **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
@@ -379,6 +379,11 @@ securityContext:
 ```
 
 > **Why `readOnlyRootFilesystem: false`?** openHAB (OSGi/Karaf) writes to several internal directories at runtime (`/openhab/runtime/`, `/openhab/userdata/tmp/`, `/openhab/userdata/cache/`). These cannot be relocated. Mount your persistent data on the three PVCs to ensure durability across restarts.
+
+This exception is limited to the main openHAB container. Config sync,
+persistence subpath, backup, and upload helpers disable privilege escalation,
+drop all Linux capabilities, and use read-only root filesystems. Backup Pods
+also run as non-root UID/GID `9001`.
 
 ### Karaf SSH Console
 
