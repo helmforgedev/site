@@ -24,6 +24,20 @@ The chart uses official pinned MCR images, encrypted SQL connections, independen
 The chart does not configure Always On, automatic failover, horizontal scaling or a transaction-log backup chain.
 Pod replacement causes an interruption while the same instance recovers its databases.
 
+## Architecture and operational boundaries
+
+Authorized clients connect through one TCP Service to a singleton SQL Server
+StatefulSet backed by a retained data PVC. Optional backup and metrics workloads
+use separate selectors, service accounts and least-privilege SQL logins. The
+backup CronJob stages native full backups on its own PVC before uploading them to
+S3-compatible storage; Prometheus reaches a separate SQL exporter Service.
+
+This topology provides stable storage identity, not database high availability.
+StatefulSet updates require downtime, full backups do not provide point-in-time
+recovery, and exporter health does not prove that a backup can be restored.
+Production operators own licensing, storage and memory sizing, credential and
+certificate rotation, bucket lifecycle, alert routing and restore drills.
+
 ## Installation and license consent
 
 ```bash
