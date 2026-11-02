@@ -382,8 +382,8 @@ securityContext:
 
 This exception is limited to the main openHAB container. Config sync,
 persistence subpath, backup, and upload helpers disable privilege escalation,
-drop all Linux capabilities, and use read-only root filesystems. Backup Pods
-also run as non-root UID/GID `9001`.
+drop all Linux capabilities, use read-only root filesystems, and run as non-root
+UID/GID `9001`. Every chart-owned Pod disables ServiceAccount token automount.
 
 ### Karaf SSH Console
 
@@ -559,6 +559,8 @@ The backup job runs as two containers sharing an `emptyDir` volume:
 2. **`upload` container** (helmforge/mc) — picks up the archive and uploads it to S3
 
 Both containers run as UID/GID 9001 to match openHAB's PVC ownership.
+They also drop all Linux capabilities, use read-only root filesystems, disable
+privilege escalation, and do not mount a Kubernetes API token.
 
 ### Enabling Backup
 
@@ -599,10 +601,15 @@ backup:
 
 | Directory           | Default | Description                           |
 | ------------------- | ------- | ------------------------------------- |
-| `/openhab/userdata` | ✅      | JSONDB, persistence data, rules state |
-| `/openhab/conf`     | ✅      | Items, things, sitemaps, rules files  |
+| `/openhab/userdata` | Yes     | JSONDB, persistence data, rules state |
+| `/openhab/conf`     | Yes     | Items, things, sitemaps, rules files  |
+| `/openhab/addons`   | No      | Drop-in JAR files                     |
 
 **Always excluded from `userdata`:** `logs/`, `tmp/`, `cache/` (ephemeral — not needed for restore).
+
+The independent `addons` PVC is outside the CronJob archive. Snapshot or
+archive it separately when it contains JAR files that cannot be reproduced
+from another source.
 
 If you manage `/openhab/conf` via ConfigMaps (GitOps), you can skip it:
 
