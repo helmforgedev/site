@@ -8371,6 +8371,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '9200',
           description: 'Client-facing Kubernetes Service port',
         },
+        {
+          label: 'Seccomp Profile',
+          key: 'podSecurityContext.seccompProfile.type',
+          type: 'select',
+          default: 'RuntimeDefault',
+          options: ['RuntimeDefault', 'Unconfined'],
+          description: 'Kubernetes seccomp profile applied to Elasticsearch pods',
+        },
       ],
     },
     {

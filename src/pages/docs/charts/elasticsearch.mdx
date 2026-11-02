@@ -265,6 +265,13 @@ curl -X PUT "localhost:9200/_index_template/logs-template" \
 
 ## Security and TLS
 
+Elasticsearch pods use the Kubernetes runtime's `RuntimeDefault` seccomp
+profile by default, run as a non-root user, drop all Linux capabilities, and
+prevent privilege escalation. The chart does not create a NetworkPolicy;
+operators must restrict client, transport, DNS, backup, and monitoring traffic
+according to their cluster policy. The privileged `sysctlInit` fallback remains
+disabled by default.
+
 ### Auto-generated passwords
 
 When `security.enabled: true` and no `existingCredentialsSecret` is set, the chart auto-generates random passwords:
@@ -403,6 +410,7 @@ exist; this chart creates only the HTTPRoute resources.
 | `coordinating.replicaCount`                   | profile-driven              | Number of coordinating nodes                             |
 | `security.enabled`                            | `false` (`true` in prod-ha) | Enable X-Pack security                                   |
 | `security.tls.certManager.enabled`            | `false`                     | Auto-issue TLS via cert-manager                          |
+| `podSecurityContext.seccompProfile.type`      | `RuntimeDefault`            | Kubernetes seccomp profile for Elasticsearch pods        |
 | `backup.enabled`                              | `false`                     | Enable S3 snapshot CronJob                               |
 | `backup.schedule`                             | `"0 2 * * *"`               | Cron schedule for snapshots                              |
 | `ilm.logs.enabled`                            | `false`                     | Enable logs ILM policy                                   |
