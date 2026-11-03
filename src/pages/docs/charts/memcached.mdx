@@ -31,7 +31,7 @@ Secrets Operator integration.
 - **Authentication options** - ASCII auth file mode or SASL mode with a prepared SASL Secret and binary protocol.
 - **TLS support** - existing Kubernetes TLS Secret, optional CA file, safe private-key permissions, and TLS-aware metrics scraping.
 - **Extstore** - optional local file-backed cache extension with ephemeral or PVC-backed storage.
-- **Observability** - optional Prometheus memcached exporter, ServiceMonitor, PrometheusRule, and `helm test` connectivity checks.
+- **Observability** - optional Prometheus memcached exporter, ServiceMonitor, PrometheusRule, and plaintext or ASCII-auth `helm test` connectivity checks.
 - **Production controls** - NetworkPolicy ingress/egress, PDB, HPA, topology spread, hardened pod security context, and disabled ServiceAccount token mount by default.
 - **Secret management** - optional External Secrets Operator `external-secrets.io/v1` resource for auth files or SASL material.
 
@@ -59,10 +59,11 @@ resources, or extstore PVC template. The platform owns client-side sharding,
 PKI, Secret stores, storage classes, Prometheus Operator, log collection,
 capacity planning, and scheduling infrastructure.
 
-Memcached entries remain disposable in every topology. Readiness and the Helm
-test prove that a server accepts connections; they do not prove correct key
-distribution, adequate capacity, a healthy cache hit ratio, or client failover.
-Extstore extends cache capacity but does not create durable application data.
+Memcached entries remain disposable in every topology. Readiness proves that a
+server accepts connections; the Helm test checks connectivity only for
+plaintext and ASCII-auth modes. Neither proves correct key distribution,
+adequate capacity, a healthy cache hit ratio, or client failover. Extstore
+extends cache capacity but does not create durable application data.
 
 ## Installation
 
@@ -360,7 +361,7 @@ Inspect endpoints and logs:
 ```bash
 kubectl get service,endpoints,pod \
   --selector "app.kubernetes.io/instance=${RELEASE}" --namespace "${NAMESPACE}"
-kubectl logs --selector "app.kubernetes.io/instance=${RELEASE}" \
+kubectl logs --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=memcached" \
   --namespace "${NAMESPACE}" --container memcached --tail=100
 ```
 
@@ -372,10 +373,14 @@ Start with the rollout, selected resources, logs, and chart test:
 kubectl rollout status statefulset \
   --selector "app.kubernetes.io/instance=${RELEASE}" --namespace "${NAMESPACE}"
 kubectl get events --namespace "${NAMESPACE}" --sort-by=.lastTimestamp
-kubectl logs --selector "app.kubernetes.io/instance=${RELEASE}" \
+kubectl logs --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=memcached" \
   --namespace "${NAMESPACE}" --container memcached --tail=200
 helm test "${RELEASE}" --namespace "${NAMESPACE}"
 ```
+
+The Helm test performs a real connection in plaintext and ASCII-auth modes. In
+TLS and SASL modes it prints validation guidance and exits; use a separate
+TLS- or SASL-capable client to verify those paths.
 
 Unexpected cache misses after scaling usually indicate that the client is not
 using consistent hashing; Memcached nodes do not replicate entries. For auth
