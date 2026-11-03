@@ -1,0 +1,272 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Discourse Chart
+description: Experimental Discourse Helm chart with the official ESR image, PostgreSQL, Redis, pgvector, persistent shared storage, Ingress, Gateway API, and External Secrets.
+---
+
+import Callout from '../../../components/Callout.astro';
+import DocsTabs from '../../../components/DocsTabs.astro';
+
+# Discourse
+
+Deploy [Discourse](https://www.discourse.org/) with the official upstream ESR
+image, PostgreSQL with pgvector, Redis, and persistent `/shared` storage.
+
+<Callout type="warning" title="Experimental and not upstream-supported for production">
+  Discourse classifies its official container image and Kubernetes deployment path as unsupported for production.
+  HelmForge validates this beta chart, but does not convert that upstream limitation into a production support claim.
+</Callout>
+
+## Key Features
+
+- Official multi-architecture image pinned by immutable digest
+- Enforced singleton Deployment with `Recreate` updates
+- Bundled PostgreSQL 18 with pgvector and bundled Redis
+- External PostgreSQL and Redis with existing Secret support
+- Persistent `/shared` uploads, backups, logs, and runtime state
+- Ingress, Gateway API, dual-stack Service, NetworkPolicy, and External Secrets
+- Upstream `/srv/status` startup, readiness, and liveness probes
+
+## Installation
+
+```bash
+helm repo add helmforge https://repo.helmforge.dev
+helm repo update
+helm install discourse helmforge/discourse --wait --timeout 20m
+```
+
+OCI installation:
+
+```bash
+helm install discourse oci://ghcr.io/helmforgedev/helm/discourse --wait --timeout 20m
+```
+
+The expanded upstream image is approximately 5.2 GB. A cold node and the first
+migration/asset compilation can take many minutes.
+
+## Deployment Examples
+
+<DocsTabs
+  tabs={[
+    { id: 'bundled', label: 'Bundled Services' },
+    { id: 'external', label: 'External Services' },
+    { id: 'eso', label: 'External Secrets' },
+  ]}
+>
+
+<div data-tab-panel="bundled">
+
+```yaml
+discourse:
+  hostname: forum.example.com
+  developerEmails: admin@example.com
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: forum.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+</div>
+
+<div data-tab-panel="external">
+
+```yaml
+postgresql:
+  enabled: false
+database:
+  mode: external
+  external:
+    host: postgresql.database.svc.cluster.local
+    port: 5432
+    name: discourse
+    username: discourse
+    existingSecret: discourse-database
+    existingSecretPasswordKey: database-password
+
+redis:
+  enabled: false
+  external:
+    host: redis.cache.svc.cluster.local
+    port: 6379
+    existingSecret: discourse-redis
+    existingSecretPasswordKey: redis-password
+```
+
+External PostgreSQL must provide `pg_trgm`, `unaccent`, and `vector`, and the
+application user must be allowed to run migrations.
+
+</div>
+
+<div data-tab-panel="eso">
+
+```yaml
+discourse:
+  existingSecret: discourse-credentials
+
+externalSecrets:
+  enabled: true
+  items:
+    - fullnameOverride: discourse-credentials
+      spec:
+        secretStoreRef:
+          name: production-secrets
+          kind: ClusterSecretStore
+        target:
+          name: discourse-credentials
+          creationPolicy: Owner
+        data:
+          - secretKey: secret-key-base
+            remoteRef:
+              key: production/discourse
+              property: secret-key-base
+```
+
+</div>
+
+</DocsTabs>
+
+## Configuration Reference
+
+### Global, Image, and Application
+
+| Parameter                     | Type    | Default                         | Description                               |
+| ----------------------------- | ------- | ------------------------------- | ----------------------------------------- |
+| `global`                      | object  | `{}`                            | Values shared with dependencies.          |
+| `nameOverride`                | string  | `""`                            | Override the chart name.                  |
+| `fullnameOverride`            | string  | `""`                            | Override the release resource prefix.     |
+| `commonLabels`                | object  | `{}`                            | Labels added to chart resources.          |
+| `replicaCount`                | integer | `1`                             | Enforced singleton replica count.         |
+| `image.repository`            | string  | `docker.io/discourse/discourse` | Official image repository.                |
+| `image.tag`                   | string  | `2026.7.4`                      | Official ESR tag.                         |
+| `image.digest`                | string  | pinned                          | Required OCI index digest.                |
+| `image.pullPolicy`            | string  | `IfNotPresent`                  | Image pull policy.                        |
+| `imagePullSecrets`            | array   | `[]`                            | Registry pull Secrets.                    |
+| `discourse.hostname`          | string  | `discourse.localhost`           | Public forum hostname.                    |
+| `discourse.developerEmails`   | string  | `admin@example.com`             | Initial developer emails.                 |
+| `discourse.secretKeyBase`     | string  | `""`                            | Inline key; generated when empty.         |
+| `discourse.existingSecret`    | string  | `""`                            | Existing application Secret.              |
+| `discourse.existingSecretKey` | string  | `secret-key-base`               | Application Secret key.                   |
+| `discourse.skipEmailSetup`    | boolean | `true`                          | Skip upstream SMTP validation.            |
+| `discourse.unicornWorkers`    | integer | `2`                             | Web worker count.                         |
+| `discourse.unicornSidekiqs`   | integer | `1`                             | Sidekiq worker count.                     |
+| `discourse.extraEnv`          | array   | `[]`                            | Additional container environment entries. |
+| `discourse.extraEnvFrom`      | array   | `[]`                            | Additional environment sources.           |
+
+### Database and Redis
+
+| Parameter                                     | Type    | Default             | Description                         |
+| --------------------------------------------- | ------- | ------------------- | ----------------------------------- |
+| `database.mode`                               | string  | `postgresql`        | Bundled `postgresql` or `external`. |
+| `database.external.host`                      | string  | `""`                | External PostgreSQL host.           |
+| `database.external.port`                      | integer | `5432`              | External PostgreSQL port.           |
+| `database.external.name`                      | string  | `discourse`         | Database name.                      |
+| `database.external.username`                  | string  | `discourse`         | Database user.                      |
+| `database.external.password`                  | string  | `""`                | Inline evaluation password.         |
+| `database.external.existingSecret`            | string  | `""`                | Existing database Secret.           |
+| `database.external.existingSecretPasswordKey` | string  | `database-password` | Password key.                       |
+| `postgresql.enabled`                          | boolean | `true`              | Deploy PostgreSQL dependency.       |
+| `postgresql.auth.database`                    | string  | `discourse`         | Bundled database name.              |
+| `postgresql.auth.username`                    | string  | `discourse`         | Bundled application user.           |
+| `postgresql.standalone.persistence.size`      | string  | `8Gi`               | PostgreSQL PVC size.                |
+| `redis.enabled`                               | boolean | `true`              | Deploy Redis dependency.            |
+| `redis.external.host`                         | string  | `""`                | External Redis host.                |
+| `redis.external.port`                         | integer | `6379`              | External Redis port.                |
+| `redis.external.existingSecret`               | string  | `""`                | Existing Redis Secret.              |
+| `redis.external.existingSecretPasswordKey`    | string  | `redis-password`    | Redis password key.                 |
+| `redis.standalone.persistence.size`           | string  | `1Gi`               | Redis PVC size.                     |
+
+### Storage, Service, and Routing
+
+| Parameter                   | Type    | Default             | Description                 |
+| --------------------------- | ------- | ------------------- | --------------------------- |
+| `persistence.enabled`       | boolean | `true`              | Create the `/shared` PVC.   |
+| `persistence.existingClaim` | string  | `""`                | Reuse an existing PVC.      |
+| `persistence.storageClass`  | string  | `""`                | Storage class.              |
+| `persistence.accessModes`   | array   | `[ReadWriteOnce]`   | PVC access modes.           |
+| `persistence.size`          | string  | `10Gi`              | `/shared` PVC size.         |
+| `service.type`              | string  | `ClusterIP`         | Service type.               |
+| `service.port`              | integer | `80`                | Client-facing Service port. |
+| `service.ipFamilyPolicy`    | string  | `""`                | Optional dual-stack policy. |
+| `service.ipFamilies`        | array   | `[]`                | Ordered IP families.        |
+| `ingress.enabled`           | boolean | `false`             | Create an Ingress.          |
+| `ingress.ingressClassName`  | string  | `""`                | Ingress class.              |
+| `ingress.hosts`             | array   | Discourse localhost | Host/path rules.            |
+| `ingress.tls`               | array   | `[]`                | TLS entries.                |
+| `gatewayAPI.enabled`        | boolean | `false`             | Create an HTTPRoute.        |
+| `gatewayAPI.parentRefs`     | array   | `[]`                | Gateway parents.            |
+| `gatewayAPI.hostnames`      | array   | `[]`                | Route hostnames.            |
+| `gatewayAPI.matches`        | array   | `/` PathPrefix      | Route matches.              |
+
+### Security, Availability, and Integrations
+
+| Parameter                                     | Type    | Default | Description                                  |
+| --------------------------------------------- | ------- | ------- | -------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `true`  | Create a dedicated ServiceAccount.           |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount Kubernetes API credentials.            |
+| `podSecurityContext.fsGroup`                  | integer | `1000`  | Shared volume group.                         |
+| `securityContext.runAsUser`                   | integer | `0`     | Required upstream root UID.                  |
+| `securityContext.readOnlyRootFilesystem`      | boolean | `false` | Required writable root filesystem.           |
+| `networkPolicy.enabled`                       | boolean | `false` | Create a NetworkPolicy.                      |
+| `networkPolicy.egress.enabled`                | boolean | `true`  | Enforce egress rules when policy is enabled. |
+| `networkPolicy.egress.allowDNS`               | boolean | `true`  | Allow cluster DNS.                           |
+| `networkPolicy.egress.allowHTTPS`             | boolean | `true`  | Allow outbound HTTPS.                        |
+| `networkPolicy.egress.allowSMTP`              | boolean | `false` | Allow configured SMTP port.                  |
+| `podDisruptionBudget.enabled`                 | boolean | `false` | Create a singleton-aware PDB.                |
+| `externalSecrets.enabled`                     | boolean | `false` | Render ExternalSecret items.                 |
+| `externalSecrets.refreshInterval`             | string  | `1h`    | Default ESO refresh interval.                |
+| `externalSecrets.items`                       | array   | `[]`    | Complete ExternalSecret definitions.         |
+
+### Runtime and Scheduling
+
+| Parameter                                  | Type    | Default               | Description                             |
+| ------------------------------------------ | ------- | --------------------- | --------------------------------------- |
+| `startupProbe.*`                           | object  | enabled, 600 s budget | Startup probe settings.                 |
+| `livenessProbe.*`                          | object  | enabled               | Liveness probe settings.                |
+| `readinessProbe.*`                         | object  | enabled               | Readiness probe settings.               |
+| `resources.requests`                       | object  | `250m`, `1Gi`         | Application requests.                   |
+| `resources.limits`                         | object  | `2000m`, `3Gi`        | Application limits.                     |
+| `terminationGracePeriodSeconds`            | integer | `120`                 | Graceful shutdown budget.               |
+| `progressDeadlineSeconds`                  | integer | `1800`                | Large-image Deployment progress budget. |
+| `podLabels`, `podAnnotations`              | object  | `{}`                  | Pod metadata.                           |
+| `priorityClassName`                        | string  | `""`                  | Priority class.                         |
+| `nodeSelector`, `affinity`                 | object  | `{}`                  | Placement controls.                     |
+| `tolerations`, `topologySpreadConstraints` | array   | `[]`                  | Placement controls.                     |
+| `extraVolumes`, `extraVolumeMounts`        | array   | `[]`                  | Additional storage mounts.              |
+| `extraManifests`                           | array   | `[]`                  | Additional Kubernetes resources.        |
+
+## Security and Operations
+
+The root and writable-filesystem exceptions are required by the official image.
+Privilege escalation is disabled, capabilities are minimized, and API token
+mounting is disabled. Back up PostgreSQL and `/shared` together before upgrades.
+Do not increase `replicaCount` or use rolling updates.
+
+```bash
+kubectl rollout status deployment/RELEASE-discourse -n NAMESPACE --timeout=20m
+kubectl logs deployment/RELEASE-discourse -n NAMESPACE -c discourse --tail=300
+kubectl get events -n NAMESPACE --sort-by=.lastTimestamp
+```
+
+## Known Limitations
+
+- No upstream production support for the container/Kubernetes path
+- Single replica only, without application high availability
+- Root and writable root filesystem required
+- Plugins require a custom image
+- No chart-managed Prometheus endpoint or backup Job
+
+## More Information
+
+- [Discourse documentation](https://meta.discourse.org/)
+- [Discourse source](https://github.com/discourse/discourse)
+- [HelmForge chart source](https://github.com/helmforgedev/charts/tree/main/charts/discourse)
+- [External Secrets Operator](https://external-secrets.io/latest/)

@@ -13597,6 +13597,82 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
   ],
+  discourse: [
+    {
+      name: 'General',
+      fields: [
+        {
+          label: 'Hostname',
+          key: 'discourse.hostname',
+          type: 'text',
+          default: 'discourse.localhost',
+          description: 'Public hostname passed to Discourse',
+        },
+        {
+          label: 'Developer Emails',
+          key: 'discourse.developerEmails',
+          type: 'text',
+          default: 'admin@example.com',
+          description: 'Comma-separated initial developer email addresses',
+        },
+        {
+          label: 'Service Port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          description: 'Client-facing Service port; upstream Nginx remains on port 80',
+        },
+        {
+          label: 'Storage Size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Persistent storage for /shared',
+        },
+        {
+          label: 'Network Policy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Restrict Discourse ingress and egress',
+        },
+      ],
+    },
+    {
+      name: 'Resources',
+      collapsible: true,
+      fields: [
+        {
+          label: 'CPU Request',
+          key: 'resources.requests.cpu',
+          type: 'text',
+          default: '250m',
+          description: 'CPU request',
+        },
+        {
+          label: 'Memory Request',
+          key: 'resources.requests.memory',
+          type: 'text',
+          default: '1Gi',
+          description: 'Memory request',
+        },
+        {
+          label: 'CPU Limit',
+          key: 'resources.limits.cpu',
+          type: 'text',
+          default: '2000m',
+          description: 'CPU limit',
+        },
+        {
+          label: 'Memory Limit',
+          key: 'resources.limits.memory',
+          type: 'text',
+          default: '3Gi',
+          description: 'Memory limit',
+        },
+      ],
+    },
+  ],
   answer: [
     {
       name: 'General',

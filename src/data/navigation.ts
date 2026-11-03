@@ -178,6 +178,7 @@ export const chartCategories: ChartCategory[] = [
       { label: 'Gitea', href: '/docs/charts/gitea', maturity: 'stable' },
       { label: 'Guacamole', href: '/docs/charts/guacamole', maturity: 'stable' },
       { label: 'Answer', href: '/docs/charts/answer', maturity: 'stable' },
+      { label: 'Discourse', href: '/docs/charts/discourse', maturity: 'beta' },
       { label: 'Jenkins', href: '/docs/charts/jenkins', maturity: 'stable' },
       { label: 'Apache', href: '/docs/charts/apache', maturity: 'stable' },
       { label: 'Tomcat', href: '/docs/charts/tomcat', maturity: 'stable' },
