@@ -3389,7 +3389,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: 'cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07',
+          default: 'cpu-1.9.4@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d',
           description: 'Pinned official CPU image; GPU needs a compatible CUDA tag and device settings',
         },
         {
