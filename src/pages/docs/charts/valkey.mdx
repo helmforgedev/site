@@ -278,11 +278,25 @@ restore Jobs, certificates, or alert receivers.
 
 Back up persistent data before upgrading. Keep the release name, `architecture`, storage settings, Secret names, and
 `clusterDomain` stable unless the migration has been planned and tested. Preserve explicit overrides with Helm's
-reset-then-reuse behavior:
+reset-then-reuse behavior.
+
+Sentinel upgrades from chart 1.x to 2.0.0 replace StatefulSet and PVC names and cannot be performed in place. Follow
+the [documented backup, reinstall, restore, and client migration procedure](https://github.com/helmforgedev/charts/blob/main/charts/valkey/UPGRADING.md)
+before upgrading.
+
+For the HTTPS repository, choose and pin a reviewed target version:
 
 ```bash
 helm repo update helmforge
-helm upgrade valkey helmforge/valkey -n valkey --reset-then-reuse-values
+helm upgrade valkey helmforge/valkey -n valkey \
+  --version <reviewed-chart-version> --reset-then-reuse-values
+```
+
+For an OCI installation, use the same reviewed version:
+
+```bash
+helm upgrade valkey oci://ghcr.io/helmforgedev/helm/valkey -n valkey \
+  --version <reviewed-chart-version> --reset-then-reuse-values
 ```
 
 After the upgrade, verify role discovery, replication or cluster health, client connectivity, persistence, metrics,
