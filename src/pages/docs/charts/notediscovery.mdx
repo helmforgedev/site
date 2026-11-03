@@ -10,7 +10,7 @@ Deploy [NoteDiscovery](https://github.com/gamosoft/NoteDiscovery) on Kubernetes 
 
 ## Overview
 
-The HelmForge NoteDiscovery chart uses the official `ghcr.io/gamosoft/notediscovery:0.31.7` image and deploys a single-writer web application.
+The HelmForge NoteDiscovery chart uses the official `ghcr.io/gamosoft/notediscovery:0.32.1` image and deploys a single-writer web application.
 NoteDiscovery listens on port `8000`, stores durable notes under `/app/data`, and reads its runtime configuration from `/app/config.yaml`.
 
 The default topology is one persistent Deployment replica with a chart-managed PVC and generated unauthenticated config. When authentication is enabled, the generated config file is stored in a Secret. Production installs should normally use `auth.existingSecret` with a complete `config.yaml`.
@@ -220,6 +220,18 @@ rules.
 Back up the PVC in every production deployment. The default `/app/data` directory contains notes and local application data.
 
 ## Upgrade Notes
+
+NoteDiscovery `0.32.1` preserves shared links when notes or their parent folders
+are renamed or moved, supports non-Latin and emoji titles in HTML exports, and
+prevents new note names from overwriting case-equivalent existing notes. See the
+[upstream v0.32.1 release](https://github.com/gamosoft/NoteDiscovery/releases/tag/v0.32.1).
+
+NoteDiscovery `0.32.0` adds an optional Streamable HTTP MCP endpoint at `/mcp`.
+It remains disabled by default. Enable it through `MCP_ENABLED=true` in
+`app.env`, or set `mcp.enabled: true` in an existing `config.yaml`. When
+authentication is enabled, configure `auth.apiKey` or its existing-Secret
+equivalent before exposing the endpoint. See the
+[upstream v0.32.0 release](https://github.com/gamosoft/NoteDiscovery/releases/tag/v0.32.0).
 
 NoteDiscovery `0.31.7` adds a homepage list view without changing the service,
 configuration or persistence contracts. See the
