@@ -56,6 +56,20 @@ Deployment strategy. Horizontal replicas are not supported by upstream's SQLite
 architecture. `config.dataDir` must equal `persistence.mountPath` so application
 state cannot be redirected to ephemeral storage.
 
+## Operational boundaries
+
+The chart owns one Deployment, its Service, a chart-created PVC and authentication
+Secret, plus enabled routing, NetworkPolicy, ExternalSecret and ServiceAccount
+resources. The platform owns DNS, TLS and certificates, routing controllers,
+storage classes and snapshots, External Secrets Operator and its SecretStore,
+the OIDC provider, and any externally supplied Secret or PVC.
+
+The health probes and Helm test verify the upstream endpoints and Service
+connectivity. They do not prove that every conversion format succeeds, that OIDC
+is reachable, or that the PVC has enough free space for another job. Log
+collection, metrics, alerts, dashboards and external availability checks remain
+platform responsibilities.
+
 ## OIDC
 
 Register this callback URI with Keycloak, Authentik, Authelia or another
@@ -270,6 +284,23 @@ have been removed.
 | `topologySpreadConstraints`                       | `[]`                       | Topology spreading                               |
 | `priorityClassName`                               | `""`                       | Pod priority class                               |
 | `terminationGracePeriodSeconds`                   | `30`                       | Shutdown grace period                            |
+
+## Troubleshooting
+
+Check rollout, events, logs and the chart test:
+
+```bash
+kubectl rollout status deployment/transmute-transmute --namespace transmute
+kubectl describe pod --selector app.kubernetes.io/instance=transmute \
+  --namespace transmute
+kubectl logs deployment/transmute-transmute --namespace transmute --tail=200
+helm test transmute --namespace transmute
+```
+
+For OIDC, confirm that `config.appUrl` produces the registered callback, that
+discovery returns the exact `oidc.issuerUrl`, and that pods can reach the public
+or internal provider URL. For conversion failures, inspect memory limits,
+temporary space, PVC capacity and application logs.
 
 ## Upstream resources
 
