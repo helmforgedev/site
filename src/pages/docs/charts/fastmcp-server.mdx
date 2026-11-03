@@ -61,6 +61,16 @@ Inline source ConfigMaps are mounted read-only at:
 | `sources.inline.prompts`   | `/app/inline/prompts`   |
 | `sources.inline.knowledge` | `/app/inline/knowledge` |
 
+### Operational Boundaries
+
+The chart owns the FastMCP Deployment, Service, inline ConfigMaps, optionally generated Secrets, and enabled routing,
+storage, policy, autoscaling, disruption, and monitoring resources. The platform remains responsible for DNS, TLS,
+controllers, storage classes, external Secrets, source-system availability, log collection, and alerting.
+
+Python tools, Git content, and packages execute inside the server process. Treat them as trusted code: the chart's
+memory and output limits are application controls, not a container sandbox. A ready pod proves that the health endpoint
+responds, but it does not prove that every tool, remote source, or downstream API works.
+
 ## Examples
 
 ### Inline Tools
@@ -208,8 +218,9 @@ When using JWT with NetworkPolicy or cluster egress controls, allow the JWKS end
 
 ## Network Policy
 
-`networkPolicy.enabled=true` restricts inbound traffic to the MCP service port. Use `networkPolicy.extraEgress` when
-tools, S3/Git sources, JWT JWKS discovery, or package installation need outbound access to specific destinations.
+`networkPolicy.enabled=true` restricts inbound traffic to the MCP service port. With an empty
+`networkPolicy.extraEgress`, egress remains unrestricted. Supplying any egress rule enables the Egress policy type and
+allows only the listed traffic. Include DNS plus every Git, S3, JWKS, package-index, and downstream-tool destination.
 
 ```yaml
 networkPolicy:
@@ -254,6 +265,9 @@ metrics:
   serviceMonitor:
     enabled: true
 ```
+
+The chart renders a ServiceMonitor only when both metrics flags are enabled. The ServiceMonitor CRD and a Prometheus
+Operator that selects the resource must already exist in the cluster.
 
 Use port-forwarding for local checks:
 
