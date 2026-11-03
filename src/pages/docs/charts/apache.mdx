@@ -219,7 +219,7 @@ The chart fails template rendering when ExternalSecret is enabled without `data`
 
 ## Observability
 
-Enable the exporter only when Apache `mod_status` is explicitly allowed for the scrape path:
+Enable the exporter and, optionally, its ServiceMonitor:
 
 ```yaml
 metrics:
@@ -228,13 +228,9 @@ metrics:
     enabled: true
     labels:
       release: prometheus
-
-serverStatus:
-  enabled: true
-  require: 'local'
 ```
 
-In production, keep `mod_status` local to the pod and let the exporter scrape it from the sidecar path. Do not expose the status endpoint to general client traffic.
+`metrics.enabled` renders the local `mod_status` endpoint required by the sidecar. Use `serverStatus.enabled` only when status is needed without the exporter. In production, keep the status endpoint local to the pod, restrict the exporter port with NetworkPolicy, and ensure a Prometheus Operator selects the ServiceMonitor.
 
 ## Network Policy
 
@@ -408,14 +404,14 @@ Use `networkPolicy.egress.extraEgress` for complete additional egress rules with
 
 ## Common Issues
 
-| Symptom                      | Likely Cause                                                    | Fix                                                                       |
-| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `/healthz` returns 404       | Custom Apache config no longer serves the generated health file | Preserve the generated health alias or update probe paths.                |
-| `403` from `/server-status`  | `serverStatus.require` blocks the exporter                      | Permit the exporter path or disable metrics.                              |
-| Basic Auth is ignored        | Secret key does not match `basicAuth.htpasswdKey`               | Check Secret data keys and ExternalSecret target keys.                    |
-| Gateway route has no traffic | `parentRefs` or listener hostnames do not match the Gateway     | Check Gateway readiness and HTTPRoute attachment status.                  |
-| NetworkPolicy blocks traffic | Namespace or pod selectors do not match callers                 | Adjust selectors or disable the policy until the CNI rules are verified.  |
-| Content does not change      | Existing ConfigMap name did not change                          | Publish a new immutable ConfigMap and update `content.existingConfigMap`. |
+| Symptom                       | Likely Cause                                                    | Fix                                                                       |
+| ----------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `/healthz` returns 404        | Custom Apache config no longer serves the generated health file | Preserve the generated health alias or update probe paths.                |
+| Exporter cannot scrape Apache | `serverStatus.require` blocks the local sidecar                 | Keep the default `local` requirement or permit the pod-local request.     |
+| Basic Auth is ignored         | Secret key does not match `basicAuth.htpasswdKey`               | Check Secret data keys and ExternalSecret target keys.                    |
+| Gateway route has no traffic  | `parentRefs` or listener hostnames do not match the Gateway     | Check Gateway readiness and HTTPRoute attachment status.                  |
+| NetworkPolicy blocks traffic  | Namespace or pod selectors do not match callers                 | Adjust selectors or disable the policy until the CNI rules are verified.  |
+| Content does not change       | Existing ConfigMap name did not change                          | Publish a new immutable ConfigMap and update `content.existingConfigMap`. |
 
 ## Validation
 
