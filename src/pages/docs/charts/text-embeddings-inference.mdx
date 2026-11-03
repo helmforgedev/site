@@ -140,6 +140,17 @@ The termination grace period must exceed the proxy read timeout (150 and 120 sec
 shutdown is graceful, but Pod failure can lose in-memory requests. Clients need bounded retries and deadlines.
 Do not claim zero downtime from readiness or grace periods alone.
 
+## Production boundaries
+
+The chart owns the Kubernetes resources and configuration that start a pinned model server. Operators remain
+responsible for model licensing and availability, vector compatibility, external index migrations, capacity and GPU
+scheduling, TLS termination, credential rotation, client retry policy, and backup of business indexes. Changing model
+ID, revision, pooling, prompts, or normalization is an application data migration even when the endpoint stays healthy.
+
+Each replica loads a complete model and multiplies RAM or VRAM and cache requirements. The chart cannot determine
+whether a new model contract is compatible with an existing vector index, and it does not train models, manage a vector
+database, install GPU drivers, or re-embed application data.
+
 ## GPU deployment
 
 [The CUDA example](https://github.com/helmforgedev/charts/blob/main/charts/text-embeddings-inference/examples/cuda.yaml) pins the official CUDA image and requests NVIDIA GPUs through the device
