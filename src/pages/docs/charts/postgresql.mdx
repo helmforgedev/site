@@ -334,6 +334,24 @@ cases, but production baselines should not depend on a full raw `pg_hba.conf` ov
 Replication slots are disabled by default for compatibility. If `replication.slots.enabled=true`, also set WAL limits
 such as `replication.wal.maxSlotWalKeepSize` so a stalled replica cannot retain unbounded WAL.
 
+### Security and observability boundaries
+
+The chart can configure non-root containers, dropped capabilities, TLS, structured `pg_hba.conf` rules, External
+Secrets, and NetworkPolicies. Operators still own certificate issuance, SecretStore configuration, credential rotation,
+backup encryption, and restrictive client and replication CIDRs. NetworkPolicy enforcement requires a compatible
+cluster network plugin, and the official PostgreSQL image keeps a writable runtime filesystem.
+
+Metrics and ServiceMonitor resources are optional and require an existing Prometheus stack. The chart does not install
+Prometheus, log collection, dashboards, tracing, or alert rules. Production operators should alert on connection
+saturation, replication lag, retained WAL, storage growth, backup freshness, restore tests, and credential expiry.
+
+### Known limitations
+
+Replication provides a fixed primary and read replicas; it does not perform promotion, fencing, failback, or automatic
+read/write routing. The backup CronJob creates logical dumps and does not provide continuous archiving or point-in-time
+recovery. Major PostgreSQL upgrades, storage migrations, connection pooling, and reconfiguration after a primary
+failure require external workflows or an operator.
+
 ## Operational Notes
 
 - The chart keeps internal health checks, metrics, and built-in backup on PostgreSQL's standard `postgres` database.
@@ -408,16 +426,21 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### TLS
 
-| Parameter                       | Type    | Default   | Description                                                                      |
-| ------------------------------- | ------- | --------- | -------------------------------------------------------------------------------- |
-| `tls.enabled`                   | boolean | `false`   | Enable TLS for PostgreSQL and internal clients.                                  |
-| `tls.existingSecret`            | string  | `""`      | Existing secret containing server TLS material.                                  |
-| `tls.certFilename`              | string  | `tls.crt` | Certificate filename inside the TLS secret.                                      |
-| `tls.keyFilename`               | string  | `tls.key` | Private key filename inside the TLS secret.                                      |
-| `tls.caFilename`                | string  | `ca.crt`  | CA certificate filename inside the TLS secret.                                   |
-| `tls.sslMode`                   | string  | `require` | libpq SSL mode used by internal probes, replication, and exporter.               |
-| `tls.minProtocolVersion`        | string  | `TLSv1.2` | Minimum accepted PostgreSQL TLS protocol version.                                |
-| `tls.volumePermissions.enabled` | boolean | `false`   | Copy TLS material to an owned `emptyDir` and restrict the private key to `0600`. |
+| Parameter                                                        | Type    | Default               | Description                                                                      |
+| ---------------------------------------------------------------- | ------- | --------------------- | -------------------------------------------------------------------------------- |
+| `tls.enabled`                                                    | boolean | `false`               | Enable TLS for PostgreSQL and internal clients.                                  |
+| `tls.existingSecret`                                             | string  | `""`                  | Existing secret containing server TLS material.                                  |
+| `tls.certFilename`                                               | string  | `tls.crt`             | Certificate filename inside the TLS secret.                                      |
+| `tls.keyFilename`                                                | string  | `tls.key`             | Private key filename inside the TLS secret.                                      |
+| `tls.caFilename`                                                 | string  | `ca.crt`              | CA certificate filename inside the TLS secret.                                   |
+| `tls.sslMode`                                                    | string  | `require`             | libpq SSL mode used by internal probes, replication, and exporter.               |
+| `tls.minProtocolVersion`                                         | string  | `TLSv1.2`             | Minimum accepted PostgreSQL TLS protocol version.                                |
+| `tls.volumePermissions.enabled`                                  | boolean | `false`               | Copy TLS material to an owned `emptyDir` and restrict the private key to `0600`. |
+| `tls.volumePermissions.securityContext.runAsUser`                | integer | `0`                   | UID used by the TLS permission init container.                                   |
+| `tls.volumePermissions.securityContext.runAsNonRoot`             | boolean | `false`               | Permit the permission init container to run as root.                             |
+| `tls.volumePermissions.securityContext.allowPrivilegeEscalation` | boolean | `false`               | Disable privilege escalation for the permission init container.                  |
+| `tls.volumePermissions.securityContext.capabilities.add`         | array   | `["CHOWN", "FOWNER"]` | Capabilities required to normalize TLS file ownership.                           |
+| `tls.volumePermissions.securityContext.capabilities.drop`        | array   | `["ALL"]`             | Capabilities dropped before the required additions.                              |
 
 ### Initialization
 
@@ -511,33 +534,36 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 
 ### Backup
 
-| Parameter                              | Type    | Default                                    | Description                                               |
-| -------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------------------- |
-| `backup.enabled`                       | boolean | `false`                                    | Enable the built-in backup CronJob.                       |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                              | Backup schedule in cron format.                           |
-| `backup.suspend`                       | boolean | `false`                                    | Suspend backup execution.                                 |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                                   | CronJob concurrency policy.                               |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                                        | Successful backup Jobs retained by the CronJob.           |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                                        | Failed backup Jobs retained by the CronJob.               |
-| `backup.backoffLimit`                  | integer | `1`                                        | Job backoff limit for backup execution.                   |
-| `backup.archivePrefix`                 | string  | `postgresql`                               | Prefix used in generated backup archive names.            |
-| `backup.resources`                     | object  | requests `100m/128Mi`, limits `500m/512Mi` | Resources applied to backup dump and upload containers.   |
-| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`                   | Uploader image repository for S3 copies.                  |
-| `backup.images.uploader.tag`           | string  | `"1.0.0"`                                  | Uploader image tag.                                       |
-| `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`                             | Pull policy for the uploader image.                       |
-| `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres`               | PostgreSQL client image used for backup jobs.             |
-| `backup.images.postgresql.tag`         | string  | `"18.6-trixie"`                            | PostgreSQL client image tag used for backup jobs.         |
-| `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`                             | Pull policy for the PostgreSQL backup image.              |
-| `backup.s3.endpoint`                   | string  | `""`                                       | S3-compatible endpoint URL.                               |
-| `backup.s3.bucket`                     | string  | `""`                                       | Target bucket name.                                       |
-| `backup.s3.prefix`                     | string  | `postgresql`                               | Optional key prefix inside the bucket.                    |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                                     | Create the bucket automatically when it does not exist.   |
-| `backup.s3.existingSecret`             | string  | `""`                                       | Existing secret containing backup access and secret keys. |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                               | Secret key name for the S3 access key.                    |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                               | Secret key name for the S3 secret key.                    |
-| `backup.s3.accessKey`                  | string  | `""`                                       | Inline S3 access key when not using an existing secret.   |
-| `backup.s3.secretKey`                  | string  | `""`                                       | Inline S3 secret key when not using an existing secret.   |
-| `backup.database.pgDumpAllArgs`        | string  | `"--clean --if-exists"`                    | Extra arguments passed to `pg_dumpall`.                   |
+| Parameter                              | Type    | Default                      | Description                                               |
+| -------------------------------------- | ------- | ---------------------------- | --------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`                      | Enable the built-in backup CronJob.                       |
+| `backup.schedule`                      | string  | `"0 3 * * *"`                | Backup schedule in cron format.                           |
+| `backup.suspend`                       | boolean | `false`                      | Suspend backup execution.                                 |
+| `backup.concurrencyPolicy`             | string  | `Forbid`                     | CronJob concurrency policy.                               |
+| `backup.successfulJobsHistoryLimit`    | integer | `3`                          | Successful backup Jobs retained by the CronJob.           |
+| `backup.failedJobsHistoryLimit`        | integer | `3`                          | Failed backup Jobs retained by the CronJob.               |
+| `backup.backoffLimit`                  | integer | `1`                          | Job backoff limit for backup execution.                   |
+| `backup.archivePrefix`                 | string  | `postgresql`                 | Prefix used in generated backup archive names.            |
+| `backup.resources.requests.cpu`        | string  | `100m`                       | CPU requested by backup dump and upload containers.       |
+| `backup.resources.requests.memory`     | string  | `128Mi`                      | Memory requested by backup dump and upload containers.    |
+| `backup.resources.limits.cpu`          | string  | `500m`                       | CPU limit for backup dump and upload containers.          |
+| `backup.resources.limits.memory`       | string  | `512Mi`                      | Memory limit for backup dump and upload containers.       |
+| `backup.images.uploader.repository`    | string  | `docker.io/helmforge/mc`     | Uploader image repository for S3 copies.                  |
+| `backup.images.uploader.tag`           | string  | `"1.0.0"`                    | Uploader image tag.                                       |
+| `backup.images.uploader.pullPolicy`    | string  | `IfNotPresent`               | Pull policy for the uploader image.                       |
+| `backup.images.postgresql.repository`  | string  | `docker.io/library/postgres` | PostgreSQL client image used for backup jobs.             |
+| `backup.images.postgresql.tag`         | string  | `"18.6-trixie"`              | PostgreSQL client image tag used for backup jobs.         |
+| `backup.images.postgresql.pullPolicy`  | string  | `IfNotPresent`               | Pull policy for the PostgreSQL backup image.              |
+| `backup.s3.endpoint`                   | string  | `""`                         | S3-compatible endpoint URL.                               |
+| `backup.s3.bucket`                     | string  | `""`                         | Target bucket name.                                       |
+| `backup.s3.prefix`                     | string  | `postgresql`                 | Optional key prefix inside the bucket.                    |
+| `backup.s3.createBucketIfNotExists`    | boolean | `true`                       | Create the bucket automatically when it does not exist.   |
+| `backup.s3.existingSecret`             | string  | `""`                         | Existing secret containing backup access and secret keys. |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                 | Secret key name for the S3 access key.                    |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                 | Secret key name for the S3 secret key.                    |
+| `backup.s3.accessKey`                  | string  | `""`                         | Inline S3 access key when not using an existing secret.   |
+| `backup.s3.secretKey`                  | string  | `""`                         | Inline S3 secret key when not using an existing secret.   |
+| `backup.database.pgDumpAllArgs`        | string  | `"--clean --if-exists"`      | Extra arguments passed to `pg_dumpall`.                   |
 
 ### NetworkPolicy
 
@@ -633,6 +659,17 @@ This reference covers the complete `values.yaml` surface for the PostgreSQL char
 | `externalSecrets.backup.enabled`      | boolean | `false`                  | Manage the backup S3 credential Secret through ESO. |
 
 ## Upgrade Notes
+
+Preserve the values file used for the release and upgrade it explicitly:
+
+```bash
+helm upgrade my-pg helmforge/postgresql -n <namespace> -f values.yaml
+kubectl rollout status statefulset/my-pg-postgresql -n <namespace>
+```
+
+Existing StatefulSets, Services, Secrets, and PVCs retain their Kubernetes identity when resource names are unchanged.
+Generated passwords are looked up and reused during live Helm upgrades. Do not use `--reset-values` unless returning to
+chart defaults is intentional, and never change the image major version without a PostgreSQL migration plan.
 
 PostgreSQL 18.6 is the August 2026 security and bug-fix release; upstream did
 not publish 18.5 because of a post-wrap regression. Back up the cluster and
