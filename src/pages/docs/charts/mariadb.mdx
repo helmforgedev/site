@@ -21,7 +21,7 @@ metrics via mysqld-exporter, and scheduled `mariadb-dump` backups to S3-compatib
 
 ## Key Features
 
-- **Two architectures** — `standalone` (Deployment) or `replication` (StatefulSet + GTID)
+- **Two architectures** — `standalone` (one StatefulSet) or `replication` (source and replica StatefulSets + GTID)
 - **GTID-based replication** — `MASTER_USE_GTID=slave_pos` with parallel replica workers
 - **Configuration presets** — `small`, `medium`, `large`, `oltp`, `read-heavy`, `analytics`
 - **Writable/read-only probes** — source readiness requires writable, replica requires read-only
@@ -228,6 +228,11 @@ upgrade. `mariadb-backup` does not support the new log-archive format while
 
 ## Configuration Reference
 
+The values schema explicitly describes every default key while remaining
+extensible for Kubernetes-native maps such as resources, labels, affinity, and
+extra objects. No new value is required, so upgrades that reuse an existing
+release's values retain the previous workload and storage identity.
+
 ### Core
 
 | Parameter          | Type   | Default         | Description                                     |
@@ -403,6 +408,25 @@ MariaDB runs hardened by default:
 | `nodeSelector`                  | object  | `{}`    | Node selector for scheduling.                                    |
 | `tolerations`                   | array   | `[]`    | Tolerations for scheduling.                                      |
 | `affinity`                      | object  | `{}`    | Affinity rules (replaces default anti-affinity if set).          |
+
+## Troubleshooting
+
+Start with the release resources, all container logs, and namespace events:
+
+```bash
+kubectl get statefulset,pod,pvc,service -l app.kubernetes.io/instance=<release>
+kubectl logs statefulset/<release> --all-containers --tail=200
+kubectl get events --sort-by=.lastTimestamp
+```
+
+- For `lost+found` warnings on an existing PVC, retain the legacy volume-root
+  layout with `persistence.subPath: ""` until the data is migrated.
+- For an unready replica, verify the stable replication Secret, source
+  writability, and MariaDB IO/SQL replication threads.
+- For exporter connection failures, verify the password Secret and keep
+  `tls.client.enabled` aligned with server-side TLS.
+- With NetworkPolicy enabled, allow application traffic on `service.port` and
+  Prometheus traffic on `service.metricsPort`.
 
 ## More Information
 
