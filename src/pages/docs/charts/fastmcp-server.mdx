@@ -220,7 +220,9 @@ When using JWT with NetworkPolicy or cluster egress controls, allow the JWKS end
 
 `networkPolicy.enabled=true` restricts inbound traffic to the MCP service port. With an empty
 `networkPolicy.extraEgress`, egress remains unrestricted. Supplying any egress rule enables the Egress policy type and
-allows only the listed traffic. Include DNS plus every Git, S3, JWKS, package-index, and downstream-tool destination.
+allows that traffic from the chart's policy. The effective Kubernetes allow set is the union of all NetworkPolicies
+that select the pods. Include DNS plus every Git, S3, JWKS, package-index, and downstream-tool destination unless
+another matching policy allows it. External policy mechanisms may still deny traffic.
 
 ```yaml
 networkPolicy:
@@ -272,9 +274,19 @@ Operator that selects the resource must already exist in the cluster.
 Use port-forwarding for local checks:
 
 ```bash
-kubectl port-forward svc/fastmcp-server-fastmcp-server 8000:8000
-curl http://localhost:8000/healthz
-curl http://localhost:8000/mcp
+RELEASE=fastmcp-server
+NAMESPACE=default
+SERVICE=$(kubectl get service -n "$NAMESPACE" \
+  -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/name=fastmcp-server" \
+  -o jsonpath='{.items[0].metadata.name}')
+SERVICE_PORT="${SERVICE_PORT:-8000}" # Match service.port.
+MCP_PATH="${MCP_PATH:-/mcp}" # Match server.path.
+kubectl port-forward service/"$SERVICE" \
+  "$SERVICE_PORT:$SERVICE_PORT" -n "$NAMESPACE"
+curl "http://127.0.0.1:$SERVICE_PORT/healthz"
+# A bare GET is expected to return HTTP 406 without an Accept:
+# text/event-stream header; that response confirms the route is reachable.
+curl -i "http://127.0.0.1:$SERVICE_PORT$MCP_PATH"
 ```
 
 ## Key Values
