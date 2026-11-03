@@ -264,6 +264,30 @@ metrics:
 
 Monitor memory pressure, evictions, replication lag, Sentinel quorum, cluster slot health, and restart counts.
 
+## Production Boundaries
+
+The chart owns topology-specific Kubernetes resources, bootstrapping, health probes, stable identities, and optional
+monitoring integration. Operators remain responsible for failure-domain placement, StorageClass durability, capacity
+planning, backups and tested restores, credential rotation, TLS issuance, alert routing, and planned maintenance.
+
+Sentinel coordinates failover but cannot recover data that was not persisted or replicated. Cluster mode requires
+cluster-aware clients and operator-managed resharding or failed-node replacement. The chart does not create backups,
+restore Jobs, certificates, or alert receivers.
+
+## Upgrade And Recovery
+
+Back up persistent data before upgrading. Keep the release name, `architecture`, storage settings, Secret names, and
+`clusterDomain` stable unless the migration has been planned and tested. Preserve explicit overrides with Helm's
+reset-then-reuse behavior:
+
+```bash
+helm repo update helmforge
+helm upgrade valkey helmforge/valkey -n valkey --reset-then-reuse-values
+```
+
+After the upgrade, verify role discovery, replication or cluster health, client connectivity, persistence, metrics,
+and the restore procedure for the selected topology.
+
 ## Validation
 
 After deployment:
