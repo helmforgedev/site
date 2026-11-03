@@ -415,7 +415,7 @@ Start with the release resources, all container logs, and namespace events:
 
 ```bash
 kubectl get statefulset,pod,pvc,service -l app.kubernetes.io/instance=<release>
-kubectl logs statefulset/<release> --all-containers --tail=200
+kubectl logs -l app.kubernetes.io/instance=<release> --all-containers --tail=200 --prefix
 kubectl get events --sort-by=.lastTimestamp
 ```
 
@@ -425,8 +425,10 @@ kubectl get events --sort-by=.lastTimestamp
   writability, and MariaDB IO/SQL replication threads.
 - For exporter connection failures, verify the password Secret and keep
   `tls.client.enabled` aligned with server-side TLS.
-- With NetworkPolicy enabled, allow application traffic on `service.port` and
-  Prometheus traffic on `service.metricsPort`.
+- With NetworkPolicy enabled, allow application traffic on `service.port`.
+  Prometheus scraping requires both `metrics.enabled: true` and
+  `networkPolicy.metrics.enabled: true`; configure
+  `networkPolicy.metrics.extraFrom` with the permitted scraper sources.
 
 ## More Information
 
