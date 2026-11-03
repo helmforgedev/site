@@ -51,6 +51,19 @@ Secrets Operator integration.
   <MemcachedDiagram mode="distributed" />
 </ArchitectureDiagram>
 
+## Operational boundaries
+
+The chart owns the StatefulSet, client and headless Services, and any enabled
+credentials Secret, ExternalSecret, NetworkPolicies, HPA, PDB, monitoring
+resources, or extstore PVC template. The platform owns client-side sharding,
+PKI, Secret stores, storage classes, Prometheus Operator, log collection,
+capacity planning, and scheduling infrastructure.
+
+Memcached entries remain disposable in every topology. Readiness and the Helm
+test prove that a server accepts connections; they do not prove correct key
+distribution, adequate capacity, a healthy cache hit ratio, or client failover.
+Extstore extends cache capacity but does not create durable application data.
+
 ## Installation
 
 For a standard Memcached pool, start three independent servers and configure the application or client library to
@@ -322,15 +335,21 @@ Memcached authentication is disabled.
 Validate the running configuration from inside the cluster:
 
 ```bash
-kubectl run memcached-client --rm -it --restart=Never \
+RELEASE=memcached
+NAMESPACE=default
+SERVICE=$(kubectl get service --namespace "${NAMESPACE}" \
+  --selector "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=memcached" \
+  --output jsonpath='{.items[?(@.spec.clusterIP!="None")].metadata.name}')
+kubectl run "${RELEASE}-client" --rm -it --restart=Never \
+  --namespace "${NAMESPACE}" \
   --image=docker.io/library/busybox:1.37.0 -- \
-  sh -ec "printf 'stats settings\r\nquit\r\n' | nc memcached 11211"
+  sh -ec "printf 'stats settings\r\nquit\r\n' | nc ${SERVICE} 11211"
 ```
 
 Scale a distributed cache:
 
 ```bash
-helm upgrade memcached helmforge/memcached \
+helm upgrade "${RELEASE}" helmforge/memcached --namespace "${NAMESPACE}" \
   --reuse-values \
   --set architecture=distributed \
   --set replicaCount=5
@@ -339,10 +358,31 @@ helm upgrade memcached helmforge/memcached \
 Inspect endpoints and logs:
 
 ```bash
-kubectl get endpoints memcached
-kubectl get pods -l app.kubernetes.io/name=memcached
-kubectl logs statefulset/memcached -c memcached --tail=100
+kubectl get service,endpoints,pod \
+  --selector "app.kubernetes.io/instance=${RELEASE}" --namespace "${NAMESPACE}"
+kubectl logs --selector "app.kubernetes.io/instance=${RELEASE}" \
+  --namespace "${NAMESPACE}" --container memcached --tail=100
 ```
+
+## Troubleshooting
+
+Start with the rollout, selected resources, logs, and chart test:
+
+```bash
+kubectl rollout status statefulset \
+  --selector "app.kubernetes.io/instance=${RELEASE}" --namespace "${NAMESPACE}"
+kubectl get events --namespace "${NAMESPACE}" --sort-by=.lastTimestamp
+kubectl logs --selector "app.kubernetes.io/instance=${RELEASE}" \
+  --namespace "${NAMESPACE}" --container memcached --tail=200
+helm test "${RELEASE}" --namespace "${NAMESPACE}"
+```
+
+Unexpected cache misses after scaling usually indicate that the client is not
+using consistent hashing; Memcached nodes do not replicate entries. For auth
+failures, confirm the selected auth mode, mounted Secret keys, and client
+protocol. For TLS, verify the certificate SAN and remember that TCP probes are
+intentionally omitted. The exporter cannot scrape an authenticated listener;
+with TLS, its configured server name must match the certificate.
 
 ## Design Notes
 
