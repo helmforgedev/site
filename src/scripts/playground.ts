@@ -989,6 +989,20 @@ function generateValuesYaml(): string {
   return lines.join('\n');
 }
 
+function getOutputBlockingReason(): string | null {
+  if (selectedSlug !== 'bulwark-mail') return null;
+
+  const needsSharedState = Number(currentValues.replicaCount) > 1 || currentValues['autoscaling.enabled'] === 'true';
+  if (!needsSharedState) return null;
+
+  const missing: string[] = [];
+  if (currentValues['sharedStore.enabled'] !== 'true') missing.push('sharedStore.enabled=true');
+  if (currentValues['persistence.enabled'] !== 'false') missing.push('persistence.enabled=false');
+  if (missing.length === 0) return null;
+
+  return `Configuration blocked: multiple replicas and autoscaling require ${missing.join(' and ')}.`;
+}
+
 function getPlainHelmCommand(): string {
   const flags = buildSetFlags();
   const parts = [`helm install ${selectedSlug} helmforge/${selectedSlug}`, '  --namespace helmforge'];
@@ -1129,8 +1143,16 @@ function updateOutput() {
   ) {
     updateToggleField('arbiter.enabled', false);
   }
-  if (copyBtn) copyBtn.disabled = false;
-  if (shareBtn) shareBtn.disabled = false;
+  const blockingReason = getOutputBlockingReason();
+  if (copyBtn) copyBtn.disabled = blockingReason !== null;
+  if (shareBtn) shareBtn.disabled = blockingReason !== null;
+
+  if (blockingReason) {
+    codeEl.textContent = `# ${blockingReason}`;
+    if (filenameEl) filenameEl.textContent = outputMode === 'helm' ? 'terminal' : 'values.yaml';
+    if (diffEl) diffEl.classList.add('hidden');
+    return;
+  }
 
   if (outputMode === 'helm') {
     codeEl.innerHTML = generateHelmOutput();

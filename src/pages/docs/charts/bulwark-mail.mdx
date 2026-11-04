@@ -10,8 +10,8 @@ description: JMAP-native webmail for Stalwart with controlled bootstrap, persist
 [Stalwart Mail Server](https://stalw.art/). It uses JMAP for mail, calendar,
 contacts, files, account security and message submission instead of connecting
 directly to IMAP or SMTP. This chart deploys the official
-`ghcr.io/bulwarkmail/webmail:1.15.0-always` image as a single hardened web
-application with persistent runtime state.
+`ghcr.io/bulwarkmail/webmail:1.20.0-always` image as a hardened web application
+with persistent local state or an external Redis-protocol shared store.
 
 ## Requirements
 
@@ -20,7 +20,11 @@ application with persistent runtime state.
 - One canonical JMAP URL that is reachable by both browsers and the Bulwark Pod.
 - CORS allowed by Stalwart when Bulwark and JMAP use different origins, or
   same-origin routing for the required JMAP and authentication paths.
-- Persistent storage writable by the official image UID/GID `1001`.
+- Writable `/app/data` storage for the official image UID/GID `1001`. Persistent
+  storage is required only when `persistence.enabled` is `true`; shared-store
+  deployments do not require a PVC.
+- Valkey, Redis 5 or newer, KeyDB, Dragonfly, or a compatible managed service
+  when `sharedStore.enabled` is used.
 - An Ingress or Gateway API controller only when its corresponding integration
   is enabled.
 
@@ -180,7 +184,7 @@ Ingress and Gateway API HTTPRoutes expose `service.port`, which defaults to
 Ports below `1024` require the runtime to permit non-root binds for UID `1001`.
 Use the root path `/`; the published image cannot be moved under a subpath at
 runtime because Next.js bakes `NEXT_PUBLIC_BASE_PATH` into the build.
-The `1.15.0-always` image redirects `/` to the locale-prefixed `/en` route, so
+The `1.20.0-always` image redirects `/` to the locale-prefixed `/en` route, so
 use `Prefix`/`PathPrefix` matching rather than an exact root-only rule. Hosting
 at `/webmail` requires a custom image built with `NEXT_PUBLIC_BASE_PATH` and is
 outside the stock chart contract.
@@ -207,16 +211,41 @@ The official image keeps runtime state below `/app/data`:
 | `/app/data/telemetry`     | Telemetry consent and stable instance identity                 |
 | `/app/data/version-check` | Upstream version-check state                                   |
 
-One PVC mounted at `/app/data` keeps those files at one recovery point.
-Disabling persistence is suitable only for disposable, fully environment-driven
-trials where losing settings and administrator state is acceptable.
+One PVC mounted at `/app/data` keeps those files at one recovery point. Without
+a shared store, disabling persistence is suitable only for disposable, fully
+environment-driven trials where losing settings and administrator state is
+acceptable.
 
-The safe topology is one replica. Local JSON and encrypted files have atomic
-rename behavior but no distributed transaction or writer lock, and configuration
-is cached per process. RWX storage does not make concurrent admin or settings
-writes safe. Do not enable horizontal scaling unless the deployment is made
-stateless, all replicas share the same session secret, runtime writers are
-disabled and the resulting limitations are accepted.
+Without a shared store, the safe topology is one replica. Local JSON and
+encrypted files have atomic rename behavior but no distributed transaction or
+writer lock, and configuration is cached per process. RWX storage does not make
+concurrent admin or settings writes safe.
+
+Bulwark 1.20.0 adds an upstream multi-instance contract. Set
+`sharedStore.enabled: true` and provide `REDIS_URL` through
+`sharedStore.existingSecret`, the runtime Secret, or `sharedStore.url`. Every
+replica then shares administrator configuration, sessions, settings and runtime
+state through one Redis-protocol store. Disable persistence before increasing
+`replicaCount` or enabling the HPA; the Deployment then uses `RollingUpdate` and
+the chart can render a PodDisruptionBudget.
+
+The chart does not install or operate the store. Configure it with persistence
+and a no-eviction policy, protect it with authentication and TLS where needed,
+and allow its port through NetworkPolicy egress. Redis Cluster is not supported
+by the upstream contract. Use a distinct `sharedStore.keyPrefix` when multiple
+releases share one endpoint.
+
+```yaml
+replicaCount: 3
+sharedStore:
+  enabled: true
+  existingSecret: bulwark-mail-store
+  existingSecretKey: shared-store-url
+persistence:
+  enabled: false
+pdb:
+  enabled: true
+```
 
 ## Network policy and security
 
@@ -232,18 +261,20 @@ relay, translation services, calendar subscriptions and other enabled features
 can require additional explicit egress. Telemetry and update checks can be
 disabled for isolated environments.
 
-The `/api/health` endpoint proves that the Bulwark process can answer HTTP. It
-does not probe Stalwart, CORS, browser DNS, OAuth or mail delivery. Keeping those
-dependencies out of liveness avoids restarting a healthy frontend during a mail
-server outage; validate them separately with an actual login and JMAP action.
+The `/api/health` endpoint proves that the Bulwark process can answer HTTP. With
+the shared store enabled, readiness moves to `/api/ready`, which also reports
+store reachability, while startup and liveness remain on `/api/health`. Neither
+endpoint proves Stalwart, CORS, browser DNS, OAuth or mail delivery; validate
+those dependencies separately with an actual login and JMAP action.
 
 ## Backup and restore
 
-Bulwark has no external SQL database. Back up the complete `/app/data` PVC and
-all independently managed Secrets, especially the stable session secret and any
-OAuth client secret. Back up Stalwart separately with its datastore-native
-procedure; the Bulwark PVC does not contain messages, calendars, contacts or
-files.
+Bulwark has no external SQL database. Without the shared store, back up the
+complete `/app/data` PVC and all independently managed Secrets, especially the
+stable session secret and any OAuth client secret. With the shared store, back
+up the store instead of the PVC and keep it at the same recovery point as the
+runtime Secret. Back up Stalwart separately with its datastore-native procedure;
+Bulwark state does not contain messages, calendars, contacts or files.
 
 For a consistent file backup, stop the writer before copying the volume:
 
@@ -261,6 +292,11 @@ not equivalent to one volume snapshot.
 Restore the PVC and Secrets before starting Bulwark. Then verify the health
 endpoint, administrator access, a remembered user setting and a real Stalwart
 login. A retained PVC is not a backup, and namespace deletion can remove it.
+
+To migrate an existing release, first enable the shared store with one replica
+while keeping the old PVC mounted. Bulwark imports the local state into an empty
+store. Verify the import and back up the PVC, then disable persistence and
+increase the replica count in a second upgrade.
 
 ## Upgrades
 
@@ -337,10 +373,15 @@ The values below are the chart's complete public configuration surface.
 | `commonLabels`                                | `{}`                            | Extra labels applied to every resource.                                                        |
 | `commonAnnotations`                           | `{}`                            | Extra annotations applied to the primary workload.                                             |
 | `image.repository`                            | `"ghcr.io/bulwarkmail/webmail"` | Official Bulwark image repository.                                                             |
-| `image.tag`                                   | `"1.15.0-always"`               | Deterministic Bulwark 1.15.0 tag with a clean multi-architecture index.                        |
+| `image.tag`                                   | `"1.20.0-always"`               | Deterministic Bulwark 1.20.0 tag with a clean multi-architecture index.                        |
 | `image.pullPolicy`                            | `"IfNotPresent"`                | Image pull policy.                                                                             |
 | `imagePullSecrets`                            | `[]`                            | Registry credentials for private mirrors.                                                      |
-| `replicaCount`                                | `1`                             | Single supported writer; other values are rejected.                                            |
+| `replicaCount`                                | `1`                             | Values above one require the shared store and disabled persistence.                            |
+| `sharedStore.enabled`                         | `false`                         | Share all mutable state through an external Redis-protocol store.                              |
+| `sharedStore.url`                             | `""`                            | Inline store URL for local tests; prefer an existing Secret in production.                     |
+| `sharedStore.existingSecret`                  | `""`                            | Dedicated Secret holding the store URL; empty uses the runtime Secret.                         |
+| `sharedStore.existingSecretKey`               | `"shared-store-url"`            | Secret key exported to the application as `REDIS_URL`.                                         |
+| `sharedStore.keyPrefix`                       | `""`                            | Optional per-release prefix exported as `REDIS_KEY_PREFIX`.                                    |
 | `config.mode`                                 | `"wizard"`                      | `wizard` for interactive setup or `declarative` for operator-managed configuration.            |
 | `config.appName`                              | `"Bulwark Webmail"`             | Display name exposed by runtime configuration.                                                 |
 | `config.stalwartFeatures`                     | `true`                          | Enable Stalwart-specific JMAP features.                                                        |
@@ -436,7 +477,8 @@ The values below are the chart's complete public configuration surface.
 | `probes.liveness.periodSeconds`               | `30`                            | Liveness probe interval.                                                                       |
 | `probes.liveness.timeoutSeconds`              | `5`                             | Liveness request timeout.                                                                      |
 | `probes.liveness.failureThreshold`            | `3`                             | Liveness failures allowed before restart.                                                      |
-| `probes.readiness.enabled`                    | `true`                          | Enable readiness probing on `/api/health`.                                                     |
+| `probes.readiness.enabled`                    | `true`                          | Enable readiness probing.                                                                      |
+| `probes.readiness.path`                       | `""`                            | Select `/api/ready` with the shared store and `/api/health` otherwise.                         |
 | `probes.readiness.initialDelaySeconds`        | `0`                             | Readiness initial delay.                                                                       |
 | `probes.readiness.periodSeconds`              | `10`                            | Readiness probe interval.                                                                      |
 | `probes.readiness.timeoutSeconds`             | `5`                             | Readiness request timeout.                                                                     |
@@ -447,12 +489,12 @@ The values below are the chart's complete public configuration surface.
 | `resources.limits.memory`                     | `"512Mi"`                       | Memory limit.                                                                                  |
 | `podSecurityContext`                          | UID/GID `1001`                  | Pod identity, volume group, RuntimeDefault seccomp and `OnRootMismatch`.                       |
 | `securityContext`                             | hardened                        | Non-root identity, read-only root, no escalation, RuntimeDefault seccomp and all caps dropped. |
-| `pdb.enabled`                                 | `false`                         | Unsupported for the required single replica; setting it to `true` is rejected.                 |
-| `pdb.minAvailable`                            | `1`                             | Reserved for a future upstream-supported multi-replica deployment.                             |
-| `autoscaling.enabled`                         | `false`                         | Unsupported; `true` is rejected.                                                               |
-| `autoscaling.minReplicas`                     | `1`                             | Reserved future HA minimum.                                                                    |
-| `autoscaling.maxReplicas`                     | `1`                             | Reserved future HA maximum.                                                                    |
-| `autoscaling.targetCPUUtilizationPercentage`  | `80`                            | Reserved future CPU target.                                                                    |
+| `pdb.enabled`                                 | `false`                         | Render a PDB for a shared-store deployment with more than one replica.                         |
+| `pdb.minAvailable`                            | `1`                             | Minimum available replicas during voluntary disruptions.                                       |
+| `autoscaling.enabled`                         | `false`                         | Render an HPA; requires the shared store and disabled persistence.                             |
+| `autoscaling.minReplicas`                     | `1`                             | HPA minimum replica count.                                                                     |
+| `autoscaling.maxReplicas`                     | `1`                             | HPA maximum replica count.                                                                     |
+| `autoscaling.targetCPUUtilizationPercentage`  | `80`                            | HPA target average CPU utilization.                                                            |
 | `networkPolicy.enabled`                       | `false`                         | Render a Bulwark NetworkPolicy.                                                                |
 | `networkPolicy.ingressFrom`                   | `[]`                            | HTTP ingress peers; empty permits every namespace.                                             |
 | `networkPolicy.egress.enabled`                | `false`                         | Restrict egress to the configured rules.                                                       |
