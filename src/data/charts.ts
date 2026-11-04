@@ -449,6 +449,13 @@ export const charts: Chart[] = [
     backup: true,
   },
   {
+    name: 'Discourse',
+    slug: 'discourse',
+    description: 'Experimental community forum with PostgreSQL, Redis, pgvector, and persistent shared data.',
+    maturity: 'beta',
+    backup: false,
+  },
+  {
     name: 'n8n',
     slug: 'n8n',
     description: 'Workflow automation with queue mode, SQL backends, and backup support.',

@@ -54,7 +54,7 @@ This frontend is built for extreme performance, rich aesthetics, and massive SEO
 
 ## Features
 
-- **55+ chart playground configs** — Interactive playground with live YAML preview for every stable chart
+- **Chart playground configs** — Interactive playground with live YAML preview for stable charts
 - **Stack Builder** — Compose multi-chart stacks visually and export install commands
 - **Full documentation** — MDX-powered docs with sidebar navigation, search, and copy-to-clipboard
 - **Public roadmap** — GitHub Milestones integration with static timeline
