@@ -146,7 +146,7 @@ export const charts: Chart[] = [
     name: 'Bulwark Mail',
     slug: 'bulwark-mail',
     description:
-      'JMAP-native webmail for Stalwart with persistent encrypted settings, controlled bootstrap and hardened HTTP exposure.',
+      'JMAP-native webmail for Stalwart with persistent or shared-store state, controlled bootstrap and multi-replica operation.',
     maturity: 'stable',
     backup: false,
   },
