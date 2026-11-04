@@ -38,9 +38,15 @@ backed by MySQL.
   member signup paths before upgrading production sites.
 </Callout>
 
+<Callout type="warning" title="MySQL 2.2.0 performs a one-time rollout">
+  Upgrading a release with bundled MySQL from chart 2.1.x to 2.2.0 changes the MySQL StatefulSet configuration checksum.
+  Kubernetes restarts the MySQL pod once as a result. Because the default standalone topology has one replica, schedule
+  a maintenance window, back up the database, and wait for the MySQL StatefulSet rollout before validating Ghost.
+</Callout>
+
 ## Architecture and Boundaries
 
-The chart runs one Ghost Deployment with a persistent content volume and either the HelmForge MySQL 2.1.1 dependency or
+The chart runs one Ghost Deployment with a persistent content volume and either the HelmForge MySQL 2.2.0 dependency or
 an external MySQL-compatible service. A ClusterIP Service exposes the named HTTP port to an optional Ingress or Gateway
 API HTTPRoute. Ghost remains a singleton: its PodDisruptionBudget can protect voluntary maintenance, but it does not
 provide application high availability.
