@@ -319,7 +319,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="notediscovery"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.31.5');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('0.32.1');
     await expect(page.locator('select[data-field-key="notediscovery.defaultTheme"]')).toHaveValue('light');
   });
 
