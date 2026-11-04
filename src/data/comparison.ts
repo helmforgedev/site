@@ -45,7 +45,7 @@ export const comparisonFull: ComparisonRow[] = [
   { aspect: 'Vendor lock-in', helmforge: 'None', bitnami: 'Tied to Bitnami images', community: 'Low', highlight: true },
   {
     aspect: 'Built-in backup',
-    helmforge: 'S3-compatible backup support across the catalog',
+    helmforge: 'S3-compatible backup support on supported charts',
     bitnami: 'Not included',
     community: 'Rarely included',
   },
