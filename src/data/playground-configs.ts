@@ -2487,7 +2487,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'number',
           default: '1',
           min: 1,
-          description: 'Upper replica bound managed by the HPA',
+          description: 'Upper replica bound managed by the HPA; raise it above 1 to allow scale-out',
         },
         {
           label: 'CPU target',

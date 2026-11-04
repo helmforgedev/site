@@ -479,6 +479,28 @@ test.describe('Playground', () => {
     await expect(code).toContainText('service.port=18081');
   });
 
+  test('bulwark-mail blocks unsafe multi-replica local state', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="bulwark-mail"]').click();
+
+    await page.locator('input[data-field-key="replicaCount"]').fill('2');
+
+    const code = page.locator('#playground-code');
+    const copy = page.locator('#playground-copy');
+    await expect(code).toContainText('Configuration blocked');
+    await expect(code).toContainText('sharedStore.enabled=true');
+    await expect(code).toContainText('persistence.enabled=false');
+    await expect(copy).toBeDisabled();
+
+    await page.locator('button[data-field-key="sharedStore.enabled"]').click();
+    await page.locator('button[data-field-key="persistence.enabled"]').click();
+
+    await expect(code).toContainText('replicaCount=2');
+    await expect(code).toContainText('sharedStore.enabled=true');
+    await expect(code).toContainText('persistence.enabled=false');
+    await expect(copy).toBeEnabled();
+  });
+
   test('changing values updates command output', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();

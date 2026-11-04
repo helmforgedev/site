@@ -20,7 +20,9 @@ with persistent local state or an external Redis-protocol shared store.
 - One canonical JMAP URL that is reachable by both browsers and the Bulwark Pod.
 - CORS allowed by Stalwart when Bulwark and JMAP use different origins, or
   same-origin routing for the required JMAP and authentication paths.
-- Persistent storage writable by the official image UID/GID `1001`.
+- Writable `/app/data` storage for the official image UID/GID `1001`. Persistent
+  storage is required only when `persistence.enabled` is `true`; shared-store
+  deployments do not require a PVC.
 - Valkey, Redis 5 or newer, KeyDB, Dragonfly, or a compatible managed service
   when `sharedStore.enabled` is used.
 - An Ingress or Gateway API controller only when its corresponding integration
@@ -209,9 +211,10 @@ The official image keeps runtime state below `/app/data`:
 | `/app/data/telemetry`     | Telemetry consent and stable instance identity                 |
 | `/app/data/version-check` | Upstream version-check state                                   |
 
-One PVC mounted at `/app/data` keeps those files at one recovery point.
-Disabling persistence is suitable only for disposable, fully environment-driven
-trials where losing settings and administrator state is acceptable.
+One PVC mounted at `/app/data` keeps those files at one recovery point. Without
+a shared store, disabling persistence is suitable only for disposable, fully
+environment-driven trials where losing settings and administrator state is
+acceptable.
 
 Without a shared store, the safe topology is one replica. Local JSON and
 encrypted files have atomic rename behavior but no distributed transaction or
