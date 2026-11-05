@@ -372,6 +372,8 @@ platform integration inside the pod needs Kubernetes API credentials.
 
 ### EKS Pod Identity and IRSA backups
 
+This feature requires MySQL chart version `2.4.0` or later.
+
 Set `backup.s3.credentialsFromPodIdentity=true` to use the backup pod's AWS credential provider instead of a static S3
 Secret. Set `backup.s3.region`, then either annotate `backup.serviceAccount` for IRSA or create an
 [EKS Pod Identity association](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-association.html) for the
@@ -380,6 +382,8 @@ dedicated ServiceAccount. The chart does not render the backup Secret or backup 
 If `backup.serviceAccount.create=false`, set `backup.serviceAccount.name` to an existing dedicated ServiceAccount.
 
 When `networkPolicy.egress.enabled=true`, also enable HTTPS egress for S3 and allow the EKS Pod Identity agent endpoint:
+
+`allowHTTPS` permits the selected pods to reach any IPv4 destination on TCP/443; it is not restricted to S3 endpoints.
 
 ```yaml
 networkPolicy:
@@ -390,6 +394,12 @@ networkPolicy:
     - to:
         - ipBlock:
             cidr: 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - ipBlock:
+            cidr: fd00:ec2::23/128
       ports:
         - protocol: TCP
           port: 80
