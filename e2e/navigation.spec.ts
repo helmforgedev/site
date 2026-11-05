@@ -5,11 +5,11 @@ test.describe('Navigation and page rendering', () => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
     // Direct nav links
-    await expect(nav.getByText('Charts')).toBeVisible();
-    await expect(nav.getByText('Playground')).toBeVisible();
-    await expect(nav.getByText('Docs')).toBeVisible();
-    await expect(nav.getByText('Blog')).toBeVisible();
-    await expect(nav.getByText('Roadmap')).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Charts', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Playground', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Docs', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Blog', exact: true })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Roadmap', exact: true })).toBeVisible();
     // Dropdown trigger buttons
     await expect(nav.getByRole('button', { name: 'Community' })).toBeVisible();
     await expect(nav.locator('a[href*="github.com"]')).toBeVisible();
