@@ -90,16 +90,16 @@ test.describe('Accessibility', () => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
 
-    const toolsBtn = nav.getByRole('button', { name: 'Tools' });
+    const communityBtn = nav.getByRole('button', { name: 'Community' });
 
-    // Keyboard users can reach Tools even when browsers expose a different
+    // Keyboard users can reach Community even when browsers expose a different
     // number of focusable controls before the desktop navigation.
-    await tabTo(page, toolsBtn);
-    await expectDomFocus(toolsBtn);
+    await tabTo(page, communityBtn);
+    await expectDomFocus(communityBtn);
 
     // ArrowDown should open dropdown and focus first item
     await page.keyboard.press('ArrowDown');
-    const menuItems = toolsBtn.locator('..').getByRole('menuitem');
+    const menuItems = communityBtn.locator('..').getByRole('menuitem');
     const firstItem = menuItems.first();
     await expectDomFocus(firstItem);
 
@@ -112,8 +112,8 @@ test.describe('Accessibility', () => {
 
     // Escape should close and return focus to trigger
     await page.keyboard.press('Escape');
-    await expectDomFocus(toolsBtn);
-    await expect(toolsBtn).toHaveAttribute('aria-expanded', 'false');
+    await expectDomFocus(communityBtn);
+    await expect(communityBtn).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('tab panels have proper ARIA roles', async ({ page }) => {
