@@ -22,7 +22,7 @@ production hardening controls that can be enabled without changing the developme
 - **Deterministic credentials** - Inline values for development or existing Secrets/External Secrets for production.
 - **TLS** - Server TLS, optional secure transport requirement, internal client TLS, and private-key permission normalization.
 - **NetworkPolicy** - Optional ingress rules plus explicit egress for DNS, same-namespace MySQL, HTTPS, and custom targets.
-- **S3 backup** - Scheduled `mysqldump` CronJobs with existing Secret support for object storage credentials.
+- **S3 backup** - Scheduled `mysqldump` CronJobs with static credentials, External Secrets, or EKS Pod Identity/IRSA.
 - **Observability** - `mysqld-exporter` sidecar with optional ServiceMonitor.
 - **Dual-stack Services** - Optional `ipFamilyPolicy` and `ipFamilies` across chart-managed Services.
 - **PVC lifecycle control** - Configure retention independently for StatefulSet deletion and scale-down.
@@ -144,7 +144,7 @@ replication:
 <div data-tab-panel="backup">
 
 ```yaml
-# values.yaml - backup credentials from an existing Secret
+# values.yaml - backup to S3 with EKS Pod Identity or IRSA
 architecture: standalone
 
 auth:
@@ -159,12 +159,22 @@ standalone:
 backup:
   enabled: true
   schedule: '0 3 * * *'
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/mysql-backup
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: my-mysql-backups
     prefix: mysql
-    existingSecret: mysql-backup
+    region: us-east-1
+    credentialsFromPodIdentity: true
 ```
+
+<Callout type="info" title="The backup identity is isolated">
+  The backup CronJob uses a dedicated ServiceAccount, so the MySQL pods do not inherit S3 permissions. For EKS Pod
+  Identity, associate the role with that ServiceAccount instead of using the IRSA annotation.
+</Callout>
 
 </div>
 
@@ -360,6 +370,41 @@ append complete Kubernetes egress rules when a platform needs selectors, IP bloc
 `serviceAccount.automountServiceAccountToken` defaults to `false`. Keep it disabled unless a sidecar, extension, or
 platform integration inside the pod needs Kubernetes API credentials.
 
+### EKS Pod Identity and IRSA backups
+
+This feature requires MySQL chart version `2.4.0` or later.
+
+Set `backup.s3.credentialsFromPodIdentity=true` to use the backup pod's AWS credential provider instead of a static S3
+Secret. Set `backup.s3.region`, then either annotate `backup.serviceAccount` for IRSA or create an
+[EKS Pod Identity association](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-association.html) for the
+dedicated ServiceAccount. The chart does not render the backup Secret or backup ExternalSecret in this mode.
+
+If `backup.serviceAccount.create=false`, set `backup.serviceAccount.name` to an existing dedicated ServiceAccount.
+
+When `networkPolicy.egress.enabled=true`, also enable HTTPS egress for S3 and allow the EKS Pod Identity agent endpoint:
+
+`allowHTTPS` permits the selected pods to reach any IPv4 destination on TCP/443; it is not restricted to S3 endpoints.
+
+```yaml
+networkPolicy:
+  egress:
+    enabled: true
+    allowHTTPS: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - ipBlock:
+            cidr: fd00:ec2::23/128
+      ports:
+        - protocol: TCP
+          port: 80
+```
+
 ## Configuration Reference
 
 ### Core and Image
@@ -407,6 +452,14 @@ platform integration inside the pod needs Kubernetes API credentials.
 | `replication.pdb.enabled`                                          | boolean | `true`           | Enable a PDB by default in replication mode.            |
 | `backup.enabled`                                                   | boolean | `false`          | Enable the built-in backup CronJob.                     |
 | `backup.schedule`                                                  | string  | `"0 3 * * *"`    | Backup schedule.                                        |
+| `backup.serviceAccount.create`                                     | boolean | `true`           | Create a dedicated ServiceAccount for pod IAM backups.  |
+| `backup.serviceAccount.name`                                       | string  | `""`             | Existing dedicated ServiceAccount for pod IAM backups.  |
+| `backup.serviceAccount.annotations`                                | object  | `{}`             | Annotations for the pod IAM backup ServiceAccount.      |
+| `backup.serviceAccount.automountServiceAccountToken`               | boolean | `false`          | Mount Kubernetes API credentials into backup pods.      |
+| `backup.s3.endpoint`                                               | string  | `""`             | S3-compatible endpoint URL.                             |
+| `backup.s3.bucket`                                                 | string  | `""`             | Target backup bucket.                                   |
+| `backup.s3.region`                                                 | string  | `""`             | AWS region required for Pod Identity or IRSA.           |
+| `backup.s3.credentialsFromPodIdentity`                             | boolean | `false`          | Use the backup pod IAM identity instead of static keys. |
 | `backup.s3.existingSecret`                                         | string  | `""`             | Existing Secret with S3 access and secret keys.         |
 | `backup.database.mysqldumpArgs`                                    | string  | See chart values | Extra arguments passed before `--all-databases`.        |
 
