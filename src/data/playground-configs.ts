@@ -12265,6 +12265,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Run wp-cron.php from Kubernetes',
         },
         {
+          label: 'wp-cron Node Pool',
+          key: 'wpCron.cronJob.nodeSelector.workload-tier',
+          type: 'text',
+          default: '',
+          description: 'Optional workload-tier node label for wp-cron pods',
+        },
+        {
           label: 'Autoscaling',
           key: 'autoscaling.enabled',
           type: 'toggle',

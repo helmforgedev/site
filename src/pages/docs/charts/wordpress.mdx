@@ -109,6 +109,7 @@ For production, make the choices explicit:
 - Set CPU and memory requests, limits, PDB, and HPA only after storage is safe for multiple pods.
 - Use `ReadWriteMany` storage or an immutable media/plugin strategy before running multiple replicas.
 - Enable the Kubernetes `wpCron` CronJob when `DISABLE_WP_CRON` is set.
+- Configure wp-cron scheduling independently when batch pods belong on a dedicated node pool.
 - Test backup and restore, not only backup creation.
 
 <Callout type="warning" title="Horizontal scaling requires a content strategy">
@@ -226,6 +227,13 @@ networkPolicy:
 wpCron:
   cronJob:
     enabled: true
+    nodeSelector:
+      workload-tier: batch
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: batch
+        effect: NoSchedule
 
 autoscaling:
   enabled: true
@@ -525,6 +533,23 @@ When `database.mode: auto`, the chart resolves the database path in this order:
 Set `wordpress.disableWpCron: true` and enable `wpCron.cronJob.enabled` when you want deterministic
 cron execution from Kubernetes instead of request-driven `wp-cron.php`.
 
+The CronJob does not inherit the WordPress Deployment placement. Use `wpCron.cronJob.nodeSelector`,
+`wpCron.cronJob.affinity`, and `wpCron.cronJob.tolerations` to place short-lived cron pods on a dedicated or lower-cost
+node pool. Empty defaults leave scheduling to the cluster.
+
+```yaml
+wpCron:
+  cronJob:
+    enabled: true
+    nodeSelector:
+      workload-tier: batch
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: batch
+        effect: NoSchedule
+```
+
 ### Bootstrap
 
 The official WordPress image creates files and `wp-config.php`, but it does not create the initial site.
@@ -695,6 +720,9 @@ consistency. A successful backup upload is not a complete disaster recovery vali
 | `pdb.minAvailable`                            | integer | `1`                                            | Minimum available pods.                      |
 | `wpCron.cronJob.enabled`                      | boolean | `false`                                        | Create Kubernetes CronJob for `wp-cron.php`. |
 | `wpCron.cronJob.schedule`                     | string  | `*/5 * * * *`                                  | WordPress cron schedule.                     |
+| `wpCron.cronJob.nodeSelector`                 | object  | `{}`                                           | Node selector applied only to wp-cron pods.  |
+| `wpCron.cronJob.affinity`                     | object  | `{}`                                           | Affinity rules applied only to wp-cron pods. |
+| `wpCron.cronJob.tolerations`                  | array   | `[]`                                           | Tolerations applied only to wp-cron pods.    |
 | `resources`                                   | object  | `{}`                                           | WordPress container requests and limits.     |
 | `podSecurityContext`                          | object  | `{ seccompProfile: { type: RuntimeDefault } }` | Pod security context.                        |
 | `securityContext`                             | object  | `allowPrivilegeEscalation: false`              | WordPress container security context.        |
