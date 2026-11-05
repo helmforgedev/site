@@ -8,6 +8,7 @@ test.describe('Navigation and page rendering', () => {
     await expect(nav.getByText('Charts')).toBeVisible();
     await expect(nav.getByText('Playground')).toBeVisible();
     await expect(nav.getByText('Docs')).toBeVisible();
+    await expect(nav.getByText('Blog')).toBeVisible();
     await expect(nav.getByText('Roadmap')).toBeVisible();
     // Dropdown trigger buttons
     await expect(nav.getByRole('button', { name: 'Community' })).toBeVisible();
