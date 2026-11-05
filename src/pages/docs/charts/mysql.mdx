@@ -25,6 +25,7 @@ production hardening controls that can be enabled without changing the developme
 - **S3 backup** - Scheduled `mysqldump` CronJobs with existing Secret support for object storage credentials.
 - **Observability** - `mysqld-exporter` sidecar with optional ServiceMonitor.
 - **Dual-stack Services** - Optional `ipFamilyPolicy` and `ipFamilies` across chart-managed Services.
+- **PVC lifecycle control** - Configure retention independently for StatefulSet deletion and scale-down.
 - **Least privilege** - Non-root containers, dropped capabilities, and opt-in ServiceAccount token mounting.
 
 ## Architecture
@@ -126,10 +127,16 @@ replication:
   source:
     persistence:
       size: 20Gi
+      retentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
   readReplicas:
     replicaCount: 2
     persistence:
       size: 20Gi
+      retentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
 ```
 
 </div>
@@ -176,6 +183,9 @@ replication:
   source:
     persistence:
       size: 100Gi
+      retentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
     resources:
       requests:
         cpu: 500m
@@ -195,6 +205,9 @@ replication:
           memory: 2Gi
     persistence:
       size: 100Gi
+      retentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
     resources:
       requests:
         cpu: 250m
@@ -313,9 +326,21 @@ explicitly:
 
 - Store `auth.*Password`, TLS material, and backup credentials in existing Secrets or External Secrets.
 - Size `replication.source.persistence`, `replication.readReplicas.persistence`, and resources for the actual workload.
+- Set both retention-policy fields to `Retain` when PVCs must survive StatefulSet deletion and scale-down.
 - Enable `tls.requireSecureTransport` when clients should be forced to use encrypted TCP connections.
 - Enable metrics and backup before accepting durable workload traffic.
 - Enable NetworkPolicy only after modelling required ingress and egress paths.
+
+### PVC retention policy
+
+The standalone, source, and read-replica persistence blocks each expose `retentionPolicy.whenDeleted` and
+`retentionPolicy.whenScaled`. Set either field to `Retain` or `Delete`; an empty field leaves the cluster default in
+effect.
+
+<Callout type="warning" title="Kubernetes 1.26 feature gate">
+  Kubernetes 1.26 disables `StatefulSetAutoDeletePVC` by default. Enable the feature gate on both the API server and
+  controller manager before relying on a `Delete` policy. Kubernetes 1.27 and later enable the feature by default.
+</Callout>
 
 ### TLS private key permissions
 
@@ -365,19 +390,25 @@ platform integration inside the pod needs Kubernetes API credentials.
 
 ### Replication, Persistence, and Backup
 
-| Parameter                                   | Type    | Default          | Description                                      |
-| ------------------------------------------- | ------- | ---------------- | ------------------------------------------------ |
-| `standalone.persistence.size`               | string  | `8Gi`            | PVC size for standalone mode.                    |
-| `replication.source.persistence.size`       | string  | `20Gi`           | PVC size for the source pod.                     |
-| `replication.readReplicas.replicaCount`     | integer | `2`              | Number of read replica pods.                     |
-| `replication.readReplicas.clone.resources`  | object  | `{}`             | Resources for the replica clone init container.  |
-| `replication.readReplicas.persistence.size` | string  | `20Gi`           | PVC size for each read replica.                  |
-| `replication.binlog.retentionDays`          | integer | `7`              | Binary log retention in whole days.              |
-| `replication.pdb.enabled`                   | boolean | `true`           | Enable a PDB by default in replication mode.     |
-| `backup.enabled`                            | boolean | `false`          | Enable the built-in backup CronJob.              |
-| `backup.schedule`                           | string  | `"0 3 * * *"`    | Backup schedule.                                 |
-| `backup.s3.existingSecret`                  | string  | `""`             | Existing Secret with S3 access and secret keys.  |
-| `backup.database.mysqldumpArgs`             | string  | See chart values | Extra arguments passed before `--all-databases`. |
+| Parameter                                                          | Type    | Default          | Description                                             |
+| ------------------------------------------------------------------ | ------- | ---------------- | ------------------------------------------------------- |
+| `standalone.persistence.size`                                      | string  | `8Gi`            | PVC size for standalone mode.                           |
+| `standalone.persistence.retentionPolicy.whenDeleted`               | string  | `""`             | PVC policy when the standalone StatefulSet is deleted.  |
+| `standalone.persistence.retentionPolicy.whenScaled`                | string  | `""`             | PVC policy when the standalone StatefulSet scales down. |
+| `replication.source.persistence.size`                              | string  | `20Gi`           | PVC size for the source pod.                            |
+| `replication.source.persistence.retentionPolicy.whenDeleted`       | string  | `""`             | PVC policy when the source StatefulSet is deleted.      |
+| `replication.source.persistence.retentionPolicy.whenScaled`        | string  | `""`             | PVC policy when the source StatefulSet scales down.     |
+| `replication.readReplicas.replicaCount`                            | integer | `2`              | Number of read replica pods.                            |
+| `replication.readReplicas.clone.resources`                         | object  | `{}`             | Resources for the replica clone init container.         |
+| `replication.readReplicas.persistence.size`                        | string  | `20Gi`           | PVC size for each read replica.                         |
+| `replication.readReplicas.persistence.retentionPolicy.whenDeleted` | string  | `""`             | PVC policy when the replica StatefulSet is deleted.     |
+| `replication.readReplicas.persistence.retentionPolicy.whenScaled`  | string  | `""`             | PVC policy when the replica StatefulSet scales down.    |
+| `replication.binlog.retentionDays`                                 | integer | `7`              | Binary log retention in whole days.                     |
+| `replication.pdb.enabled`                                          | boolean | `true`           | Enable a PDB by default in replication mode.            |
+| `backup.enabled`                                                   | boolean | `false`          | Enable the built-in backup CronJob.                     |
+| `backup.schedule`                                                  | string  | `"0 3 * * *"`    | Backup schedule.                                        |
+| `backup.s3.existingSecret`                                         | string  | `""`             | Existing Secret with S3 access and secret keys.         |
+| `backup.database.mysqldumpArgs`                                    | string  | See chart values | Extra arguments passed before `--all-databases`.        |
 
 ### TLS, Services, Metrics, and Policies
 
