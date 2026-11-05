@@ -379,6 +379,22 @@ dedicated ServiceAccount. The chart does not render the backup Secret or backup 
 
 If `backup.serviceAccount.create=false`, set `backup.serviceAccount.name` to an existing dedicated ServiceAccount.
 
+When `networkPolicy.egress.enabled=true`, also enable HTTPS egress for S3 and allow the EKS Pod Identity agent endpoint:
+
+```yaml
+networkPolicy:
+  egress:
+    enabled: true
+    allowHTTPS: true
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+```
+
 ## Configuration Reference
 
 ### Core and Image
@@ -426,9 +442,9 @@ If `backup.serviceAccount.create=false`, set `backup.serviceAccount.name` to an 
 | `replication.pdb.enabled`                                          | boolean | `true`           | Enable a PDB by default in replication mode.            |
 | `backup.enabled`                                                   | boolean | `false`          | Enable the built-in backup CronJob.                     |
 | `backup.schedule`                                                  | string  | `"0 3 * * *"`    | Backup schedule.                                        |
-| `backup.serviceAccount.create`                                     | boolean | `true`           | Create a dedicated ServiceAccount for the backup job.   |
-| `backup.serviceAccount.name`                                       | string  | `""`             | Existing backup ServiceAccount when creation is off.    |
-| `backup.serviceAccount.annotations`                                | object  | `{}`             | Annotations for the dedicated backup ServiceAccount.    |
+| `backup.serviceAccount.create`                                     | boolean | `true`           | Create a dedicated ServiceAccount for pod IAM backups.  |
+| `backup.serviceAccount.name`                                       | string  | `""`             | Existing dedicated ServiceAccount for pod IAM backups.  |
+| `backup.serviceAccount.annotations`                                | object  | `{}`             | Annotations for the pod IAM backup ServiceAccount.      |
 | `backup.serviceAccount.automountServiceAccountToken`               | boolean | `false`          | Mount Kubernetes API credentials into backup pods.      |
 | `backup.s3.endpoint`                                               | string  | `""`             | S3-compatible endpoint URL.                             |
 | `backup.s3.bucket`                                                 | string  | `""`             | Target backup bucket.                                   |
