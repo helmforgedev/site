@@ -6563,6 +6563,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Workload replicas when HPA is disabled; HPA owns this field when enabled',
         },
         {
+          label: 'Minimum Ready Seconds',
+          key: 'minReadySeconds',
+          type: 'number',
+          default: '0',
+          description: 'Continuous Ready duration before long-running Pods count as available',
+        },
+        {
           label: 'Workload Type',
           key: 'workload.type',
           type: 'select',
