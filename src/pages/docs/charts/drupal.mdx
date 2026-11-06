@@ -198,8 +198,9 @@ backup:
     existingSecret: drupal-backup-s3
 ```
 
-For AWS Pod Identity, IRSA, or another compatible projected credential
-provider, enable workload identity instead of storing S3 keys in a Secret:
+For IRSA or another compatible projected credential provider, enable workload
+identity instead of storing S3 keys in a Secret. This annotation example
+configures IRSA:
 
 ```yaml
 backup:
@@ -212,6 +213,29 @@ backup:
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/drupal-backup
+```
+
+EKS Pod Identity does not use a ServiceAccount annotation. Give the dedicated
+backup ServiceAccount a stable name and create the association in EKS instead:
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    bucket: drupal-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+  serviceAccount:
+    name: drupal-backup
+```
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name <cluster-name> \
+  --namespace <release-namespace> \
+  --service-account drupal-backup \
+  --role-arn arn:aws:iam::123456789012:role/drupal-backup
 ```
 
 This mode uses a dedicated backup ServiceAccount and does not render static S3
@@ -245,8 +269,10 @@ If those requirements are not met, the chart fails during render instead of lett
 When HPA is enabled, the Deployment omits `spec.replicas` and leaves the replica
 count exclusively under HPA control. This prevents routine Helm upgrades from
 resetting a scaled workload to a chart value. The first upgrade from an older
-release that rendered `spec.replicas` can briefly transition before the HPA
-reconciles `minReplicas`.
+release that rendered `spec.replicas` can reduce the Deployment to one replica
+before the HPA reconciles. A fresh installation with `minReplicas > 1` can also
+start at one replica until that first reconciliation. Plan for reduced capacity
+or redundancy during this transition.
 
 ### HPA Example
 
