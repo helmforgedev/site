@@ -353,7 +353,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `hpa.enabled`            | `false`               | Render HPA; not valid for DaemonSet.                            |
 | `hpa.minReplicas`        | `1`                   | HPA minimum replicas.                                           |
 | `hpa.maxReplicas`        | required when enabled | HPA maximum replicas.                                           |
-| `hpa.metrics`            | `[]`                  | HPA metrics.                                                    |
+| `hpa.metrics`            | `[]`                  | Native `autoscaling/v2` metrics or Resource shorthand.          |
 | `hpa.behavior`           | `{}`                  | HPA scaling behavior.                                           |
 | `vpa.enabled`            | `false`               | Render VerticalPodAutoscaler.                                   |
 | `vpa.updateMode`         | `Off`                 | VPA update mode.                                                |
@@ -365,6 +365,32 @@ Kubernetes or operator API fields inside the corresponding value.
 | `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
 Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. When HPA is enabled, the chart omits `spec.replicas` so the autoscaler owns the replica count within `hpa.minReplicas` and `hpa.maxReplicas`; `replicaCount` applies only while HPA is disabled. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
+
+Use a native `autoscaling/v2` Resource metric when you need the complete Kubernetes target shape:
+
+```yaml
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: AverageValue
+          averageValue: 500m
+```
+
+The legacy shorthand remains supported and can be mixed with native metric objects:
+
+```yaml
+hpa:
+  metrics:
+    - resource: memory
+      type: Utilization
+      target: 80
+```
 
 ### Batch
 
