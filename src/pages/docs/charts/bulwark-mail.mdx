@@ -261,7 +261,8 @@ relay, translation services, calendar subscriptions and other enabled features
 can require additional explicit egress. Telemetry and update checks can be
 disabled for isolated environments.
 
-The `/api/health` endpoint proves that the Bulwark process can answer HTTP. With
+The `/api/health` endpoint proves that the Bulwark process can answer HTTP. Compatible custom images may override
+`probes.startup.path` and `probes.liveness.path` independently; the official image remains root-path only. With
 the shared store enabled, readiness moves to `/api/ready`, which also reports
 store reachability, while startup and liveness remain on `/api/health`. Neither
 endpoint proves Stalwart, CORS, browser DNS, OAuth or mail delivery; validate
@@ -468,11 +469,13 @@ The values below are the chart's complete public configuration surface.
 | `externalSecrets.refreshInterval`             | `"1h"`                          | Default reconciliation interval.                                                               |
 | `externalSecrets.items`                       | `[]`                            | Canonical complete ExternalSecret definitions.                                                 |
 | `probes.startup.enabled`                      | `true`                          | Enable startup probing on `/api/health`.                                                       |
+| `probes.startup.path`                         | `/api/health`                   | Startup path; override only for a compatible custom image.                                     |
 | `probes.startup.initialDelaySeconds`          | `5`                             | Startup initial delay.                                                                         |
 | `probes.startup.periodSeconds`                | `5`                             | Startup probe interval.                                                                        |
 | `probes.startup.timeoutSeconds`               | `3`                             | Startup request timeout.                                                                       |
 | `probes.startup.failureThreshold`             | `30`                            | Startup failures allowed before restart.                                                       |
 | `probes.liveness.enabled`                     | `true`                          | Enable liveness probing on `/api/health`.                                                      |
+| `probes.liveness.path`                        | `/api/health`                   | Liveness path; override only for a compatible custom image.                                    |
 | `probes.liveness.initialDelaySeconds`         | `0`                             | Liveness initial delay.                                                                        |
 | `probes.liveness.periodSeconds`               | `30`                            | Liveness probe interval.                                                                       |
 | `probes.liveness.timeoutSeconds`              | `5`                             | Liveness request timeout.                                                                      |

@@ -2441,6 +2441,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Independent Kubernetes Service port targeting the application listener by name',
         },
         {
+          label: 'Startup probe path',
+          key: 'probes.startup.path',
+          type: 'text',
+          default: '/api/health',
+          description: 'Override only for a compatible custom image built with another base path',
+        },
+        {
+          label: 'Liveness probe path',
+          key: 'probes.liveness.path',
+          type: 'text',
+          default: '/api/health',
+          description: 'Override only for a compatible custom image built with another base path',
+        },
+        {
           label: 'Settings sync',
           key: 'config.settingsSync',
           type: 'toggle',
