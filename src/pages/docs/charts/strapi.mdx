@@ -1056,9 +1056,19 @@ than a raw environment-variable string.
 MySQL standalone persistence settings use `mysql.standalone.persistence`.
 Replace the former `mysql.primary.persistence` parent value in custom values
 files; it was not consumed by the HelmForge MySQL subchart. For replicated
-MySQL, configure `mysql.replication.source.persistence` instead. Standalone
-persistence settings do not size the replication source PVC, which retains the
-MySQL chart default when no source size is configured.
+MySQL, configure `mysql.replication.source.persistence` and
+`mysql.replication.readReplicas.persistence` instead. Standalone persistence
+settings do not size replication PVCs, which retain the MySQL chart defaults
+when no replication-specific sizes are configured.
+
+Existing standalone releases used the effective claim-template size, normally
+`8Gi`, even if a different size was set under the unused
+`mysql.primary.persistence` path. Keep
+`mysql.standalone.persistence.size` equal to that existing size during the
+chart upgrade. Copying the intended size directly can make Kubernetes reject
+the immutable StatefulSet update. Resize or migrate the bound PVC separately,
+and only change the claim template through a planned StatefulSet recreation
+after taking a backup.
 
 ## Migration Guide
 
