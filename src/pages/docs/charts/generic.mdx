@@ -254,25 +254,26 @@ Kubernetes or operator API fields inside the corresponding value.
 
 ### Core and Image
 
-| Parameter              | Default                   | Description                                                   |
-| ---------------------- | ------------------------- | ------------------------------------------------------------- |
-| `replicaCount`         | `1`                       | Replica count when HPA is disabled.                           |
-| `nameOverride`         | `""`                      | Override the release name component.                          |
-| `fullnameOverride`     | `""`                      | Override the generated full name.                             |
-| `commonLabels`         | `{}`                      | Labels added to chart-managed resources.                      |
-| `workload.enabled`     | `true`                    | Render the long-running workload.                             |
-| `workload.type`        | `Deployment`              | `Deployment`, `StatefulSet`, or `DaemonSet`.                  |
-| `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
-| `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
-| `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
-| `image.tag`            | `1.31.7`                  | Default image tag.                                            |
-| `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
-| `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
-| `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |
-| `containers[]`         | app container             | Workload containers with image, env, ports, probes, and more. |
-| `initContainers[]`     | `[]`                      | Init containers using the same container shape.               |
-| `env`                  | `[]`                      | Global environment variables for workloads and batch jobs.    |
-| `envFrom`              | `[]`                      | Global ConfigMap or Secret environment sources.               |
+| Parameter              | Default                   | Description                                                    |
+| ---------------------- | ------------------------- | -------------------------------------------------------------- |
+| `replicaCount`         | `1`                       | Replica count when HPA is disabled.                            |
+| `minReadySeconds`      | `0`                       | Ready duration for Deployment, StatefulSet, or DaemonSet Pods. |
+| `nameOverride`         | `""`                      | Override the release name component.                           |
+| `fullnameOverride`     | `""`                      | Override the generated full name.                              |
+| `commonLabels`         | `{}`                      | Labels added to chart-managed resources.                       |
+| `workload.enabled`     | `true`                    | Render the long-running workload.                              |
+| `workload.type`        | `Deployment`              | `Deployment`, `StatefulSet`, or `DaemonSet`.                   |
+| `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.            |
+| `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.     |
+| `image.repository`     | `docker.io/library/nginx` | Default image repository.                                      |
+| `image.tag`            | `1.31.7`                  | Default image tag.                                             |
+| `image.digest`         | `""`                      | Image digest; takes precedence over tag.                       |
+| `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                     |
+| `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                           |
+| `containers[]`         | app container             | Workload containers with image, env, ports, probes, and more.  |
+| `initContainers[]`     | `[]`                      | Init containers using the same container shape.                |
+| `env`                  | `[]`                      | Global environment variables for workloads and batch jobs.     |
+| `envFrom`              | `[]`                      | Global ConfigMap or Secret environment sources.                |
 
 ### Networking
 
@@ -342,6 +343,10 @@ Kubernetes or operator API fields inside the corresponding value.
 | `rollout.restartAt`                 | `""`                | Explicit pod restart marker.                |
 | `rollout.podAnnotations`            | `{}`                | Rollout-only pod annotations.               |
 | `rollout.checksum`                  | enabled             | ConfigMap/Secret checksum rollout controls. |
+
+For Deployments, `minReadySeconds` values of 600 or more automatically set `progressDeadlineSeconds` 600 seconds later.
+This preserves a rollout progress window beyond the minimum Ready duration while satisfying the Kubernetes API
+requirement. Jobs and CronJobs do not use this setting.
 
 ### Observability and Autoscaling
 
