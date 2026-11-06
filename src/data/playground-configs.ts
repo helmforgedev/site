@@ -6567,6 +6567,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'minReadySeconds',
           type: 'number',
           default: '0',
+          min: 0,
           description: 'Continuous Ready duration before long-running Pods count as available',
         },
         {
