@@ -56,11 +56,11 @@ helm install strapi oci://ghcr.io/helmforgedev/helm/strapi
 
 The chart uses **HelmForge's production-ready Strapi base image** instead of the generic Strapi image. This provides significant advantages for Kubernetes deployments:
 
-**Image:** `docker.io/helmforge/strapi-base:5.52.2`
+**Image:** `docker.io/helmforge/strapi-base:5.61.0`
 
 ### Key Features
 
-- **Strapi 5.52.2** — Stable HelmForge base image with security patches
+- **Strapi 5.61.0** — Stable HelmForge base image with security patches
 - **All official plugins included** — Upload providers, email, database plugins pre-installed
 - **Database support** — PostgreSQL for production-ready defaults and SQLite for development use
 - **Health check endpoint** — HTTP `/_health` endpoint returns HTTP 200 with JSON body containing status, uptime, database connectivity, and version
@@ -76,7 +76,7 @@ The chart uses **HelmForge's production-ready Strapi base image** instead of the
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
 ```
 
 This provides a working Strapi instance with default configuration, perfect for:
@@ -92,10 +92,10 @@ For production deployments with custom content types and configurations:
 
 ```dockerfile
 # Dockerfile
-FROM docker.io/helmforge/strapi-base:5.52.2
+FROM docker.io/helmforge/strapi-base:5.61.0
 
 # Copy your Strapi project
-COPY --chown=strapi:strapi . /opt/app
+COPY --chown=node:node . /opt/app
 
 # Build admin panel (if customized)
 RUN npm run build
@@ -114,18 +114,18 @@ image:
 
 ### Image Specifications
 
-| Specification      | Value                       |
-| ------------------ | --------------------------- |
-| **Registry**       | docker.io                   |
-| **Repository**     | helmforge/strapi-base       |
-| **Current Tag**    | 5.52.2                      |
-| **Strapi Version** | 5.52.2                      |
-| **Base Image**     | node:22-alpine              |
-| **User**           | strapi (UID 1000, GID 1000) |
-| **Working Dir**    | /opt/app                    |
-| **Exposed Port**   | 1337                        |
-| **Architectures**  | linux/amd64, linux/arm64    |
-| **Size**           | ~297MB                      |
+| Specification      | Value                     |
+| ------------------ | ------------------------- |
+| **Registry**       | docker.io                 |
+| **Repository**     | helmforge/strapi-base     |
+| **Current Tag**    | 5.61.0                    |
+| **Strapi Version** | 5.61.0                    |
+| **Base Image**     | node:22-alpine            |
+| **User**           | node (UID 1000, GID 1000) |
+| **Working Dir**    | /opt/app                  |
+| **Exposed Port**   | 1337                      |
+| **Architectures**  | linux/amd64, linux/arm64  |
+| **Size**           | ~297MB                    |
 
 ### Included Features
 
@@ -178,7 +178,7 @@ Default deployment for development or testing:
 ```yaml
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
 
 postgresql:
   enabled: true
@@ -208,7 +208,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
 
 # S3 uploads enable multi-replica scaling
 strapi:
@@ -739,7 +739,7 @@ kubectl port-forward svc/strapi 1337:80 -n strapi
 | -------------------------- | ----------------------- | ----------------------------------------------------- |
 | `replicaCount`             | `1`                     | Number of replicas (requires S3/Cloudinary if > 1)    |
 | `image.repository`         | `helmforge/strapi-base` | Strapi application image (HelmForge production-ready) |
-| `image.tag`                | `5.52.2`                | HelmForge Strapi base image tag                       |
+| `image.tag`                | `5.61.0`                | HelmForge Strapi base image tag                       |
 | `strapi.url`               | `""`                    | Public URL (auto-detected from ingress)               |
 | `strapi.nodeEnv`           | `production`            | Node environment                                      |
 | `strapi.telemetryDisabled` | `true`                  | Disable Strapi telemetry                              |
@@ -816,7 +816,7 @@ replicaCount: 1
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
   pullPolicy: IfNotPresent
 
 database:
@@ -854,7 +854,7 @@ replicaCount: 2
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
 
 database:
   mode: external
@@ -899,7 +899,7 @@ replicaCount: 3
 
 image:
   repository: docker.io/helmforge/strapi-base
-  tag: '5.52.2'
+  tag: '5.61.0'
 
 postgresql:
   enabled: true
@@ -1043,12 +1043,19 @@ affinity:
 
 ## Upgrade Notes
 
-Strapi `5.52.2` includes maintenance and security fixes plus an opt-in beta
-media library. Existing deployments keep their current SVG upload behavior;
-new upstream projects block SVG uploads by default. The HelmForge base image
-preserves the existing runtime and database contract. Back up the database
-before upgrading production workloads. If `strapi.upload.provider` is `local`,
-also back up the uploads PVC.
+Strapi `5.61.0` requires Node.js 22.19 or later; the HelmForge base image uses
+Node.js 22.23.4. This upgrade includes Knex 3.3.0. Review custom application
+code that calls `delete()` with `limit` or `having`, or `truncate()` with
+`where`, `having`, or `limit`, because the database-driver behavior changed.
+
+Back up the database before upgrading production workloads. If
+`strapi.upload.provider` is `local`, also back up the uploads PVC. Custom upload
+configuration must pass `sharp.limitInputPixels` as a number or boolean rather
+than a raw environment-variable string.
+
+MySQL persistence settings use `mysql.standalone.persistence`. Replace the
+former `mysql.primary.persistence` parent value in custom values files; it was
+not consumed by the HelmForge MySQL subchart.
 
 ## Migration Guide
 

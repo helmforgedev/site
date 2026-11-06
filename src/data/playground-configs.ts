@@ -16836,7 +16836,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '5.50.0',
+          default: '5.61.0',
           description: 'Pinned HelmForge Strapi base image tag',
         },
         {
