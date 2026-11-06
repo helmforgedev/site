@@ -21,7 +21,7 @@ const SCENARIO: Step[] = [
   { type: 'pause', duration: 600 },
 
   { type: 'command', text: 'helm install db helmforge/postgresql --namespace production' },
-  { type: 'spinner', text: 'Installing chart...', duration: 1800 },
+  { type: 'spinner', text: 'Installing chart...', duration: 2000 },
   {
     type: 'output',
     lines: [
@@ -31,26 +31,17 @@ const SCENARIO: Step[] = [
       { text: 'REVISION: 1', class: 'text-zinc-400' },
     ],
   },
-  { type: 'pause', duration: 700 },
+  { type: 'pause', duration: 800 },
   {
     type: 'output',
     lines: [
-      { text: 'NOTES:', class: 'text-zinc-300 font-semibold' },
-      { text: '========================================================', class: 'text-zinc-600' },
-      { text: '📊 HelmForge Dashboard: postgresql 17.4', class: 'text-primary-light font-medium' },
-      { text: '✓ Deployment status: Ready (1/1 replicas)', class: 'text-emerald-400' },
-      { text: '✓ NetworkPolicy & Non-root security applied', class: 'text-emerald-400' },
-      { text: '✓ Automated backup CronJob configured (daily 02:00)', class: 'text-emerald-400' },
-      { text: '--------------------------------------------------------', class: 'text-zinc-600' },
-      { text: '🔑 Connect to PostgreSQL:', class: 'text-zinc-300 font-medium' },
-      {
-        text: '  kubectl port-forward -n production svc/db-postgresql 5432:5432',
-        class: 'text-zinc-400 font-mono text-xs',
-      },
-      { text: '========================================================', class: 'text-zinc-600' },
+      { text: '✓ PostgreSQL 17.4 deployed with secure defaults', class: 'text-emerald-400' },
+      { text: '✓ S3 backup CronJob configured (daily 02:00)', class: 'text-emerald-400' },
+      { text: '✓ NetworkPolicy applied', class: 'text-emerald-400' },
+      { text: '✓ Secrets generated and mounted', class: 'text-emerald-400' },
     ],
   },
-  { type: 'pause', duration: 900 },
+  { type: 'pause', duration: 1000 },
 
   { type: 'command', text: 'kubectl get pods -n production' },
   {
@@ -60,8 +51,8 @@ const SCENARIO: Step[] = [
       { text: 'db-postgresql-0          1/1     Running   0          42s', class: 'text-zinc-300' },
     ],
   },
-  { type: 'pause', duration: 1200 },
-  { type: 'output', text: '🚀 Happy Helmforging!', class: 'text-white font-semibold' },
+  { type: 'pause', duration: 1500 },
+  { type: 'output', text: '🚀 Happy forging!', class: 'text-white font-semibold' },
   { type: 'pause', duration: 4000 },
 ];
 
