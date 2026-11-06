@@ -361,7 +361,7 @@ requirement. Jobs and CronJobs do not use this setting. This value requires Gene
 | `hpa.metrics`            | `[]`                  | Native `autoscaling/v2` metrics or Resource shorthand.          |
 | `hpa.behavior`           | `{}`                  | HPA scaling behavior.                                           |
 | `vpa.enabled`            | `false`               | Render VerticalPodAutoscaler.                                   |
-| `vpa.updateMode`         | `Off`                 | VPA update mode.                                                |
+| `vpa.updateMode`         | `Off`                 | `Off`, `Initial`, `Recreate`, `InPlaceOrRecreate`, or `Auto`.   |
 | `keda.enabled`           | `false`               | Render KEDA ScaledObject/ScaledJob resources.                   |
 | `keda.scaledObject`      | disabled              | Scales the chart workload; requires `workload.enabled=true`.    |
 | `keda.scaledJobs[]`      | `[]`                  | KEDA ScaledJob definitions for batch scaling.                   |
@@ -370,6 +370,11 @@ requirement. Jobs and CronJobs do not use this setting. This value requires Gene
 | `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
 Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. When HPA is enabled, the chart omits `spec.replicas` so the autoscaler owns the replica count within `hpa.minReplicas` and `hpa.maxReplicas`; `replicaCount` applies only while HPA is disabled. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
+
+`vpa.updateMode: InPlaceOrRecreate` asks VPA to resize running Pods in place and fall back to recreation when required.
+It needs VPA 1.4.0 or later with matching CRDs and Kubernetes 1.33 or later with in-place Pod resource resizing enabled.
+Generic chart 3.2.0 and earlier reject this value. The chart does not install VPA, enable feature gates, or guarantee
+disruption-free updates.
 
 Use a native `autoscaling/v2` Resource metric when you need the complete Kubernetes target shape:
 
