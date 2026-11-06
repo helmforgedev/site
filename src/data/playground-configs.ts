@@ -6560,7 +6560,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'replicaCount',
           type: 'number',
           default: '1',
-          description: 'Workload replicas when HPA is disabled',
+          description: 'Workload replicas when HPA is disabled; HPA owns this field when enabled',
         },
         {
           label: 'Workload Type',
@@ -6581,7 +6581,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.31.1',
+          default: '1.31.7',
           description: 'Container image tag',
         },
       ],

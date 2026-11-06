@@ -86,7 +86,7 @@ workload:
 
 image:
   repository: docker.io/library/nginx
-  tag: '1.31.6'
+  tag: '1.31.7'
   pullPolicy: IfNotPresent
 
 containers:
@@ -265,7 +265,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
 | `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
 | `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
-| `image.tag`            | `1.31.6`                  | Default image tag.                                            |
+| `image.tag`            | `1.31.7`                  | Default image tag.                                            |
 | `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
 | `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
 | `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |
@@ -364,7 +364,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `pdb.minAvailable`       | unset                 | Minimum available pods; mutually exclusive with maxUnavailable. |
 | `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
-Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
+Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. When HPA is enabled, the chart omits `spec.replicas` so the autoscaler owns the replica count within `hpa.minReplicas` and `hpa.maxReplicas`; `replicaCount` applies only while HPA is disabled. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
 
 ### Batch
 
@@ -380,6 +380,7 @@ Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API
 - Replace any inherited `latest` assumptions with an explicit tag or digest.
 - Set `service.enabled: false` for batch-only releases that should not render a Service.
 - Set `hpa.maxReplicas` whenever `hpa.enabled: true`.
+- The first upgrade that removes an explicit `spec.replicas`, or a transition from HPA disabled to enabled, can briefly use one replica before HPA reconciles its minimum. Plan this transition for stateful workloads; a PodDisruptionBudget does not prevent controller-driven scale-down.
 - Configure exactly one of `pdb.minAvailable` or `pdb.maxUnavailable` when enabling PDB.
 - Use `rollout.restartAt` or checksum settings instead of relying on render-time timestamps.
 
