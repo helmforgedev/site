@@ -136,24 +136,6 @@ input.addEventListener('input', () => {
 
 backdrop.addEventListener('click', closeSearch);
 
-// Expose global open/close handlers
-(window as any).__openSearch = openSearch;
-(window as any).__closeSearch = closeSearch;
-
-// Connect hero search trigger if present on page
-const heroSearchBtn = document.getElementById('hero-search-trigger');
-if (heroSearchBtn) {
-  heroSearchBtn.addEventListener('click', openSearch);
-}
-
-// Detect platform shortcut for hero command trigger
-const heroKbd = document.getElementById('hero-search-kbd');
-if (heroKbd) {
-  const isMac =
-    typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
-  heroKbd.textContent = isMac ? '⌘K' : 'Ctrl+K';
-}
-
 // Keyboard navigation
 document.addEventListener('keydown', (e) => {
   // Open with Cmd/Ctrl+K
@@ -165,17 +147,6 @@ document.addEventListener('keydown', (e) => {
       closeSearch();
     }
     return;
-  }
-
-  // Open search with '/' when outside form controls
-  if (e.key === '/' && overlay.classList.contains('hidden')) {
-    const target = e.target as HTMLElement | null;
-    const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-    if (!isInput) {
-      e.preventDefault();
-      openSearch();
-      return;
-    }
   }
 
   // Only handle these when modal is open

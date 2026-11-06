@@ -8,8 +8,6 @@ interface FieldConfig {
   excludedValues?: number[];
   enables?: string;
   options?: string[];
-  placeholder?: string;
-  dependsOn?: { key: string; value: string };
   valueActivationValues?: Record<string, Record<string, string>>;
   toggleActivationValues?: Record<string, Record<string, string>>;
   activationExpandSections?: Record<string, string[]>;
@@ -626,14 +624,8 @@ function toggleSection(group: GroupConfig) {
 
 function buildFieldControl(field: FieldConfig): HTMLElement {
   const div = document.createElement('div');
-  const isHidden = field.dependsOn && currentValues[field.dependsOn.key] !== field.dependsOn.value;
-  div.className = `flex items-center justify-between gap-4 transition-all duration-150 ${isHidden ? 'hidden' : ''}`;
+  div.className = 'flex items-center justify-between gap-4';
   div.dataset.fieldKey = field.key;
-  if (field.dependsOn) {
-    div.dataset.dependsOnKey = field.dependsOn.key;
-    div.dataset.dependsOnValue = field.dependsOn.value;
-    div.classList.add('pl-3', 'border-l-2', 'border-primary/40', 'ml-1');
-  }
 
   const labelDiv = document.createElement('div');
   labelDiv.className = 'min-w-0';
@@ -743,7 +735,6 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = currentValues[field.key] ?? field.default;
-    if (field.placeholder) input.placeholder = field.placeholder;
     input.dataset.fieldKey = field.key;
     input.className =
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
@@ -1142,25 +1133,7 @@ function setTreeValue(tree: Record<string, any>, key: string, value: boolean | n
   node[parts[parts.length - 1]] = value;
 }
 
-function syncDependentFieldsVisibility() {
-  if (!controlsEl) return;
-  const dependentElements = controlsEl.querySelectorAll<HTMLElement>('[data-depends-on-key]');
-  dependentElements.forEach((el) => {
-    const parentKey = el.dataset.dependsOnKey;
-    const expectedVal = el.dataset.dependsOnValue;
-    if (parentKey && expectedVal !== undefined) {
-      const currentVal = currentValues[parentKey] ?? 'false';
-      if (currentVal === expectedVal) {
-        el.classList.remove('hidden');
-      } else {
-        el.classList.add('hidden');
-      }
-    }
-  });
-}
-
 function updateOutput() {
-  syncDependentFieldsVisibility();
   if (!codeEl || !selectedSlug) return;
   if (
     selectedSlug === 'mongodb' &&
