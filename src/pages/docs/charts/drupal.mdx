@@ -45,7 +45,7 @@ Drupal `11.4.10` fixes SA-CORE-2026-014, SA-CORE-2026-015, and
 SA-CORE-2026-016; no other fixes are included. Review the
 [official release notes](https://www.drupal.org/project/drupal/releases/11.4.10).
 
-The bundled HelmForge MySQL dependency is aligned to the current `2.1.1` chart
+The bundled HelmForge MySQL dependency is aligned to the current `2.4.0` chart
 while preserving the same Drupal installer values for the default bundled
 database path. Before upgrading production workloads, test the site in staging
 with the same PHP extensions, Composer dependency set, storage class, and
@@ -58,7 +58,7 @@ An optional Ingress routes to a Service whose named target resolves to the
 configurable Apache listener in the Drupal Deployment. Only
 `/var/www/html/sites` is persistent, so mutable site state survives while core
 continues to come from the pinned image. The database can be the bundled MySQL
-2.1.1 subchart, an external MySQL-compatible service, or SQLite for one replica.
+2.4.0 subchart, an external MySQL-compatible service, or SQLite for one replica.
 
 The pod does not receive a Kubernetes API token by default, uses
 `RuntimeDefault` seccomp, and blocks privilege escalation. The Docker Official
@@ -198,6 +198,54 @@ backup:
     existingSecret: drupal-backup-s3
 ```
 
+For IRSA or another compatible projected credential provider, enable workload
+identity instead of storing S3 keys in a Secret. This annotation example
+configures IRSA:
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    bucket: drupal-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/drupal-backup
+```
+
+EKS Pod Identity does not use a ServiceAccount annotation. Give the dedicated
+backup ServiceAccount a stable name and create the association in EKS instead:
+
+```yaml
+backup:
+  enabled: true
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    bucket: drupal-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+  serviceAccount:
+    name: drupal-backup
+```
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name <cluster-name> \
+  --namespace <release-namespace> \
+  --service-account drupal-backup \
+  --role-arn arn:aws:iam::123456789012:role/drupal-backup
+```
+
+This mode uses a dedicated backup ServiceAccount and does not render static S3
+credentials. Grant it only bucket-list and object-write access for the selected
+prefix, plus bucket creation only when that option remains enabled. If egress
+NetworkPolicy is enabled, allow DNS, HTTPS, and any identity-provider metadata
+endpoint required by the cluster. Token automount remains disabled unless the
+provider explicitly needs it; metadata address-family routing remains a cluster
+responsibility rather than a hardcoded chart address.
+
 If `database.mode=external`, also provide backup credentials for the dump job:
 
 ```yaml
@@ -217,6 +265,14 @@ Required for multi-replica or HPA Drupal:
 - a MySQL-compatible database mode
 
 If those requirements are not met, the chart fails during render instead of letting an unsafe deployment reach the cluster.
+
+When HPA is enabled, the Deployment omits `spec.replicas` and leaves the replica
+count exclusively under HPA control. This prevents routine Helm upgrades from
+resetting a scaled workload to a chart value. The first upgrade from an older
+release that rendered `spec.replicas` can reduce the Deployment to one replica
+before the HPA reconciles. A fresh installation with `minReplicas > 1` can also
+start at one replica until that first reconciliation. Plan for reduced capacity
+or redundancy during this transition.
 
 ### HPA Example
 
@@ -242,7 +298,7 @@ The chart still has an installer-oriented surface, but it now covers production 
 
 | Key                         | Default                          | Description                                                     |
 | --------------------------- | -------------------------------- | --------------------------------------------------------------- |
-| `replicaCount`              | `1`                              | Number of Drupal replicas                                       |
+| `replicaCount`              | `1`                              | Fixed Drupal replicas when HPA is disabled                      |
 | `image.repository`          | `docker.io/library/drupal`       | Docker Official Drupal image repository                         |
 | `image.tag`                 | `11.4.10-php8.5-apache-bookworm` | Pinned Drupal image tag                                         |
 | `image.pullPolicy`          | `IfNotPresent`                   | Container pull policy                                           |
@@ -290,8 +346,11 @@ The chart still has an installer-oriented surface, but it now covers production 
 | `backup.schedule`                               | `0 3 * * *` | Cron schedule for backups                        |
 | `backup.s3.endpoint`                            | `""`        | S3-compatible endpoint                           |
 | `backup.s3.bucket`                              | `""`        | S3 target bucket                                 |
+| `backup.s3.region`                              | `""`        | Region required for workload identity            |
+| `backup.s3.credentialsFromPodIdentity`          | `false`     | Use workload identity instead of static S3 keys  |
 | `backup.s3.prefix`                              | `drupal`    | Key prefix in the bucket                         |
 | `backup.s3.existingSecret`                      | `""`        | Existing secret for S3 credentials               |
+| `backup.serviceAccount.create`                  | `true`      | Create a dedicated backup ServiceAccount         |
 | `backup.database.host`                          | `""`        | Optional database host override for backup       |
 | `backup.database.password`                      | `""`        | Inline database password override for backup     |
 | `backup.database.existingSecret`                | `""`        | Existing secret for backup database password     |
