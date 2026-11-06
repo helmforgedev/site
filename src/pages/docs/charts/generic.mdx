@@ -15,12 +15,12 @@ containers, Services, Ingress, storage, security resources, observability hooks,
 arbitrary extra manifests rendered through Helm `tpl`.
 
 <Callout type="warning" title="Breaking feature release">
-  The default image is now pinned to `docker.io/library/nginx:1.31.6`, image pull policy defaults to `IfNotPresent`, pod
+  The default image is now pinned to `docker.io/library/nginx:1.31.7`, image pull policy defaults to `IfNotPresent`, pod
   templates are deterministic, and stricter validation blocks invalid combinations such as HPA on DaemonSets. Review
   image, HPA, PDB, and rollout values before upgrading.
 </Callout>
 
-<Callout type="info" title="NGINX 1.31.6 security update">
+<Callout type="info" title="NGINX 1.31.7 security update">
   The default image fixes CVE-2026-90439, a buffer overflow in the HTTP/3 module. NGINX lists 1.31.6 and later as not
   vulnerable. Review the [official advisory](https://nginx.org/en/security_advisories.html). No Generic chart
   configuration changes are required for this image update.
@@ -86,7 +86,7 @@ workload:
 
 image:
   repository: docker.io/library/nginx
-  tag: '1.31.6'
+  tag: '1.31.7'
   pullPolicy: IfNotPresent
 
 containers:
@@ -265,7 +265,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `workload.*`           | varies                    | StatefulSet and DaemonSet-specific workload fields.           |
 | `global.imageRegistry` | `""`                      | Registry prefix for image repositories without a registry.    |
 | `image.repository`     | `docker.io/library/nginx` | Default image repository.                                     |
-| `image.tag`            | `1.31.6`                  | Default image tag.                                            |
+| `image.tag`            | `1.31.7`                  | Default image tag.                                            |
 | `image.digest`         | `""`                      | Image digest; takes precedence over tag.                      |
 | `image.pullPolicy`     | `IfNotPresent`            | Default image pull policy.                                    |
 | `imagePullSecrets`     | `[]`                      | Pull secrets for private registries.                          |
@@ -364,7 +364,7 @@ Kubernetes or operator API fields inside the corresponding value.
 | `pdb.minAvailable`       | unset                 | Minimum available pods; mutually exclusive with maxUnavailable. |
 | `pdb.maxUnavailable`     | unset                 | Maximum unavailable pods; mutually exclusive with minAvailable. |
 
-Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
+Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API. When HPA is enabled, the chart omits `spec.replicas` so the autoscaler owns the replica count within `hpa.minReplicas` and `hpa.maxReplicas`; `replicaCount` applies only while HPA is disabled. StatefulSet scaling should be enabled only after validating the workload's identity, storage, and clustering behavior. KEDA ScaledObjects target the chart-managed Deployment or StatefulSet; use ScaledJobs for event-driven batch releases without a long-running workload. KEDA, VPA, PodMonitor, and PrometheusRule remain disabled by default and require their CRDs before installation.
 
 ### Batch
 
@@ -380,6 +380,7 @@ Deployment and StatefulSet HPA resources use the Kubernetes `autoscaling/v2` API
 - Replace any inherited `latest` assumptions with an explicit tag or digest.
 - Set `service.enabled: false` for batch-only releases that should not render a Service.
 - Set `hpa.maxReplicas` whenever `hpa.enabled: true`.
+- The first upgrade that removes an explicit `spec.replicas`, or a transition from HPA disabled to enabled, can reduce the workload to one replica. That count can persist when `hpa.minReplicas` is `1`, and CPU-only metrics cannot scale a container that has no CPU request. Configure an appropriate minimum and resource requests before enabling HPA. For StatefulSets, also verify `persistentVolumeClaimRetentionPolicy.whenScaled` and the StorageClass reclaim policy: `whenScaled: Delete` can remove PVCs during scale-down, and a `Delete` reclaim policy can remove their backing volumes. Back up stateful data before the transition. A PodDisruptionBudget does not prevent controller-driven scale-down.
 - Configure exactly one of `pdb.minAvailable` or `pdb.maxUnavailable` when enabling PDB.
 - Use `rollout.restartAt` or checksum settings instead of relying on render-time timestamps.
 
