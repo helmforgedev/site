@@ -14,6 +14,9 @@ interface FieldConfig {
   activationResetSections?: Record<string, string[]>;
   conflictsWith?: string[];
   conflictResetValues?: Record<string, string>;
+  visibleWhen?: Record<string, string>;
+  requiredWhen?: Record<string, string>;
+  emitDefault?: boolean;
   description: string;
 }
 
@@ -111,6 +114,21 @@ function getFieldConfig(key: string): FieldConfig | undefined {
   }
 
   return undefined;
+}
+
+function matchesFieldConditions(
+  conditions: Record<string, string> | undefined,
+  values: Record<string, string>,
+): boolean {
+  return Object.entries(conditions ?? {}).every(([key, value]) => values[key] === value);
+}
+
+function isFieldVisible(field: FieldConfig, values: Record<string, string> = currentValues): boolean {
+  return matchesFieldConditions(field.visibleWhen, values);
+}
+
+function hasVisibilityDependents(key: string): boolean {
+  return getGroups(selectedSlug).some((group) => group.fields.some((field) => key in (field.visibleWhen ?? {})));
 }
 
 function isValidNumberValue(field: FieldConfig, value: string): boolean {
@@ -533,6 +551,7 @@ function buildControls() {
       : 'space-y-2';
 
     for (const field of group.fields) {
+      if (!isFieldVisible(field)) continue;
       const fieldEl = buildFieldControl(field);
       fieldsInner.appendChild(fieldEl);
     }
@@ -669,6 +688,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       syncLinkedFieldValue(field.key, select.value);
       if (field.enables) autoEnableField(field.enables);
       applyFieldSideEffects(field.key, select.value);
+      if (hasVisibilityDependents(field.key)) buildControls();
       updateOutput();
     });
     controlDiv.appendChild(select);
@@ -696,6 +716,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         return;
       }
       applyFieldSideEffects(field.key, currentValues[field.key]);
+      if (hasVisibilityDependents(field.key)) buildControls();
       updateOutput();
     });
     controlDiv.appendChild(btn);
@@ -860,10 +881,12 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
     if (group.collapsible && !expandedSections.has(group.name)) continue;
 
     for (const field of group.fields) {
+      if (!isFieldVisible(field)) continue;
       const val = currentValues[field.key];
       if (val !== undefined && !isValidFieldValue(field, val, currentValues)) continue;
       if (group.collapsible && expandedSections.has(group.name) && group.emitDefaultsOnExpand !== false) {
         // Expanded collapsible sections normally emit all fields; opt out for read-only tuning groups.
+        if (field.emitDefault === false && val === field.default) continue;
         if (val !== undefined && val !== '') {
           addChange(field.key, val, field.default);
         }
@@ -994,6 +1017,21 @@ function generateValuesYaml(): string {
 }
 
 function getOutputBlockingReason(): string | null {
+  if (selectedSlug === 'postgresql' && currentValues['backup.enabled'] === 'true') {
+    const missingFields = getGroups(selectedSlug)
+      .flatMap((group) => group.fields)
+      .filter(
+        (field) =>
+          field.requiredWhen !== undefined &&
+          matchesFieldConditions(field.requiredWhen, currentValues) &&
+          (currentValues[field.key] ?? '').trim() === '',
+      )
+      .map((field) => field.key);
+    if (missingFields.length > 0) {
+      return `Configuration blocked: set ${missingFields.join(' and ')} for backup workload identity.`;
+    }
+  }
+
   if (selectedSlug !== 'bulwark-mail') return null;
 
   const needsSharedState = Number(currentValues.replicaCount) > 1 || currentValues['autoscaling.enabled'] === 'true';

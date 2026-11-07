@@ -10574,6 +10574,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'standalone' },
           description: 'PVC policy when the standalone StatefulSet is deleted',
         },
         {
@@ -10582,6 +10583,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'standalone' },
           description: 'PVC policy when the standalone StatefulSet scales down',
         },
         {
@@ -10590,6 +10592,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'replication' },
           description: 'PVC policy when the primary StatefulSet is deleted',
         },
         {
@@ -10598,6 +10601,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'replication' },
           description: 'PVC policy when the primary StatefulSet scales down',
         },
         {
@@ -10606,6 +10610,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'replication' },
           description: 'PVC policy when the replica StatefulSet is deleted',
         },
         {
@@ -10614,6 +10619,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'select',
           default: '',
           options: ['', 'Retain', 'Delete'],
+          visibleWhen: { architecture: 'replication' },
           description: 'PVC policy when the replica StatefulSet scales down',
         },
       ],
@@ -10704,6 +10710,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.region',
           type: 'text',
           default: '',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
+          requiredWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Region required by Pod Identity or IRSA',
         },
         {
@@ -10711,6 +10719,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.credentialsFromPodIdentity',
           type: 'toggle',
           default: 'false',
+          emitDefault: false,
           description: 'Use EKS Pod Identity or IRSA instead of static S3 keys',
         },
         {
@@ -10718,6 +10727,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.create',
           type: 'toggle',
           default: 'true',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Create the dedicated backup identity',
         },
         {
@@ -10725,6 +10735,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.name',
           type: 'text',
           default: '',
+          visibleWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
+          requiredWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
           description: 'Existing dedicated backup ServiceAccount when creation is disabled',
         },
         {
@@ -10732,6 +10750,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.automountServiceAccountToken',
           type: 'toggle',
           default: 'false',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Mount Kubernetes API credentials into backup pods',
         },
         {
@@ -10739,6 +10758,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
           type: 'text',
           default: '',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'IAM role annotation for IRSA',
         },
       ],

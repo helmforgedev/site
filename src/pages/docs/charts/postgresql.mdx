@@ -147,14 +147,22 @@ standalone:
 backup:
   enabled: true
   schedule: '0 3 * * *'
-  serviceAccount:
-    annotations:
-      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/postgresql-backup
   s3:
     endpoint: https://s3.us-east-2.amazonaws.com
     bucket: my-pg-backups
     region: us-east-2
     credentialsFromPodIdentity: true
+```
+
+The example above uses EKS Pod Identity and therefore does not add an IRSA
+annotation. For IRSA, keep `credentialsFromPodIdentity: true` and annotate the
+backup ServiceAccount with your own role ARN:
+
+```yaml
+backup:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/replace-with-your-backup-role
 ```
 
 </div>

@@ -1052,6 +1052,51 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).not.toContainText('replication.wal.maxSlotWalKeepSize');
   });
 
+  test('PostgreSQL retention controls follow the selected architecture', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+    await page.locator('[data-section-toggle="PVC Retention"]').click();
+
+    const standalonePolicy = page.locator(
+      'select[data-field-key="standalone.persistence.retentionPolicy.whenDeleted"]',
+    );
+    const primaryPolicy = page.locator(
+      'select[data-field-key="replication.primary.persistence.retentionPolicy.whenDeleted"]',
+    );
+    await expect(standalonePolicy).toBeVisible();
+    await expect(primaryPolicy).toHaveCount(0);
+    await standalonePolicy.selectOption('Delete');
+    await expect(page.locator('#playground-code')).toContainText(
+      'standalone.persistence.retentionPolicy.whenDeleted=Delete',
+    );
+
+    await page.locator('select[data-field-key="architecture"]').selectOption('replication');
+    await expect(standalonePolicy).toHaveCount(0);
+    await expect(primaryPolicy).toBeVisible();
+    await expect(page.locator('#playground-code')).not.toContainText('standalone.persistence.retentionPolicy');
+  });
+
+  test('PostgreSQL workload identity requires its coupled inputs', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+
+    await expect(page.locator('#playground-code')).not.toContainText('backup.s3.credentialsFromPodIdentity');
+    await expect(page.locator('#playground-code')).not.toContainText('backup.serviceAccount.create');
+
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    await expect(page.locator('#playground-code')).toContainText('set backup.s3.region');
+
+    await page.locator('input[data-field-key="backup.s3.region"]').fill('us-east-2');
+    await expect(page.locator('#playground-code')).toContainText('backup.s3.credentialsFromPodIdentity=true');
+
+    await page.locator('button[data-field-key="backup.serviceAccount.create"]').click();
+    await expect(page.locator('#playground-code')).toContainText('set backup.serviceAccount.name');
+
+    await page.locator('input[data-field-key="backup.serviceAccount.name"]').fill('postgresql-backup');
+    await expect(page.locator('#playground-code')).toContainText('backup.serviceAccount.name=postgresql-backup');
+  });
+
   test('RabbitMQ exposes the Management UI Referrer-Policy', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="rabbitmq"]').click();
