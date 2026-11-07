@@ -1097,6 +1097,59 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText('backup.serviceAccount.name=postgresql-backup');
   });
 
+  test('PostgreSQL validates replication slot WAL retention units', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+    await page.locator('[data-section-toggle="Production Security"]').click();
+
+    const walRetention = page.locator('input[data-field-key="replication.wal.maxSlotWalKeepSize"]');
+    await walRetention.fill('8Gi');
+    await expect(walRetention).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#playground-code')).toContainText(
+      'use -1 or a PostgreSQL memory unit: B, kB, MB, GB, or TB',
+    );
+    await expect(page.locator('#playground-copy')).toBeDisabled();
+
+    await walRetention.fill('8GB');
+    await expect(walRetention).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.locator('#playground-code')).toContainText('replication.wal.maxSlotWalKeepSize=8GB');
+  });
+
+  test('PostgreSQL section reset rebuilds conditional workload identity controls', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    await expect(page.locator('input[data-field-key="backup.s3.region"]')).toBeVisible();
+
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+
+    await expect(page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]')).toHaveClass(
+      /bg-border/,
+    );
+    await expect(page.locator('input[data-field-key="backup.s3.region"]')).toHaveCount(0);
+    await expect(page.locator('#playground-code')).not.toContainText('backup.s3.credentialsFromPodIdentity');
+  });
+
+  test('PostgreSQL blocked workload identity state remains synchronized with the URL', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="postgresql"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    const region = page.locator('input[data-field-key="backup.s3.region"]');
+    await region.fill('us-east-2');
+    await expect(page).toHaveURL(/backup.s3.region=us-east-2/);
+
+    await region.fill('');
+    await expect(page.locator('#playground-code')).toContainText('set backup.s3.region');
+    await expect(page).not.toHaveURL(/backup.s3.region=/);
+
+    await page.reload();
+    await expect(page.locator('#playground-code')).toContainText('set backup.s3.region');
+    await expect(page.locator('input[data-field-key="backup.s3.region"]')).toHaveValue('');
+  });
+
   test('RabbitMQ exposes the Management UI Referrer-Policy', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="rabbitmq"]').click();

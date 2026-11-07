@@ -10668,6 +10668,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'replication.wal.maxSlotWalKeepSize',
           type: 'text',
           default: '',
+          pattern: '^(?:-1|[0-9]+(?:B|kB|MB|GB|TB))$',
+          validationMessage: 'use -1 or a PostgreSQL memory unit: B, kB, MB, GB, or TB (for example, 8GB)',
           description: 'Maximum WAL retained by replication slots',
         },
         {

@@ -17,6 +17,8 @@ interface FieldConfig {
   visibleWhen?: Record<string, string>;
   requiredWhen?: Record<string, string>;
   emitDefault?: boolean;
+  pattern?: string;
+  validationMessage?: string;
   description: string;
 }
 
@@ -156,6 +158,7 @@ function hasMoodleListenerConflict(values: Record<string, string>): boolean {
 
 function isValidFieldValue(field: FieldConfig, value: string, values: Record<string, string>): boolean {
   if (!isValidNumberValue(field, value)) return false;
+  if (field.pattern !== undefined && value !== '' && !new RegExp(field.pattern).test(value)) return false;
   if (hasMoodleListenerConflict(values) && (field.key === 'containerPorts.http' || field.key === 'metrics.port')) {
     return false;
   }
@@ -589,7 +592,8 @@ function toggleSection(group: GroupConfig) {
     }
   }
 
-  if (Object.keys(group.activationValues ?? {}).length > 0) {
+  const controlsVisibility = group.fields.some((field) => hasVisibilityDependents(field.key));
+  if (Object.keys(group.activationValues ?? {}).length > 0 || controlsVisibility) {
     buildControls();
     updateOutput();
     updateUrlState();
@@ -760,6 +764,10 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.className =
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
+      const candidateValues = { ...currentValues, [field.key]: input.value };
+      const valid = isValidFieldValue(field, input.value, candidateValues);
+      input.setCustomValidity(valid ? '' : (field.validationMessage ?? 'Enter a valid value.'));
+      input.setAttribute('aria-invalid', String(!valid));
       setFieldValue(field.key, input.value);
       enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);
@@ -1017,6 +1025,18 @@ function generateValuesYaml(): string {
 }
 
 function getOutputBlockingReason(): string | null {
+  const invalidField = getGroups(selectedSlug)
+    .flatMap((group) => group.fields)
+    .find(
+      (field) =>
+        isFieldVisible(field) &&
+        (currentValues[field.key] ?? '') !== '' &&
+        !isValidFieldValue(field, currentValues[field.key] ?? '', currentValues),
+    );
+  if (invalidField) {
+    return `Configuration blocked: ${invalidField.validationMessage ?? `set a valid value for ${invalidField.key}`}.`;
+  }
+
   if (selectedSlug === 'postgresql' && currentValues['backup.enabled'] === 'true') {
     const missingFields = getGroups(selectedSlug)
       .flatMap((group) => group.fields)
@@ -1193,6 +1213,7 @@ function updateOutput() {
     codeEl.textContent = `# ${blockingReason}`;
     if (filenameEl) filenameEl.textContent = outputMode === 'helm' ? 'terminal' : 'values.yaml';
     if (diffEl) diffEl.classList.add('hidden');
+    updateUrlState();
     return;
   }
 
