@@ -111,11 +111,10 @@ primaryObjectStore:
   existingSecretSecretKeyKey: secret-key
 ```
 
-The application mounts static credentials from the Secret as files. The CronJob
-bypasses the image entrypoint and therefore reads the same Secret keys through
-Kubernetes `secretKeyRef` environment sources. Credentials are never placed in
-chart values or Pod environment literals. The standard `externalSecrets.items`
-contract can own that Secret. For AWS workload identity, set
+Static credentials are mounted from the Secret as files and never placed in
+chart values or Pod environment literals. The pinned image's S3 configuration
+reads those files directly, including from the CronJob. The standard
+`externalSecrets.items` contract can own that Secret. For AWS workload identity, set
 `credentialsFromPodIdentity: true` and configure
 `primaryObjectStore.serviceAccount`; the application and CronJob share that
 dedicated identity.
