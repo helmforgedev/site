@@ -111,7 +111,9 @@ primaryObjectStore:
   existingSecretSecretKeyKey: secret-key
 ```
 
-Static credentials are mounted from the Secret as files and never placed in
+The application mounts static credentials from the Secret as files. The CronJob
+bypasses the image entrypoint and therefore reads the same Secret keys through
+Kubernetes `secretKeyRef` environment sources. Credentials are never placed in
 chart values or Pod environment literals. The standard `externalSecrets.items`
 contract can own that Secret. For AWS workload identity, set
 `credentialsFromPodIdentity: true` and configure
@@ -122,10 +124,11 @@ The chart supplies the official image's complete `OBJECTSTORE_S3_*` contract to
 the application and CronJob. With NetworkPolicy enabled,
 `primaryObjectStore.networkPolicyEgress` must explicitly select the provider's
 CIDRs or in-cluster Pods and port. Kubernetes NetworkPolicy cannot select a
-destination by DNS name. IRSA also requires HTTPS egress to the AWS STS endpoint
-selected by the SDK: allow the configured regional endpoint or the global
-`sts.amazonaws.com` endpoint when it remains in use. EKS Pod Identity requires
-access to its Pod Identity Agent endpoint in addition to the S3 endpoint.
+destination by DNS name. IRSA (IAM Roles for Service Accounts) also requires
+HTTPS egress to the AWS STS endpoint selected by the SDK. Add that endpoint's
+CIDR ranges to `primaryObjectStore.networkPolicyEgress`; when the SDK uses the
+global `sts.amazonaws.com` endpoint, add its CIDR ranges. EKS Pod Identity
+requires access to its Pod Identity Agent endpoint in addition to S3.
 
 A guard Secret records the enabled storage identity. Real Helm upgrades reject
 an accidental disable or a change to the endpoint, bucket, prefix, credentials
