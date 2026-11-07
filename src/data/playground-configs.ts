@@ -2961,7 +2961,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Create bucket automatically',
           key: 'primaryObjectStore.autocreate',
           type: 'toggle',
-          default: 'true',
+          default: 'false',
           description: 'Allow Nextcloud to create a missing bucket when credentials permit it',
         },
         {
