@@ -18184,6 +18184,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '',
           description: 'Secret containing the PostgreSQL password',
         },
+        {
+          label: 'Password Secret Key',
+          key: 'externalDatabase.existingSecretPasswordKey',
+          type: 'text',
+          default: 'database-password',
+          description: 'Password key in the PostgreSQL Secret',
+        },
       ],
     },
     {
@@ -18279,8 +18286,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
         {
           label: 'Use Workload Identity',
           key: 'backup.s3.credentialsFromPodIdentity',
-          type: 'boolean',
-          default: false,
+          type: 'toggle',
+          default: 'false',
           description: 'Use EKS Pod Identity or IRSA instead of static keys',
         },
         {
