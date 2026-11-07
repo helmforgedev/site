@@ -2929,6 +2929,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           default: '',
           description: 'Stable ServiceAccount name for workload identity associations',
         },
+        {
+          label: 'IRSA role ARN',
+          key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
+          type: 'text',
+          default: '',
+          description: 'IAM role ARN attached to the backup ServiceAccount for IRSA',
+        },
       ],
     },
   ],

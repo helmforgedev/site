@@ -914,8 +914,12 @@ function pruneIncompleteCoupledRules(changes: { key: string; value: string; defa
 function buildSetFlags(): string[] {
   return getChangedValues().map((c) => {
     const setter = shouldPreserveString(c.key) ? '--set-string' : '--set';
-    return `${setter} ${c.key}=${quoteSetValue(c.value)}`;
+    return `${setter} ${quoteSetKey(c.key)}=${quoteSetValue(c.value)}`;
   });
+}
+
+function quoteSetKey(key: string): string {
+  return key.includes('\\') ? `'${key.replace(/'/g, "'\\''")}'` : key;
 }
 
 function quoteSetValue(value: string): string {
