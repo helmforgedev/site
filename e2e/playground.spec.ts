@@ -847,7 +847,7 @@ test.describe('Playground', () => {
     await page.locator('.playground-scenario-btn:has-text("Production")').click();
     await expect(page.locator('#playground-code')).toContainText('gatewayAPI.enabled=true');
     await expect(page.locator('#playground-code')).toContainText(
-      String.raw`networkPolicy.ingress.extraFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=gateway-system`,
+      String.raw`--set 'networkPolicy.ingress.extraFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name'=gateway-system`,
     );
     await page.locator('.playground-output-btn[data-output="values"]').click();
     await expect(page.locator('#playground-code')).toContainText('kubernetes.io/metadata.name: gateway-system');
