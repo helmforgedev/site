@@ -11,22 +11,23 @@ import Callout from '../../../components/Callout.astro';
 
 Self-hosted web archiving platform. ArchiveBox captures websites in multiple formats simultaneously — HTML,
 PDF, screenshot, WARC, media extraction, git clone — using a built-in Chromium headless browser. All archived
-content and the SQLite database are stored on a single large persistent volume.
+content is stored on a persistent volume, with SQLite by default or optional
+external PostgreSQL for metadata.
 
 <Callout type="warning" title="Single instance only — no horizontal scaling">
-  ArchiveBox uses SQLite as its database. SQLite allows only a single writer at a time. Running multiple replicas will
-  cause database corruption. Keep `replicaCount` at 1.
+  ArchiveBox uses one collection writer even with PostgreSQL. The chart enforces a single Recreate Deployment; do not
+  scale it horizontally.
 </Callout>
 
 ## Key Features
 
 - **Multi-format archiving** — HTML, PDF, screenshot, WARC, media, git clone in one pass
 - **Chromium headless** — full JavaScript rendering with `/dev/shm` tmpfs for stability
-- **Three search backends** — ripgrep (default), sqlite, or Sonic for full-text search
-- **Access control** — configurable public/private access for index, snapshots, and adding links
-- **Non-root by default** — runs as UID 911 out of the box
-- **S3 backup** — full `/data` directory backup (SQLite + all archived files) to S3-compatible storage
-- **Persistent storage** — single large PVC for all archived content and database
+- **SQLite or PostgreSQL** — embedded SQLite or an existing PostgreSQL service
+- **Access control** — public index/add controls and upstream UI snapshot permissions
+- **Upstream privilege drop** — starts as root, detects collection ownership, then drops privileges
+- **S3 backup** — `/data` archives with Secret credentials or workload identity
+- **Persistent storage** — one PVC for archived content and SQLite when selected
 
 ## Architecture and boundaries
 
@@ -110,8 +111,8 @@ archivebox:
   adminPassword: 'my-secure-password'
   allowedHosts: 'archive.example.com'
   publicIndex: 'False'
-  publicSnapshots: 'False'
   publicAddLinks: 'False'
+  serverSecurityMode: safe-onedomain-nojsreplay
 
 persistence:
   enabled: true
@@ -218,18 +219,19 @@ credentials.
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                 |
+| ------------------- | ------ | ------- | ------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                    |
+| `fullnameOverride`  | string | `""`    | Override the full release name.             |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.        |
+| `commonAnnotations` | object | `{}`    | Annotations added to chart-owned resources. |
 
 ### Image
 
 | Parameter          | Type   | Default                           | Description                          |
 | ------------------ | ------ | --------------------------------- | ------------------------------------ |
 | `image.repository` | string | `docker.io/archivebox/archivebox` | ArchiveBox container image.          |
-| `image.tag`        | string | `"0.9.73"`                        | Image tag.                           |
+| `image.tag`        | string | `"0.9.77"`                        | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`                    | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                              | Pull secrets for private registries. |
 
@@ -243,11 +245,12 @@ credentials.
 | `archivebox.existingSecret`            | string  | `""`             | Existing Kubernetes Secret containing admin credentials.              |
 | `archivebox.existingSecretUsernameKey` | string  | `admin-username` | Key in the existing secret for the admin username.                    |
 | `archivebox.existingSecretPasswordKey` | string  | `admin-password` | Key in the existing secret for the admin password.                    |
+| `archivebox.baseUrl`                   | string  | `""`             | Canonical public URL; empty uses first-use UI configuration.          |
+| `archivebox.serverSecurityMode`        | string  | `auto`           | ArchiveBox replay security mode.                                      |
+| `archivebox.puid` / `archivebox.pgid`  | string  | `""`             | Optional UID/GID overrides; empty detects the collection owner.       |
 | `archivebox.allowedHosts`              | string  | `"*"`            | Comma-separated allowed hostnames. Set to your domain in production.  |
 | `archivebox.publicIndex`               | string  | `"True"`         | Allow unauthenticated access to the archive index page.               |
-| `archivebox.publicSnapshots`           | string  | `"True"`         | Allow unauthenticated access to archived snapshots.                   |
 | `archivebox.publicAddLinks`            | string  | `"False"`        | Allow unauthenticated access to the add URL view (`PUBLIC_ADD_VIEW`). |
-| `archivebox.searchBackendEngine`       | string  | `ripgrep`        | Search backend: `ripgrep` (default), `sqlite`, or `sonic`.            |
 | `archivebox.mediaMaxSize`              | string  | `"750m"`         | Maximum size for media downloads (e.g. `750m`, `1g`).                 |
 | `archivebox.timeout`                   | string  | `"60"`           | Timeout per URL archiving job, in seconds.                            |
 | `archivebox.timezone`                  | string  | `UTC`            | Timezone for scheduled tasks and timestamps.                          |
@@ -257,16 +260,25 @@ When the chart manages the admin Secret, it retains that Secret on Helm uninstal
 on upgrade. Set `archivebox.existingSecret` when credential lifecycle must remain entirely outside Helm.
 
 <Callout type="danger" title="Restrict public access before exposing to the internet">
-  By default, `publicIndex` and `publicSnapshots` are both `"True"`. Anyone who reaches your ArchiveBox URL can browse
-  your entire archive and view all captured pages. For internet-facing deployments, set both to `"False"` and restrict
-  `allowedHosts` to your exact domain.
+  By default, `publicIndex` is `"True"`. Restrict it and `allowedHosts` before exposing the service. Manage individual
+  snapshot permissions in the ArchiveBox UI.
 </Callout>
 
-<Callout type="info" title="Search backend trade-offs">
-  - **ripgrep** (default) — fast grep-based full-text search, no extra dependencies, searches HTML files directly -
-  **sqlite** — uses SQLite FTS5, no extra setup, slower on large archives - **sonic** — fastest on large archives,
-  requires a separate Sonic server deployed alongside ArchiveBox
-</Callout>
+### External PostgreSQL
+
+| Parameter                                    | Type    | Default             | Description                          |
+| -------------------------------------------- | ------- | ------------------- | ------------------------------------ |
+| `externalDatabase.enabled`                   | boolean | `false`             | Use an existing PostgreSQL database. |
+| `externalDatabase.host`                      | string  | `""`                | PostgreSQL hostname.                 |
+| `externalDatabase.port`                      | integer | `5432`              | PostgreSQL port.                     |
+| `externalDatabase.name`                      | string  | `archivebox`        | Database name.                       |
+| `externalDatabase.user`                      | string  | `archivebox`        | Database user.                       |
+| `externalDatabase.existingSecret`            | string  | `""`                | Secret containing the password.      |
+| `externalDatabase.existingSecretPasswordKey` | string  | `database-password` | Password key in the Secret.          |
+
+The chart waits for an authenticated PostgreSQL `SELECT 1` before starting
+ArchiveBox. `/data` still stores captures and configuration. Migrate existing
+SQLite data before enabling this option.
 
 ### Persistence
 
@@ -284,42 +296,55 @@ outside Helm.
 | `persistence.accessModes`   | array   | `["ReadWriteOnce"]` | PVC access modes.                                           |
 | `persistence.existingClaim` | string  | `""`                | Use an existing PVC instead of creating one.                |
 
-<Callout type="warning" title="NFS storage may require fsGroup configuration">
-  ArchiveBox 0.9 requires `/data` to be owned by UID/GID 911. A narrowly scoped init container applies ownership to the
-  mount root, then the application starts and remains non-root as UID/GID 911. Some NFS provisioners ignore ownership
-  changes; if using NFS, configure the provisioner accordingly or override the security contexts deliberately.
+<Callout type="warning" title="Storage must allow ownership changes">
+  A narrowly scoped init container changes only a root-owned `/data` mount root to the selected UID/GID; it never
+  recursively rewrites existing collections. Some NFS provisioners block `chown`, so configure the provisioner
+  accordingly.
 </Callout>
 
 ### Backup
 
-The S3 backup archives the full `/data` directory — including the SQLite database and all archived files. This is a
-complete backup of the entire ArchiveBox dataset, unlike other charts where only media files are backed up.
+The S3 backup archives `/data`. With SQLite, that includes the database and
+archived files. With external PostgreSQL, the CronJob does not dump the
+database; retain a matching `pg_dump` and quiesced `/data` archive.
 
 `backup.enabled` requires `persistence.enabled: true`; the chart rejects an ephemeral backup configuration because the
 CronJob must mount the durable data claim.
 
-| Parameter                              | Type    | Default                         | Description                                                  |
-| -------------------------------------- | ------- | ------------------------------- | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                         | Enable scheduled S3 backup CronJob.                          |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                   | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                         | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                        | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                             | Number of successful Job records to keep.                    |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                             | Number of failed Job records to keep.                        |
-| `backup.backoffLimit`                  | integer | `1`                             | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `archivebox`                    | Prefix for backup archive filenames.                         |
-| `backup.images.tar`                    | string  | `docker.io/library/alpine:3.22` | Image used for `tar` archive.                                |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`  | Image used for S3 upload.                                    |
-| `backup.resources`                     | object  | `{}`                            | Resources for backup containers.                             |
-| `backup.s3.endpoint`                   | string  | `""`                            | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                            | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `archivebox`                    | Key prefix within the bucket.                                |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                          | Create the bucket automatically if it does not exist.        |
-| `backup.s3.existingSecret`             | string  | `""`                            | Existing secret containing S3 access and secret keys.        |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                    | Key in the existing secret for the S3 access key.            |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                    | Key in the existing secret for the S3 secret key.            |
-| `backup.s3.accessKey`                  | string  | `""`                            | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                            | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                                            | Type    | Default                         | Description                                                  |
+| ---------------------------------------------------- | ------- | ------------------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                                     | boolean | `false`                         | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                                    | string  | `"0 3 * * *"`                   | Cron schedule for backups.                                   |
+| `backup.suspend`                                     | boolean | `false`                         | Suspend the CronJob without deleting it.                     |
+| `backup.concurrencyPolicy`                           | string  | `Forbid`                        | CronJob concurrency policy.                                  |
+| `backup.successfulJobsHistoryLimit`                  | integer | `3`                             | Number of successful Job records to keep.                    |
+| `backup.failedJobsHistoryLimit`                      | integer | `3`                             | Number of failed Job records to keep.                        |
+| `backup.backoffLimit`                                | integer | `1`                             | Job retry limit.                                             |
+| `backup.archivePrefix`                               | string  | `archivebox`                    | Prefix for backup archive filenames.                         |
+| `backup.images.tar`                                  | string  | `docker.io/library/alpine:3.22` | Image used for `tar` archive.                                |
+| `backup.images.uploader`                             | string  | `docker.io/helmforge/mc:1.0.0`  | Image used for S3 upload.                                    |
+| `backup.resources`                                   | object  | `{}`                            | Resources for backup containers.                             |
+| `backup.podSecurityContext`                          | object  | hardened defaults               | Pod-level security for the backup job.                       |
+| `backup.securityContext`                             | object  | hardened defaults               | Container-level security for backup containers.              |
+| `backup.serviceAccount.create`                       | boolean | `true`                          | Create a dedicated backup ServiceAccount.                    |
+| `backup.serviceAccount.name`                         | string  | `""`                            | Existing backup ServiceAccount when creation is disabled.    |
+| `backup.serviceAccount.annotations`                  | object  | `{}`                            | Workload identity annotations.                               |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `false`                         | Mount the Kubernetes API token.                              |
+| `backup.s3.endpoint`                                 | string  | `""`                            | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                                   | string  | `""`                            | Target bucket name.                                          |
+| `backup.s3.prefix`                                   | string  | `archivebox`                    | Key prefix within the bucket.                                |
+| `backup.s3.createBucketIfNotExists`                  | boolean | `true`                          | Create the bucket automatically if it does not exist.        |
+| `backup.s3.existingSecret`                           | string  | `""`                            | Existing secret containing S3 access and secret keys.        |
+| `backup.s3.existingSecretAccessKeyKey`               | string  | `access-key`                    | Key in the existing secret for the S3 access key.            |
+| `backup.s3.existingSecretSecretKeyKey`               | string  | `secret-key`                    | Key in the existing secret for the S3 secret key.            |
+| `backup.s3.accessKey`                                | string  | `""`                            | Inline S3 access key (ignored when `existingSecret` is set). |
+| `backup.s3.secretKey`                                | string  | `""`                            | Inline S3 secret key (ignored when `existingSecret` is set). |
+| `backup.s3.region`                                   | string  | `""`                            | AWS region for Pod Identity or IRSA.                         |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`                         | Use workload identity instead of static keys.                |
+
+The scheduled CronJob reads live `/data` and does not stop ArchiveBox. Use a
+quiesced maintenance window for application-consistent recovery points. With
+workload identity enabled, the chart does not render static S3 credentials.
 
 ### Service
 
@@ -367,11 +392,15 @@ ArchiveBox uses Chromium internally to render pages. The Chromium process requir
 function reliably. Without memory limits, the container may be OOMKilled during archiving of JavaScript-heavy
 pages.
 
-| Parameter            | Type   | Default                                                   | Description                                                  |
-| -------------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------ |
-| `resources`          | object | `{}`                                                      | CPU and memory requests and limits. Recommended: 2–4 Gi RAM. |
-| `podSecurityContext` | object | `{ fsGroup: 911 }`                                        | Pod-level security context.                                  |
-| `securityContext`    | object | `{ runAsUser: 911, runAsGroup: 911, runAsNonRoot: true }` | Container-level security context.                            |
+| Parameter            | Type   | Default                                        | Description                                                  |
+| -------------------- | ------ | ---------------------------------------------- | ------------------------------------------------------------ |
+| `resources`          | object | `{}`                                           | CPU and memory requests and limits. Recommended: 2–4 Gi RAM. |
+| `podSecurityContext` | object | `{ seccompProfile: { type: RuntimeDefault } }` | Pod-level security context.                                  |
+| `securityContext`    | object | Root startup with bounded capabilities         | Upstream entrypoint privilege-drop contract.                 |
+
+The application container starts as root so the upstream entrypoint can detect
+the collection owner and drop privileges. The default workload therefore needs
+an explicit exception in namespaces enforcing Pod Security `restricted`.
 
 ### Service Account
 
