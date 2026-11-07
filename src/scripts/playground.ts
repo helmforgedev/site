@@ -14,6 +14,11 @@ interface FieldConfig {
   activationResetSections?: Record<string, string[]>;
   conflictsWith?: string[];
   conflictResetValues?: Record<string, string>;
+  visibleWhen?: Record<string, string>;
+  requiredWhen?: Record<string, string>;
+  emitDefault?: boolean;
+  pattern?: string;
+  validationMessage?: string;
   description: string;
 }
 
@@ -113,6 +118,21 @@ function getFieldConfig(key: string): FieldConfig | undefined {
   return undefined;
 }
 
+function matchesFieldConditions(
+  conditions: Record<string, string> | undefined,
+  values: Record<string, string>,
+): boolean {
+  return Object.entries(conditions ?? {}).every(([key, value]) => values[key] === value);
+}
+
+function isFieldVisible(field: FieldConfig, values: Record<string, string> = currentValues): boolean {
+  return matchesFieldConditions(field.visibleWhen, values);
+}
+
+function hasVisibilityDependents(key: string): boolean {
+  return getGroups(selectedSlug).some((group) => group.fields.some((field) => key in (field.visibleWhen ?? {})));
+}
+
 function isValidNumberValue(field: FieldConfig, value: string): boolean {
   if (field.type !== 'number') return true;
   if (!/^-?\d+$/.test(value)) return false;
@@ -138,6 +158,7 @@ function hasMoodleListenerConflict(values: Record<string, string>): boolean {
 
 function isValidFieldValue(field: FieldConfig, value: string, values: Record<string, string>): boolean {
   if (!isValidNumberValue(field, value)) return false;
+  if (field.pattern !== undefined && value !== '' && !new RegExp(field.pattern).test(value)) return false;
   if (hasMoodleListenerConflict(values) && (field.key === 'containerPorts.http' || field.key === 'metrics.port')) {
     return false;
   }
@@ -533,6 +554,7 @@ function buildControls() {
       : 'space-y-2';
 
     for (const field of group.fields) {
+      if (!isFieldVisible(field)) continue;
       const fieldEl = buildFieldControl(field);
       fieldsInner.appendChild(fieldEl);
     }
@@ -570,7 +592,8 @@ function toggleSection(group: GroupConfig) {
     }
   }
 
-  if (Object.keys(group.activationValues ?? {}).length > 0) {
+  const controlsVisibility = group.fields.some((field) => hasVisibilityDependents(field.key));
+  if (Object.keys(group.activationValues ?? {}).length > 0 || controlsVisibility) {
     buildControls();
     updateOutput();
     updateUrlState();
@@ -669,6 +692,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
       syncLinkedFieldValue(field.key, select.value);
       if (field.enables) autoEnableField(field.enables);
       applyFieldSideEffects(field.key, select.value);
+      if (hasVisibilityDependents(field.key)) buildControls();
       updateOutput();
     });
     controlDiv.appendChild(select);
@@ -696,6 +720,7 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
         return;
       }
       applyFieldSideEffects(field.key, currentValues[field.key]);
+      if (hasVisibilityDependents(field.key)) buildControls();
       updateOutput();
     });
     controlDiv.appendChild(btn);
@@ -739,6 +764,10 @@ function buildFieldControl(field: FieldConfig): HTMLElement {
     input.className =
       'w-36 rounded-lg border border-border bg-bg-surface/80 px-3 py-1.5 text-sm text-text-base focus:outline-none focus:ring-2 focus:ring-primary-light';
     input.addEventListener('input', () => {
+      const candidateValues = { ...currentValues, [field.key]: input.value };
+      const valid = isValidFieldValue(field, input.value, candidateValues);
+      input.setCustomValidity(valid ? '' : (field.validationMessage ?? 'Enter a valid value.'));
+      input.setAttribute('aria-invalid', String(!valid));
       setFieldValue(field.key, input.value);
       enforceFieldConflicts(field, input.value);
       if (field.enables) autoEnableField(field.enables);
@@ -860,10 +889,12 @@ function getChangedValues(): { key: string; value: string; defaultValue: string 
     if (group.collapsible && !expandedSections.has(group.name)) continue;
 
     for (const field of group.fields) {
+      if (!isFieldVisible(field)) continue;
       const val = currentValues[field.key];
       if (val !== undefined && !isValidFieldValue(field, val, currentValues)) continue;
       if (group.collapsible && expandedSections.has(group.name) && group.emitDefaultsOnExpand !== false) {
         // Expanded collapsible sections normally emit all fields; opt out for read-only tuning groups.
+        if (field.emitDefault === false && val === field.default) continue;
         if (val !== undefined && val !== '') {
           addChange(field.key, val, field.default);
         }
@@ -994,6 +1025,33 @@ function generateValuesYaml(): string {
 }
 
 function getOutputBlockingReason(): string | null {
+  const invalidField = getGroups(selectedSlug)
+    .flatMap((group) => group.fields)
+    .find(
+      (field) =>
+        isFieldVisible(field) &&
+        (currentValues[field.key] ?? '') !== '' &&
+        !isValidFieldValue(field, currentValues[field.key] ?? '', currentValues),
+    );
+  if (invalidField) {
+    return `Configuration blocked: ${invalidField.validationMessage ?? `set a valid value for ${invalidField.key}`}.`;
+  }
+
+  if (selectedSlug === 'postgresql' && currentValues['backup.enabled'] === 'true') {
+    const missingFields = getGroups(selectedSlug)
+      .flatMap((group) => group.fields)
+      .filter(
+        (field) =>
+          field.requiredWhen !== undefined &&
+          matchesFieldConditions(field.requiredWhen, currentValues) &&
+          (currentValues[field.key] ?? '').trim() === '',
+      )
+      .map((field) => field.key);
+    if (missingFields.length > 0) {
+      return `Configuration blocked: set ${missingFields.join(' and ')} for backup workload identity.`;
+    }
+  }
+
   if (selectedSlug !== 'bulwark-mail') return null;
 
   const needsSharedState = Number(currentValues.replicaCount) > 1 || currentValues['autoscaling.enabled'] === 'true';
@@ -1155,6 +1213,7 @@ function updateOutput() {
     codeEl.textContent = `# ${blockingReason}`;
     if (filenameEl) filenameEl.textContent = outputMode === 'helm' ? 'terminal' : 'values.yaml';
     if (diffEl) diffEl.classList.add('hidden');
+    updateUrlState();
     return;
   }
 
