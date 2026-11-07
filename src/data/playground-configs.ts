@@ -10658,6 +10658,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Use physical replication slots',
         },
         {
+          label: 'Maximum Slot WAL Retention',
+          key: 'replication.wal.maxSlotWalKeepSize',
+          type: 'text',
+          default: '',
+          description: 'Maximum WAL retained by replication slots',
+        },
+        {
           label: 'Client CIDRs',
           key: 'config.allowedClientCIDRs[0]',
           type: 'text',
