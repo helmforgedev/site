@@ -1037,7 +1037,7 @@ function getOutputBlockingReason(): string | null {
     return `Configuration blocked: ${invalidField.validationMessage ?? `set a valid value for ${invalidField.key}`}.`;
   }
 
-  if (selectedSlug === 'postgresql' && currentValues['backup.enabled'] === 'true') {
+  if (currentValues['backup.enabled'] === 'true') {
     const missingFields = getGroups(selectedSlug)
       .flatMap((group) => group.fields)
       .filter(
