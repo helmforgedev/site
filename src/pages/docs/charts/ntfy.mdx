@@ -319,12 +319,13 @@ gateway:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
-| `global`           | object | `{}`    | Reserved global values contract.     |
+| Parameter           | Type   | Default | Description                                             |
+| ------------------- | ------ | ------- | ------------------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                                |
+| `fullnameOverride`  | string | `""`    | Override the full release name.                         |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.                    |
+| `commonAnnotations` | object | `{}`    | Extra annotations added to all chart-managed resources. |
+| `global`            | object | `{}`    | Reserved global values contract.                        |
 
 ### Image
 
@@ -487,12 +488,12 @@ Probes use the `/v1/health` endpoint.
 
 ### Service Account
 
-| Parameter                                     | Type    | Default | Description                                             |
-| --------------------------------------------- | ------- | ------- | ------------------------------------------------------- |
-| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                      |
-| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                       |
-| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                     |
-| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into ntfy and backup pods. |
+| Parameter                                     | Type    | Default | Description                                     |
+| --------------------------------------------- | ------- | ------- | ----------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.              |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.               |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.             |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into the ntfy pod. |
 
 ### Runtime Security and Availability
 
@@ -537,18 +538,46 @@ External PostgreSQL requires an explicit database CIDR; SMTP, OIDC, web push, an
 ### Backup
 
 The optional CronJob archives `/var/cache/ntfy` and uploads it to S3-compatible storage. It requires persistent storage
-and does not dump PostgreSQL. Use an existing Secret containing `access-key` and `secret-key` in production.
+and does not dump PostgreSQL. Static credentials come from an existing Secret containing `access-key` and `secret-key`.
+Alternatively, enable workload identity to use EKS Pod Identity or IRSA through a dedicated backup ServiceAccount.
 
-| Parameter                  | Type    | Default     | Description                                    |
-| -------------------------- | ------- | ----------- | ---------------------------------------------- |
-| `backup.enabled`           | boolean | `false`     | Enable scheduled data-volume backup.           |
-| `backup.schedule`          | string  | `0 3 * * *` | Cron schedule in UTC.                          |
-| `backup.scratchSizeLimit`  | string  | `3Gi`       | Bound temporary archive storage with headroom. |
-| `backup.tmpSizeLimit`      | string  | `64Mi`      | Bound backup container `/tmp`.                 |
-| `backup.s3.endpoint`       | string  | `""`        | S3-compatible endpoint.                        |
-| `backup.s3.bucket`         | string  | `""`        | Destination bucket.                            |
-| `backup.s3.prefix`         | string  | `ntfy`      | Object-key prefix.                             |
-| `backup.s3.existingSecret` | string  | `""`        | Existing S3 credential Secret.                 |
+| Parameter                                            | Type    | Default     | Description                                                     |
+| ---------------------------------------------------- | ------- | ----------- | --------------------------------------------------------------- |
+| `backup.enabled`                                     | boolean | `false`     | Enable scheduled data-volume backup.                            |
+| `backup.schedule`                                    | string  | `0 3 * * *` | Cron schedule in UTC.                                           |
+| `backup.scratchSizeLimit`                            | string  | `3Gi`       | Bound temporary archive storage with headroom.                  |
+| `backup.tmpSizeLimit`                                | string  | `64Mi`      | Bound backup container `/tmp`.                                  |
+| `backup.s3.endpoint`                                 | string  | `""`        | S3-compatible endpoint.                                         |
+| `backup.s3.bucket`                                   | string  | `""`        | Destination bucket.                                             |
+| `backup.s3.region`                                   | string  | `""`        | AWS region; required when workload identity is enabled.         |
+| `backup.s3.prefix`                                   | string  | `ntfy`      | Object-key prefix.                                              |
+| `backup.s3.createBucketIfNotExists`                  | boolean | `false`     | Create the bucket; requires bucket-management permission.       |
+| `backup.s3.existingSecret`                           | string  | `""`        | Existing S3 credential Secret for static authentication.        |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`     | Use the pod credential chain instead of static access keys.     |
+| `backup.serviceAccount.create`                       | boolean | `true`      | Create a dedicated ServiceAccount for identity-enabled backups. |
+| `backup.serviceAccount.name`                         | string  | `""`        | Existing or overridden backup ServiceAccount name.              |
+| `backup.serviceAccount.annotations`                  | object  | `{}`        | Cloud identity annotations, such as an IRSA role ARN.           |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `false`     | Mount Kubernetes API credentials into backup pods.              |
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ntfy-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: ntfy-backups
+    region: us-east-1
+    createBucketIfNotExists: false
+    credentialsFromPodIdentity: true
+```
+
+When workload identity is enabled, the chart does not render or reference static access keys. If
+`backup.serviceAccount.create` is disabled, `backup.serviceAccount.name` is required so the CronJob cannot silently
+fall back to the application identity.
+Bucket creation is disabled by default so the backup identity only needs object-level permissions. Enable
+`backup.s3.createBucketIfNotExists` only when the identity is also authorized to manage buckets.
 
 ### OpenID Connect and SMTP
 

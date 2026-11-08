@@ -362,6 +362,30 @@ test.describe('Playground', () => {
     await expect(page.locator('#playground-code')).toContainText('ntfy.banFeed.file=/var/cache/ntfy/ban.log');
   });
 
+  test('ntfy backup workload identity requires its coupled inputs', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="ntfy"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+
+    const code = page.locator('#playground-code');
+    await expect(code).not.toContainText('backup.s3.credentialsFromPodIdentity');
+    await expect(code).not.toContainText('backup.s3.createBucketIfNotExists');
+    await expect(code).toContainText('backup.s3.existingSecret=ntfy-backup-s3');
+
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    await expect(code).toContainText('set backup.s3.region');
+    await expect(code).not.toContainText('backup.s3.existingSecret=ntfy-backup-s3');
+
+    await page.locator('input[data-field-key="backup.s3.region"]').fill('us-east-1');
+    await expect(code).toContainText('backup.s3.credentialsFromPodIdentity=true');
+
+    await page.locator('button[data-field-key="backup.serviceAccount.create"]').click();
+    await expect(code).toContainText('set backup.serviceAccount.name');
+
+    await page.locator('input[data-field-key="backup.serviceAccount.name"]').fill('ntfy-backup');
+    await expect(code).toContainText('backup.serviceAccount.name=ntfy-backup');
+  });
+
   test('poznote defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
