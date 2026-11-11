@@ -274,6 +274,12 @@ controls the process listener and legacy objects render together with
 `extraManifests`. Migrate to `metrics.containerPort` and `extraManifests` when
 editing the configuration.
 
+The release that adopts the fixed `node-agent` DaemonSet name replaces the previous release-named DaemonSet instead
+of rolling the same Kubernetes object. Before upgrading, pause Velero schedules and wait for active backup, restore,
+PodVolumeBackup, and data-movement operations to finish. Upgrade the release, wait for `daemonset/node-agent` to
+become Ready on the intended nodes, and then resume schedules. In-progress transfers can resume after an agent
+restart, but quiescing scheduled work avoids starting new transfers during the replacement.
+
 Before relying on backups, verify that the Deployment is ready and every configured backup storage location is
 available:
 
