@@ -248,6 +248,10 @@ The node-agent is the intentional exception: filesystem backup needs kubelet hos
 It remains unprivileged, drops all capabilities, blocks privilege escalation, and uses a read-only root filesystem.
 Enable it only after reviewing Pod Security admission, hostPath policy, and node isolation.
 
+When enabled, the chart creates the DaemonSet with Velero's required fixed name `node-agent`. Its pods always carry
+the protected `role: node-agent` label used by File System Backup and CSI Snapshot Data Movement discovery. Release
+name overrides and `nodeAgent.podLabels` cannot change these compatibility identifiers.
+
 Velero needs its ServiceAccount token and cluster-wide API access to back up and restore Kubernetes resources. The
 default ClusterRoleBinding targets `cluster-admin`. Set `rbac.create: false` only when equivalent, reviewed RBAC is
 managed outside the chart.
@@ -275,6 +279,7 @@ available:
 
 ```bash
 kubectl rollout status deployment/velero -n velero
+kubectl rollout status daemonset/node-agent -n velero
 kubectl get backupstoragelocations.velero.io -n velero
 kubectl logs deployment/velero -n velero --since=15m
 ```
@@ -287,11 +292,12 @@ separately during upgrades.
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                                            |
+| ------------------- | ------ | ------- | ---------------------------------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                                               |
+| `fullnameOverride`  | string | `""`    | Override the full release name.                                        |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.                                   |
+| `commonAnnotations` | object | `{}`    | Annotations on chart-owned resource metadata, excluding pod templates. |
 
 ### Image
 
@@ -382,7 +388,8 @@ server-level `defaultBackupTTL`.
 <Callout type="info" title="node-agent runs as a DaemonSet on every node">
   The node-agent requires host path access to pod volume directories. It runs as root (`runAsUser: 0`) by design — this
   is necessary to read PVC mount paths on the node filesystem. Enabling node-agent is the only way to include PVC data
-  in backups via filesystem copy.
+  in backups via filesystem copy. The chart uses the fixed DaemonSet name `node-agent` and protects the `role:
+  node-agent` pod label required by Velero discovery.
 </Callout>
 
 | Parameter                      | Type    | Default                    | Description                                             |
