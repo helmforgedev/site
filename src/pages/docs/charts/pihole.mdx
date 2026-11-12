@@ -38,7 +38,7 @@ presets, and automated gravity database management.
 - **Unbound sidecar** — recursive DNS from root servers (no third-party DNS provider required)
 - **DHCP support** — requires `hostNetwork: true`
 - **Prometheus metrics** — `pihole-exporter` sidecar with ServiceMonitor
-- **S3 backup** — gravity.db, custom DNS records, and dnsmasq config
+- **S3 backup** — gravity.db, custom DNS records, and dnsmasq config with static credentials or workload identity
 - **Immutable images** — Pi-hole, sidecars, and backup helpers are pinned by tag and digest
 - **Configurable listeners** — DNS and primary HTTP ports configure Pi-hole FTL end to end, with full IPv4, IPv6, HTTP, and HTTPS web listener support
 - **Default ingress policy** — NetworkPolicy limits pod ingress to the enabled service ports
@@ -201,10 +201,14 @@ serviceDns:
 backup:
   enabled: true
   schedule: '0 3 * * *'
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/pihole-backup
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: pihole-backups
-    existingSecret: pihole-s3-credentials
+    region: us-east-1
+    credentialsFromPodIdentity: true
   include:
     gravity: true
     customDns: true
@@ -382,6 +386,10 @@ that DHCP-enabled workload.
 | `networkPolicy.enabled`                       | boolean | `true`                                     | Restricts ingress to the enabled Pi-hole ports.                              |
 | `networkPolicy.ingressFrom`                   | array   | `[]`                                       | Optional source selectors; empty allows all sources on allowed ports.        |
 
+`commonAnnotations` applies metadata annotations to every chart-managed resource, excluding pod templates. When a
+resource also has its own annotations, such as `ingress.annotations` or `backup.serviceAccount.annotations`, those
+resource-specific values take precedence over matching common keys.
+
 When `dhcp.hostNetwork: true`, NetworkPolicy enforcement for the pod's host-networked listeners depends
 on the cluster network plugin. Verify that behavior in the target cluster and use node firewall or other
 node-level controls when access to those listeners must be restricted.
@@ -430,20 +438,35 @@ Use `unbound.extraConfig` for small additions to the default server block. Use
 
 ### Metrics and Backup
 
-| Parameter                        | Type    | Default       | Description                                  |
-| -------------------------------- | ------- | ------------- | -------------------------------------------- |
-| `metrics.enabled`                | boolean | `false`       | Deploy `pihole-exporter` Prometheus sidecar. |
-| `metrics.port`                   | integer | `9617`        | Metrics endpoint port.                       |
-| `metrics.serviceMonitor.enabled` | boolean | `false`       | Create Prometheus ServiceMonitor resource.   |
-| `backup.enabled`                 | boolean | `false`       | Enable scheduled S3 backup.                  |
-| `backup.schedule`                | string  | `"0 3 * * *"` | Cron schedule.                               |
-| `backup.include.gravity`         | boolean | `true`        | Include gravity.db in backup.                |
-| `backup.include.customDns`       | boolean | `true`        | Include custom DNS records in backup.        |
-| `backup.include.dnsmasq`         | boolean | `true`        | Include dnsmasq configuration in backup.     |
-| `backup.s3.existingSecret`       | string  | `""`          | Existing secret with S3 credentials.         |
-| `persistence.enabled`            | boolean | `true`        | Enable PVC for `/etc/pihole`.                |
-| `persistence.size`               | string  | `1Gi`         | PVC size.                                    |
-| `extraManifests`                 | array   | `[]`          | Extra Kubernetes manifests.                  |
+| Parameter                                            | Type    | Default       | Description                                                    |
+| ---------------------------------------------------- | ------- | ------------- | -------------------------------------------------------------- |
+| `metrics.enabled`                                    | boolean | `false`       | Deploy `pihole-exporter` Prometheus sidecar.                   |
+| `metrics.port`                                       | integer | `9617`        | Metrics endpoint port.                                         |
+| `metrics.serviceMonitor.enabled`                     | boolean | `false`       | Create Prometheus ServiceMonitor resource.                     |
+| `backup.enabled`                                     | boolean | `false`       | Enable scheduled S3 backup.                                    |
+| `backup.schedule`                                    | string  | `"0 3 * * *"` | Cron schedule.                                                 |
+| `backup.include.gravity`                             | boolean | `true`        | Include gravity.db in backup.                                  |
+| `backup.include.customDns`                           | boolean | `true`        | Include custom DNS records in backup.                          |
+| `backup.include.dnsmasq`                             | boolean | `true`        | Include dnsmasq configuration in backup.                       |
+| `backup.serviceAccount.create`                       | boolean | `true`        | Create a dedicated ServiceAccount for backup jobs.             |
+| `backup.serviceAccount.name`                         | string  | `""`          | Existing dedicated ServiceAccount when creation is disabled.   |
+| `backup.serviceAccount.annotations`                  | object  | `{}`          | Workload identity annotations, such as an IRSA role ARN.       |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `false`       | Mount the Kubernetes API token into backup pods.               |
+| `backup.s3.endpoint`                                 | string  | `""`          | S3-compatible endpoint URL.                                    |
+| `backup.s3.bucket`                                   | string  | `""`          | Target bucket name.                                            |
+| `backup.s3.prefix`                                   | string  | `pihole`      | Object key prefix within the bucket.                           |
+| `backup.s3.existingSecret`                           | string  | `""`          | Existing secret with `access-key` and `secret-key`.            |
+| `backup.s3.region`                                   | string  | `""`          | AWS region; required when workload identity is enabled.        |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`       | Use EKS Pod Identity or IRSA instead of static S3 credentials. |
+| `persistence.enabled`                                | boolean | `true`        | Enable PVC for `/etc/pihole`.                                  |
+| `persistence.size`                                   | string  | `1Gi`         | PVC size.                                                      |
+| `commonAnnotations`                                  | object  | `{}`          | Annotations added to every chart-managed resource.             |
+| `extraManifests`                                     | array   | `[]`          | Extra Kubernetes manifests.                                    |
+
+Backup jobs always use their dedicated ServiceAccount. With static credentials, set `backup.s3.existingSecret` or
+the inline access and secret keys. With EKS Pod Identity or IRSA, enable `backup.s3.credentialsFromPodIdentity`, set
+`backup.s3.region`, and configure the identity through the dedicated ServiceAccount name or annotations. The chart
+does not render or reference a static credential Secret in workload identity mode.
 
 ## Upgrade Notes
 
