@@ -196,10 +196,19 @@ configuration:
 
 </DocsTabs>
 
+<Callout type="warning" title="Chart version requirement">
+  Preserving an explicitly empty `checksumAlgorithm` requires Velero chart 1.7.0 or later. Earlier chart releases omit
+  empty values from the rendered `BackupStorageLocation`.
+</Callout>
+
 <Callout type="info" title="Disable checksum headers for incompatible S3 providers">
   The AWS plugin uses `CRC32` by default. Providers such as NetApp S3 may require uploads without AWS checksum headers.
   Set `configuration.backupStorageLocations[].config.checksumAlgorithm` to an explicit empty string (`""`) to disable
-  them. Supported non-empty values are `CRC32`, `CRC32C`, `SHA1`, and `SHA256`.
+  them. Do not override `plugins.aws.tag` to v1.14.1 or v1.14.2 for checksum-incompatible providers: those releases may
+  still send automatic checksum headers and fail with `400 InvalidArgument`. Plugin v1.14.3 fixes single-part uploads,
+  but validate multipart backups against the target backend ([upstream
+  issue](https://github.com/velero-io/velero/issues/9804)). Supported non-empty values are `CRC32`, `CRC32C`, `SHA1`,
+  and `SHA256`.
 </Callout>
 
 ## S3 Credentials Format
