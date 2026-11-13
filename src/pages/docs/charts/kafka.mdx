@@ -35,6 +35,8 @@ a KRaft-only design — no ZooKeeper required. It supports a `single-broker` top
 - **JMX metrics** — optional Prometheus-compatible metrics via a SHA-256 verified JMX exporter javaagent
 - **ServiceMonitor** — Prometheus Operator integration for metrics collection
 - **PodDisruptionBudget** — optional disruption protection for cluster mode
+- **Resource metadata** — shared annotations across chart-owned resources, with resource-specific overrides
+- **PVC lifecycle controls** — optional retain/delete policies for StatefulSet deletion and scale-down
 
 ## Installation
 
@@ -230,20 +232,21 @@ pdb:
 
 ### Core
 
-| Parameter          | Type   | Default         | Description                                            |
-| ------------------ | ------ | --------------- | ------------------------------------------------------ |
-| `architecture`     | string | `single-broker` | Broker topology: `single-broker` or `cluster`.         |
-| `nameOverride`     | string | `""`            | Override the chart name.                               |
-| `fullnameOverride` | string | `""`            | Override the full release name.                        |
-| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
-| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
+| Parameter           | Type   | Default         | Description                                            |
+| ------------------- | ------ | --------------- | ------------------------------------------------------ |
+| `architecture`      | string | `single-broker` | Broker topology: `single-broker` or `cluster`.         |
+| `nameOverride`      | string | `""`            | Override the chart name.                               |
+| `fullnameOverride`  | string | `""`            | Override the full release name.                        |
+| `commonLabels`      | object | `{}`            | Extra labels added to all resources.                   |
+| `commonAnnotations` | object | `{}`            | Annotations added to all chart-owned resources.        |
+| `clusterDomain`     | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
 
 ### Image
 
 | Parameter          | Type   | Default                  | Description                          |
 | ------------------ | ------ | ------------------------ | ------------------------------------ |
 | `image.repository` | string | `docker.io/apache/kafka` | Kafka container image.               |
-| `image.tag`        | string | `"4.3.0"`                | Image tag.                           |
+| `image.tag`        | string | `"4.3.1"`                | Image tag.                           |
 | `image.pullPolicy` | string | `IfNotPresent`           | Image pull policy.                   |
 | `imagePullSecrets` | array  | `[]`                     | Pull secrets for private registries. |
 
@@ -306,27 +309,33 @@ pdb:
 
 ### Single-Broker Topology
 
-| Parameter                               | Type    | Default             | Description                                |
-| --------------------------------------- | ------- | ------------------- | ------------------------------------------ |
-| `singleBroker.persistence.enabled`      | boolean | `true`              | Enable PVC for single-broker data.         |
-| `singleBroker.persistence.size`         | string  | `8Gi`               | PVC size for single-broker.                |
-| `singleBroker.persistence.storageClass` | string  | `""`                | StorageClass for single-broker PVC.        |
-| `singleBroker.persistence.accessModes`  | array   | `["ReadWriteOnce"]` | Access modes.                              |
-| `singleBroker.resources`                | object  | `{}`                | Resources for the single-broker container. |
+| Parameter                                              | Type    | Default             | Description                                                     |
+| ------------------------------------------------------ | ------- | ------------------- | --------------------------------------------------------------- |
+| `singleBroker.persistence.enabled`                     | boolean | `true`              | Enable PVC for single-broker data.                              |
+| `singleBroker.persistence.size`                        | string  | `8Gi`               | PVC size for single-broker.                                     |
+| `singleBroker.persistence.storageClass`                | string  | `""`                | StorageClass for single-broker PVC.                             |
+| `singleBroker.persistence.accessModes`                 | array   | `["ReadWriteOnce"]` | Access modes.                                                   |
+| `singleBroker.persistence.retentionPolicy.whenDeleted` | string  | `""`                | PVC policy when the StatefulSet is deleted: `Retain`/`Delete`.  |
+| `singleBroker.persistence.retentionPolicy.whenScaled`  | string  | `""`                | PVC policy when the StatefulSet scales down: `Retain`/`Delete`. |
+| `singleBroker.resources`                               | object  | `{}`                | Resources for the single-broker container.                      |
 
 ### Cluster Topology
 
-| Parameter                                 | Type    | Default | Description                                                                              |
-| ----------------------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------- |
-| `cluster.minInSyncReplicas`               | integer | `2`     | Minimum in-sync replicas for internal topics.                                            |
-| `cluster.controllers.replicaCount`        | integer | `3`     | Number of dedicated controller pods.                                                     |
-| `cluster.controllers.persistence.enabled` | boolean | `true`  | Enable PVCs for controllers.                                                             |
-| `cluster.controllers.persistence.size`    | string  | `8Gi`   | PVC size per controller.                                                                 |
-| `cluster.controllers.resources`           | object  | `{}`    | Resources for controller containers.                                                     |
-| `cluster.brokers.replicaCount`            | integer | `3`     | Number of broker pods. Set to `0` for combined mode (brokers co-located on controllers). |
-| `cluster.brokers.persistence.enabled`     | boolean | `true`  | Enable PVCs for brokers.                                                                 |
-| `cluster.brokers.persistence.size`        | string  | `20Gi`  | PVC size per broker.                                                                     |
-| `cluster.brokers.resources`               | object  | `{}`    | Resources for broker containers.                                                         |
+| Parameter                                                     | Type    | Default | Description                                                                              |
+| ------------------------------------------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------- |
+| `cluster.minInSyncReplicas`                                   | integer | `2`     | Minimum in-sync replicas for internal topics.                                            |
+| `cluster.controllers.replicaCount`                            | integer | `3`     | Number of dedicated controller pods.                                                     |
+| `cluster.controllers.persistence.enabled`                     | boolean | `true`  | Enable PVCs for controllers.                                                             |
+| `cluster.controllers.persistence.size`                        | string  | `8Gi`   | PVC size per controller.                                                                 |
+| `cluster.controllers.persistence.retentionPolicy.whenDeleted` | string  | `""`    | Controller PVC policy when the StatefulSet is deleted: `Retain`/`Delete`.                |
+| `cluster.controllers.persistence.retentionPolicy.whenScaled`  | string  | `""`    | Controller PVC policy when the StatefulSet scales down: `Retain`/`Delete`.               |
+| `cluster.controllers.resources`                               | object  | `{}`    | Resources for controller containers.                                                     |
+| `cluster.brokers.replicaCount`                                | integer | `3`     | Number of broker pods. Set to `0` for combined mode (brokers co-located on controllers). |
+| `cluster.brokers.persistence.enabled`                         | boolean | `true`  | Enable PVCs for brokers.                                                                 |
+| `cluster.brokers.persistence.size`                            | string  | `20Gi`  | PVC size per broker.                                                                     |
+| `cluster.brokers.persistence.retentionPolicy.whenDeleted`     | string  | `""`    | Broker PVC policy when the StatefulSet is deleted: `Retain`/`Delete`.                    |
+| `cluster.brokers.persistence.retentionPolicy.whenScaled`      | string  | `""`    | Broker PVC policy when the StatefulSet scales down: `Retain`/`Delete`.                   |
+| `cluster.brokers.resources`                                   | object  | `{}`    | Resources for broker containers.                                                         |
 
 ### PodDisruptionBudget
 
