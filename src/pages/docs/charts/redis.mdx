@@ -78,6 +78,7 @@ authentication, TLS, persistence, memory limits, dual-stack Services, and Extern
 - **`config.redis`** — custom `redis.conf` lines (maxmemory, eviction policy, etc.)
 - **Prometheus exporter** — `oliver006/redis_exporter` sidecar with ServiceMonitor
 - **Non-root** — runs as UID/GID 999 by default
+- **Explicit PVC lifecycle** — independently control retention after StatefulSet deletion and scale-down for every topology
 
 ## Installation
 
@@ -122,6 +123,9 @@ standalone:
   persistence:
     enabled: true
     size: 20Gi
+    retentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
   resources:
     requests:
       memory: 256Mi
@@ -313,6 +317,11 @@ Redis has room for client buffers, persistence buffers, Lua, and allocator overh
 Secrets for credentials, enable TLS when traffic crosses a trust boundary, and enable PodDisruptionBudget for Sentinel
 or clustered deployments.
 
+Every persistence block exposes `retentionPolicy.whenDeleted` and `retentionPolicy.whenScaled`. Leave both values empty
+to omit `persistentVolumeClaimRetentionPolicy` and preserve Kubernetes' default PVC retention. Set either field to
+`Retain` or `Delete` only when that lifecycle is deliberate; `Delete` can remove StatefulSet-owned data after deletion
+or scale-down.
+
 ### Listener and Service ports
 
 Redis process listeners are independent from client-facing Service ports. Use
@@ -390,19 +399,22 @@ assume that enabling TLS alone enables mutual TLS for every architecture.
 
 ### Standalone
 
-| Parameter                        | Type    | Default | Description                     |
-| -------------------------------- | ------- | ------- | ------------------------------- |
-| `standalone.persistence.enabled` | boolean | `true`  | Enable PVC for standalone.      |
-| `standalone.persistence.size`    | string  | `8Gi`   | PVC size.                       |
-| `standalone.resources`           | object  | `{}`    | CPU and memory requests/limits. |
+| Parameter                                | Type    | Default                             | Description                                          |
+| ---------------------------------------- | ------- | ----------------------------------- | ---------------------------------------------------- |
+| `standalone.persistence.enabled`         | boolean | `true`                              | Enable PVC for standalone.                           |
+| `standalone.persistence.size`            | string  | `8Gi`                               | PVC size.                                            |
+| `standalone.persistence.retentionPolicy` | object  | `{whenDeleted: "", whenScaled: ""}` | PVC lifecycle on StatefulSet deletion or scale-down. |
+| `standalone.resources`                   | object  | `{}`                                | CPU and memory requests/limits.                      |
 
 ### Replication
 
-| Parameter                              | Type    | Default | Description             |
-| -------------------------------------- | ------- | ------- | ----------------------- |
-| `replication.replicaCount`             | integer | `2`     | Number of replica pods. |
-| `replication.primary.persistence.size` | string  | `8Gi`   | Primary PVC size.       |
-| `replication.replica.persistence.size` | string  | `8Gi`   | Replica PVC size.       |
+| Parameter                                         | Type    | Default                             | Description             |
+| ------------------------------------------------- | ------- | ----------------------------------- | ----------------------- |
+| `replication.replicaCount`                        | integer | `2`                                 | Number of replica pods. |
+| `replication.primary.persistence.size`            | string  | `8Gi`                               | Primary PVC size.       |
+| `replication.primary.persistence.retentionPolicy` | object  | `{whenDeleted: "", whenScaled: ""}` | Primary PVC lifecycle.  |
+| `replication.replica.persistence.size`            | string  | `8Gi`                               | Replica PVC size.       |
+| `replication.replica.persistence.retentionPolicy` | object  | `{whenDeleted: "", whenScaled: ""}` | Replica PVC lifecycle.  |
 
 ### Sentinel
 
@@ -411,6 +423,7 @@ assume that enabling TLS alone enables mutual TLS for every architecture.
 | `node.replicaCount`                                   | integer | `3`        | Number of role-neutral Redis data nodes.                      |
 | `node.persistence.enabled`                            | boolean | `true`     | Persist AOF/RDB data for Sentinel nodes.                      |
 | `node.persistence.size`                               | string  | `8Gi`      | PVC size for each Sentinel data node.                         |
+| `node.persistence.retentionPolicy`                    | object  | empty      | Data-node PVC lifecycle on deletion or scale-down.            |
 | `node.resources`                                      | object  | `{}`       | CPU and memory resources applied to every Sentinel data node. |
 | `sentinel.replicaCount`                               | integer | `3`        | Number of Sentinel pods (always use an odd number).           |
 | `sentinel.masterSet`                                  | string  | `mymaster` | Master set name used by Sentinel-aware clients.               |
@@ -423,15 +436,17 @@ assume that enabling TLS alone enables mutual TLS for every architecture.
 | `sentinel.gracefulFailover.replicaSyncTimeoutSeconds` | integer | `15`       | Seconds to wait for an in-sync replica before handoff.        |
 | `sentinel.startupFailoverGuard.enabled`               | boolean | `true`     | Prevent an empty node from resuming as master.                |
 | `sentinel.startupFailoverGuard.maxAttempts`           | integer | `20`       | Attempts to force safe promotion before startup.              |
+| `sentinel.persistence.retentionPolicy`                | object  | empty      | Sentinel PVC lifecycle when Sentinel persistence is enabled.  |
 
 ### Cluster
 
-| Parameter                   | Type    | Default | Description                                                |
-| --------------------------- | ------- | ------- | ---------------------------------------------------------- |
-| `cluster.nodes`             | integer | `6`     | Total cluster nodes (minimum 6: 3 masters + 3 replicas).   |
-| `cluster.replicasPerMaster` | integer | `1`     | Replicas per master shard.                                 |
-| `cluster.initJob.enabled`   | boolean | `true`  | Run `redis-cli --cluster create` Job after pods are ready. |
-| `cluster.persistence.size`  | string  | `8Gi`   | PVC size per cluster node.                                 |
+| Parameter                             | Type    | Default | Description                                                |
+| ------------------------------------- | ------- | ------- | ---------------------------------------------------------- |
+| `cluster.nodes`                       | integer | `6`     | Total cluster nodes (minimum 6: 3 masters + 3 replicas).   |
+| `cluster.replicasPerMaster`           | integer | `1`     | Replicas per master shard.                                 |
+| `cluster.initJob.enabled`             | boolean | `true`  | Run `redis-cli --cluster create` Job after pods are ready. |
+| `cluster.persistence.size`            | string  | `8Gi`   | PVC size per cluster node.                                 |
+| `cluster.persistence.retentionPolicy` | object  | empty   | Cluster-node PVC lifecycle on deletion or scale-down.      |
 
 ### Networking
 

@@ -421,6 +421,17 @@ test.describe('Playground', () => {
     await expect(code).not.toContainText('replication.replica');
   });
 
+  test('redis exposes topology-specific PVC retention policies', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="redis"]').click();
+    const whenDeleted = page.locator('select[data-field-key="standalone.persistence.retentionPolicy.whenDeleted"]');
+    await whenDeleted.selectOption('Delete');
+
+    await expect(page.locator('#playground-code')).toContainText(
+      'standalone.persistence.retentionPolicy.whenDeleted=Delete',
+    );
+  });
+
   test('valkey defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="valkey"]').click();
