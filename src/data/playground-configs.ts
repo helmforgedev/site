@@ -14163,7 +14163,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.existingSecret',
           type: 'text',
           default: '',
-          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'false' },
           description: 'Secret with S3 access-key and secret-key',
         },
         {
@@ -14171,7 +14170,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.credentialsFromPodIdentity',
           type: 'toggle',
           default: 'false',
-          emitDefault: false,
           description: 'Use EKS Pod Identity or IRSA instead of static keys',
         },
         {
@@ -14179,8 +14177,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.region',
           type: 'text',
           default: '',
-          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
-          requiredWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Required for workload identity',
         },
         {
@@ -14188,7 +14184,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.create',
           type: 'toggle',
           default: 'true',
-          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Create the dedicated ServiceAccount used by backup jobs',
         },
         {
@@ -14196,23 +14191,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.name',
           type: 'text',
           default: '',
-          visibleWhen: {
-            'backup.s3.credentialsFromPodIdentity': 'true',
-            'backup.serviceAccount.create': 'false',
-          },
-          requiredWhen: {
-            'backup.s3.credentialsFromPodIdentity': 'true',
-            'backup.serviceAccount.create': 'false',
-          },
           description: 'Required when dedicated ServiceAccount creation is disabled',
-        },
-        {
-          label: 'IRSA Role ARN',
-          key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
-          type: 'text',
-          default: '',
-          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
-          description: 'IAM role annotation for IRSA',
         },
       ],
     },
@@ -14359,6 +14338,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.existingSecret',
           type: 'text',
           default: '',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'false' },
           description: 'Secret with S3 access-key and secret-key',
         },
         {
@@ -14366,6 +14346,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.credentialsFromPodIdentity',
           type: 'toggle',
           default: 'false',
+          emitDefault: false,
           description: 'Use EKS Pod Identity or IRSA instead of static keys',
         },
         {
@@ -14373,6 +14354,8 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.region',
           type: 'text',
           default: '',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
+          requiredWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Required for workload identity',
         },
         {
@@ -14380,6 +14363,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.create',
           type: 'toggle',
           default: 'true',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
           description: 'Create the dedicated ServiceAccount used by backup jobs',
         },
         {
@@ -14387,7 +14371,23 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.name',
           type: 'text',
           default: '',
+          visibleWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
+          requiredWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
           description: 'Required when dedicated ServiceAccount creation is disabled',
+        },
+        {
+          label: 'IRSA Role ARN',
+          key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
+          type: 'text',
+          default: '',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
+          description: 'IAM role annotation for IRSA',
         },
       ],
     },
