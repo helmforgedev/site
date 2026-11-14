@@ -28,6 +28,8 @@ installation required.
 - **OIDC, SAML, and TOTP** — SSO and MFA integrations
 - **Tomcat reverse proxy** — correct client IP via `X-Forwarded-For` support
 - **Database-aware backup** — `pg_dump` or `mysqldump` to S3
+- **Workload identity backups** — use a dedicated ServiceAccount without static S3 credentials
+- **Shared metadata** — apply `commonAnnotations` to chart-owned resources
 - **Real listener overrides** — configure Tomcat HTTP and guacd process ports independently from the Service
 - **Immutable official images** — Guacamole and guacd 1.6.0 are pinned by multi-architecture digest
 - **Secure pod defaults** — non-root users, read-only filesystems, seccomp, dropped capabilities, and no API token
@@ -198,10 +200,14 @@ database:
 backup:
   enabled: true
   schedule: '0 2 * * *'
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/guacamole-backup
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: guacamole-backups
-    existingSecret: guacamole-s3-credentials
+    region: us-east-1
+    credentialsFromPodIdentity: true
 
 ingress:
   enabled: true
@@ -250,6 +256,13 @@ these settings do not change only Kubernetes metadata.
 | `guacd.image.repository` | string | `docker.io/guacamole/guacd`     | guacd protocol daemon image.     |
 | `guacd.image.tag`        | string | `"1.6.0"`                       | guacd image tag.                 |
 | `guacd.image.digest`     | string | pinned 1.6.0 digest             | Immutable daemon image manifest. |
+
+### Common Metadata
+
+| Parameter           | Type   | Default | Description                                                                       |
+| ------------------- | ------ | ------- | --------------------------------------------------------------------------------- |
+| `commonLabels`      | object | `{}`    | Labels added to chart-owned resources.                                            |
+| `commonAnnotations` | object | `{}`    | Annotations added to chart-owned resources; resource annotations take precedence. |
 
 ### Guacamole
 
@@ -327,17 +340,22 @@ these settings do not change only Kubernetes metadata.
 
 Database-aware: `pg_dump` for PostgreSQL, `mysqldump` for MySQL.
 
-| Parameter                  | Type    | Default       | Description                           |
-| -------------------------- | ------- | ------------- | ------------------------------------- |
-| `backup.enabled`           | boolean | `false`       | Enable scheduled database S3 backup.  |
-| `backup.schedule`          | string  | `"0 2 * * *"` | Cron schedule.                        |
-| `backup.s3.endpoint`       | string  | `""`          | S3-compatible endpoint URL.           |
-| `backup.s3.bucket`         | string  | `""`          | Target bucket name.                   |
-| `backup.s3.prefix`         | string  | `guacamole`   | Prefix inside the target bucket.      |
-| `backup.s3.existingSecret` | string  | `""`          | Existing secret with S3 credentials.  |
-| `backup.s3.accessKey`      | string  | `""`          | Inline S3 access key. Prefer secrets. |
-| `backup.s3.secretKey`      | string  | `""`          | Inline S3 secret key. Prefer secrets. |
-| `extraManifests`           | array   | `[]`          | Extra Kubernetes manifests.           |
+| Parameter                              | Type    | Default       | Description                                               |
+| -------------------------------------- | ------- | ------------- | --------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`       | Enable scheduled database S3 backup.                      |
+| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                            |
+| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                               |
+| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                       |
+| `backup.s3.prefix`                     | string  | `guacamole`   | Prefix inside the target bucket.                          |
+| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                      |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`       | Use ambient workload identity instead of static keys.     |
+| `backup.s3.region`                     | string  | `""`          | AWS region required for workload identity.                |
+| `backup.serviceAccount.create`         | boolean | `true`        | Create a dedicated backup ServiceAccount.                 |
+| `backup.serviceAccount.name`           | string  | `""`          | Existing backup ServiceAccount when creation is disabled. |
+| `backup.serviceAccount.annotations`    | object  | `{}`          | Workload identity annotations for the backup account.     |
+| `backup.s3.accessKey`                  | string  | `""`          | Inline S3 access key. Prefer secrets.                     |
+| `backup.s3.secretKey`                  | string  | `""`          | Inline S3 secret key. Prefer secrets.                     |
+| `extraManifests`                       | array   | `[]`          | Extra Kubernetes manifests.                               |
 
 ## Security and Operations
 
