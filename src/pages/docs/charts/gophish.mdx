@@ -25,7 +25,7 @@ Gophish is an open-source phishing awareness platform for authorized security tr
 - **NetworkPolicy** — separate admin, phishing, database, DNS, and SMTP egress controls
 - **Gateway API** — optional HTTPRoutes for admin and phishing listeners with separate parentRefs
 - **Dual-stack Services** — optional IP family policy and families for admin and phishing Services
-- **SQLite backup** — optional CronJob uploads archive and checksum to S3-compatible storage
+- **SQLite backup** — optional CronJob uploads archive and checksum with a static Secret or ambient AWS workload identity
 
 ## Installation
 
@@ -166,11 +166,15 @@ networkPolicy:
 backup:
   enabled: true
   schedule: '0 3 * * *'
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/gophish-backup
   s3:
     endpoint: https://s3.amazonaws.com
     bucket: gophish-backups
     prefix: gophish
-    existingSecret: gophish-backup
+    region: us-east-1
+    credentialsFromPodIdentity: true
 ```
 
 </div>
@@ -255,6 +259,10 @@ External MySQL should use `database.external.existingSecret` with a complete DSN
 
 Chart-managed backup covers SQLite mode only. It archives the chart-managed PVC path containing the SQLite database, writes a SHA256 checksum, and uploads both files with `docker.io/helmforge/mc:1.0.0`.
 
+For Amazon S3, set `backup.s3.credentialsFromPodIdentity=true` and a region. The chart then uses a dedicated backup
+ServiceAccount and does not render or reference static S3 credentials. Configure `backup.serviceAccount.annotations` for
+IRSA, associate the ServiceAccount externally for EKS Pod Identity, or set `create: false` with an existing name.
+
 Embedded MySQL and external MySQL backup are delegated to MySQL-specific backup tooling.
 
 ## Values Reference
@@ -264,6 +272,7 @@ Embedded MySQL and external MySQL backup are delegated to MySQL-specific backup 
 | `nameOverride`                                | string  | `""`                                  | Override chart name in resource names         |
 | `fullnameOverride`                            | string  | `""`                                  | Override full resource name                   |
 | `commonLabels`                                | object  | `{}`                                  | Labels added to chart resources               |
+| `commonAnnotations`                           | object  | `{}`                                  | Annotations added to chart resources          |
 | `replicaCount`                                | integer | `1`                                   | Gophish replicas; SQLite requires `1`         |
 | `clusterDomain`                               | string  | `cluster.local`                       | Kubernetes cluster domain                     |
 | `image.repository`                            | string  | `docker.io/gophish/gophish`           | Official Gophish image repository             |
@@ -337,8 +346,13 @@ Embedded MySQL and external MySQL backup are delegated to MySQL-specific backup 
 | `backup.schedule`                             | string  | `0 3 * * *`                           | Backup schedule                               |
 | `backup.images.archive.repository`            | string  | `docker.io/library/busybox`           | Archive image                                 |
 | `backup.images.uploader.repository`           | string  | `docker.io/helmforge/mc`              | HelmForge S3 uploader image                   |
+| `backup.serviceAccount.create`                | boolean | `true`                                | Create workload identity backup identity      |
+| `backup.serviceAccount.name`                  | string  | `""`                                  | Existing backup ServiceAccount name           |
+| `backup.serviceAccount.annotations`           | object  | `{}`                                  | Backup identity annotations                   |
 | `backup.s3.endpoint`                          | string  | `""`                                  | S3-compatible endpoint                        |
 | `backup.s3.bucket`                            | string  | `""`                                  | Backup bucket                                 |
+| `backup.s3.region`                            | string  | `""`                                  | AWS region for ambient credentials            |
+| `backup.s3.credentialsFromPodIdentity`        | boolean | `false`                               | Use IRSA or EKS Pod Identity                  |
 | `backup.s3.existingSecret`                    | string  | `""`                                  | S3 credential Secret                          |
 | `probes.*`                                    | object  | see values                            | Startup, liveness, readiness probes           |
 | `resources`                                   | object  | see values                            | Gophish container resources                   |
@@ -374,7 +388,7 @@ Embedded MySQL and external MySQL backup are delegated to MySQL-specific backup 
 - **MySQL DSN errors** — confirm the DSN Secret key and MySQL `sql_mode` compatibility.
 - **Ingress TLS mismatch** — align ingress TLS termination with native Gophish TLS settings.
 - **Trusted origins or CSRF errors** — add the external admin origin to `gophish.adminServer.trustedOrigins`.
-- **Backup failures** — inspect backup Job logs, S3 endpoint reachability, and the S3 credential Secret.
+- **Backup failures** — inspect backup Job logs, S3 endpoint reachability, and either the credential Secret or workload identity association.
 - **Image pull errors** — confirm access to `docker.io/gophish/gophish:0.12.1` and the HelmForge uploader image.
 
 ## More Information
