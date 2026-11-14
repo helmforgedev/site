@@ -400,34 +400,35 @@ The chart renders `external-secrets.io/v1` resources and supports multiple compl
   backup feature) to protect the full Ghost dataset.
 </Callout>
 
-| Parameter                              | Type    | Default                          | Description                                                  |
-| -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
-| `backup.enabled`                       | boolean | `false`                          | Enable scheduled S3 content backup CronJob.                  |
-| `backup.serviceAccount.create`         | boolean | `true`                           | Create a dedicated workload identity ServiceAccount.         |
-| `backup.serviceAccount.name`           | string  | `""`                             | Existing backup ServiceAccount when creation is disabled.    |
-| `backup.serviceAccount.annotations`    | object  | `{}`                             | Workload identity annotations for the backup account.        |
-| `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
-| `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
-| `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
-| `backup.successfulJobsHistoryLimit`    | integer | `3`                              | Number of successful Job records to keep.                    |
-| `backup.failedJobsHistoryLimit`        | integer | `3`                              | Number of failed Job records to keep.                        |
-| `backup.backoffLimit`                  | integer | `1`                              | Job retry limit.                                             |
-| `backup.archivePrefix`                 | string  | `ghost`                          | Prefix for backup archive filenames.                         |
-| `backup.images.backup`                 | string  | `docker.io/library/busybox:1.37` | Image used for `tar` archive.                                |
-| `backup.images.uploader`               | string  | `docker.io/helmforge/mc:1.0.0`   | Image used for S3 upload.                                    |
-| `backup.resources`                     | object  | `{}`                             | Resources for backup containers.                             |
-| `backup.scratchSizeLimit`              | string  | `2Gi`                            | Maximum ephemeral archive size per backup Job.               |
-| `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
-| `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
-| `backup.s3.prefix`                     | string  | `ghost`                          | Key prefix within the bucket.                                |
-| `backup.s3.region`                     | string  | `""`                             | AWS region required for workload identity.                   |
-| `backup.s3.credentialsFromPodIdentity` | boolean | `false`                          | Use ambient workload identity instead of static keys.        |
-| `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
-| `backup.s3.existingSecret`             | string  | `""`                             | Existing secret containing S3 access and secret keys.        |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.            |
-| `backup.s3.accessKey`                  | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set). |
-| `backup.s3.secretKey`                  | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set). |
+| Parameter                                            | Type    | Default                          | Description                                                             |
+| ---------------------------------------------------- | ------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `backup.enabled`                                     | boolean | `false`                          | Enable scheduled S3 content backup CronJob.                             |
+| `backup.serviceAccount.create`                       | boolean | `true`                           | Create a dedicated workload identity ServiceAccount.                    |
+| `backup.serviceAccount.name`                         | string  | `""`                             | Existing backup ServiceAccount when creation is disabled.               |
+| `backup.serviceAccount.annotations`                  | object  | `{}`                             | Workload identity annotations for the backup account.                   |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `true`                           | Mount the projected Kubernetes API token required by workload identity. |
+| `backup.schedule`                                    | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                              |
+| `backup.suspend`                                     | boolean | `false`                          | Suspend the CronJob without deleting it.                                |
+| `backup.concurrencyPolicy`                           | string  | `Forbid`                         | CronJob concurrency policy.                                             |
+| `backup.successfulJobsHistoryLimit`                  | integer | `3`                              | Number of successful Job records to keep.                               |
+| `backup.failedJobsHistoryLimit`                      | integer | `3`                              | Number of failed Job records to keep.                                   |
+| `backup.backoffLimit`                                | integer | `1`                              | Job retry limit.                                                        |
+| `backup.archivePrefix`                               | string  | `ghost`                          | Prefix for backup archive filenames.                                    |
+| `backup.images.backup`                               | string  | `docker.io/library/busybox:1.37` | Image used for `tar` archive.                                           |
+| `backup.images.uploader`                             | string  | `docker.io/helmforge/mc:1.0.0`   | Image used for S3 upload.                                               |
+| `backup.resources`                                   | object  | `{}`                             | Resources for backup containers.                                        |
+| `backup.scratchSizeLimit`                            | string  | `2Gi`                            | Maximum ephemeral archive size per backup Job.                          |
+| `backup.s3.endpoint`                                 | string  | `""`                             | S3-compatible endpoint URL.                                             |
+| `backup.s3.bucket`                                   | string  | `""`                             | Target bucket name.                                                     |
+| `backup.s3.prefix`                                   | string  | `ghost`                          | Key prefix within the bucket.                                           |
+| `backup.s3.region`                                   | string  | `""`                             | AWS region required for workload identity.                              |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`                          | Use ambient workload identity instead of static keys.                   |
+| `backup.s3.createBucketIfNotExists`                  | boolean | `true`                           | Create the bucket automatically if it does not exist.                   |
+| `backup.s3.existingSecret`                           | string  | `""`                             | Existing secret containing S3 access and secret keys.                   |
+| `backup.s3.existingSecretAccessKeyKey`               | string  | `access-key`                     | Key in the existing secret for the S3 access key.                       |
+| `backup.s3.existingSecretSecretKeyKey`               | string  | `secret-key`                     | Key in the existing secret for the S3 secret key.                       |
+| `backup.s3.accessKey`                                | string  | `""`                             | Inline S3 access key (ignored when `existingSecret` is set).            |
+| `backup.s3.secretKey`                                | string  | `""`                             | Inline S3 secret key (ignored when `existingSecret` is set).            |
 
 ### Service
 
