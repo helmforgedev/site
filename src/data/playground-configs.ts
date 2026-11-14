@@ -5890,10 +5890,20 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Required when workload identity is enabled',
         },
         {
+          label: 'Create backup ServiceAccount',
+          key: 'backup.serviceAccount.create',
+          type: 'toggle',
+          default: 'true',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
+          description: 'Create the dedicated ServiceAccount used by backup workload identity',
+        },
+        {
           label: 'Backup ServiceAccount',
           key: 'backup.serviceAccount.name',
           type: 'text',
           default: '',
+          visibleWhen: { 'backup.serviceAccount.create': 'false' },
+          requiredWhen: { 'backup.serviceAccount.create': 'false' },
           description: 'Existing dedicated ServiceAccount name when chart creation is disabled',
         },
         {
@@ -5901,6 +5911,10 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
           type: 'text',
           default: '',
+          visibleWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'true',
+          },
           description: 'Optional IAM role annotation for the dedicated backup ServiceAccount',
         },
       ],
