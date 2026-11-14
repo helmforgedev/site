@@ -227,11 +227,12 @@ ingress:
 
 ### Core
 
-| Parameter          | Type    | Default | Description                           |
-| ------------------ | ------- | ------- | ------------------------------------- |
-| `replicaCount`     | integer | `1`     | Pod replicas. SQLite supports 1 only. |
-| `nameOverride`     | string  | `""`    | Override the chart name.              |
-| `fullnameOverride` | string  | `""`    | Override the full release name.       |
+| Parameter           | Type    | Default | Description                                       |
+| ------------------- | ------- | ------- | ------------------------------------------------- |
+| `replicaCount`      | integer | `1`     | Pod replicas. SQLite supports 1 only.             |
+| `commonAnnotations` | object  | `{}`    | Annotations applied to all chart-owned resources. |
+| `nameOverride`      | string  | `""`    | Override the chart name.                          |
+| `fullnameOverride`  | string  | `""`    | Override the full release name.                   |
 
 ### Image
 
@@ -341,6 +342,13 @@ target port continues to route to that fixed application listener.
 | `serviceAccount.create`                       | boolean | `false`             | Create a dedicated ServiceAccount.                |
 | `serviceAccount.automountServiceAccountToken` | boolean | `false`             | Mount an API token for scoped workload discovery. |
 
+### Security Defaults
+
+The chart drops the default Linux capability set and adds only `CHOWN`,
+`DAC_OVERRIDE`, `SETGID`, and `SETUID`, which the pinned Homarr image requires
+while configuring nginx at startup. Privilege escalation remains disabled and
+the pod uses the `RuntimeDefault` seccomp profile.
+
 ### Gateway API
 
 Use `gateway.enabled` to render a native Kubernetes
@@ -386,16 +394,38 @@ service:
 Database-aware backup: SQLite archives the full `/appdata` directory with `tar`.
 PostgreSQL uses `pg_dump`.
 
-| Parameter                          | Type    | Default       | Description                          |
-| ---------------------------------- | ------- | ------------- | ------------------------------------ |
-| `backup.enabled`                   | boolean | `false`       | Enable scheduled S3 backup CronJob.  |
-| `backup.schedule`                  | string  | `"0 3 * * *"` | Cron schedule.                       |
-| `backup.archivePrefix`             | string  | `homarr`      | Prefix for backup archive filenames. |
-| `backup.s3.endpoint`               | string  | `""`          | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`                 | string  | `""`          | Target bucket name.                  |
-| `backup.s3.existingSecret`         | string  | `""`          | Existing secret with S3 credentials. |
-| `backup.database.postgresDumpArgs` | string  | `""`          | Extra arguments for `pg_dump`.       |
-| `extraManifests`                   | array   | `[]`          | Extra Kubernetes manifests.          |
+AWS workload identity uses a dedicated backup ServiceAccount and does not
+render static S3 credential references:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/homarr-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: homarr-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+```
+
+| Parameter                                       | Type    | Default             | Description                                                  |
+| ----------------------------------------------- | ------- | ------------------- | ------------------------------------------------------------ |
+| `backup.enabled`                                | boolean | `false`             | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                               | string  | `"0 3 * * *"`       | Cron schedule.                                               |
+| `backup.archivePrefix`                          | string  | `homarr`            | Prefix for backup archive filenames.                         |
+| `backup.s3.endpoint`                            | string  | `""`                | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                              | string  | `""`                | Target bucket name.                                          |
+| `backup.s3.existingSecret`                      | string  | `""`                | Existing secret with S3 credentials.                         |
+| `backup.s3.region`                              | string  | `""`                | AWS region for ambient workload identity.                    |
+| `backup.s3.credentialsFromPodIdentity`          | boolean | `false`             | Use ambient workload identity instead of static credentials. |
+| `backup.serviceAccount.create`                  | boolean | `true`              | Create a dedicated backup ServiceAccount.                    |
+| `backup.serviceAccount.annotations`             | object  | `{}`                | Workload identity annotations for the backup ServiceAccount. |
+| `backup.securityContext.capabilities.drop`      | array   | `[ALL]`             | Drop all Linux capabilities from backup containers.          |
+| `backup.sqliteSecurityContext.capabilities.add` | array   | `[DAC_READ_SEARCH]` | Read private Homarr files during SQLite backups.             |
+| `backup.database.postgresDumpArgs`              | string  | `""`                | Extra arguments for `pg_dump`.                               |
+| `extraManifests`                                | array   | `[]`                | Extra Kubernetes manifests.                                  |
 
 ### External Secrets
 
