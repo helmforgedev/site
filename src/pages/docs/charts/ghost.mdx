@@ -289,11 +289,12 @@ when the container starts.
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                                                       |
+| ------------------- | ------ | ------- | --------------------------------------------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                                                          |
+| `fullnameOverride`  | string | `""`    | Override the full release name.                                                   |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.                                              |
+| `commonAnnotations` | object | `{}`    | Annotations added to chart-owned resources; resource annotations take precedence. |
 
 ### Image
 
@@ -402,6 +403,9 @@ The chart renders `external-secrets.io/v1` resources and supports multiple compl
 | Parameter                              | Type    | Default                          | Description                                                  |
 | -------------------------------------- | ------- | -------------------------------- | ------------------------------------------------------------ |
 | `backup.enabled`                       | boolean | `false`                          | Enable scheduled S3 content backup CronJob.                  |
+| `backup.serviceAccount.create`         | boolean | `true`                           | Create a dedicated workload identity ServiceAccount.         |
+| `backup.serviceAccount.name`           | string  | `""`                             | Existing backup ServiceAccount when creation is disabled.    |
+| `backup.serviceAccount.annotations`    | object  | `{}`                             | Workload identity annotations for the backup account.        |
 | `backup.schedule`                      | string  | `"0 3 * * *"`                    | Cron schedule for backups.                                   |
 | `backup.suspend`                       | boolean | `false`                          | Suspend the CronJob without deleting it.                     |
 | `backup.concurrencyPolicy`             | string  | `Forbid`                         | CronJob concurrency policy.                                  |
@@ -416,6 +420,8 @@ The chart renders `external-secrets.io/v1` resources and supports multiple compl
 | `backup.s3.endpoint`                   | string  | `""`                             | S3-compatible endpoint URL.                                  |
 | `backup.s3.bucket`                     | string  | `""`                             | Target bucket name.                                          |
 | `backup.s3.prefix`                     | string  | `ghost`                          | Key prefix within the bucket.                                |
+| `backup.s3.region`                     | string  | `""`                             | AWS region required for workload identity.                   |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`                          | Use ambient workload identity instead of static keys.        |
 | `backup.s3.createBucketIfNotExists`    | boolean | `true`                           | Create the bucket automatically if it does not exist.        |
 | `backup.s3.existingSecret`             | string  | `""`                             | Existing secret containing S3 access and secret keys.        |
 | `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                     | Key in the existing secret for the S3 access key.            |
@@ -474,12 +480,12 @@ Probes use the Ghost Admin API endpoint `/ghost/api/admin/site/` to verify the a
 
 ### Service Account
 
-| Parameter                                     | Type    | Default | Description                                                |
-| --------------------------------------------- | ------- | ------- | ---------------------------------------------------------- |
-| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                         |
-| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                          |
-| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                        |
-| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into Ghost and backup pods. |
+| Parameter                                     | Type    | Default | Description                                                    |
+| --------------------------------------------- | ------- | ------- | -------------------------------------------------------------- |
+| `serviceAccount.create`                       | boolean | `false` | Create a dedicated ServiceAccount.                             |
+| `serviceAccount.name`                         | string  | `""`    | Override the ServiceAccount name.                              |
+| `serviceAccount.annotations`                  | object  | `{}`    | Annotations for the ServiceAccount.                            |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount the Kubernetes API token into the Ghost application pod. |
 
 ### Scheduling
 
