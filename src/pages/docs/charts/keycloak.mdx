@@ -243,10 +243,14 @@ logging:
 backup:
   enabled: true
   schedule: '0 3 * * *'
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/keycloak-backup
   s3:
-    endpoint: https://s3.example.com
+    endpoint: https://s3.amazonaws.com
     bucket: keycloak-backups
-    existingSecret: keycloak-s3
+    region: us-east-1
+    credentialsFromPodIdentity: true
 
 networkPolicy:
   enabled: true
@@ -311,17 +315,18 @@ externalSecrets:
 
 ### Core and Image
 
-| Parameter          | Type   | Default                     | Description                          |
-| ------------------ | ------ | --------------------------- | ------------------------------------ |
-| `mode`             | string | `dev`                       | Runtime mode: `dev` or `production`. |
-| `nameOverride`     | string | `""`                        | Override chart name.                 |
-| `fullnameOverride` | string | `""`                        | Override full release name.          |
-| `commonLabels`     | object | `{}`                        | Labels added to all resources.       |
-| `clusterDomain`    | string | `cluster.local`             | Kubernetes cluster DNS domain.       |
-| `image.repository` | string | `quay.io/keycloak/keycloak` | Keycloak image repository.           |
-| `image.tag`        | string | `"26.8.1"`                  | Keycloak image tag.                  |
-| `image.pullPolicy` | string | `IfNotPresent`              | Image pull policy.                   |
-| `imagePullSecrets` | array  | `[]`                        | Pull secrets for private registries. |
+| Parameter           | Type   | Default                     | Description                                                                         |
+| ------------------- | ------ | --------------------------- | ----------------------------------------------------------------------------------- |
+| `mode`              | string | `dev`                       | Runtime mode: `dev` or `production`.                                                |
+| `nameOverride`      | string | `""`                        | Override chart name.                                                                |
+| `fullnameOverride`  | string | `""`                        | Override full release name.                                                         |
+| `commonLabels`      | object | `{}`                        | Labels added to all resources.                                                      |
+| `commonAnnotations` | object | `{}`                        | Annotations added to all chart resources; resource-specific values take precedence. |
+| `clusterDomain`     | string | `cluster.local`             | Kubernetes cluster DNS domain.                                                      |
+| `image.repository`  | string | `quay.io/keycloak/keycloak` | Keycloak image repository.                                                          |
+| `image.tag`         | string | `"26.8.1"`                  | Keycloak image tag.                                                                 |
+| `image.pullPolicy`  | string | `IfNotPresent`              | Image pull policy.                                                                  |
+| `imagePullSecrets`  | array  | `[]`                        | Pull secrets for private registries.                                                |
 
 ### Bootstrap Admin
 
@@ -499,22 +504,27 @@ externalSecrets:
 
 ### Backup
 
-| Parameter                           | Type    | Default                                                            | Description                          |
-| ----------------------------------- | ------- | ------------------------------------------------------------------ | ------------------------------------ |
-| `backup.enabled`                    | boolean | `false`                                                            | Enable database backup CronJob.      |
-| `backup.schedule`                   | string  | `"0 3 * * *"`                                                      | Backup schedule.                     |
-| `backup.suspend`                    | boolean | `false`                                                            | Suspend scheduled execution.         |
-| `backup.concurrencyPolicy`          | string  | `Forbid`                                                           | CronJob concurrency policy.          |
-| `backup.archivePrefix`              | string  | `keycloak`                                                         | Prefix for generated archive names.  |
-| `backup.images.uploader.repository` | string  | `docker.io/helmforge/mc`                                           | S3 uploader image.                   |
-| `backup.images.uploader.tag`        | string  | `"1.0.0"`                                                          | S3 uploader image tag.               |
-| `backup.s3.endpoint`                | string  | `""`                                                               | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`                  | string  | `""`                                                               | Target bucket name.                  |
-| `backup.s3.prefix`                  | string  | `keycloak`                                                         | Object key prefix.                   |
-| `backup.s3.createBucketIfNotExists` | boolean | `true`                                                             | Create bucket when missing.          |
-| `backup.s3.existingSecret`          | string  | `""`                                                               | Existing Secret with S3 credentials. |
-| `backup.database.postgresDumpArgs`  | string  | `--clean --if-exists`                                              | Extra `pg_dump` arguments.           |
-| `backup.database.mysqlDumpArgs`     | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra `mysqldump` arguments.         |
+| Parameter                                  | Type    | Default                                                            | Description                                                  |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `backup.enabled`                           | boolean | `false`                                                            | Enable database backup CronJob.                              |
+| `backup.schedule`                          | string  | `"0 3 * * *"`                                                      | Backup schedule.                                             |
+| `backup.suspend`                           | boolean | `false`                                                            | Suspend scheduled execution.                                 |
+| `backup.concurrencyPolicy`                 | string  | `Forbid`                                                           | CronJob concurrency policy.                                  |
+| `backup.archivePrefix`                     | string  | `keycloak`                                                         | Prefix for generated archive names.                          |
+| `backup.images.uploader.repository`        | string  | `docker.io/helmforge/mc`                                           | S3 uploader image.                                           |
+| `backup.images.uploader.tag`               | string  | `"1.0.0"`                                                          | S3 uploader image tag.                                       |
+| `backup.s3.endpoint`                       | string  | `""`                                                               | S3-compatible endpoint URL.                                  |
+| `backup.s3.bucket`                         | string  | `""`                                                               | Target bucket name.                                          |
+| `backup.s3.prefix`                         | string  | `keycloak`                                                         | Object key prefix.                                           |
+| `backup.s3.region`                         | string  | `""`                                                               | AWS region for ambient workload identity.                    |
+| `backup.s3.credentialsFromPodIdentity`     | boolean | `false`                                                            | Use ambient workload identity instead of static credentials. |
+| `backup.s3.createBucketIfNotExists`        | boolean | `true`                                                             | Create bucket when missing.                                  |
+| `backup.s3.existingSecret`                 | string  | `""`                                                               | Existing Secret with S3 credentials.                         |
+| `backup.serviceAccount.create`             | boolean | `true`                                                             | Create a dedicated backup ServiceAccount.                    |
+| `backup.serviceAccount.annotations`        | object  | `{}`                                                               | Workload identity annotations for the backup ServiceAccount. |
+| `backup.securityContext.capabilities.drop` | array   | `[ALL]`                                                            | Remove all Linux capabilities from backup containers.        |
+| `backup.database.postgresDumpArgs`         | string  | `--clean --if-exists`                                              | Extra `pg_dump` arguments.                                   |
+| `backup.database.mysqlDumpArgs`            | string  | `--single-transaction --quick --skip-lock-tables --no-tablespaces` | Extra `mysqldump` arguments.                                 |
 
 ### Security, Scheduling, and Extension Points
 
