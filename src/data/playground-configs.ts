@@ -5849,6 +5849,62 @@ export const chartConfigs: Record<string, ChartConfig> = {
         },
       ],
     },
+    {
+      name: 'PostgreSQL S3 backup',
+      collapsible: true,
+      gateField: 'backup.enabled',
+      fields: [
+        {
+          label: 'Backup endpoint',
+          key: 'backup.s3.endpoint',
+          type: 'text',
+          default: 'https://s3.us-east-1.amazonaws.com',
+          description: 'S3-compatible destination for PostgreSQL dumps',
+        },
+        {
+          label: 'Backup bucket',
+          key: 'backup.s3.bucket',
+          type: 'text',
+          default: 'ente-backups',
+          description: 'Bucket independent from the live Ente object store',
+        },
+        {
+          label: 'Backup Secret',
+          key: 'backup.s3.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Static S3 credentials; leave empty when workload identity is enabled',
+        },
+        {
+          label: 'Workload identity',
+          key: 'backup.s3.credentialsFromPodIdentity',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use IRSA or EKS Pod Identity instead of static access keys',
+        },
+        {
+          label: 'AWS region',
+          key: 'backup.s3.region',
+          type: 'text',
+          default: 'us-east-1',
+          description: 'Required when workload identity is enabled',
+        },
+        {
+          label: 'Backup ServiceAccount',
+          key: 'backup.serviceAccount.name',
+          type: 'text',
+          default: '',
+          description: 'Existing dedicated ServiceAccount name when chart creation is disabled',
+        },
+        {
+          label: 'IRSA role ARN',
+          key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
+          type: 'text',
+          default: '',
+          description: 'Optional IAM role annotation for the dedicated backup ServiceAccount',
+        },
+      ],
+    },
   ],
   pimcore: [
     {
