@@ -18,6 +18,7 @@ Immich is a self-hosted photo and video management platform. The HelmForge chart
 - Machine learning service with persistent model cache
 - External PostgreSQL and external Redis/Valkey modes
 - Ingress, Gateway API, dual-stack Service fields, HPA, PDB, NetworkPolicy, External Secrets, and Helm tests
+- Chart-wide `commonAnnotations` with resource-specific override precedence
 
 <a id="install"></a>
 
@@ -48,6 +49,25 @@ Review the [Immich 3 migration guide](https://immich.app/blog/v3-migration) and
 databases, follow the [standalone PostgreSQL migration guide](https://docs.immich.app/administration/postgres-standalone).
 
 ## Examples
+
+Shared resource annotations:
+
+```yaml
+commonAnnotations:
+  example.com/owner: media-platform
+  example.com/environment: production
+```
+
+Annotations configured directly on a Service, Ingress, Gateway route,
+ServiceAccount, or `extraObjects` entry override the same key from
+`commonAnnotations` for that resource.
+
+### Shared Metadata
+
+| Parameter           | Type   | Default | Description                                                                    |
+| ------------------- | ------ | ------- | ------------------------------------------------------------------------------ |
+| `commonLabels`      | object | `{}`    | Labels added to chart resources.                                               |
+| `commonAnnotations` | object | `{}`    | Annotations added to all rendered resources, including `extraObjects` entries. |
 
 External database:
 
@@ -94,8 +114,8 @@ Runtime flow:
 4. The machine-learning service stores model files on its own cache volume.
 5. Optional External Secrets wire external database or cache credentials.
 
-Bundled dependencies are pinned to HelmForge PostgreSQL `2.1.1` and Redis
-`3.1.0`. The PostgreSQL chart keeps the Immich VectorChord image override, and
+Bundled dependencies are pinned to HelmForge PostgreSQL `2.2.0` and Redis
+`3.2.1`. The PostgreSQL chart keeps the Immich VectorChord image override, and
 the Redis chart is exposed to the application under the `valkey` alias.
 
 ## Production Values
