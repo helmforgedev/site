@@ -282,10 +282,11 @@ ingress:
 
 ### Configuration
 
-| Parameter               | Type   | Default | Description                                                                |
-| ----------------------- | ------ | ------- | -------------------------------------------------------------------------- |
-| `config.adGuardHome`    | object | `{}`    | Pre-seed config rendered as `AdGuardHome.yaml`. Empty = wizard mode.       |
-| `config.existingSecret` | string | `""`    | Existing secret with `AdGuardHome.yaml` content (key: `AdGuardHome.yaml`). |
+| Parameter               | Type   | Default | Description                                                                                  |
+| ----------------------- | ------ | ------- | -------------------------------------------------------------------------------------------- |
+| `config.adGuardHome`    | object | `{}`    | Pre-seed config rendered as `AdGuardHome.yaml`. Empty = wizard mode.                         |
+| `config.existingSecret` | string | `""`    | Existing secret with `AdGuardHome.yaml` content (key: `AdGuardHome.yaml`).                   |
+| `commonAnnotations`     | object | `{}`    | Annotations added to all chart-owned resources; resource-specific annotations override them. |
 
 ### Application Listeners
 
@@ -346,13 +347,17 @@ The optional NetworkPolicy admits only the active web and DNS listener ports. An
 `networkPolicy.ingressFrom` preserves access from all sources, including external DNS clients;
 set explicit peers to restrict sources. Egress remains unrestricted unless `extraEgress` is non-empty.
 
-| Parameter                                     | Type    | Default | Description                                                |
-| --------------------------------------------- | ------- | ------- | ---------------------------------------------------------- |
-| `serviceAccount.automountServiceAccountToken` | boolean | `false` | Mount a Kubernetes API token into chart workloads.         |
-| `networkPolicy.enabled`                       | boolean | `false` | Render the server NetworkPolicy.                           |
-| `networkPolicy.ingressFrom`                   | array   | `[]`    | Optional peers allowed to reach the declared listeners.    |
-| `networkPolicy.extraIngress`                  | array   | `[]`    | Additional complete ingress rules.                         |
-| `networkPolicy.extraEgress`                   | array   | `[]`    | Complete egress rules; non-empty enables egress isolation. |
+| Parameter                                     | Type    | Default              | Description                                                |
+| --------------------------------------------- | ------- | -------------------- | ---------------------------------------------------------- |
+| `podSecurityContext.seccompProfile.type`      | string  | `RuntimeDefault`     | Runtime-default seccomp profile.                           |
+| `securityContext.allowPrivilegeEscalation`    | boolean | `false`              | Prevent privilege escalation.                              |
+| `securityContext.capabilities.drop`           | array   | `[ALL]`              | Drop all Linux capabilities before adding exceptions.      |
+| `securityContext.capabilities.add`            | array   | `[NET_BIND_SERVICE]` | Permit binding the privileged DNS listener.                |
+| `serviceAccount.automountServiceAccountToken` | boolean | `false`              | Mount a Kubernetes API token into chart workloads.         |
+| `networkPolicy.enabled`                       | boolean | `false`              | Render the server NetworkPolicy.                           |
+| `networkPolicy.ingressFrom`                   | array   | `[]`                 | Optional peers allowed to reach the declared listeners.    |
+| `networkPolicy.extraIngress`                  | array   | `[]`                 | Additional complete ingress rules.                         |
+| `networkPolicy.extraEgress`                   | array   | `[]`                 | Complete egress rules; non-empty enables egress isolation. |
 
 ### Services
 
@@ -394,15 +399,55 @@ set explicit peers to restrict sources. Egress remains unrestricted unless `extr
 
 Backup archives both PVCs (`conf` + `work`) as tar archives. No database is involved.
 
-| Parameter                  | Type    | Default        | Description                          |
-| -------------------------- | ------- | -------------- | ------------------------------------ |
-| `backup.enabled`           | boolean | `false`        | Enable scheduled S3 backup CronJob.  |
-| `backup.schedule`          | string  | `"0 2 * * *"`  | Cron schedule.                       |
-| `backup.archivePrefix`     | string  | `adguard-home` | Prefix for backup archive filenames. |
-| `backup.s3.endpoint`       | string  | `""`           | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`         | string  | `""`           | Target bucket name.                  |
-| `backup.s3.existingSecret` | string  | `""`           | Existing secret with S3 credentials. |
-| `extraManifests`           | array   | `[]`           | Extra Kubernetes manifests.          |
+| Parameter                                            | Type    | Default        | Description                                                  |
+| ---------------------------------------------------- | ------- | -------------- | ------------------------------------------------------------ |
+| `backup.enabled`                                     | boolean | `false`        | Enable scheduled S3 backup CronJob.                          |
+| `backup.schedule`                                    | string  | `"0 2 * * *"`  | Cron schedule.                                               |
+| `backup.archivePrefix`                               | string  | `adguard-home` | Prefix for backup archive filenames.                         |
+| `backup.s3.endpoint`                                 | string  | `""`           | S3-compatible endpoint URL.                                  |
+| `backup.s3.region`                                   | string  | `""`           | AWS region required by workload identity.                    |
+| `backup.s3.bucket`                                   | string  | `""`           | Target bucket name.                                          |
+| `backup.s3.existingSecret`                           | string  | `""`           | Existing secret with S3 credentials.                         |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`        | Use IRSA or EKS Pod Identity instead of static credentials.  |
+| `backup.serviceAccount.create`                       | boolean | `true`         | Create the dedicated backup ServiceAccount.                  |
+| `backup.serviceAccount.name`                         | string  | `""`           | Existing dedicated ServiceAccount when creation is disabled. |
+| `backup.serviceAccount.annotations`                  | object  | `{}`           | IRSA or other workload identity annotations.                 |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `false`        | Mount the Kubernetes API token into backup Pods.             |
+| `extraManifests`                                     | array   | `[]`           | Extra Kubernetes manifests.                                  |
+
+#### Backup with IRSA
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    name: adguard-home-backup
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/adguard-home-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    region: us-east-1
+    bucket: adguard-backups
+    credentialsFromPodIdentity: true
+```
+
+#### Backup with EKS Pod Identity
+
+EKS Pod Identity does not use a ServiceAccount annotation. Install the EKS Pod
+Identity Agent unless the cluster uses EKS Auto Mode, and create the AWS-side
+association for the cluster, release namespace, and stable ServiceAccount:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    name: adguard-home-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    region: us-east-1
+    bucket: adguard-backups
+    credentialsFromPodIdentity: true
+```
 
 ## More Information
 
