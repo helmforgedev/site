@@ -285,6 +285,12 @@ zookeeper:
 | `image.repository` | string | `docker.io/apache/druid` | Druid image. |
 | `image.tag`        | string | `"38.0.0"`               | Image tag.   |
 
+### Common metadata
+
+| Parameter           | Type   | Default | Description                                                                       |
+| ------------------- | ------ | ------- | --------------------------------------------------------------------------------- |
+| `commonAnnotations` | object | `{}`    | Annotations added to chart-owned resources; resource annotations take precedence. |
+
 <Callout type="warning" title="Review Apache Druid 38.0.0 upgrade notes before upgrading persistent clusters">
   Apache Druid 38.0.0 removes Java 17 support, the ZooKeeper-based `remote` task runner, and ZooKeeper-based segment
   announcement and discovery. Remove legacy overrides or move to `httpRemote` and HTTP server views before upgrading.
@@ -315,11 +321,15 @@ Every component uses the same shape, but default enablement differs by role:
 
 Historical and middlemanager also have:
 
-| Parameter                        | Type    | Default | Description                             |
-| -------------------------------- | ------- | ------- | --------------------------------------- |
-| `historical.persistence.size`    | string  | `10Gi`  | Segment cache PVC size.                 |
-| `middleManager.persistence.size` | string  | `10Gi`  | Task storage PVC size.                  |
-| `middleManager.workerCapacity`   | integer | `2`     | Concurrent tasks per middlemanager pod. |
+| Parameter                                               | Type    | Default | Description                                                                          |
+| ------------------------------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------ |
+| `historical.persistence.size`                           | string  | `10Gi`  | Segment cache PVC size.                                                              |
+| `historical.persistence.retentionPolicy.whenDeleted`    | string  | `""`    | PVC retention after StatefulSet deletion: `Retain`, `Delete`, or Kubernetes default. |
+| `historical.persistence.retentionPolicy.whenScaled`     | string  | `""`    | PVC retention after scale-down: `Retain`, `Delete`, or Kubernetes default.           |
+| `middleManager.persistence.size`                        | string  | `10Gi`  | Task storage PVC size.                                                               |
+| `middleManager.persistence.retentionPolicy.whenDeleted` | string  | `""`    | PVC retention after StatefulSet deletion: `Retain`, `Delete`, or Kubernetes default. |
+| `middleManager.persistence.retentionPolicy.whenScaled`  | string  | `""`    | PVC retention after scale-down: `Retain`, `Delete`, or Kubernetes default.           |
+| `middleManager.workerCapacity`                          | integer | `2`     | Concurrent tasks per middlemanager pod.                                              |
 
 ### Deep Storage
 
@@ -336,18 +346,24 @@ Historical and middlemanager also have:
 
 ### Metadata and ZooKeeper
 
-| Parameter                          | Type    | Default    | Description                                         |
-| ---------------------------------- | ------- | ---------- | --------------------------------------------------- |
-| `metadata.mode`                    | string  | `subchart` | Mode: `subchart` or `external`.                     |
-| `metadata.external.host`           | string  | `""`       | External PostgreSQL hostname.                       |
-| `metadata.external.existingSecret` | string  | `""`       | Existing secret with database password.             |
-| `postgresql.enabled`               | boolean | `true`     | Deploy the bundled PostgreSQL subchart.             |
-| `postgresql.auth.password`         | string  | `""`       | Password. Auto-generated if empty.                  |
-| `zookeeperConfig.mode`             | string  | `subchart` | Mode: `subchart` or `external`.                     |
-| `zookeeperConfig.external.hosts`   | string  | `""`       | External ZooKeeper hosts (`host1:port,host2:port`). |
-| `zookeeper.enabled`                | boolean | `true`     | Deploy the bundled ZooKeeper StatefulSet.           |
-| `zookeeper.replicaCount`           | integer | `1`        | ZooKeeper replicas (3 for production HA).           |
-| `zookeeper.persistence.size`       | string  | `2Gi`      | ZooKeeper data PVC size.                            |
+| Parameter                                           | Type    | Default    | Description                                                                          |
+| --------------------------------------------------- | ------- | ---------- | ------------------------------------------------------------------------------------ |
+| `metadata.mode`                                     | string  | `subchart` | Mode: `subchart` or `external`.                                                      |
+| `metadata.external.host`                            | string  | `""`       | External PostgreSQL hostname.                                                        |
+| `metadata.external.existingSecret`                  | string  | `""`       | Existing secret with database password.                                              |
+| `postgresql.enabled`                                | boolean | `true`     | Deploy the bundled PostgreSQL subchart.                                              |
+| `postgresql.auth.password`                          | string  | `""`       | Password. Auto-generated if empty.                                                   |
+| `zookeeperConfig.mode`                              | string  | `subchart` | Mode: `subchart` or `external`.                                                      |
+| `zookeeperConfig.external.hosts`                    | string  | `""`       | External ZooKeeper hosts (`host1:port,host2:port`).                                  |
+| `zookeeper.enabled`                                 | boolean | `true`     | Deploy the bundled ZooKeeper StatefulSet.                                            |
+| `zookeeper.replicaCount`                            | integer | `1`        | ZooKeeper replicas (3 for production HA).                                            |
+| `zookeeper.persistence.size`                        | string  | `2Gi`      | ZooKeeper data PVC size.                                                             |
+| `zookeeper.persistence.retentionPolicy.whenDeleted` | string  | `""`       | PVC retention after StatefulSet deletion: `Retain`, `Delete`, or Kubernetes default. |
+| `zookeeper.persistence.retentionPolicy.whenScaled`  | string  | `""`       | PVC retention after scale-down: `Retain`, `Delete`, or Kubernetes default.           |
+
+PVC retention policies require Kubernetes 1.27 or later. On Kubernetes 1.26,
+enable the `StatefulSetAutoDeletePVC` feature gate on both the API server and
+controller manager.
 
 ### Service and Ingress
 
