@@ -785,6 +785,28 @@ The Job runs `pg_dump` in custom format and uploads the result with the MinIO
 client. It works with S3-compatible providers and can use credentials distinct
 from the live Ente bucket.
 
+For Amazon S3, use IRSA or EKS Pod Identity instead of long-lived keys:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ente-backup
+  s3:
+    endpoint: https://s3.us-east-1.amazonaws.com
+    bucket: platform-backups
+    prefix: ente/postgresql
+    region: us-east-1
+    credentialsFromPodIdentity: true
+```
+
+The chart creates a dedicated backup ServiceAccount. IRSA uses its role
+annotation; EKS Pod Identity uses an association managed outside Helm. To reuse
+an existing ServiceAccount, set `backup.serviceAccount.create: false` and set
+`backup.serviceAccount.name`. Workload identity mode does not render or
+reference a static backup credential Secret.
+
 ### Manual backup test
 
 ```bash
@@ -1033,6 +1055,7 @@ backup:
 | `nameOverride`                  | `""`    | Override resource name base     |
 | `fullnameOverride`              | `""`    | Override complete resource name |
 | `commonLabels`                  | `{}`    | Labels on chart resources       |
+| `commonAnnotations`             | `{}`    | Annotations on chart resources  |
 | `productionMode`                | `false` | Reject evaluation placeholders  |
 | `imagePullSecrets`              | `[]`    | Private registry pull Secrets   |
 | `priorityClassName`             | `""`    | Shared pod priority class       |
@@ -1134,36 +1157,42 @@ backup:
 
 ### Platform integration
 
-| Value                                            | Default                  | Description                     |
-| ------------------------------------------------ | ------------------------ | ------------------------------- |
-| `externalSecrets.enabled`                        | `false`                  | Render ExternalSecrets          |
-| `externalSecrets.apiVersion`                     | `external-secrets.io/v1` | ESO API version                 |
-| `externalSecrets.refreshInterval`                | `1h`                     | Default refresh interval        |
-| `externalSecrets.items`                          | `[]`                     | Complete ExternalSecret entries |
-| `ingress.enabled`                                | `false`                  | Create Ingress                  |
-| `ingress.ingressClassName`                       | `""`                     | Ingress class                   |
-| `ingress.hosts`                                  | `[]`                     | Host and service routes         |
-| `ingress.tls`                                    | `[]`                     | Ingress TLS entries             |
-| `gateway.enabled`                                | `false`                  | Create HTTPRoutes               |
-| `gateway.parentRefs`                             | `[]`                     | Shared Gateway parents          |
-| `gateway.routes`                                 | `[]`                     | Per-service HTTPRoutes          |
-| `networkPolicy.enabled`                          | `false`                  | Create workload policies        |
-| `networkPolicy.egress.objectStorageDestinations` | public IPv4/IPv6 peers   | S3 destination peers            |
-| `networkPolicy.egress.objectStoragePorts`        | `[443]`                  | S3 destination ports            |
-| `pdb.museum.enabled`                             | `false`                  | Museum API PDB                  |
-| `pdb.web.enabled`                                | `false`                  | Web PDB                         |
-| `autoscaling.museum.enabled`                     | `false`                  | Museum API HPA                  |
-| `autoscaling.web.enabled`                        | `false`                  | Web HPA                         |
-| `metrics.enabled`                                | `false`                  | Metrics Service                 |
-| `metrics.serviceMonitor.enabled`                 | `false`                  | Prometheus Operator discovery   |
-| `metrics.prometheusRule.enabled`                 | `false`                  | Baseline alerts                 |
-| `backup.enabled`                                 | `false`                  | PostgreSQL backup CronJob       |
-| `backup.schedule`                                | `0 3 * * *`              | Backup schedule                 |
-| `backup.s3.endpoint`                             | `""`                     | Backup endpoint                 |
-| `backup.s3.bucket`                               | `""`                     | Backup bucket                   |
-| `backup.s3.prefix`                               | `ente/postgresql`        | Backup object prefix            |
-| `backup.s3.existingSecret`                       | `""`                     | Backup S3 Secret                |
-| `extraManifests`                                 | `[]`                     | Additional templated resources  |
+| Value                                                | Default                  | Description                     |
+| ---------------------------------------------------- | ------------------------ | ------------------------------- |
+| `externalSecrets.enabled`                            | `false`                  | Render ExternalSecrets          |
+| `externalSecrets.apiVersion`                         | `external-secrets.io/v1` | ESO API version                 |
+| `externalSecrets.refreshInterval`                    | `1h`                     | Default refresh interval        |
+| `externalSecrets.items`                              | `[]`                     | Complete ExternalSecret entries |
+| `ingress.enabled`                                    | `false`                  | Create Ingress                  |
+| `ingress.ingressClassName`                           | `""`                     | Ingress class                   |
+| `ingress.hosts`                                      | `[]`                     | Host and service routes         |
+| `ingress.tls`                                        | `[]`                     | Ingress TLS entries             |
+| `gateway.enabled`                                    | `false`                  | Create HTTPRoutes               |
+| `gateway.parentRefs`                                 | `[]`                     | Shared Gateway parents          |
+| `gateway.routes`                                     | `[]`                     | Per-service HTTPRoutes          |
+| `networkPolicy.enabled`                              | `false`                  | Create workload policies        |
+| `networkPolicy.egress.objectStorageDestinations`     | public IPv4/IPv6 peers   | S3 destination peers            |
+| `networkPolicy.egress.objectStoragePorts`            | `[443]`                  | S3 destination ports            |
+| `pdb.museum.enabled`                                 | `false`                  | Museum API PDB                  |
+| `pdb.web.enabled`                                    | `false`                  | Web PDB                         |
+| `autoscaling.museum.enabled`                         | `false`                  | Museum API HPA                  |
+| `autoscaling.web.enabled`                            | `false`                  | Web HPA                         |
+| `metrics.enabled`                                    | `false`                  | Metrics Service                 |
+| `metrics.serviceMonitor.enabled`                     | `false`                  | Prometheus Operator discovery   |
+| `metrics.prometheusRule.enabled`                     | `false`                  | Baseline alerts                 |
+| `backup.enabled`                                     | `false`                  | PostgreSQL backup CronJob       |
+| `backup.schedule`                                    | `0 3 * * *`              | Backup schedule                 |
+| `backup.s3.endpoint`                                 | `""`                     | Backup endpoint                 |
+| `backup.s3.bucket`                                   | `""`                     | Backup bucket                   |
+| `backup.s3.prefix`                                   | `ente/postgresql`        | Backup object prefix            |
+| `backup.s3.region`                                   | `""`                     | AWS workload identity region    |
+| `backup.s3.credentialsFromPodIdentity`               | `false`                  | Use ambient AWS credentials     |
+| `backup.s3.existingSecret`                           | `""`                     | Backup S3 Secret                |
+| `backup.serviceAccount.create`                       | `true`                   | Create backup ServiceAccount    |
+| `backup.serviceAccount.name`                         | `""`                     | Existing backup ServiceAccount  |
+| `backup.serviceAccount.annotations`                  | `{}`                     | Backup identity annotations     |
+| `backup.serviceAccount.automountServiceAccountToken` | `true`                   | Mount projected identity token  |
+| `extraManifests`                                     | `[]`                     | Additional templated resources  |
 
 ## 17. Upgrade procedure
 
