@@ -23,6 +23,8 @@ before creating a workload.
 - **LinuxServer.io image** — PUID/PGID file ownership control for PVC compatibility
 - **Persistent storage** — SQLite database and all configuration in `/config`
 - **S3 backup** — scheduled archive of the full `/config` directory to S3-compatible storage
+- **Workload identity** — dedicated backup ServiceAccount with ambient cloud credentials instead of static keys
+- **Common annotations** — chart-wide metadata with resource-specific override precedence
 - **Ingress support** — configurable TLS via cert-manager
 - **End-to-end listener configuration** — custom application and Service ports remain independent
 - **Hardened defaults** — restricted capabilities, seccomp, no API token, and an ingress NetworkPolicy
@@ -175,11 +177,12 @@ ingress:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                     |
+| ------------------- | ------ | ------- | ----------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                        |
+| `fullnameOverride`  | string | `""`    | Override the full release name.                 |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.            |
+| `commonAnnotations` | object | `{}`    | Annotations added to all chart-owned resources. |
 
 ### Image
 
@@ -241,12 +244,23 @@ application tiles, custom icons, and settings. This is a complete backup of the 
 | `backup.s3.endpoint`                   | string  | `""`                            | S3-compatible endpoint URL.                                  |
 | `backup.s3.bucket`                     | string  | `""`                            | Target bucket name.                                          |
 | `backup.s3.prefix`                     | string  | `heimdall`                      | Key prefix within the bucket.                                |
+| `backup.s3.region`                     | string  | `""`                            | AWS region used by ambient workload identity credentials.    |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`                         | Use workload identity instead of static S3 credentials.      |
 | `backup.s3.createBucketIfNotExists`    | boolean | `true`                          | Create the bucket automatically if it does not exist.        |
 | `backup.s3.existingSecret`             | string  | `""`                            | Existing secret containing S3 access and secret keys.        |
 | `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`                    | Key in the existing secret for the S3 access key.            |
 | `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`                    | Key in the existing secret for the S3 secret key.            |
 | `backup.s3.accessKey`                  | string  | `""`                            | Inline S3 access key (ignored when `existingSecret` is set). |
 | `backup.s3.secretKey`                  | string  | `""`                            | Inline S3 secret key (ignored when `existingSecret` is set). |
+| `backup.serviceAccount.create`         | boolean | `true`                          | Create a dedicated backup ServiceAccount for identity mode.  |
+| `backup.serviceAccount.name`           | string  | `""`                            | Existing backup ServiceAccount when creation is disabled.    |
+| `backup.serviceAccount.annotations`    | object  | `{}`                            | Workload identity annotations for the backup ServiceAccount. |
+
+<Callout type="info" title="Static keys are excluded in workload identity mode">
+  Set `backup.s3.credentialsFromPodIdentity: true`, provide `backup.s3.region`, and attach the cloud identity to the
+  dedicated backup ServiceAccount. Existing Secret and inline static credential values are not rendered or referenced in
+  this mode.
+</Callout>
 
 ### Service
 
