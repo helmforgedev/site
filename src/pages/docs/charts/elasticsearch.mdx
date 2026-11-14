@@ -302,6 +302,33 @@ security:
   existingCredentialsSecret: my-creds-secret # keys: elastic-password
 ```
 
+## S3 backup identity
+
+Static S3 credentials remain supported, but cloud workload identity avoids
+storing long-lived keys in Kubernetes. When enabled, Elasticsearch nodes use
+the main ServiceAccount identity for snapshot I/O and the bucket must already
+exist. The scheduled snapshot orchestration runs with a separate configurable
+ServiceAccount. Before each node starts, the chart exposes the injected token
+inside `${ES_PATH_CONF}/repository-s3` using the required
+`aws-web-identity-token-file` link for IRSA or `eks-pod-identity-token` for EKS
+Pod Identity.
+
+```yaml
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/elasticsearch-snapshots
+
+backup:
+  enabled: true
+  s3:
+    bucket: elasticsearch-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+  serviceAccount:
+    create: true
+```
+
 ## Monitoring
 
 ```yaml
@@ -413,6 +440,10 @@ exist; this chart creates only the HTTPRoute resources.
 | `podSecurityContext.seccompProfile.type`      | `RuntimeDefault`            | Kubernetes seccomp profile for Elasticsearch pods        |
 | `backup.enabled`                              | `false`                     | Enable S3 snapshot CronJob                               |
 | `backup.schedule`                             | `"0 2 * * *"`               | Cron schedule for snapshots                              |
+| `backup.s3.credentialsFromPodIdentity`        | `false`                     | Use workload identity instead of static S3 credentials   |
+| `backup.serviceAccount.create`                | `true`                      | Create the snapshot CronJob ServiceAccount               |
+| `master.persistence.retentionPolicy.*`        | `""`                        | Master PVC deletion and scale-down retention policy      |
+| `data.persistence.retentionPolicy.*`          | `""`                        | Data PVC deletion and scale-down retention policy        |
 | `ilm.logs.enabled`                            | `false`                     | Enable logs ILM policy                                   |
 | `ilm.metrics.enabled`                         | `false`                     | Enable metrics ILM policy                                |
 | `dataTiers.hot.enabled`                       | `false`                     | Enable dedicated hot tier nodes                          |
