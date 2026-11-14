@@ -29,7 +29,7 @@ Helm upgrades preserve the generated Secret; explicitly manage
 The release updates Node and collaboration services, adds page-version comparison
 and attachments, fixes Redis ACL/URL/TLS handling, and includes security fixes.
 Review the [official notes](https://github.com/docmost/docmost/releases/tag/v0.96.0).
-The bundled dependency set now uses PostgreSQL `2.1.1` and Redis `3.1.0`.
+The bundled dependency set now uses PostgreSQL `2.2.0` and Redis `3.2.1`.
 
 ## Key Features
 
@@ -38,6 +38,8 @@ The bundled dependency set now uses PostgreSQL `2.1.1` and Redis `3.1.0`.
 - **Auto-bootstrap** — `unaccent` and `pg_trgm` extensions granted on first start
 - **Storage modes** — local PVC (single replica) or S3-compatible (scalable)
 - **pg_dump backup** — scheduled CronJob to S3; database-only (uploads separate)
+- **Workload identity backup** — dedicated ServiceAccount for EKS Pod Identity or IRSA without static S3 keys
+- **Common annotations** — platform metadata on every chart-owned resource with resource-specific overrides
 - **JWT sessions** — configurable `jwtTokenExpiresIn` with auto-generated app secret
 - **Explicit listener contract** — `containerPorts.http` changes the real Docmost process port
 - **Least-privilege pod identity** — Kubernetes API token mounting is disabled by default
@@ -280,6 +282,48 @@ ingress:
 
 </DocsTabs>
 
+### Backup with IRSA
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/docmost-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    region: us-east-1
+    bucket: docmost-backups
+    credentialsFromPodIdentity: true
+```
+
+The backup CronJob uses its own ServiceAccount. Static access and secret keys
+are omitted in workload identity mode. The `eks.amazonaws.com/role-arn`
+annotation is specific to IRSA.
+
+### Backup with EKS Pod Identity
+
+EKS Pod Identity does not use a ServiceAccount annotation. Configure a stable
+name so the AWS-side association has a predictable target:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    name: docmost-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    region: us-east-1
+    bucket: docmost-backups
+    credentialsFromPodIdentity: true
+```
+
+Install the EKS Pod Identity Agent add-on unless the cluster uses EKS Auto Mode,
+then create an EKS Pod Identity association that maps the IAM role to the
+cluster, release namespace, and `docmost-backup` ServiceAccount. Kubernetes API
+token mounting remains disabled unless
+`backup.serviceAccount.automountServiceAccountToken` is enabled.
+
 ## Configuration Reference
 
 ### Core
@@ -290,6 +334,7 @@ ingress:
 | `nameOverride`        | string  | `""`    | Override the chart name.                                     |
 | `fullnameOverride`    | string  | `""`    | Override the full release name.                              |
 | `commonLabels`        | object  | `{}`    | Extra labels added to all resources.                         |
+| `commonAnnotations`   | object  | `{}`    | Annotations added to all chart-owned resources.              |
 | `containerPorts.http` | integer | `3000`  | Docmost process listener and declared container port.        |
 
 ### Image
@@ -387,15 +432,21 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 The backup CronJob runs `pg_dump` and uploads the result to S3. **Upload files are not included.**
 
-| Parameter                  | Type    | Default              | Description                           |
-| -------------------------- | ------- | -------------------- | ------------------------------------- |
-| `backup.enabled`           | boolean | `false`              | Enable scheduled `pg_dump` S3 backup. |
-| `backup.schedule`          | string  | `"0 3 * * *"`        | Cron schedule.                        |
-| `backup.archivePrefix`     | string  | `docmost`            | Prefix for backup archive filenames.  |
-| `backup.images.postgresql` | string  | `postgres:18-alpine` | Image providing `pg_dump`.            |
-| `backup.s3.endpoint`       | string  | `""`                 | S3-compatible endpoint URL.           |
-| `backup.s3.bucket`         | string  | `""`                 | Target bucket name.                   |
-| `backup.s3.existingSecret` | string  | `""`                 | Existing secret with S3 credentials.  |
+| Parameter                                            | Type    | Default              | Description                                                 |
+| ---------------------------------------------------- | ------- | -------------------- | ----------------------------------------------------------- |
+| `backup.enabled`                                     | boolean | `false`              | Enable scheduled `pg_dump` S3 backup.                       |
+| `backup.schedule`                                    | string  | `"0 3 * * *"`        | Cron schedule.                                              |
+| `backup.archivePrefix`                               | string  | `docmost`            | Prefix for backup archive filenames.                        |
+| `backup.images.postgresql`                           | string  | `postgres:18-alpine` | Image providing `pg_dump`.                                  |
+| `backup.s3.endpoint`                                 | string  | `""`                 | S3-compatible endpoint URL.                                 |
+| `backup.s3.region`                                   | string  | `""`                 | AWS region used for workload identity.                      |
+| `backup.s3.bucket`                                   | string  | `""`                 | Target bucket name.                                         |
+| `backup.s3.existingSecret`                           | string  | `""`                 | Existing secret with S3 credentials.                        |
+| `backup.s3.credentialsFromPodIdentity`               | boolean | `false`              | Use EKS Pod Identity or IRSA instead of static credentials. |
+| `backup.serviceAccount.create`                       | boolean | `true`               | Create a dedicated backup ServiceAccount.                   |
+| `backup.serviceAccount.name`                         | string  | `""`                 | Existing ServiceAccount name when creation is disabled.     |
+| `backup.serviceAccount.annotations`                  | object  | `{}`                 | Workload identity annotations.                              |
+| `backup.serviceAccount.automountServiceAccountToken` | boolean | `false`              | Mount the Kubernetes API token into backup pods.            |
 
 ### Service and Ingress
 
@@ -458,6 +509,10 @@ and use `storage.mode=s3` before increasing `replicaCount`.
   the init containers only prove TCP reachability.
 - For S3 errors, verify endpoint reachability, bucket policy, path-style mode,
   and both credential keys in the referenced Secret.
+- For IRSA backup errors, verify `backup.s3.region`, the dedicated ServiceAccount
+  role annotation, and the IAM trust policy. For EKS Pod Identity, verify the
+  agent add-on and the AWS-side cluster, namespace, and ServiceAccount
+  association; Pod Identity does not use the IRSA annotation.
 
 ## More Information
 
