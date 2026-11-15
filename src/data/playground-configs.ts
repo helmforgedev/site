@@ -10465,14 +10465,6 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Cron schedule for backups',
         },
         {
-          label: 'Backup fsGroup',
-          key: 'backup.podSecurityContext.fsGroup',
-          type: 'text',
-          default: '',
-          emitDefault: false,
-          description: 'Storage group used to read an existing non-root config PVC',
-        },
-        {
           label: 'S3 Endpoint',
           key: 'backup.s3.endpoint',
           type: 'text',
@@ -16514,6 +16506,14 @@ export const chartConfigs: Record<string, ChartConfig> = {
           type: 'text',
           default: 'komga-backups',
           description: 'Backup bucket name',
+        },
+        {
+          label: 'Backup fsGroup',
+          key: 'backup.podSecurityContext.fsGroup',
+          type: 'text',
+          default: '',
+          emitDefault: false,
+          description: 'Storage group used to read an existing non-root config PVC',
         },
         {
           label: 'Existing Secret',
