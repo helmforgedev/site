@@ -61,6 +61,7 @@ access before enabling them.
 - **OPDS support** — works with Kybook, Chunky, Moon+ Reader, and other OPDS clients
 - **JVM tuning** — configurable JVM flags via `javaToolOptions` (`-Xmx`, GC options)
 - **S3 backup** — consistent SQLite export via Alpine backup job (covers `/config` only)
+- **Workload identity** — EKS Pod Identity or IRSA for S3 backup without static credentials
 - **External Secrets** — optional ExternalSecret items for S3 backup credentials
 - **Gateway API** — optional HTTPRoute for clusters using Gateway API
 - **Session timeout** — configurable for long-lived mobile client sessions
@@ -274,11 +275,12 @@ ingress:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                                                         |
+| ------------------- | ------ | ------- | ----------------------------------------------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                                                            |
+| `fullnameOverride`  | string | `""`    | Override the full release name.                                                     |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.                                                |
+| `commonAnnotations` | object | `{}`    | Extra annotations added to all resources; resource-specific values take precedence. |
 
 ### Image
 
@@ -361,17 +363,40 @@ ingress:
   provider's snapshot mechanism.
 </Callout>
 
-| Parameter                              | Type    | Default       | Description                                          |
-| -------------------------------------- | ------- | ------------- | ---------------------------------------------------- |
-| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.                  |
-| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                       |
-| `backup.archivePrefix`                 | string  | `komga`       | Prefix for backup archive filenames.                 |
-| `backup.includeLogs`                   | boolean | `true`        | Include the `/config/logs` directory in the archive. |
-| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                          |
-| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                  |
-| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                 |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                           |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                           |
+| Parameter                              | Type    | Default       | Description                                               |
+| -------------------------------------- | ------- | ------------- | --------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.                       |
+| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                            |
+| `backup.archivePrefix`                 | string  | `komga`       | Prefix for backup archive filenames.                      |
+| `backup.includeLogs`                   | boolean | `true`        | Include the `/config/logs` directory in the archive.      |
+| `backup.serviceAccount.create`         | boolean | `true`        | Create a dedicated backup ServiceAccount.                 |
+| `backup.serviceAccount.name`           | string  | `""`          | Existing backup ServiceAccount when creation is disabled. |
+| `backup.serviceAccount.annotations`    | object  | `{}`          | Workload identity annotations.                            |
+| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                               |
+| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                       |
+| `backup.s3.region`                     | string  | `""`          | AWS region for ambient workload identity.                 |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`       | Use EKS Pod Identity or IRSA instead of static keys.      |
+| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                      |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                                |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                                |
+
+<Callout type="tip" title="Use workload identity for AWS S3 backups">
+  Set `backup.s3.credentialsFromPodIdentity: true`, provide `backup.s3.region`, and annotate the dedicated
+  `backup.serviceAccount` for EKS Pod Identity or IRSA. No static credential Secret is rendered in this mode.
+</Callout>
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/komga-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-komga-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+```
 
 ### External Secrets
 
