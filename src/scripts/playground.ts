@@ -1125,7 +1125,10 @@ function coerceValue(key: string, value: string): boolean | number | string {
 
 function shouldPreserveString(key: string): boolean {
   return (
-    /(^|\.)extraEnv\[\d+\]\.value$/.test(key) || /(^|\.)env\[\d+\]\.value$/.test(key) || /(^|\.)image\.tag$/.test(key)
+    /(^|\.)extraEnv\[\d+\]\.value$/.test(key) ||
+    /(^|\.)env\[\d+\]\.value$/.test(key) ||
+    /(^|\.)image\.tag$/.test(key) ||
+    /(^|\.)commonAnnotations\./.test(key)
   );
 }
 

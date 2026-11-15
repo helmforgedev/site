@@ -229,11 +229,12 @@ backup:
 
 ### Core
 
-| Parameter          | Type   | Default | Description                          |
-| ------------------ | ------ | ------- | ------------------------------------ |
-| `nameOverride`     | string | `""`    | Override the chart name.             |
-| `fullnameOverride` | string | `""`    | Override the full release name.      |
-| `commonLabels`     | object | `{}`    | Extra labels added to all resources. |
+| Parameter           | Type   | Default | Description                                 |
+| ------------------- | ------ | ------- | ------------------------------------------- |
+| `nameOverride`      | string | `""`    | Override the chart name.                    |
+| `fullnameOverride`  | string | `""`    | Override the full release name.             |
+| `commonLabels`      | object | `{}`    | Extra labels added to all resources.        |
+| `commonAnnotations` | object | `{}`    | Annotations added to chart-owned resources. |
 
 ### Image
 
@@ -344,16 +345,24 @@ In external mode, Code node module allowlists such as `NODE_FUNCTION_ALLOW_BUILT
 ### Backup
 
 Backup mode is automatically selected based on the active database vendor.
+Backup Jobs use a dedicated configurable ServiceAccount. Set
+`backup.s3.credentialsFromPodIdentity: true` with an AWS region to use IRSA or
+EKS Pod Identity instead of a static Secret.
 
-| Parameter                          | Type    | Default       | Description                          |
-| ---------------------------------- | ------- | ------------- | ------------------------------------ |
-| `backup.enabled`                   | boolean | `false`       | Enable scheduled S3 backup CronJob.  |
-| `backup.schedule`                  | string  | `"0 3 * * *"` | Cron schedule.                       |
-| `backup.archivePrefix`             | string  | `n8n`         | Prefix for backup archive filenames. |
-| `backup.s3.endpoint`               | string  | `""`          | S3-compatible endpoint URL.          |
-| `backup.s3.bucket`                 | string  | `""`          | Target bucket name.                  |
-| `backup.s3.existingSecret`         | string  | `""`          | Existing secret with S3 credentials. |
-| `backup.database.postgresDumpArgs` | string  | `""`          | Extra arguments for `pg_dump`.       |
+| Parameter                              | Type    | Default       | Description                                 |
+| -------------------------------------- | ------- | ------------- | ------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.         |
+| `backup.schedule`                      | string  | `"0 3 * * *"` | Cron schedule.                              |
+| `backup.archivePrefix`                 | string  | `n8n`         | Prefix for backup archive filenames.        |
+| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                 |
+| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                         |
+| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.        |
+| `backup.s3.region`                     | string  | `""`          | AWS region required for workload identity.  |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`       | Use IRSA or EKS Pod Identity.               |
+| `backup.serviceAccount.create`         | boolean | `true`        | Create the dedicated backup ServiceAccount. |
+| `backup.serviceAccount.name`           | string  | `""`          | Existing dedicated ServiceAccount name.     |
+| `backup.serviceAccount.annotations`    | object  | `{}`          | IRSA or other identity annotations.         |
+| `backup.database.postgresDumpArgs`     | string  | `""`          | Extra arguments for `pg_dump`.              |
 
 ### Service, Ingress, Probes
 
