@@ -16738,6 +16738,43 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Extstore',
+      collapsible: true,
+      gateField: 'extstore.enabled',
+      fields: [
+        {
+          label: 'Persistent Extstore',
+          key: 'extstore.persistence.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Use a PVC for the extstore cache files',
+        },
+        {
+          label: 'Storage Size',
+          key: 'extstore.persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Extstore PVC requested capacity',
+        },
+        {
+          label: 'Delete Retention',
+          key: 'extstore.persistence.retentionPolicy.whenDeleted',
+          type: 'select',
+          default: 'Retain',
+          options: ['Retain', 'Delete'],
+          description: 'PVC policy when the StatefulSet is deleted',
+        },
+        {
+          label: 'Scale Retention',
+          key: 'extstore.persistence.retentionPolicy.whenScaled',
+          type: 'select',
+          default: 'Retain',
+          options: ['Retain', 'Delete'],
+          description: 'PVC policy when replicas are scaled down',
+        },
+      ],
+    },
+    {
       name: 'TLS',
       collapsible: true,
       gateField: 'tls.enabled',
