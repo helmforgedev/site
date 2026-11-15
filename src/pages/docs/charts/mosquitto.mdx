@@ -271,16 +271,28 @@ mqttxWeb:
 
 </DocsTabs>
 
+## Resource metadata and PVC retention
+
+Use `commonAnnotations` to add annotations to every chart-owned resource. Resource-specific annotations take
+precedence when the same key is present in both maps.
+
+Broker PVCs use `Retain` when the StatefulSet is deleted or scaled down. Set either retention policy to `Delete` only
+when automatic broker-data removal is intentional. On Kubernetes 1.26, deletion requires the
+`StatefulSetAutoDeletePVC` feature gate on the API server and controller manager. The gate is enabled by default from
+Kubernetes 1.27 through 1.31 but can still be disabled, so verify both the API server and controller manager settings.
+The feature is stable from Kubernetes 1.32.
+
 ## Configuration Reference
 
 ### Core
 
-| Parameter          | Type   | Default         | Description                                            |
-| ------------------ | ------ | --------------- | ------------------------------------------------------ |
-| `nameOverride`     | string | `""`            | Override the chart name.                               |
-| `fullnameOverride` | string | `""`            | Override the full release name.                        |
-| `commonLabels`     | object | `{}`            | Extra labels added to all resources.                   |
-| `clusterDomain`    | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
+| Parameter           | Type   | Default         | Description                                            |
+| ------------------- | ------ | --------------- | ------------------------------------------------------ |
+| `nameOverride`      | string | `""`            | Override the chart name.                               |
+| `fullnameOverride`  | string | `""`            | Override the full release name.                        |
+| `commonLabels`      | object | `{}`            | Extra labels added to all resources.                   |
+| `commonAnnotations` | object | `{}`            | Annotations added to all chart-owned resources.        |
+| `clusterDomain`     | string | `cluster.local` | Kubernetes cluster domain for internal DNS resolution. |
 
 ### Image
 
@@ -361,23 +373,29 @@ Set explicit limits for production deployments with many connected devices.
 
 #### Persistence
 
-| Parameter                         | Type    | Default         | Description                   |
-| --------------------------------- | ------- | --------------- | ----------------------------- |
-| `broker.persistence.enabled`      | boolean | `true`          | Enable PVCs for broker data.  |
-| `broker.persistence.size`         | string  | `8Gi`           | Size of each broker PVC.      |
-| `broker.persistence.storageClass` | string  | `""`            | StorageClass for broker PVCs. |
-| `broker.persistence.accessMode`   | string  | `ReadWriteOnce` | PVC access mode.              |
+| Parameter                                        | Type    | Default         | Description                                      |
+| ------------------------------------------------ | ------- | --------------- | ------------------------------------------------ |
+| `broker.persistence.enabled`                     | boolean | `true`          | Enable PVCs for broker data.                     |
+| `broker.persistence.size`                        | string  | `8Gi`           | Size of each broker PVC.                         |
+| `broker.persistence.storageClass`                | string  | `""`            | StorageClass for broker PVCs.                    |
+| `broker.persistence.accessMode`                  | string  | `ReadWriteOnce` | PVC access mode.                                 |
+| `broker.persistence.retentionPolicy.whenDeleted` | string  | `Retain`        | PVC policy when the StatefulSet is deleted.      |
+| `broker.persistence.retentionPolicy.whenScaled`  | string  | `Retain`        | PVC policy when broker replicas are scaled down. |
 
 ### Authentication
 
-| Parameter                        | Type    | Default    | Description                                       |
-| -------------------------------- | ------- | ---------- | ------------------------------------------------- |
-| `auth.enabled`                   | boolean | `false`    | Enable username/password authentication.          |
-| `auth.username`                  | string  | `mqtt`     | Username stored in the generated password file.   |
-| `auth.password`                  | string  | `""`       | Password. Auto-generated if empty.                |
-| `auth.existingSecret`            | string  | `""`       | Existing Kubernetes Secret with MQTT credentials. |
-| `auth.existingSecretUsernameKey` | string  | `username` | Key in the existing secret for the username.      |
-| `auth.existingSecretPasswordKey` | string  | `password` | Key in the existing secret for the password.      |
+| Parameter                        | Type    | Default    | Description                                           |
+| -------------------------------- | ------- | ---------- | ----------------------------------------------------- |
+| `auth.enabled`                   | boolean | `false`    | Enable username/password authentication.              |
+| `auth.username`                  | string  | `mqtt`     | Username stored in the generated password file.       |
+| `auth.password`                  | string  | `""`       | Password; preserved by live Helm upgrades when empty. |
+| `auth.existingSecret`            | string  | `""`       | Existing Kubernetes Secret with MQTT credentials.     |
+| `auth.existingSecretUsernameKey` | string  | `username` | Key in the existing secret for the username.          |
+| `auth.existingSecretPasswordKey` | string  | `password` | Key in the existing secret for the password.          |
+
+Live `helm install` and `helm upgrade` operations preserve an empty `auth.password` by looking up the existing Secret.
+Render-only tools such as `helm template` and GitOps renderers cannot perform that cluster lookup and may generate a
+new value on each render. Use `auth.existingSecret` for GitOps workflows.
 
 ### ACL
 
