@@ -600,7 +600,7 @@ backup:
     existingSecret: 'my-s3-creds'
 ```
 
-### Using EKS Pod Identity or IRSA
+### Using IRSA
 
 Avoid static S3 credentials by annotating the dedicated backup ServiceAccount
 and enabling ambient AWS credentials:
@@ -617,6 +617,24 @@ backup:
     region: 'us-east-1'
     credentialsFromPodIdentity: true
 ```
+
+### Using EKS Pod Identity
+
+Keep the same S3 values and `credentialsFromPodIdentity: true`, but omit the
+ServiceAccount role annotation. The cluster must run the EKS Pod Identity Agent
+add-on. Create an association for the generated backup ServiceAccount in its
+actual namespace:
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name <cluster-name> \
+  --namespace <namespace> \
+  --service-account <release>-openhab-backup \
+  --role-arn <role-arn>
+```
+
+If `backup.serviceAccount.name` overrides the generated name, use that value in
+the association.
 
 ### What Gets Backed Up
 
