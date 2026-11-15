@@ -28,10 +28,12 @@ before upgrading.
 
 ## Upgrade Compatibility
 
-The chart preserves the root UID/GID behavior from previous releases so
-root-owned SQLite databases on existing `/config` PVCs remain writable. The
-new compatible security defaults prevent privilege escalation, use
-RuntimeDefault seccomp, and disable Kubernetes API token mounts without changing
+The chart preserves the root UID/GID behavior from previous releases. The
+container now drops all Linux capabilities, so verify that existing `/config`
+and `/data` files are accessible to the configured `runAsUser`, `runAsGroup`,
+or `fsGroup` before upgrading. Set `podSecurityContext.fsGroup` to the storage
+group when an existing PVC is not root-readable. The remaining security defaults
+prevent privilege escalation, use RuntimeDefault seccomp, and disable Kubernetes API token mounts without changing
 file ownership or filesystem access.
 
 Back up `/config`, then use either a normal upgrade with your values file or
@@ -363,27 +365,30 @@ ingress:
   provider's snapshot mechanism.
 </Callout>
 
-| Parameter                              | Type    | Default       | Description                                               |
-| -------------------------------------- | ------- | ------------- | --------------------------------------------------------- |
-| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.                       |
-| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                            |
-| `backup.archivePrefix`                 | string  | `komga`       | Prefix for backup archive filenames.                      |
-| `backup.includeLogs`                   | boolean | `true`        | Include the `/config/logs` directory in the archive.      |
-| `backup.serviceAccount.create`         | boolean | `true`        | Create a dedicated backup ServiceAccount.                 |
-| `backup.serviceAccount.name`           | string  | `""`          | Existing backup ServiceAccount when creation is disabled. |
-| `backup.serviceAccount.annotations`    | object  | `{}`          | Workload identity annotations.                            |
-| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                               |
-| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                       |
-| `backup.s3.region`                     | string  | `""`          | AWS region for ambient workload identity.                 |
-| `backup.s3.credentialsFromPodIdentity` | boolean | `false`       | Use EKS Pod Identity or IRSA instead of static keys.      |
-| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                      |
-| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                                |
-| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                                |
+| Parameter                              | Type    | Default       | Description                                                 |
+| -------------------------------------- | ------- | ------------- | ----------------------------------------------------------- |
+| `backup.enabled`                       | boolean | `false`       | Enable scheduled S3 backup CronJob.                         |
+| `backup.schedule`                      | string  | `"0 2 * * *"` | Cron schedule.                                              |
+| `backup.archivePrefix`                 | string  | `komga`       | Prefix for backup archive filenames.                        |
+| `backup.includeLogs`                   | boolean | `true`        | Include the `/config/logs` directory in the archive.        |
+| `backup.podSecurityContext`            | object  | `{}`          | Overrides merged over the application pod security context. |
+| `backup.serviceAccount.create`         | boolean | `true`        | Create a dedicated backup ServiceAccount.                   |
+| `backup.serviceAccount.name`           | string  | `""`          | Existing backup ServiceAccount when creation is disabled.   |
+| `backup.serviceAccount.annotations`    | object  | `{}`          | Workload identity annotations.                              |
+| `backup.s3.endpoint`                   | string  | `""`          | S3-compatible endpoint URL.                                 |
+| `backup.s3.bucket`                     | string  | `""`          | Target bucket name.                                         |
+| `backup.s3.region`                     | string  | `""`          | AWS region for ambient workload identity.                   |
+| `backup.s3.credentialsFromPodIdentity` | boolean | `false`       | Use EKS Pod Identity or IRSA instead of static keys.        |
+| `backup.s3.existingSecret`             | string  | `""`          | Existing secret with S3 credentials.                        |
+| `backup.s3.existingSecretAccessKeyKey` | string  | `access-key`  | Key for the S3 access key.                                  |
+| `backup.s3.existingSecretSecretKeyKey` | string  | `secret-key`  | Key for the S3 secret key.                                  |
 
 <Callout type="tip" title="Use workload identity for AWS S3 backups">
-  Set `backup.s3.credentialsFromPodIdentity: true`, provide `backup.s3.region`, and annotate the dedicated
-  `backup.serviceAccount` for EKS Pod Identity or IRSA. No static credential Secret is rendered in this mode.
+  Set `backup.s3.credentialsFromPodIdentity: true` and provide `backup.s3.region`. IRSA uses a ServiceAccount
+  annotation; EKS Pod Identity uses an AWS-side association and no annotation. No static credential Secret is rendered.
 </Callout>
+
+For IRSA, annotate the dedicated backup ServiceAccount:
 
 ```yaml
 backup:
@@ -397,6 +402,34 @@ backup:
     region: us-east-1
     credentialsFromPodIdentity: true
 ```
+
+For EKS Pod Identity, give the ServiceAccount a stable name and do not add the
+IRSA annotation. Install the EKS Pod Identity Agent unless the cluster uses EKS
+Auto Mode, then create the association:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    name: komga-backup
+  s3:
+    endpoint: https://s3.amazonaws.com
+    bucket: my-komga-backups
+    region: us-east-1
+    credentialsFromPodIdentity: true
+```
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name my-cluster \
+  --namespace komga \
+  --service-account komga-backup \
+  --role-arn arn:aws:iam::123456789012:role/komga-backup
+```
+
+The backup pod inherits `podSecurityContext`. Use `fsGroup` there, or override
+it through `backup.podSecurityContext`, when an existing `/config` PVC is owned
+by a non-root storage group.
 
 ### External Secrets
 
