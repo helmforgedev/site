@@ -8858,6 +8858,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       fields: [
         { label: 'Replicas', key: 'replicaCount', type: 'number', default: '1', description: 'OpenCut pod count' },
         {
+          label: 'Resource owner annotation',
+          key: 'commonAnnotations.example\\.com/owner',
+          type: 'text',
+          default: '',
+          description: 'Example chart-wide annotation; resource-specific annotations take precedence',
+        },
+        {
           label: 'HTTP Container Port',
           key: 'containerPorts.http',
           type: 'number',
