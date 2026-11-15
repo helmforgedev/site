@@ -220,7 +220,13 @@ extstore:
   persistence:
     enabled: true
     size: 20Gi
+    retentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
 ```
+
+The default policy preserves extstore PVCs when the StatefulSet is deleted or scaled down. Change either value to
+`Delete` only when the corresponding cache files may be discarded.
 
 </div>
 
@@ -303,33 +309,36 @@ Memcached authentication is disabled.
 
 ## Configuration Reference
 
-| Value                                         | Default                       | Description                                                                   |
-| --------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `architecture`                                | `standalone`                  | `standalone` or `distributed`.                                                |
-| `replicaCount`                                | `1`                           | Number of Memcached pods. Standalone requires exactly one pod.                |
-| `image.repository`                            | `docker.io/library/memcached` | Official Memcached image repository.                                          |
-| `image.tag`                                   | `1.6.45`                      | Pinned Memcached image tag.                                                   |
-| `memcached.memoryLimitMB`                     | `64`                          | Item memory limit passed to `-m`.                                             |
-| `memcached.maxConnections`                    | `1024`                        | Connection limit passed to `-c`.                                              |
-| `memcached.threads`                           | `4`                           | Worker thread count passed to `-t`.                                           |
-| `memcached.maxItemSize`                       | `1m`                          | Maximum item size passed to `-I`.                                             |
-| `memcached.disableFlushAll`                   | `false`                       | Disables the `flush_all` command when enabled.                                |
-| `auth.enabled`                                | `false`                       | Enables ASCII or SASL authentication.                                         |
-| `auth.mode`                                   | `ascii`                       | `ascii` or `sasl`.                                                            |
-| `tls.enabled`                                 | `false`                       | Adds Memcached TLS extended options from an existing Secret.                  |
-| `extstore.enabled`                            | `false`                       | Enables Memcached extstore cache extension.                                   |
-| `metrics.enabled`                             | `false`                       | Adds a Prometheus memcached exporter sidecar and metrics Service.             |
-| `metrics.memcachedTLS.enabled`                | `false`                       | Uses TLS between the exporter and local Memcached process.                    |
-| `networkPolicy.enabled`                       | `false`                       | Renders NetworkPolicy rules for cache and metrics access.                     |
-| `networkPolicy.egress.enabled`                | `false`                       | Adds optional egress policy rules.                                            |
-| `networkPolicy.egress.extraEgress`            | `[]`                          | Appends full custom NetworkPolicy egress rules to generated egress.           |
-| `autoscaling.enabled`                         | `false`                       | Enables HPA for distributed mode only.                                        |
-| `pdb.enabled`                                 | `false`                       | Renders a PodDisruptionBudget.                                                |
-| `service.type`                                | `ClusterIP`                   | Client Service type; use `LoadBalancer` if external TCP exposure is required. |
-| `service.ipFamilyPolicy`                      | `""`                          | Optional Kubernetes dual-stack policy.                                        |
-| `service.ipFamilies`                          | `[]`                          | Optional ordered IP family list such as `IPv4`, `IPv6`.                       |
-| `externalSecrets.enabled`                     | `false`                       | Renders External Secrets Operator v1 resource.                                |
-| `serviceAccount.automountServiceAccountToken` | `false`                       | Keeps the Kubernetes API token unmounted by default.                          |
+| Value                                              | Default                       | Description                                                                   |
+| -------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `architecture`                                     | `standalone`                  | `standalone` or `distributed`.                                                |
+| `replicaCount`                                     | `1`                           | Number of Memcached pods. Standalone requires exactly one pod.                |
+| `commonAnnotations`                                | `{}`                          | Annotations on every resource; resource-specific values take precedence.      |
+| `image.repository`                                 | `docker.io/library/memcached` | Official Memcached image repository.                                          |
+| `image.tag`                                        | `1.6.45`                      | Pinned Memcached image tag.                                                   |
+| `memcached.memoryLimitMB`                          | `64`                          | Item memory limit passed to `-m`.                                             |
+| `memcached.maxConnections`                         | `1024`                        | Connection limit passed to `-c`.                                              |
+| `memcached.threads`                                | `4`                           | Worker thread count passed to `-t`.                                           |
+| `memcached.maxItemSize`                            | `1m`                          | Maximum item size passed to `-I`.                                             |
+| `memcached.disableFlushAll`                        | `false`                       | Disables the `flush_all` command when enabled.                                |
+| `auth.enabled`                                     | `false`                       | Enables ASCII or SASL authentication.                                         |
+| `auth.mode`                                        | `ascii`                       | `ascii` or `sasl`.                                                            |
+| `tls.enabled`                                      | `false`                       | Adds Memcached TLS extended options from an existing Secret.                  |
+| `extstore.enabled`                                 | `false`                       | Enables Memcached extstore cache extension.                                   |
+| `extstore.persistence.retentionPolicy.whenDeleted` | `Retain`                      | PVC retention when the StatefulSet is deleted.                                |
+| `extstore.persistence.retentionPolicy.whenScaled`  | `Retain`                      | PVC retention when replicas are scaled down.                                  |
+| `metrics.enabled`                                  | `false`                       | Adds a Prometheus memcached exporter sidecar and metrics Service.             |
+| `metrics.memcachedTLS.enabled`                     | `false`                       | Uses TLS between the exporter and local Memcached process.                    |
+| `networkPolicy.enabled`                            | `false`                       | Renders NetworkPolicy rules for cache and metrics access.                     |
+| `networkPolicy.egress.enabled`                     | `false`                       | Adds optional egress policy rules.                                            |
+| `networkPolicy.egress.extraEgress`                 | `[]`                          | Appends full custom NetworkPolicy egress rules to generated egress.           |
+| `autoscaling.enabled`                              | `false`                       | Enables HPA for distributed mode only.                                        |
+| `pdb.enabled`                                      | `false`                       | Renders a PodDisruptionBudget.                                                |
+| `service.type`                                     | `ClusterIP`                   | Client Service type; use `LoadBalancer` if external TCP exposure is required. |
+| `service.ipFamilyPolicy`                           | `""`                          | Optional Kubernetes dual-stack policy.                                        |
+| `service.ipFamilies`                               | `[]`                          | Optional ordered IP family list such as `IPv4`, `IPv6`.                       |
+| `externalSecrets.enabled`                          | `false`                       | Renders External Secrets Operator v1 resource.                                |
+| `serviceAccount.automountServiceAccountToken`      | `false`                       | Keeps the Kubernetes API token unmounted by default.                          |
 
 ## Operations
 
