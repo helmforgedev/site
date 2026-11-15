@@ -279,8 +279,8 @@ precedence when the same key is present in both maps.
 Broker PVCs use `Retain` when the StatefulSet is deleted or scaled down. Set either retention policy to `Delete` only
 when automatic broker-data removal is intentional. On Kubernetes 1.26, deletion requires the
 `StatefulSetAutoDeletePVC` feature gate on the API server and controller manager. The gate is enabled by default from
-Kubernetes 1.27 through 1.31 but can still be disabled, so verify the controller manager setting. The feature is
-stable from Kubernetes 1.32.
+Kubernetes 1.27 through 1.31 but can still be disabled, so verify both the API server and controller manager settings.
+The feature is stable from Kubernetes 1.32.
 
 ## Configuration Reference
 
@@ -384,14 +384,18 @@ Set explicit limits for production deployments with many connected devices.
 
 ### Authentication
 
-| Parameter                        | Type    | Default    | Description                                                    |
-| -------------------------------- | ------- | ---------- | -------------------------------------------------------------- |
-| `auth.enabled`                   | boolean | `false`    | Enable username/password authentication.                       |
-| `auth.username`                  | string  | `mqtt`     | Username stored in the generated password file.                |
-| `auth.password`                  | string  | `""`       | Password; generated once and preserved on upgrades when empty. |
-| `auth.existingSecret`            | string  | `""`       | Existing Kubernetes Secret with MQTT credentials.              |
-| `auth.existingSecretUsernameKey` | string  | `username` | Key in the existing secret for the username.                   |
-| `auth.existingSecretPasswordKey` | string  | `password` | Key in the existing secret for the password.                   |
+| Parameter                        | Type    | Default    | Description                                           |
+| -------------------------------- | ------- | ---------- | ----------------------------------------------------- |
+| `auth.enabled`                   | boolean | `false`    | Enable username/password authentication.              |
+| `auth.username`                  | string  | `mqtt`     | Username stored in the generated password file.       |
+| `auth.password`                  | string  | `""`       | Password; preserved by live Helm upgrades when empty. |
+| `auth.existingSecret`            | string  | `""`       | Existing Kubernetes Secret with MQTT credentials.     |
+| `auth.existingSecretUsernameKey` | string  | `username` | Key in the existing secret for the username.          |
+| `auth.existingSecretPasswordKey` | string  | `password` | Key in the existing secret for the password.          |
+
+Live `helm install` and `helm upgrade` operations preserve an empty `auth.password` by looking up the existing Secret.
+Render-only tools such as `helm template` and GitOps renderers cannot perform that cluster lookup and may generate a
+new value on each render. Use `auth.existingSecret` for GitOps workflows.
 
 ### ACL
 
