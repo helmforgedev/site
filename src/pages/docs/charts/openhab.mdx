@@ -15,7 +15,7 @@ Helm chart for deploying [openHAB](https://www.openhab.org/) on Kubernetes using
 - **StatefulSet workload** for stable, predictable PVC attachment on every restart
 - **Three persistent volumes** (`userdata`, `conf`, `addons`) with independent sizing and storage class configuration
 - **ConfigMap startup sync** for sitemaps, things, and items into the writable `conf` PVC with checksum-driven rollouts
-- **Compatible security hardening** — `fsGroup: 9001`, `RuntimeDefault` seccomp, disabled ServiceAccount token automount, and capability-free helper containers with read-only root filesystems while the official entrypoint retains its required bootstrap path
+- **Compatible security hardening** — `fsGroup: 9001`, `RuntimeDefault` seccomp, disabled ServiceAccount token automount, and `drop: [ALL]` with only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID` restored for the official entrypoint
 - **Smart health probes** via `/rest/uuid` (available in openHAB 4.x, no auth required) with a 10-minute startup window for OSGi bundle loading
 - **Prometheus metrics** via `/rest/metrics/prometheus` — pod annotations and ServiceMonitor supported
 - **Optional Ingress** with websocket annotation guidance for the `/rest/events` SSE endpoint
@@ -376,6 +376,9 @@ podSecurityContext:
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: false # openHAB writes to internal dirs at runtime
+  capabilities:
+    drop: [ALL]
+    add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
 ```
 
 > **Why `readOnlyRootFilesystem: false`?** openHAB (OSGi/Karaf) writes to several internal directories at runtime (`/openhab/runtime/`, `/openhab/userdata/tmp/`, `/openhab/userdata/cache/`). These cannot be relocated. Mount your persistent data on the three PVCs to ensure durability across restarts.
@@ -560,7 +563,7 @@ The backup job runs as two containers sharing an `emptyDir` volume:
 
 Both containers run as UID/GID 9001 to match openHAB's PVC ownership.
 They also drop all Linux capabilities, use read-only root filesystems, disable
-privilege escalation, and do not mount a Kubernetes API token.
+privilege escalation, and use a dedicated backup ServiceAccount.
 
 ### Enabling Backup
 
@@ -596,6 +599,43 @@ backup:
     bucket: 'openhab-backups'
     existingSecret: 'my-s3-creds'
 ```
+
+### Using IRSA
+
+Avoid static S3 credentials by annotating the dedicated backup ServiceAccount
+and enabling ambient AWS credentials:
+
+```yaml
+backup:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/openhab-backup
+  s3:
+    endpoint: 'https://s3.amazonaws.com'
+    bucket: 'openhab-backups'
+    region: 'us-east-1'
+    credentialsFromPodIdentity: true
+```
+
+### Using EKS Pod Identity
+
+Keep the same S3 values and `credentialsFromPodIdentity: true`, but omit the
+ServiceAccount role annotation. The cluster must run the EKS Pod Identity Agent
+add-on. Create an association for the rendered backup ServiceAccount in its
+actual namespace. For release `my-openhab`, the default name is
+`my-openhab-backup`:
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name <cluster-name> \
+  --namespace <namespace> \
+  --service-account my-openhab-backup \
+  --role-arn <role-arn>
+```
+
+If `fullnameOverride` or `backup.serviceAccount.name` is set, use the
+ServiceAccount name rendered by the chart instead.
 
 ### What Gets Backed Up
 
@@ -674,22 +714,25 @@ kubectl scale statefulset my-openhab -n openhab --replicas=1
 | Parameter          | Description      | Default                     |
 | ------------------ | ---------------- | --------------------------- |
 | `image.repository` | Image repository | `docker.io/openhab/openhab` |
-| `image.tag`        | Image tag        | `5.2.0`                     |
+| `image.tag`        | Image tag        | `5.2.3`                     |
 | `image.pullPolicy` | Pull policy      | `IfNotPresent`              |
 
 ### Workload
 
-| Parameter                                     | Description                                    | Default          |
-| --------------------------------------------- | ---------------------------------------------- | ---------------- |
-| `replicaCount`                                | Must be `1` — clustering not supported         | `1`              |
-| `podSecurityContext.fsGroup`                  | fsGroup for PVC ownership after privilege drop | `9001`           |
-| `podSecurityContext.seccompProfile.type`      | Pod seccomp profile                            | `RuntimeDefault` |
-| `securityContext.allowPrivilegeEscalation`    | Prevent privilege escalation                   | `false`          |
-| `securityContext.readOnlyRootFilesystem`      | Keep writable for OSGi/Karaf runtime state     | `false`          |
-| `namespaceOverride`                           | Override chart-managed object namespace        | `""`             |
-| `podLabels`                                   | Extra pod labels; selector labels are reserved | `{}`             |
-| `serviceAccount.create`                       | Create a dedicated ServiceAccount              | `true`           |
-| `serviceAccount.automountServiceAccountToken` | Mount Kubernetes API token into pods           | `false`          |
+| Parameter                                     | Description                                     | Default                                         |
+| --------------------------------------------- | ----------------------------------------------- | ----------------------------------------------- |
+| `replicaCount`                                | Must be `1` — clustering not supported          | `1`                                             |
+| `podSecurityContext.fsGroup`                  | fsGroup for PVC ownership after privilege drop  | `9001`                                          |
+| `podSecurityContext.seccompProfile.type`      | Pod seccomp profile                             | `RuntimeDefault`                                |
+| `securityContext.allowPrivilegeEscalation`    | Prevent privilege escalation                    | `false`                                         |
+| `securityContext.readOnlyRootFilesystem`      | Keep writable for OSGi/Karaf runtime state      | `false`                                         |
+| `securityContext.capabilities.drop`           | Drop the ambient Linux capability set           | `[ALL]`                                         |
+| `securityContext.capabilities.add`            | Entrypoint bootstrap capabilities               | `[CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]` |
+| `namespaceOverride`                           | Override chart-managed object namespace         | `""`                                            |
+| `commonAnnotations`                           | Annotations added to every chart-managed object | `{}`                                            |
+| `podLabels`                                   | Extra pod labels; selector labels are reserved  | `{}`                                            |
+| `serviceAccount.create`                       | Create a dedicated ServiceAccount               | `true`                                          |
+| `serviceAccount.automountServiceAccountToken` | Mount Kubernetes API token into pods            | `false`                                         |
 
 ### Namespace Override
 
@@ -792,29 +835,35 @@ gateway:
 
 ### Backup
 
-| Parameter                           | Description                                             | Default                    |
-| ----------------------------------- | ------------------------------------------------------- | -------------------------- |
-| `backup.enabled`                    | Enable automated backup CronJob                         | `false`                    |
-| `backup.schedule`                   | Cron schedule                                           | `0 3 * * *`                |
-| `backup.suspend`                    | Suspend the CronJob without deleting it                 | `false`                    |
-| `backup.concurrencyPolicy`          | CronJob concurrency policy                              | `Forbid`                   |
-| `backup.successfulJobsHistoryLimit` | Successful job history to retain                        | `3`                        |
-| `backup.failedJobsHistoryLimit`     | Failed job history to retain                            | `3`                        |
-| `backup.backoffLimit`               | Job backoff limit                                       | `1`                        |
-| `backup.archivePrefix`              | Archive filename prefix                                 | `openhab`                  |
-| `backup.include.userdata`           | Back up `/openhab/userdata`                             | `true`                     |
-| `backup.include.conf`               | Back up `/openhab/conf`                                 | `true`                     |
-| `backup.images.utility.repository`  | Backup utility image                                    | `docker.io/library/alpine` |
-| `backup.images.utility.tag`         | Backup utility tag                                      | `3.22`                     |
-| `backup.images.uploader.repository` | S3 uploader image                                       | `docker.io/helmforge/mc`   |
-| `backup.images.uploader.tag`        | S3 uploader tag                                         | `1.0.0`                    |
-| `backup.resources`                  | Resource requests/limits for backup containers          | requests/limits set        |
-| `backup.s3.endpoint`                | S3-compatible endpoint URL                              | `""`                       |
-| `backup.s3.bucket`                  | Target bucket name                                      | `""`                       |
-| `backup.s3.prefix`                  | Key prefix within the bucket                            | `openhab`                  |
-| `backup.s3.accessKey`               | S3 access key                                           | `""`                       |
-| `backup.s3.secretKey`               | S3 secret key                                           | `""`                       |
-| `backup.s3.existingSecret`          | Existing Secret name (keys: `access-key`, `secret-key`) | `""`                       |
+| Parameter                                            | Description                                                | Default                    |
+| ---------------------------------------------------- | ---------------------------------------------------------- | -------------------------- |
+| `backup.enabled`                                     | Enable automated backup CronJob                            | `false`                    |
+| `backup.schedule`                                    | Cron schedule                                              | `0 3 * * *`                |
+| `backup.suspend`                                     | Suspend the CronJob without deleting it                    | `false`                    |
+| `backup.concurrencyPolicy`                           | CronJob concurrency policy                                 | `Forbid`                   |
+| `backup.successfulJobsHistoryLimit`                  | Successful job history to retain                           | `3`                        |
+| `backup.failedJobsHistoryLimit`                      | Failed job history to retain                               | `3`                        |
+| `backup.backoffLimit`                                | Job backoff limit                                          | `1`                        |
+| `backup.archivePrefix`                               | Archive filename prefix                                    | `openhab`                  |
+| `backup.serviceAccount.create`                       | Create a dedicated backup ServiceAccount                   | `true`                     |
+| `backup.serviceAccount.automountServiceAccountToken` | Mount the Kubernetes API token in backup pods              | `false`                    |
+| `backup.serviceAccount.annotations`                  | Backup ServiceAccount annotations                          | `{}`                       |
+| `backup.serviceAccount.name`                         | Backup ServiceAccount name override                        | `""`                       |
+| `backup.include.userdata`                            | Back up `/openhab/userdata`                                | `true`                     |
+| `backup.include.conf`                                | Back up `/openhab/conf`                                    | `true`                     |
+| `backup.images.utility.repository`                   | Backup utility image                                       | `docker.io/library/alpine` |
+| `backup.images.utility.tag`                          | Backup utility tag                                         | `3.22`                     |
+| `backup.images.uploader.repository`                  | S3 uploader image                                          | `docker.io/helmforge/mc`   |
+| `backup.images.uploader.tag`                         | S3 uploader tag                                            | `1.0.0`                    |
+| `backup.resources`                                   | Resource requests/limits for backup containers             | requests/limits set        |
+| `backup.s3.endpoint`                                 | S3-compatible endpoint URL                                 | `""`                       |
+| `backup.s3.bucket`                                   | Target bucket name                                         | `""`                       |
+| `backup.s3.prefix`                                   | Key prefix within the bucket                               | `openhab`                  |
+| `backup.s3.region`                                   | AWS region used by Pod Identity or IRSA                    | `""`                       |
+| `backup.s3.accessKey`                                | S3 access key                                              | `""`                       |
+| `backup.s3.secretKey`                                | S3 secret key                                              | `""`                       |
+| `backup.s3.existingSecret`                           | Existing Secret name (keys: `access-key`, `secret-key`)    | `""`                       |
+| `backup.s3.credentialsFromPodIdentity`               | Use EKS Pod Identity or IRSA instead of static credentials | `false`                    |
 
 ## Upgrade Notes
 
