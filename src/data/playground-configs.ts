@@ -3508,6 +3508,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'Contains tls.crt, tls.key and ca.crt; empty generates retained private CA material',
         },
         {
+          label: 'Resource owner annotation',
+          key: 'commonAnnotations.example\\.com/owner',
+          type: 'text',
+          default: '',
+          description: 'Example chart-wide annotation; resource-specific annotations take precedence',
+        },
+        {
           label: 'Data volume size',
           key: 'persistence.size',
           type: 'text',
@@ -3598,7 +3605,54 @@ export const chartConfigs: Record<string, ChartConfig> = {
           key: 'backup.s3.existingSecret',
           type: 'text',
           default: 'sql-server-backup-s3',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'false' },
           description: 'Contains AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY',
+        },
+        {
+          label: 'Ambient S3 credentials',
+          key: 'backup.s3.credentialsFromPodIdentity',
+          type: 'toggle',
+          default: 'false',
+          toggleActivationValues: {
+            true: {
+              'backup.serviceAccount.create': 'true',
+            },
+          },
+          description: 'Use EKS Pod Identity, IRSA or another ambient AWS credential provider',
+        },
+        {
+          label: 'Create backup ServiceAccount',
+          key: 'backup.serviceAccount.create',
+          type: 'toggle',
+          default: 'true',
+          visibleWhen: { 'backup.s3.credentialsFromPodIdentity': 'true' },
+          description: 'Create the dedicated identity used only by backup Jobs',
+        },
+        {
+          label: 'Backup ServiceAccount name',
+          key: 'backup.serviceAccount.name',
+          type: 'text',
+          default: '',
+          visibleWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
+          requiredWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'false',
+          },
+          description: 'Existing dedicated backup identity when account creation is disabled',
+        },
+        {
+          label: 'Backup IAM role annotation',
+          key: 'backup.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn',
+          type: 'text',
+          default: '',
+          visibleWhen: {
+            'backup.s3.credentialsFromPodIdentity': 'true',
+            'backup.serviceAccount.create': 'true',
+          },
+          description: 'Optional IRSA role ARN on the dedicated backup ServiceAccount',
         },
         {
           label: 'S3 endpoint',
