@@ -17120,6 +17120,22 @@ export const chartConfigs: Record<string, ChartConfig> = {
           description: 'PVC size for each broker pod',
         },
         {
+          label: 'Delete Retention',
+          key: 'broker.persistence.retentionPolicy.whenDeleted',
+          type: 'select',
+          default: 'Retain',
+          options: ['Retain', 'Delete'],
+          description: 'PVC policy when the StatefulSet is deleted',
+        },
+        {
+          label: 'Scale Retention',
+          key: 'broker.persistence.retentionPolicy.whenScaled',
+          type: 'select',
+          default: 'Retain',
+          options: ['Retain', 'Delete'],
+          description: 'PVC policy when broker replicas are scaled down',
+        },
+        {
           label: 'WebSocket Listener',
           key: 'broker.listeners.websocketEnabled',
           type: 'toggle',
