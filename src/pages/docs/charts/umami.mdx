@@ -439,12 +439,33 @@ The backup CronJob runs `pg_dump` against the Umami PostgreSQL database and uplo
 storage. It protects Umami users, websites, dashboards, events, session replay data, shares, and related PostgreSQL
 state.
 
-For EKS Pod Identity or IRSA, set `backup.s3.credentialsFromPodIdentity=true`, provide `backup.s3.region`, and annotate
-the dedicated `backup.serviceAccount`. Workload identity mode renders no static S3 credential Secret or environment
-variables. Allow DNS and HTTPS egress to S3 and STS; if the CNI filters link-local traffic, also allow the applicable
-Pod Identity or IRSA metadata endpoint for the cluster's IPv4 or IPv6 mode. Keep bucket creation disabled unless the
-identity has `s3:CreateBucket`; object-only backups require `s3:PutObject`, and IRSA requires
-`sts:AssumeRoleWithWebIdentity`.
+For EKS Pod Identity or IRSA, set `backup.s3.credentialsFromPodIdentity=true` and provide `backup.s3.region`. Workload
+identity mode renders a dedicated ServiceAccount for the backup CronJob and no static S3 credential Secret or
+environment variables.
+
+For EKS Pod Identity, install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html)
+once per cluster unless EKS Auto Mode already provides it. Associate the IAM role with the exact namespace and backup
+ServiceAccount; the default ServiceAccount name is `<release>-umami-backup`. Pod Identity does not use a ServiceAccount
+annotation.
+
+```bash
+aws eks create-addon \
+  --cluster-name <cluster-name> \
+  --addon-name eks-pod-identity-agent
+
+aws eks create-pod-identity-association \
+  --cluster-name <cluster-name> \
+  --namespace <release-namespace> \
+  --service-account <release>-umami-backup \
+  --role-arn <iam-role-arn>
+```
+
+For IRSA, annotate `backup.serviceAccount.annotations` with `eks.amazonaws.com/role-arn`; the role trust policy must
+allow `sts:AssumeRoleWithWebIdentity`.
+
+Allow DNS and HTTPS egress to S3 and STS; if the CNI filters link-local traffic, also allow the applicable Pod Identity
+or IRSA metadata endpoint for the cluster's IPv4 or IPv6 mode. Keep bucket creation disabled unless the identity has
+`s3:CreateBucket`; object-only backups require `s3:PutObject`.
 
 | Value                                  | Default                                  | Description                                        |
 | -------------------------------------- | ---------------------------------------- | -------------------------------------------------- |
