@@ -449,7 +449,9 @@ environment variables.
 For EKS Pod Identity, install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html)
 once per cluster unless EKS Auto Mode already provides it. Associate the IAM role with the exact namespace and backup
 ServiceAccount; the default ServiceAccount name is `<release>-umami-backup`. Pod Identity does not use a ServiceAccount
-annotation.
+annotation. The IAM role trust policy must allow the `pods.eks.amazonaws.com` service principal to call
+`sts:AssumeRole` and `sts:TagSession`; see the
+[AWS Pod Identity association guide](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-association.html).
 
 ```bash
 aws eks create-addon \
@@ -463,8 +465,11 @@ aws eks create-pod-identity-association \
   --role-arn <iam-role-arn>
 ```
 
-For IRSA, annotate `backup.serviceAccount.annotations` with `eks.amazonaws.com/role-arn`; the role trust policy must
-allow `sts:AssumeRoleWithWebIdentity`.
+For IRSA, first [create an IAM OIDC provider](https://docs.aws.amazon.com/eks/latest/userguide/enable-iam-roles-for-service-accounts.html)
+for the cluster issuer. The IAM role must
+[trust that provider](https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html) for the exact
+backup namespace and ServiceAccount through `sts:AssumeRoleWithWebIdentity`. Then annotate
+`backup.serviceAccount.annotations` with `eks.amazonaws.com/role-arn`.
 
 Allow DNS and HTTPS egress to S3 and STS; if the CNI filters link-local traffic, also allow the applicable Pod Identity
 or IRSA metadata endpoint for the cluster's IPv4 or IPv6 mode. Keep bucket creation disabled unless the identity has
