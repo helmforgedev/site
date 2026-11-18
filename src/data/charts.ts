@@ -1004,7 +1004,7 @@ export const charts: Chart[] = [
     description: 'MongoDB Helm Chart - standalone, replica set, or sharded cluster using the official MongoDB image',
     maturity: 'stable',
     backup: true,
-    version: '1.8.7',
+    version: '1.9.0',
     appVersion: '9.0.4',
     category: 'database',
     keywords: ['mongodb', 'database', 'nosql', 'replicaset', 'sharded'],
