@@ -135,13 +135,14 @@ jobs:
           # Extract internal href links from all HTML files
           for f in $(find dist -name '*.html'); do
             grep -oE 'href="(/[^"#]*)"' "$f" | sed 's/href="//;s/"//' | while read -r link; do
+              clean_link="${link%%\?*}"
               # Normalize: /docs/ -> dist/docs/index.html
-              TARGET="dist${link}"
-              if [ "${link}" != "/" ] && [ "${link: -1}" = "/" ]; then
+              TARGET="dist${clean_link}"
+              if [ "${clean_link}" != "/" ] && [ "${clean_link: -1}" = "/" ]; then
                 TARGET="${TARGET}index.html"
-              elif [ "${link}" = "/" ]; then
+              elif [ "${clean_link}" = "/" ]; then
                 TARGET="dist/index.html"
-              elif [[ ! "$link" =~ \. ]]; then
+              elif [[ ! "$clean_link" =~ \. ]]; then
                 TARGET="${TARGET}/index.html"
               fi
               if [ ! -f "$TARGET" ]; then
