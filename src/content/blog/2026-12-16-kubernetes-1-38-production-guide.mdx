@@ -27,7 +27,7 @@ Reading release notes SIG by SIG often obscures the holistic operational impact.
 
 1. **Hardware & Accelerator Management**: The `DynamicResourceAllocation` feature gate has been completely removed from the codebase. DRA is no longer an optional experiment; it is a permanent core subsystem with stable device binding and fractional capacity.
 2. **Workload Co-Scheduling**: Native multi-pod group coordination via `CompositePodGroup` eliminates the requirement for standalone external schedulers during distributed model training.
-3. **Admission Control Determinism**: Mutating admission webhooks finally support explicit static ordering, ending unpredictable ordering races between security, secret injection, and service mesh webhooks.
+3. **Admission Control Determinism**: Mutating admission webhooks support explicit static ordering phases, giving operators deterministic sequencing between static manifest-defined and dynamic admission plugins.
 4. **Validation & Strict Parsing**: Kubelet strictly enforces `.env` comment formatting, and `kube-apiserver` caps RSA keys at 4096 bits during JWK parsing, catching latent configuration debt.
 
 ![Architectural topology of Kubernetes 1.38 showing API server admission ordering, composite pod gang-scheduling, and node DRA runtime execution.](/blog/2026-12-16-kubernetes-1-38-architecture-map.webp)
@@ -40,7 +40,7 @@ Historically, Kubernetes managed GPUs and hardware accelerators through the lega
 
 Kubernetes 1.38 completes the transition by graduating Dynamic Resource Allocation to General Availability and removing the feature gate entirely. Key architectural milestones include:
 
-- **Device Binding Conditions (KEP-5007)**: Kubelet and the scheduler coordinate atomic resource allocation, ensuring that hardware devices and retained persistent volumes bind simultaneously without deadlocking node resources.
+- **Device Binding Conditions (KEP-5007)**: Kubelet and the scheduler coordinate device-readiness conditions as an explicit prerequisite gate before Pod binding is initiated, decoupling device preparation from volume binding while ensuring Pods are only scheduled to nodes capable of satisfying hardware claims.
 - **`DRAPartitionableDevices` in GA**: Hardware accelerators can be partitioned dynamically on demand (such as provisioning isolated compute slices or GPU partitions) rather than relying on pre-configured static node pools.
 - **`DRAConsumableCapacity` & `DRAFractionalCapacityRange`**: Applications can declare granular hardware allocations, sharing physical devices safely across multiple pods with explicit capacity guarantees.
 - **`DRADeviceTaints` & Rules**: Device-level taints are enabled by default, featuring a `None` preview effect that enables platform operators to observe taint evaluations in telemetry before enforcing workload eviction (`NoExecute`).
@@ -51,7 +51,7 @@ For Helm chart maintainers, the implications are straightforward: applications p
 
 Distributed training jobs (such as PyTorch DDP, DeepSpeed, or Megatron-LM) have a fundamental operational requirement: **all pods in a distributed worker set must be scheduled concurrently**. If a cluster with 64 GPUs schedules 60 pods and starves the remaining 4, the entire job hangs while holding costly hardware idle.
 
-Historically, solving this required deploying custom batch schedulers (such as Volcano or customized Kueue topologies). Kubernetes 1.38 promotes the **`CompositePodGroup` API (`scheduling.k8s.io/v1beta1`)** to native beta.
+Historically, solving this required deploying custom batch schedulers (such as Volcano or customized Kueue topologies). Kubernetes 1.38 promotes the **`CompositePodGroup` API (`scheduling.k8s.io/v1beta1`)** to native beta. In v1.38, the feature is disabled by default and requires enabling feature gates on control-plane components: `--feature-gates=CompositePodGroup=true,GenericWorkload=true,TopologyAwareWorkloadScheduling=true`.
 
 ```yaml
 apiVersion: scheduling.k8s.io/v1beta1
@@ -60,35 +60,42 @@ metadata:
   name: distributed-llama-training
   namespace: ml-workloads
 spec:
-  minMember: 16
-  scheduleTimeoutSeconds: 300
-  topologyPolicy: GuaranteedTopology
+  workloadRef:
+    name: llama-training-workload
+  schedulingPolicy:
+    gang:
+      minGroupCount: 4
 ```
 
 Key scheduling advancements in 1.38 include:
 
-- **Atomic All-or-Nothing Placement**: The scheduler guarantees that all `minMember` pods within the group acquire placement and hardware claims simultaneously. If full placement cannot be satisfied within `scheduleTimeoutSeconds`, the reservations are released cleanly.
+- **Hierarchical Gang Placement**: The composite scheduler coordinates child `PodGroup` instances bound to a parent `Workload`. The scheduler guarantees that the required quota of leaf groups (`minGroupCount`) acquire placements and hardware claims concurrently before workloads are dispatched to nodes.
 - **Topology-Aware Placement Scoring**: Through `TopologyAwareWorkloadScheduling`, kube-scheduler introduces the `percentageOfPlacementsToScore` parameter. In large clusters with spine-leaf network topologies, the scheduler adaptively samples candidate placements, optimizing inter-node communication latency without incurring high CPU scheduling overhead.
-- **Explicit Job Failure Policy Reasons (KEP-4443)**: Under `PodFailurePolicy`, rules using `action: FailJob` now support custom condition reasons. Higher-level orchestrators (such as JobSet or Kueue) can distinguish between transient infrastructure failures (like an uncorrectable GPU ECC memory error) and fatal application code bugs, preventing wasted retry budgets.
+- **Job Failure Policy Reasons (KEP-4443, Alpha)**: Under `PodFailurePolicy`, rules using `action: FailJob` support custom condition reasons when the Alpha gate `--feature-gates=PodFailurePolicyName=true` is enabled on `kube-apiserver` and `kube-controller-manager`. Higher-level orchestrators (such as JobSet or Kueue) can distinguish between transient infrastructure failures (like an uncorrectable GPU ECC memory error) and fatal application code bugs, preventing wasted retry budgets.
 
 ## API machinery: ending the mutating webhook race
 
 In complex production clusters, mutating admission webhooks frequently conflict. When a Pod creation request triggers HashiCorp Vault / External Secrets secret injection, Istio or Linkerd ambient sidecars, and Kyverno or OPA Gatekeeper security policies, the evaluation order was historically non-deterministic or dictated strictly by alphabetical webhook registration names.
 
-Kubernetes 1.38 introduces **`staticOrder` in `WebhookAdmissionConfiguration` (KEP-5793)**:
+Kubernetes 1.38 introduces **`staticOrder` in `WebhookAdmissionConfiguration` (KEP-5793)**, enabled via the `--feature-gates=MutatingAdmissionWebhookStaticOrder=true` flag:
 
 ```yaml
 apiVersion: apiserver.config.k8s.io/v1
-kind: WebhookAdmissionConfiguration
-mutatingWebhookConfiguration:
-  staticOrder: StaticFirst # Supported modes: StaticFirst, StaticLast, ByName
+kind: AdmissionConfiguration
+plugins:
+  - name: MutatingAdmissionWebhook
+    configuration:
+      apiVersion: apiserver.config.k8s.io/v1alpha1
+      kind: WebhookAdmissionConfiguration
+      staticManifestsDir: /etc/kubernetes/admission/static
+      staticOrder: StaticFirst # Supported modes: StaticFirst, StaticLast, ByName
 ```
 
-- **`StaticFirst` (Default)**: Evaluates manifest-defined administrative webhooks before dynamically registered cluster webhooks.
-- **`StaticLast`**: Allows API-registered webhooks to mutate objects before static policy enforcers inspect the final result.
+- **`StaticFirst` (Default)**: Evaluates manifest-defined administrative webhooks located in `staticManifestsDir` before dynamically registered cluster webhooks.
+- **`StaticLast`**: Allows dynamic API-registered webhooks to mutate objects before static policy enforcers inspect the final result.
 - **`ByName`**: Maintains interleaved alphabetical ordering for backward compatibility.
 
-This capability eliminates mutation drift where security controllers occasionally evaluated pods before sidecars or security contexts were fully injected.
+While `staticOrder` organizes the execution phase of static manifests versus dynamic webhooks, it does not prevent subsequent dynamic mutators from modifying an object after early mutators complete. When security policies must strictly validate the final converged state of an object, teams should continue utilizing webhook reinvocation policies and final validating admission (ValidatingAdmissionWebhook or Common Expression Language validations).
 
 ### Reducing API payload bloat with ManagedFieldsOptOut
 
@@ -119,11 +126,13 @@ Ensure any comments are placed on dedicated lines or preceded by whitespace (`KE
 
 The Kubernetes API server updates its core cryptographic dependency to `go-jose/v4`. To protect control-plane nodes against algorithmic complexity and denial-of-service vectors during JWT signature verification, RSA keys larger than 4096 bits are strictly rejected during JWK parsing.
 
-If your cluster integrates with custom corporate OpenID Connect (OIDC) identity providers using 8192-bit RSA signing keys, token authentication will fail immediately upon upgrading `kube-apiserver`. Ensure identity provider keys are rotated to standard 2048-bit or 4096-bit RSA, or modern ECDSA/Ed25519 curves before upgrade.
+If your cluster integrates with custom corporate OpenID Connect (OIDC) identity providers using 8192-bit RSA signing keys, token authentication will fail immediately upon upgrading `kube-apiserver`. Ensure identity provider keys are rotated to compliant 2048-bit or 4096-bit RSA keys. If migrating to elliptic curve cryptography such as ECDSA (e.g., P-256 with ES256), explicitly configure `kube-apiserver` with `--oidc-signing-algs=ES256,RS256`, as the default setting expects RS256 only (note that Ed25519/EdDSA is not supported by the OIDC authenticator).
 
 ### 3. CRI writable cgroups support
 
-The Container Runtime Interface (CRI) adds `cgroup_mount_mode` support to natively manage writable cgroups inside container namespaces. This change streamlines running nested systemd workloads, development sandboxes, and virtualized container runtimes without requiring dangerous host-level `/sys/fs/cgroup` bind mounts. Ensure containerd (v2.0+) or CRI-O runtimes are updated to versions supporting CRI v1.38 specifications.
+The Container Runtime Interface (CRI) adds `cgroup_mount_mode` support to manage writable cgroups natively inside container namespaces. This change streamlines running nested systemd workloads, development sandboxes, and virtualized container runtimes without requiring dangerous host-level `/sys/fs/cgroup` bind mounts.
+
+Operating writable cgroups requires worker nodes running **cgroup v2** with `nsdelegate` enabled in systemd, alongside a container runtime implementing CRI v1.38 specifications (such as containerd 2.1+ or CRI-O 1.38+).
 
 ### 4. Kube-proxy cleanup
 
@@ -141,16 +150,16 @@ Platform engineers and Helm chart authors should execute this operational audit 
    Review GPU/accelerator Helm values. Prepare opt-in ResourceClaim templates for dynamic hardware partitioning alongside legacy resource limits.
 
 3. Align Admission Webhook Ordering:
-   Configure WebhookAdmissionConfiguration on control planes to establish explicit staticOrder (StaticFirst) for security and mutation pipelines.
+   Configure WebhookAdmissionConfiguration on control planes to establish explicit staticOrder (StaticFirst) alongside staticManifestsDir for security and mutation pipelines.
 
 4. Audit OIDC Signing Keys:
-   Confirm that all identity provider OIDC JWKS endpoints serve RSA keys <= 4096 bits.
+   Confirm that all identity provider OIDC JWKS endpoints serve RSA keys <= 4096 bits, and configure --oidc-signing-algs if using ECDSA.
 
 5. Validate Batch Pod Failure Policies:
-   Adopt custom failure condition reasons in Job and JobSet specifications to cleanly delineate infrastructure faults from application failures.
+   Enable PodFailurePolicyName on control planes if testing custom failure condition reasons in Job and JobSet specifications to delineate infrastructure faults.
 
 6. Verify Node Container Runtimes:
-   Ensure containerd or CRI-O versions in worker pools support CRI v1.38 cgroup mount specifications.
+   Ensure container runtimes support CRI v1.38 cgroup mount specifications, with host cgroup v2 nsdelegate enabled.
 ```
 
 ## The bigger read
@@ -169,4 +178,4 @@ For production clusters, upgrading to 1.38 is not merely an API refresh. It repr
 - [KEP-5007: DRA Device Binding Conditions](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/5007-dra-device-binding-conditions)
 - [KEP-4443: Job Failure Policy Condition Reasons](https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/4443-job-failure-policy-condition-reasons)
 - [KEP-5793: Webhook Admission Static Order](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/5793-webhook-admission-static-order)
-- [KEP-4381: CompositePodGroup Co-Scheduling](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/4381-composite-pod-group)
+- [KEP-6012: CompositePodGroup Co-Scheduling](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/6012-composite-pod-group)
