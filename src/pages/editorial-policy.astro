@@ -1,4 +1,5 @@
 ---
+// SPDX-License-Identifier: Apache-2.0
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -15,53 +16,94 @@ const policyJsonLd = {
 
 const sections = [
   {
-    title: 'Technical review',
-    body: 'Articles should be grounded in working Helm, Kubernetes, or project repository behavior. Commands, paths, and configuration examples are reviewed against the current HelmForge codebase when possible.',
+    title: 'Behavioral Verification',
+    badge: 'Accuracy',
+    body: 'Articles and documentation are tested against real Kubernetes clusters (k3d/Kind) before publication. Commands, Helm values, and architecture topologies must reflect reproducible behavior.',
   },
   {
-    title: 'Source selection',
-    body: 'Posts favor primary sources such as upstream documentation, release notes, project repositories, and official specifications. When a claim depends on current behavior, the source should be linked or reproducible.',
+    title: 'Primary Source Grounding',
+    badge: 'Evidence',
+    body: 'Claims link directly to primary upstream sources: official application documentation, CVE databases, Kubernetes Enhancement Proposals (KEPs), and release changelogs.',
   },
   {
-    title: 'AI and editorial assistance',
-    body: 'Automation and AI tools may assist with drafts, checks, and formatting. Maintainers remain responsible for factual review, final wording, and publication decisions.',
+    title: 'Human Review & Attribution Prohibition',
+    badge: 'Integrity',
+    body: 'Maintainers take personal accountability for every published word. Under project guardrails (GR-059), automated or AI attributions are forbidden. Human engineers review and sign all content.',
   },
   {
-    title: 'Corrections',
-    body: 'Material errors are corrected when discovered. Meaningful updates should preserve or add visible updated dates so readers can understand when guidance changed.',
+    title: 'Transparent Correction Policy',
+    badge: 'Accountability',
+    body: 'When technical errors or upstream regressions are identified, we update articles immediately. Substantive technical updates include explicit modification dates so operators know when guidance evolved.',
   },
   {
-    title: 'Update policy',
-    body: 'Dates are not changed for cosmetic edits. Updated dates are reserved for meaningful technical changes, migration guidance, corrected behavior, or refreshed references.',
+    title: 'Vendor-Neutral Operations',
+    badge: 'Independence',
+    body: 'We do not publish sponsored placements, hidden vendor affiliations, or paywalled workarounds. All charts, benchmarks, and architectural comparisons are open-source under Apache-2.0.',
+  },
+  {
+    title: 'Deprecation & Migration Clarity',
+    badge: 'Day-2',
+    body: 'When upstream software introduces breaking contract changes or deprecations, we provide explicit rollback steps, S3 backup verification, and migration manifests.',
   },
 ];
 ---
 
 <BaseLayout
-  title="Editorial Policy"
-  description="HelmForge editorial standards for technical review, source selection, AI assistance, corrections, and update policy."
+  title="Editorial Policy — Technical Accuracy & Transparency Standards"
+  description="HelmForge editorial standards for technical verification, primary sources, human review, corrections, and vendor-neutral Kubernetes operational content."
 >
   <Header />
   <script type="application/ld+json" set:html={JSON.stringify(policyJsonLd)}></script>
-  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+  <main id="main-content" class="py-16 sm:py-24" data-pagefind-body>
     <Container>
+      <!-- Section Header -->
       <SectionHeader
-        label="Editorial Policy"
+        label="Editorial Standards"
         as="h1"
-        title="How HelmForge publishes technical content."
-        description="These standards keep articles useful, verifiable, and honest about operational trade-offs."
+        title="Technical integrity, verified in production."
+        description="Our editorial policy guarantees that HelmForge guides, articles, and documentation reflect reproducible Kubernetes behavior, not marketing claims."
       />
 
-      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <!-- Policy Grid -->
+      <div class="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2">
         {sections.map((section) => (
-          <section class="glass-panel rounded-2xl p-6">
-            <h2 class="text-lg font-bold text-text-base heading-font">{section.title}</h2>
-            <p class="mt-3 text-sm leading-relaxed text-text-muted">{section.body}</p>
+          <section class="glass-panel rounded-2xl p-6 sm:p-7 border border-border hover:border-primary/40 transition-colors">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h2 class="text-base sm:text-lg font-bold text-text-base heading-font">{section.title}</h2>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-primary-light bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+                {section.badge}
+              </span>
+            </div>
+            <p class="text-xs sm:text-sm leading-relaxed text-text-muted">{section.body}</p>
           </section>
         ))}
       </div>
+
+      <!-- Action Footer -->
+      <div class="mt-16 glass-panel rounded-2xl p-6 sm:p-8 border border-border text-center max-w-2xl mx-auto">
+        <h3 class="text-base font-bold text-text-base">Found an Error or Outdated Command?</h3>
+        <p class="mt-2 text-xs sm:text-sm text-text-muted leading-relaxed">
+          We welcome community corrections. Report inaccuracies through our dedicated corrections portal or open an
+          issue on GitHub.
+        </p>
+        <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href="/corrections"
+            class="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-dark transition-all shadow-sm"
+          >
+            Read Corrections Policy
+          </a>
+          <a
+            href="https://github.com/helmforgedev/site/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-5 py-2.5 rounded-xl text-xs font-bold border border-border bg-bg-surface hover:border-primary/40 text-text-base transition-colors"
+          >
+            Submit an Issue on GitHub
+          </a>
+        </div>
+      </div>
     </Container>
   </main>
-
   <Footer />
 </BaseLayout>

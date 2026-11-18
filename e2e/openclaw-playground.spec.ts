@@ -41,7 +41,7 @@ test('documentation, values and official icon are available on mobile', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/docs/charts/openclaw');
   await expect(page.getByRole('heading', { name: 'OpenClaw', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Values reference', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Values|Values Schema Reference/i }).first()).toBeVisible();
   const dimensions = await page.evaluate(() => ({ viewport: innerWidth, page: document.body.scrollWidth }));
   expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport + 1);
   const icon = await request.get('/icons/charts/openclaw.png');

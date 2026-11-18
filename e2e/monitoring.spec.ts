@@ -4,8 +4,8 @@ test.describe('Blog monitoring', () => {
   test('renders the discovery monitoring workflow', async ({ page }) => {
     await page.goto('/blog/monitoring');
 
-    await expect(page).toHaveTitle(/Blog Discovery Monitoring/i);
-    await expect(page.locator('h1')).toContainText('Blog discovery monitoring');
+    await expect(page).toHaveTitle(/Blog Discovery.*Monitoring/i);
+    await expect(page.locator('h1')).toContainText('Discovery & performance monitoring');
     await expect(page.getByText('Google Search Console').first()).toBeVisible();
     await expect(page.getByText('Bing Webmaster Tools').first()).toBeVisible();
     await expect(page.getByText('Core Web Vitals').first()).toBeVisible();

@@ -1,9 +1,11 @@
 ---
+// SPDX-License-Identifier: Apache-2.0
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
+import { chartCount } from '../data/charts';
 
 const aboutJsonLd = {
   '@context': 'https://schema.org',
@@ -14,6 +16,12 @@ const aboutJsonLd = {
     '@type': 'Organization',
     name: 'HelmForge',
     url: 'https://helmforge.dev',
+    foundingDate: '2025',
+    founder: {
+      '@type': 'Person',
+      name: 'Maicon Berlofa',
+      url: 'https://helmforge.dev/authors/maicon-berlofa',
+    },
     sameAs: [
       'https://github.com/helmforgedev',
       'https://github.com/helmforgedev/charts',
@@ -23,57 +31,184 @@ const aboutJsonLd = {
   },
 };
 
-const principles = [
-  'Use official upstream images instead of rebuilding application containers.',
-  'Keep Helm chart defaults practical for production Kubernetes operations.',
-  'Treat backups, upgrade paths, security context, and observability as first-class chart behavior.',
-  'Document operational trade-offs clearly so users can make informed decisions.',
+const pillars = [
+  {
+    title: 'Official Upstream Images',
+    tag: 'Integrity',
+    description:
+      'We run only official images published by upstream maintainers with immutable SHA256 digests. No custom wrappers, no proprietary entrypoints, and zero telemetry.',
+  },
+  {
+    title: 'Zero-Root & Least Privilege',
+    tag: 'Security',
+    description:
+      'Every chart enforces UID 10001+, non-root execution, read-only root filesystems, and drops all Linux capabilities by default. Ready for restricted Pod Security Standards.',
+  },
+  {
+    title: 'Native Day-2 Automation',
+    tag: 'Reliability',
+    description:
+      'Built-in CronJobs for S3-compatible automated backups, External Secrets Operator (ESO) integration, Prometheus ServiceMonitors, and dual-stack IPv4/IPv6 networking.',
+  },
+  {
+    title: 'Cryptographic Supply Chain',
+    tag: 'Provenance',
+    description:
+      'Every release includes GPG provenance signatures and keyless Sigstore Cosign verification via GitHub Actions OIDC on both HTTPS Helm and GHCR OCI registries.',
+  },
+];
+
+const qualityGateLayers = [
+  'Helm Lint & Strict Linting',
+  'Helm Unittest Suite',
+  'Kubeconform with Live Schemas',
+  'Artifact Hub Metadata Lint',
+  'SPDX Apache-2.0 Header Audit',
+  'Non-Root Security Context Check',
+  'External Secrets Invariants',
+  'Behavioral k3d Runtime Smoke Gate',
 ];
 ---
 
 <BaseLayout
-  title="About HelmForge"
-  description="Learn about HelmForge as an open-source Helm chart project and technical publication for Kubernetes operations."
+  title="About HelmForge — The Open-Source Alternative to Bitnami"
+  description={`HelmForge maintains ${chartCount}+ production-ready, Apache-2.0 Helm charts for Kubernetes. Built with official upstream images, non-root security, automated S3 backups, and zero vendor lock-in.`}
 >
   <Header />
   <script type="application/ld+json" set:html={JSON.stringify(aboutJsonLd)}></script>
-  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+  <main id="main-content" class="py-16 sm:py-24" data-pagefind-body>
     <Container>
+      <!-- Hero Header -->
       <SectionHeader
-        label="About"
+        label="About HelmForge"
         as="h1"
-        title="Production-ready Helm charts, documented in the open."
-        description="HelmForge publishes Apache-2.0 Helm charts and practical Kubernetes operations content for teams that want transparent, reproducible infrastructure."
+        title="Open-source Helm charts, forged to last."
+        description={`HelmForge is the community-first, Apache-2.0 alternative to commercial chart ecosystems. We package ${chartCount}+ popular open-source applications with sane operational defaults, built-in backups, and uncompromising security.`}
       />
 
-      <div class="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <section class="space-y-5 text-sm leading-relaxed text-text-muted">
+      <!-- Mission Narrative Grid -->
+      <div class="mt-14 grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
+        <section class="lg:col-span-7 space-y-5 text-sm sm:text-base leading-relaxed text-text-muted">
+          <h2 class="text-xl sm:text-2xl font-bold text-text-base heading-font">Why we built HelmForge</h2>
           <p>
-            HelmForge exists to keep Kubernetes application deployment accessible, secure, and independently
-            maintainable. The project focuses on charts that use official upstream container images, clear operational
-            defaults, and automation around release quality.
+            When legacy chart vendors introduced commercial paywalls, shifted to proprietary container bases, and
+            deprecated hundreds of popular open-source charts, Kubernetes platform engineers and self-hosters were left
+            stranded.
           </p>
           <p>
-            The site is both project documentation and a technical publication. Blog posts explain Kubernetes behavior,
-            chart migration paths, production trade-offs, and lessons learned from operating self-hosted applications.
+            HelmForge was created to restore transparency and reliability to Kubernetes packaging. We believe
+            infrastructure software should belong to the community: 100% open-source under Apache-2.0, completely free
+            forever, with zero proprietary layers between your cluster and the official upstream code.
           </p>
           <p>
-            HelmForge is maintained in public repositories under the HelmForge GitHub organization, with charts
-            published through the Helm repository, OCI registry, and Artifact Hub.
+            Today, HelmForge maintains over {chartCount} production-grade Helm charts distributed via both classic HTTPS
+            repository and GHCR OCI artifacts, backed by automated k3d runtime testing and strict cryptographic
+            verification.
           </p>
         </section>
 
-        <section class="glass-panel rounded-2xl p-6">
-          <h2 class="text-lg font-bold text-text-base heading-font">Editorial and project principles</h2>
-          <ul class="mt-4 space-y-3 text-sm text-text-muted">
-            {principles.map((principle) => (
-              <li class="leading-relaxed">{principle}</li>
+        <!-- Sidebar Snapshot -->
+        <aside class="lg:col-span-5 glass-panel rounded-2xl p-6 sm:p-8 border border-border">
+          <div class="text-xs font-bold uppercase tracking-[0.16em] text-primary">At a Glance</div>
+          <div class="mt-4 space-y-4 text-xs sm:text-sm">
+            <div class="flex items-center justify-between pb-3 border-b border-border/60">
+              <span class="text-text-muted">Total Charts</span>
+              <span class="font-mono font-bold text-text-base">{chartCount}+ packages</span>
+            </div>
+            <div class="flex items-center justify-between pb-3 border-b border-border/60">
+              <span class="text-text-muted">License</span>
+              <span class="font-mono font-bold text-emerald-800 dark:text-emerald-300">Apache-2.0</span>
+            </div>
+            <div class="flex items-center justify-between pb-3 border-b border-border/60">
+              <span class="text-text-muted">Container Security</span>
+              <span class="font-mono font-bold text-text-base">Non-Root UID 10001+</span>
+            </div>
+            <div class="flex items-center justify-between pb-3 border-b border-border/60">
+              <span class="text-text-muted">Signatures</span>
+              <span class="font-mono font-bold text-text-base">GPG + Sigstore Cosign</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-text-muted">Distribution</span>
+              <span class="font-mono font-bold text-text-base">HTTPS & OCI (GHCR)</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- 4 Engineering Pillars -->
+      <div class="mt-20">
+        <div class="text-center max-w-2xl mx-auto mb-12">
+          <span class="text-xs font-bold uppercase tracking-[0.2em] text-primary">Core Principles</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-text-base heading-font mt-2">The 4 Engineering Pillars</h2>
+          <p class="text-sm text-text-muted mt-2">
+            Every HelmForge chart conforms to non-negotiable operational standards.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {pillars.map((pillar) => (
+            <div class="glass-panel rounded-2xl p-6 sm:p-7 border border-border hover:border-primary/40 transition-colors">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <h3 class="text-base sm:text-lg font-bold text-text-base heading-font">{pillar.title}</h3>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-primary-light bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+                  {pillar.tag}
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-text-muted leading-relaxed">{pillar.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Quality Gate Section -->
+      <div class="mt-20 glass-panel rounded-2xl p-8 border border-border">
+        <div class="max-w-3xl">
+          <span class="text-xs font-bold uppercase tracking-[0.2em] text-primary">Deterministic Quality</span>
+          <h2 class="text-2xl font-bold text-text-base heading-font mt-1">The 20-Layer Validation Gate</h2>
+          <p class="text-sm text-text-muted mt-2 leading-relaxed">
+            No chart is ever released to production on "lint and template passed". Every single chart must pass
+            end-to-end behavioral validation on local k3d clusters with real volumes, real secrets, and real application
+            probes.
+          </p>
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+            {qualityGateLayers.map((layer) => (
+              <div class="flex items-center gap-2.5 text-text-base">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 shrink-0 font-bold text-xs">
+                  ✓
+                </span>
+                <span>{layer}</span>
+              </div>
             ))}
-          </ul>
-        </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- Open Ecosystem Links -->
+      <div class="mt-16 text-center">
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold">
+          <a
+            href="https://github.com/helmforgedev/charts"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-dark transition-all shadow-sm"
+          >
+            Explore Charts on GitHub
+          </a>
+          <a
+            href="/stack"
+            class="px-5 py-2.5 rounded-xl border border-border bg-bg-surface hover:border-primary/40 text-text-base transition-colors"
+          >
+            Launch Stack Builder
+          </a>
+          <a
+            href="/roadmap"
+            class="px-5 py-2.5 rounded-xl border border-border bg-bg-surface hover:border-primary/40 text-text-base transition-colors"
+          >
+            Public Roadmap
+          </a>
+        </div>
       </div>
     </Container>
   </main>
-
   <Footer />
 </BaseLayout>

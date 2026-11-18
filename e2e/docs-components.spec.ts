@@ -56,4 +56,49 @@ test.describe('Docs Components', () => {
       expect(await tabs.count()).toBeGreaterThanOrEqual(1);
     }
   });
+
+  test('chart docs page displays chart header quick bar', async ({ page }) => {
+    await page.goto('/docs/charts/postgresql');
+    const main = page.locator('#main-content');
+    await expect(main.getByRole('link', { name: 'Values Studio' }).first()).toHaveAttribute(
+      'href',
+      '/playground/postgresql',
+    );
+    await expect(main.getByRole('link', { name: 'Stack Builder' })).toHaveAttribute(
+      'href',
+      '/stack?select=postgresql',
+    );
+    await expect(main.locator('text=Pinned Digest').first()).toBeVisible();
+
+    // Verify official schema reference section is loaded
+    const schemaRef = page.locator('#values-schema-reference');
+    await expect(schemaRef).toBeVisible();
+    await expect(schemaRef.locator('text=Values Schema Reference')).toBeVisible();
+    await expect(schemaRef.locator('.schema-row').first()).toBeVisible();
+
+    // Verify architecture topology section is loaded from DESIGN.md
+    const archSection = page.locator('#architecture-topology');
+    await expect(archSection).toBeVisible();
+    await expect(archSection.locator('text=System Architecture')).toBeVisible();
+    await expect(archSection.locator('text=DESIGN.md Synced')).toBeVisible();
+    await expect(archSection.getByRole('link', { name: /GitHub DESIGN\.md/i })).toHaveAttribute(
+      'href',
+      /github\.com\/helmforgedev\/charts\/blob\/main\/charts\/postgresql\/DESIGN\.md#architecture/,
+    );
+  });
+
+  test('chart docs page with multiple topologies renders switchable tabs if available', async ({
+    page,
+  }) => {
+    await page.goto('/docs/charts/mysql');
+    const archSection = page.locator('#architecture-topology');
+    if (await archSection.isVisible()) {
+      const tabs = archSection.locator('[role="tab"]');
+      const tabCount = await tabs.count();
+      if (tabCount >= 2) {
+        await tabs.nth(1).click();
+        await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+      }
+    }
+  });
 });

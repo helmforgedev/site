@@ -1,50 +1,65 @@
 ---
+// SPDX-License-Identifier: Apache-2.0
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Container from '../components/Container.astro';
 import SectionHeader from '../components/SectionHeader.astro';
+import { chartCount } from '../data/charts';
+
+const communityStats = [
+  { value: `${chartCount}+`, label: 'Production Charts', highlight: '100% Pinned Digests' },
+  { value: 'Apache-2.0', label: 'Open Source', highlight: 'Zero Proprietary Layers' },
+  { value: '20-Layer', label: 'Quality Gate', highlight: 'Automated k3d Tests' },
+  { value: '100%', label: 'Request Delivery', highlight: 'Zero Backlog Guarantee' },
+];
 
 const ways = [
   {
     icon: 'chart',
     title: 'Submit a Chart',
-    description: 'Build and contribute a new Helm chart for an application you use in production.',
+    description:
+      'Build and contribute a production-grade Helm chart using official pinned images, non-root security, and S3 backup integration.',
     link: 'https://github.com/helmforgedev/charts/blob/main/CONTRIBUTING.md',
     linkText: 'Read CONTRIBUTING.md',
   },
   {
-    icon: 'bug',
-    title: 'Report Issues',
-    description: 'Found a bug or unexpected behavior? Open an issue with reproduction steps.',
-    link: 'https://github.com/helmforgedev/charts/issues/new',
-    linkText: 'Open an issue',
-  },
-  {
     icon: 'request',
     title: 'Request a Chart',
-    description: 'Need a chart for an application? Submit a request and the community will evaluate it.',
+    description:
+      'Need an application packaged? Submit a community request. We evaluate demand, upstream image quality, and deliver with automated CI.',
     link: '/request',
-    linkText: 'Request form',
-  },
-  {
-    icon: 'docs',
-    title: 'Improve Docs',
-    description: 'Fix typos, add examples, improve explanations. Documentation PRs are always welcome.',
-    link: 'https://github.com/helmforgedev/site',
-    linkText: 'Site repository',
+    linkText: 'Open Request Hub',
   },
   {
     icon: 'test',
     title: 'Test & Review',
-    description: 'Try charts on your cluster and report results. Review open pull requests.',
+    description:
+      'Run `./test.sh <chart>` on local k3d clusters, review open pull requests, and report production edge cases.',
     link: 'https://github.com/helmforgedev/charts/pulls',
-    linkText: 'Open PRs',
+    linkText: 'Explore Open PRs',
+  },
+  {
+    icon: 'bug',
+    title: 'Report Issues',
+    description:
+      'Found unexpected behavior, security vulnerability, or upstream image drift? Open an issue with reproduction steps.',
+    link: 'https://github.com/helmforgedev/charts/issues/new',
+    linkText: 'Report an issue',
+  },
+  {
+    icon: 'docs',
+    title: 'Improve Documentation',
+    description:
+      'Help improve architecture guides, deployment scenarios, values schemas, and operational troubleshooting playbooks.',
+    link: 'https://github.com/helmforgedev/site',
+    linkText: 'Contribute to Docs',
   },
   {
     icon: 'star',
     title: 'Spread the Word',
-    description: 'Star the repo, share on social media, or write about your experience with HelmForge.',
+    description:
+      'Star the repository on GitHub, share HelmForge in Kubernetes communities, or write about your self-hosted setup.',
     link: 'https://github.com/helmforgedev/charts',
     linkText: 'Star on GitHub',
   },
@@ -61,61 +76,105 @@ const iconPaths: Record<string, string> = {
 };
 
 const governance = [
-  { label: 'License', value: 'Apache-2.0', description: 'All charts are open-source under the Apache-2.0 license.' },
+  {
+    label: 'License',
+    value: 'Apache-2.0',
+    description: '100% open-source under Apache-2.0. No open-core split, no paywalls, free forever for any workload.',
+  },
   {
     label: 'Versioning',
-    value: 'SemVer',
-    description: 'Automated semantic versioning from Conventional Commits.',
+    value: 'Strict SemVer',
+    description: 'Automated semantic versioning managed strictly by CI based on scoped Conventional Commits.',
   },
   {
-    label: 'Signing',
+    label: 'Integrity',
     value: 'GPG + Cosign',
-    description: 'GPG provenance files and Sigstore Cosign keyless signatures on every release.',
+    description: 'Every release includes GPG provenance signatures and keyless Sigstore Cosign verification on GHCR.',
   },
   {
-    label: 'Maturity',
-    value: 'alpha → beta → stable',
-    description: 'Charts progress through maturity levels with clear criteria.',
+    label: 'Security',
+    value: 'Zero-Root Contract',
+    description:
+      'Mandatory non-root UID 10001+, drop all Linux capabilities, and immutable read-only root filesystems.',
+  },
+];
+
+const requestSteps = [
+  {
+    step: '1',
+    title: 'Submit Request',
+    description: 'Open a request through the community hub or GitHub with upstream container details.',
+  },
+  {
+    step: '2',
+    title: 'Maintainer Audit',
+    description: 'We verify official image provenance, multi-arch support, CVE posture, and volume lifecycles.',
+  },
+  {
+    step: '3',
+    title: 'k3d Validation',
+    description: 'Chart is scaffolded and tested end-to-end on local k3d with real secrets, backups, and ingress.',
+  },
+  {
+    step: '4',
+    title: 'Signed Release',
+    description: 'Signed with Cosign and published simultaneously to HTTPS Helm repo and OCI registry.',
   },
 ];
 ---
 
 <BaseLayout
-  title="Community"
-  description="Join the HelmForge community. Contribute charts, report issues, and help shape the future of Kubernetes deployments."
+  title="Community — Built in the Open, Shaped by Kubernetes Operators"
+  description="Join the HelmForge community. Contribute production-ready Helm charts, report issues, test runtime behaviors, and help build the open-source alternative to Bitnami."
 >
   <Header />
-  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+  <main id="main-content" class="py-16 sm:py-24" data-pagefind-body>
     <Container>
+      <!-- Section Header -->
       <SectionHeader
+        as="h1"
         label="Community"
-        title="Built in the open, shaped by the community."
-        description="HelmForge is open-source and community-driven. Every contribution makes the project better for everyone."
+        title="Built in the open, shaped by operators."
+        description="HelmForge is an open-source, community-driven ecosystem. We build reliable, verifiable, vendor-neutral Kubernetes tooling for teams worldwide."
       />
 
+      <!-- Metrics Bar -->
+      <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+        {communityStats.map((stat) => (
+          <div class="glass-panel rounded-2xl p-5 border border-border/70 text-center flex flex-col justify-center">
+            <div class="text-2xl sm:text-3xl font-extrabold text-primary-light font-mono">{stat.value}</div>
+            <div class="text-xs sm:text-sm font-bold text-text-base mt-1">{stat.label}</div>
+            <div class="text-[11px] text-text-muted mt-0.5">{stat.highlight}</div>
+          </div>
+        ))}
+      </div>
+
       <!-- How to Contribute -->
-      <div class="mt-12">
-        <h3 class="text-lg font-bold text-text-base heading-font mb-6">How to contribute</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="mt-16">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-text-base heading-font">How to contribute</h2>
+          <span class="text-xs font-semibold text-text-muted">PRs always welcome</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {ways.map((way) => (
-            <div class="glass-panel rounded-2xl p-5 flex flex-col">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+            <div class="glass-panel rounded-2xl p-6 flex flex-col transition-all hover:border-primary/40 hover:-translate-y-0.5">
+              <div class="flex items-center gap-3.5 mb-3.5">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary-light shrink-0">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={iconPaths[way.icon]} />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d={iconPaths[way.icon]} />
                   </svg>
                 </div>
-                <h4 class="text-sm font-bold text-text-base">{way.title}</h4>
+                <h3 class="text-base font-bold text-text-base">{way.title}</h3>
               </div>
               <p class="text-xs text-text-muted leading-relaxed flex-1">{way.description}</p>
               <a
                 href={way.link}
                 target={way.link.startsWith('/') ? undefined : '_blank'}
                 rel={way.link.startsWith('/') ? undefined : 'noopener noreferrer'}
-                class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-light hover:underline"
+                class="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-primary-light hover:underline"
               >
                 {way.linkText}
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </a>
@@ -124,14 +183,63 @@ const governance = [
         </div>
       </div>
 
-      <!-- Contributors -->
+      <!-- Chart Request Process -->
+      <div class="mt-16">
+        <h2 class="text-xl font-bold text-text-base heading-font mb-6">Chart request pipeline</h2>
+        <div class="glass-panel rounded-2xl p-6 sm:p-8">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {requestSteps.map((s) => (
+              <div class="flex flex-col items-center text-center">
+                <div class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white text-sm font-extrabold shadow-md shadow-primary/20 mb-3">
+                  {s.step}
+                </div>
+                <h3 class="text-sm font-bold text-text-base">{s.title}</h3>
+                <p class="mt-1.5 text-xs text-text-muted leading-relaxed">{s.description}</p>
+              </div>
+            ))}
+          </div>
+          <div class="mt-8 pt-6 border-t border-border/50 text-center">
+            <a
+              href="/request"
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-dark transition-all shadow-sm"
+            >
+              Open a Chart Request
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Governance & Standards -->
+      <div class="mt-16">
+        <h2 class="text-xl font-bold text-text-base heading-font mb-6">Governance & standards</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {governance.map((g) => (
+            <div class="glass-panel rounded-2xl p-6">
+              <div class="flex items-center gap-2 mb-2.5">
+                <span class="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{g.label}</span>
+                <span class="text-xs font-mono font-bold text-primary-light bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+                  {g.value}
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-text-muted leading-relaxed">{g.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Contributors Section -->
       <div id="contributors-section" class="mt-16">
-        <h3 class="text-lg font-bold text-text-base heading-font mb-6">Contributors</h3>
-        <div class="glass-panel rounded-2xl p-6">
-          <p class="max-w-3xl text-sm text-text-muted leading-relaxed mb-5">
-            Thanks to everyone who improves HelmForge through code, docs, tests, reviews, and chart fixes.
+        <h2 class="text-xl font-bold text-text-base heading-font mb-6">Contributors</h2>
+        <div class="glass-panel rounded-2xl p-6 sm:p-8 text-center">
+          <p class="max-w-2xl mx-auto text-sm text-text-muted leading-relaxed mb-6">
+            HelmForge is shaped and maintained by independent engineers across the globe. Every chart patch,
+            documentation correction, and security review helps build transparent, enterprise-ready Kubernetes
+            packaging.
           </p>
-          <div class="flex justify-center">
+          <div class="flex justify-center mb-6">
             <a
               href="https://github.com/helmforgedev/charts/graphs/contributors"
               target="_blank"
@@ -141,91 +249,53 @@ const governance = [
               <img
                 src="https://repo.helmforge.dev/badges/contributors.svg"
                 alt="HelmForge contributors"
-                class="max-w-full rounded-xl"
+                class="max-w-full rounded-xl shadow-sm"
                 loading="lazy"
               />
             </a>
           </div>
-          <a
-            href="https://github.com/helmforgedev/charts/graphs/contributors"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-5 inline-flex text-xs font-semibold text-primary-light hover:underline"
-          >
-            View all contributors on GitHub
-          </a>
-        </div>
-      </div>
-
-      <!-- Governance -->
-      <div class="mt-16">
-        <h3 class="text-lg font-bold text-text-base heading-font mb-6">Project governance</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {governance.map((g) => (
-            <div class="glass-panel rounded-2xl p-5">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{g.label}</span>
-                <span class="text-xs font-mono text-primary-light bg-primary/10 px-2 py-0.5 rounded-full">
-                  {g.value}
-                </span>
-              </div>
-              <p class="text-sm text-text-muted leading-relaxed">{g.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <!-- Chart Request Process -->
-      <div class="mt-16">
-        <h3 class="text-lg font-bold text-text-base heading-font mb-6">Chart request process</h3>
-        <div class="glass-panel rounded-2xl p-6">
-          <div class="flex flex-col sm:flex-row gap-4">
-            {[
-              {
-                step: '1',
-                title: 'Submit',
-                description: 'Open a chart request via the request form or GitHub issue.',
-              },
-              {
-                step: '2',
-                title: 'Evaluate',
-                description: 'Maintainers assess demand, complexity, and upstream support.',
-              },
-              {
-                step: '3',
-                title: 'Build',
-                description: 'Chart is scaffolded, tested on k3d, and reviewed.',
-              },
-              {
-                step: '4',
-                title: 'Release',
-                description: 'Chart is published to OCI and Helm repo with signed artifacts.',
-              },
-            ].map((s) => (
-              <div class="flex-1 text-center">
-                <div class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-sm font-bold mb-2">
-                  {s.step}
-                </div>
-                <div class="text-sm font-bold text-text-base">{s.title}</div>
-                <p class="mt-1 text-xs text-text-muted">{s.description}</p>
-              </div>
-            ))}
+          <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold">
+            <a
+              href="https://github.com/helmforgedev/charts/graphs/contributors"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1.5 text-primary-light hover:underline"
+            >
+              View contributor graph on GitHub
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </a>
+            <span class="text-border">|</span>
+            <a
+              href="https://github.com/helmforgedev/charts/blob/main/CODE_OF_CONDUCT.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-text-muted hover:text-text-base"
+            >
+              Code of Conduct
+            </a>
           </div>
         </div>
       </div>
 
-      <!-- CTA -->
+      <!-- Global CTA -->
       <div class="mt-16 text-center">
         <a
           href="https://github.com/helmforgedev/charts"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/20"
+          class="inline-flex items-center gap-2.5 rounded-full bg-primary px-7 py-3.5 text-sm font-bold text-white transition-all hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/25"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path>
           </svg>
-          Star on GitHub
+          Star HelmForge on GitHub
         </a>
       </div>
     </Container>

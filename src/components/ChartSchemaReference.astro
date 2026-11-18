@@ -1,0 +1,244 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import { getChartSchema } from '../data/chart-schema';
+
+interface Props {
+  slug: string;
+  chartName: string;
+}
+
+const { slug, chartName } = Astro.props;
+const schemaGroups = getChartSchema(slug);
+
+if (!schemaGroups || schemaGroups.length === 0) {
+  // If no schema available for this chart, render nothing
+  return;
+}
+
+const totalParams = schemaGroups.reduce((acc, g) => acc + g.parameters.length, 0);
+---
+
+<section id="values-schema-reference" class="mt-14 pt-10 border-t border-border">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="text-xs font-bold uppercase tracking-wider text-primary">Official Contract</span>
+        <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-bg-surface border border-border text-text-muted">
+          values.schema.json
+        </span>
+      </div>
+      <h2 class="text-2xl font-bold heading-font text-text-base">{chartName} Values Schema Reference</h2>
+      <p class="text-sm text-text-muted mt-1">
+        Official schema parameters, default values, and types extracted directly from the chart repository.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-primary/10 text-primary-light border border-primary/20">
+        {totalParams} parameters
+      </span>
+      <a
+        href={`/playground/${slug}`}
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-dark transition-all shadow-sm"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+          ></path>
+        </svg>
+        Values Studio
+      </a>
+    </div>
+  </div>
+
+  <!-- Search & Category Filters -->
+  <div class="mb-6 space-y-3">
+    <div class="relative">
+      <input
+        type="search"
+        id="schema-param-search"
+        placeholder={`Search ${totalParams} parameters in ${chartName} (e.g. storage, port, metrics, secret)...`}
+        class="w-full px-4 py-2.5 rounded-xl border border-border bg-bg-surface text-text-base text-sm placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+      />
+    </div>
+
+    <!-- Category selector tabs -->
+    <div class="flex flex-wrap items-center gap-1.5" id="schema-group-filters">
+      <button
+        type="button"
+        data-group-filter="all"
+        class="schema-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-primary text-white transition-all cursor-pointer"
+      >
+        All ({totalParams})
+      </button>
+      {schemaGroups.map((group) => (
+        <button
+          type="button"
+          data-group-filter={group.name}
+          class="schema-filter-btn px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-text-base bg-bg-surface/60 hover:bg-bg-surface border border-border transition-all cursor-pointer"
+        >
+          {group.name} ({group.parameters.length})
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <!-- Schema Parameters by Group -->
+  <div class="space-y-6" id="schema-groups-container">
+    {schemaGroups.map((group) => (
+      <div
+        class="schema-group-block rounded-2xl border border-border bg-bg-surface/40 overflow-hidden"
+        data-group-name={group.name}
+      >
+        <div class="px-5 py-3 border-b border-border bg-bg-surface/80 flex items-center justify-between">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-text-base flex items-center gap-2">
+            <span>{group.name}</span>
+            <span class="text-xs font-mono font-normal text-text-muted">({group.parameters.length})</span>
+          </h3>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-bg-base/40 text-text-muted uppercase text-[10px] tracking-wider font-semibold border-b border-border/60">
+              <tr>
+                <th scope="col" class="py-2.5 px-4 font-bold min-w-[200px]">
+                  Parameter
+                </th>
+                <th scope="col" class="py-2.5 px-4 font-bold w-[90px]">
+                  Type
+                </th>
+                <th scope="col" class="py-2.5 px-4 font-bold min-w-[140px]">
+                  Default
+                </th>
+                <th scope="col" class="py-2.5 px-4 font-bold">
+                  Description
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border/40 font-sans">
+              {group.parameters.map((param) => (
+                <tr
+                  class="schema-row hover:bg-primary/5 transition-colors"
+                  data-param-key={param.key}
+                  data-param-desc={param.description}
+                >
+                  <td class="py-2.5 px-4 font-mono font-semibold text-primary-light align-top break-all select-all">
+                    {param.key}
+                  </td>
+                  <td class="py-2.5 px-4 align-top">
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-bg-base border border-border text-text-muted">
+                      {param.type}
+                    </span>
+                  </td>
+                  <td class="py-2.5 px-4 font-mono text-text-muted align-top break-all">{param.default}</td>
+                  <td class="py-2.5 px-4 text-text-base leading-relaxed align-top">
+                    {param.description || <span class="text-text-muted italic">Chart configuration parameter</span>}
+                    {param.enum && param.enum.length > 0 && (
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        <span class="text-[10px] text-text-muted font-bold">Allowed:</span>
+                        {param.enum.map((opt) => (
+                          <code class="text-[10px] px-1 py-0.2 rounded bg-bg-base border border-border text-text-muted">
+                            {String(opt)}
+                          </code>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <div id="schema-no-results" class="hidden text-center py-12 text-text-muted">
+    <p class="text-base font-semibold">No schema parameters match your search</p>
+    <p class="text-xs mt-1">Try searching for a different keyword or reset the filter.</p>
+  </div>
+</section>
+
+<script>
+  function setupSchemaFilter() {
+    const searchInput = document.getElementById('schema-param-search') as HTMLInputElement | null;
+    const filterButtons = document.querySelectorAll<HTMLButtonElement>('.schema-filter-btn');
+    const groupBlocks = document.querySelectorAll<HTMLElement>('.schema-group-block');
+    const noResults = document.getElementById('schema-no-results');
+
+    if (!searchInput) return;
+
+    let activeGroup = 'all';
+
+    function applyFilter() {
+      const query = (searchInput?.value || '').toLowerCase().trim();
+      let totalVisible = 0;
+
+      groupBlocks.forEach((block) => {
+        const groupName = block.dataset.groupName || '';
+        const groupMatches = activeGroup === 'all' || activeGroup === groupName;
+
+        if (!groupMatches) {
+          block.classList.add('hidden');
+          return;
+        }
+
+        const rows = block.querySelectorAll<HTMLElement>('.schema-row');
+        let groupVisibleCount = 0;
+
+        rows.forEach((row) => {
+          const key = (row.dataset.paramKey || '').toLowerCase();
+          const desc = (row.dataset.paramDesc || '').toLowerCase();
+          const matchesQuery = !query || key.includes(query) || desc.includes(query);
+
+          if (matchesQuery) {
+            row.classList.remove('hidden');
+            groupVisibleCount++;
+            totalVisible++;
+          } else {
+            row.classList.add('hidden');
+          }
+        });
+
+        if (groupVisibleCount > 0) {
+          block.classList.remove('hidden');
+        } else {
+          block.classList.add('hidden');
+        }
+      });
+
+      if (noResults) {
+        noResults.classList.toggle('hidden', totalVisible > 0);
+      }
+    }
+
+    searchInput.addEventListener('input', applyFilter);
+
+    filterButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeGroup = btn.dataset.groupFilter || 'all';
+
+        filterButtons.forEach((b) => {
+          if (b === btn) {
+            b.classList.remove('text-text-muted', 'bg-bg-surface/60');
+            b.classList.add('bg-primary', 'text-white');
+          } else {
+            b.classList.add('text-text-muted', 'bg-bg-surface/60');
+            b.classList.remove('bg-primary', 'text-white');
+          }
+        });
+
+        applyFilter();
+      });
+    });
+  }
+
+  // Run on mount
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSchemaFilter);
+  } else {
+    setupSchemaFilter();
+  }
+</script>

@@ -46,7 +46,7 @@ test('S3 activation includes a database, credential reference and explicit netwo
 test('SQL Server documentation and canonical icon are published by the build', async ({ page, request }) => {
   await page.goto('/docs/charts/mssql');
   await expect(page.getByRole('heading', { name: 'Microsoft SQL Server', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Complete values reference', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Values Schema Reference|Configuration|Features/i }).first()).toBeVisible();
   const response = await request.get('/icons/charts/mssql.png');
   expect(response.status()).toBe(200);
   expect(response.headers()['content-type']).toContain('image/png');

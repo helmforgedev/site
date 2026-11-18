@@ -1,0 +1,53 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import { charts } from '../../data/charts';
+
+export function getStaticPaths() {
+  return charts.map((chart) => ({
+    params: { chart: chart.slug },
+    props: { chart },
+  }));
+}
+
+const { chart } = Astro.props;
+const targetUrl = `/playground?chart=${chart.slug}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{`${chart.name} Values Studio — HelmForge`}</title>
+    <meta
+      name="description"
+      content={`Configure, preview, and generate production values for the ${chart.name} Helm chart.`}
+    />
+    <meta http-equiv="refresh" content={`0;url=${targetUrl}`} />
+    <link rel="canonical" href={`https://helmforge.dev/playground?chart=${chart.slug}`} />
+  </head>
+  <body class="bg-[#0f1117] text-zinc-100 flex items-center justify-center min-h-screen font-sans">
+    <div class="text-center p-8 max-w-md">
+      <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
+        <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+          ></path>
+        </svg>
+      </div>
+      <h1 class="text-xl font-bold mb-2">Loading {chart.name} Values Studio</h1>
+      <p class="text-sm text-zinc-400 mb-6">Preparing interactive values schema and deployment generator...</p>
+      <a
+        href={targetUrl}
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-all shadow-sm"
+      >
+        Click here if not redirected automatically
+      </a>
+    </div>
+    <script define:vars={{ targetUrl }}>
+      window.location.replace(targetUrl);
+    </script>
+  </body>
+</html>

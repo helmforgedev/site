@@ -12,10 +12,17 @@ const noResults = document.getElementById('search-no-results')!;
 async function loadPagefind() {
   if (pagefind) return pagefind;
   try {
-    pagefind = await import(/* @vite-ignore */ '/pagefind/pagefind.js');
+    // Verify file exists before dynamic import to avoid 404 in dev mode
+    const head = await fetch('/pagefind/pagefind.js', { method: 'HEAD' });
+    if (!head.ok) {
+      pagefind = null;
+      return null;
+    }
+    const dynamicImport = new Function('url', 'return import(url)');
+    pagefind = await dynamicImport('/pagefind/pagefind.js');
     await pagefind.init();
   } catch {
-    // Pagefind not available (dev mode) — show message
+    // Pagefind not available (dev mode without build)
     pagefind = null;
   }
   return pagefind;

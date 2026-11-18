@@ -1,0 +1,22 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import DocsLayout from '../../../layouts/DocsLayout.astro';
+import { charts } from '../../../data/charts';
+import { getChartDocContent } from '../../../data/chart-docs';
+
+export function getStaticPaths() {
+  return charts.map((chart) => ({
+    params: { chart: chart.slug },
+    props: { chart },
+  }));
+}
+
+const { chart } = Astro.props;
+const doc = getChartDocContent(chart.slug);
+const displayTitle = doc.title || chart.name;
+---
+
+<DocsLayout title={`${displayTitle} Helm Chart — HelmForge`} description={chart.description || doc.description}>
+  <h1 class="text-3xl font-extrabold tracking-tight text-text-base mb-6">{displayTitle}</h1>
+  <div class="chart-readme-content overflow-hidden" set:html={doc.html} />
+</DocsLayout>
