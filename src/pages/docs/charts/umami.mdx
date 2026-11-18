@@ -227,10 +227,12 @@ database:
 Use `database.external.parameters` for Prisma connection arguments without the leading `?`. PgBouncer deployments that
 require Prisma compatibility mode can set `parameters: pgbouncer=true`. For a complete URL override, store the URL in the
 existing Secret and set `database.external.existingSecretUrlKey` to its key. Keep the structured host, port, and database
-values aligned because the readiness check, optional database preparation, and backup jobs use them independently. When
-backups are enabled, the Secret must also contain the key selected by
+values and `database.external.username` aligned because the readiness check, optional database preparation, and backup
+jobs use them independently. Set `backup.database.username` when backups use a separate database user. When backups are
+enabled, the Secret must also contain the key selected by
 `database.external.existingSecretPasswordKey`, or configure a backup-specific Secret with
-`backup.database.existingSecret` and `backup.database.existingSecretPasswordKey`.
+`backup.database.existingSecret` and `backup.database.existingSecretPasswordKey`. Clear `database.external.parameters`
+when selecting a complete Secret-backed URL; parameters apply only when the chart generates the URL.
 
 </div>
 
@@ -536,8 +538,8 @@ or IRSA metadata endpoint for the cluster's IPv4 or IPv6 mode. Keep bucket creat
 | `database.external.password`                             | string  | `""`                                       | Inline external database password. Prefer Secret or External Secrets.  |
 | `database.external.existingSecret`                       | string  | `""`                                       | Existing Secret with the database password.                            |
 | `database.external.existingSecretPasswordKey`            | string  | `password`                                 | Password key in the existing Secret.                                   |
-| `database.external.existingSecretUrlKey`                 | string  | `""`                                       | Key in the existing Secret containing a complete `DATABASE_URL`.       |
-| `database.external.parameters`                           | string  | `""`                                       | Query string appended to the generated URL, without `?`.               |
+| `database.external.existingSecretUrlKey`                 | string  | `""`                                       | Key containing a complete `DATABASE_URL`; requires empty `parameters`. |
+| `database.external.parameters`                           | string  | `""`                                       | Query string for generated URLs only, without `?`.                     |
 | `database.external.init.enabled`                         | boolean | `false`                                    | Run external database preparation before Umami starts.                 |
 | `database.external.init.image`                           | string  | `docker.io/library/postgres:18.6-alpine`   | PostgreSQL client image for init.                                      |
 | `database.external.init.adminUsername`                   | string  | `postgres`                                 | Admin user used only by init.                                          |
