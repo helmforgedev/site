@@ -54,11 +54,15 @@ This frontend is built for extreme performance, rich aesthetics, and massive SEO
 
 ## Features
 
-- **Chart playground configs** — Interactive playground with live YAML preview for stable charts
-- **Stack Builder** — Compose multi-chart stacks visually and export install commands
-- **Full documentation** — MDX-powered docs with sidebar navigation, search, and copy-to-clipboard
-- **Public roadmap** — GitHub Milestones integration with static timeline
-- **Chart request form** — Pre-filled GitHub issue creation for new chart suggestions
+- **100+ Charts Catalog** — Dynamic, searchable catalog synchronized directly from the `charts` repository (`npm run catalog:generate`)
+- **Values Studio v2.0** (`/playground`) — Real-time values customizer with schema-driven form controls, presets (Production, Minimal, HA, External Secrets), and live YAML export & download
+- **Stack Builder** (`/stack`) — Interactive multi-chart composer supporting 5 export formats (Helm CLI, OCI, Helmfile, ArgoCD Application, FluxCD HelmRelease)
+- **Interactive Technical Blog** (`/blog`) — High-performance technical articles featuring reading progress bar, scrollspy table of contents, one-click code copy, and "Deploy with HelmForge" quick-deploy banners
+- **Full documentation** (`/docs`) — MDX-powered documentation with sidebar navigation, Pagefind instant search (`Cmd+K`), and copy-to-clipboard
+- **Public Roadmap** (`/roadmap`) — Comprehensive delivery track record spanning 100+ charts, GPG/Cosign signing, Day-2 S3/ESO, and future strategic initiatives
+- **Community Hub & Governance** (`/community`) — Contribution pipelines, chart request workflows, and transparent SLA-backed contact channels
+- **Real-Time Changelog** (`/changelog`) — Searchable release changelog with chart icons, version tags, Cosign verification badges, and direct links to Values Studio
+- **WCAG 2.2 Level AA Accessible** — 100% compliant across all pages with zero automated violations and full keyboard navigation
 - **Dark/Light themes** — System-aware theme toggle with smooth transitions
 
 ## Accessibility & Compliance
@@ -96,8 +100,16 @@ Ensure you have **Node.js >= 22** installed.
 # Install dependencies
 npm install
 
+# Generate catalog and chart metadata from charts repository
+npm run catalog:generate
+
 # Start the dev server at localhost:4321
 npm run dev
+
+# Lint and check formatting
+npm run lint
+npm run lint:blog
+npm run format:check
 
 # Build the production bundle
 npm run build

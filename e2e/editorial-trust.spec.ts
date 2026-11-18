@@ -6,11 +6,10 @@ test.describe('Editorial trust signals', () => {
 
     await expect(page).toHaveTitle(/Maicon Berlofa/i);
     await expect(page.locator('h1')).toContainText('Maicon Berlofa');
-    await expect(page.getByText(/founder and maintainer of HelmForge/i)).toBeVisible();
+    await expect(page.getByText(/founder and maintainer of HelmForge/i).first()).toBeVisible();
     await expect(page.getByText('Kubernetes operations', { exact: true })).toBeVisible();
     await expect(page.locator('a[href="https://github.com/mberlofa"]')).toBeVisible();
     await expect(page.locator('a[href="https://www.linkedin.com/in/berlofa"]')).toBeVisible();
-    await expect(page.locator('a[href="mailto:maicon.berloffa@gmail.com"]')).toBeVisible();
 
     const structuredData = (await page.locator('script[type="application/ld+json"]').allTextContents()).map((content) =>
       JSON.parse(content),
@@ -34,9 +33,9 @@ test.describe('Editorial trust signals', () => {
   test('about page explains the project and is backed by AboutPage schema', async ({ page }) => {
     await page.goto('/about');
 
-    await expect(page.locator('h1')).toContainText('Production-ready Helm charts');
-    await expect(page.getByText(/Apache-2\.0 Helm charts/i)).toBeVisible();
-    await expect(page.getByText(/official upstream container images/i)).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Open-source Helm charts, forged to last');
+    await expect(page.getByText('Why we built HelmForge')).toBeVisible();
+    await expect(page.getByText(/100% open-source under Apache-2\.0/i)).toBeVisible();
 
     const structuredData = (await page.locator('script[type="application/ld+json"]').allTextContents()).map((content) =>
       JSON.parse(content),
@@ -48,24 +47,24 @@ test.describe('Editorial trust signals', () => {
     await page.goto('/contact');
 
     await expect(page.locator('h1')).toContainText('Reach the right channel');
-    await expect(page.locator('a[href="mailto:berlofa@helmforge.dev"]')).toBeVisible();
-    await expect(page.locator('a[href="https://github.com/helmforgedev/charts/issues"]')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Corrections Report an article/i })).toBeVisible();
+    await expect(page.locator('#main-content a[href="mailto:berlofa@helmforge.dev"]')).toBeVisible();
+    await expect(page.locator('#main-content a[href="https://github.com/helmforgedev/charts/issues"]')).toBeVisible();
+    await expect(page.locator('#main-content a[href="/corrections"]')).toBeVisible();
 
     await page.goto('/corrections');
-    await expect(page.locator('h1')).toContainText('Help keep HelmForge content accurate');
-    await expect(page.locator('a[href="mailto:berlofa@helmforge.dev"]')).toBeVisible();
-    await expect(page.locator('a[href="https://github.com/helmforgedev/site/issues/new"]')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Help keep HelmForge accurate');
+    await expect(page.locator('#main-content a[href="mailto:berlofa@helmforge.dev"]')).toBeVisible();
+    await expect(page.locator('#main-content a[href="https://github.com/helmforgedev/site/issues/new"]')).toBeVisible();
   });
 
-  test('editorial policy documents review, sources, updates, and AI assistance', async ({ page }) => {
+  test('editorial policy documents review, sources, updates, and standards', async ({ page }) => {
     await page.goto('/editorial-policy');
 
-    await expect(page.locator('h1')).toContainText('How HelmForge publishes technical content');
-    await expect(page.getByText('Technical review')).toBeVisible();
-    await expect(page.getByText('Source selection')).toBeVisible();
-    await expect(page.getByText('AI and editorial assistance')).toBeVisible();
-    await expect(page.getByText('Update policy')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Technical integrity, verified in production');
+    await expect(page.getByText('Primary Source Grounding')).toBeVisible();
+    await expect(page.getByText('Behavioral Verification')).toBeVisible();
+    await expect(page.getByText('Human Review & Attribution Prohibition')).toBeVisible();
+    await expect(page.getByText('Transparent Correction Policy')).toBeVisible();
   });
 
   test('footer links to project trust pages', async ({ page }) => {

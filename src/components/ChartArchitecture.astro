@@ -1,0 +1,282 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import { getChartArchitecture } from '../data/chart-architecture';
+
+interface Props {
+  chartSlug: string;
+}
+
+const { chartSlug } = Astro.props;
+const arch = getChartArchitecture(chartSlug);
+
+if (!arch.hasDiagrams) {
+  return null;
+}
+
+const githubDesignUrl = `https://github.com/helmforgedev/charts/blob/main/charts/${chartSlug}/DESIGN.md#architecture`;
+---
+
+<section id="architecture-topology" class="my-10 scroll-mt-24">
+  <div class="glass-panel rounded-2xl p-6 sm:p-8 border border-border-default/60 shadow-xl overflow-hidden relative">
+    {/* Subtle gradient glow in corner */}
+    <div
+      class="absolute top-0 right-0 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"
+      aria-hidden="true"
+    ></div>
+
+    {/* Section Header */}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-border-default/50">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary-light">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            ></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <h2 class="text-xl font-bold text-text-base m-0 tracking-tight">System Architecture</h2>
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              DESIGN.md Synced
+            </span>
+          </div>
+          <p class="text-xs text-text-muted mt-0.5">
+            Verified architecture contract rendered dynamically from GitHub{' '}
+            <code class="font-mono text-primary-light">DESIGN.md</code>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a
+          href={githubDesignUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-base bg-surface-subtle hover:bg-surface-elevated border border-border-default transition-colors"
+          title="Inspect canonical DESIGN.md in charts repository"
+        >
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+            ></path>
+          </svg>
+          GitHub DESIGN.md
+          <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            ></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    {/* Topology Tabs if multiple */}
+    {arch.diagrams.length > 1 && (
+      <div
+        class="flex items-center gap-2 mt-4 pt-1 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label="Topology Scenarios"
+      >
+        {arch.diagrams.map((d, idx) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={idx === 0 ? 'true' : 'false'}
+            data-diagram-tab={idx}
+            class={`diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              idx === 0
+                ? 'bg-primary text-text-inverted shadow-sm font-semibold'
+                : 'text-text-muted hover:text-text-base bg-surface-subtle hover:bg-surface-elevated'
+            }`}
+          >
+            {d.title}
+          </button>
+        ))}
+      </div>
+    )}
+
+    {/* Diagram Panels */}
+    <div class="mt-4">
+      {arch.diagrams.map((d, idx) => (
+        <div
+          data-diagram-panel={idx}
+          class={`diagram-panel transition-opacity duration-200 ${idx !== 0 ? 'hidden' : 'block'}`}
+        >
+          {d.description && (
+            <p class="text-xs text-text-muted mb-4 bg-surface-subtle/50 px-3 py-2 rounded-lg border border-border-default/40">
+              {d.description}
+            </p>
+          )}
+
+          {/* Diagram viewport container */}
+          <div class="relative bg-surface-subtle/30 rounded-xl border border-border-default/40 p-4 min-h-[180px] flex items-center justify-center overflow-x-auto">
+            <div class="mermaid-diagram-wrapper w-full flex justify-center py-2" data-raw-mermaid={d.mermaid}>
+              <pre class="mermaid text-xs font-mono select-all text-text-muted opacity-80">{d.mermaid}</pre>
+            </div>
+
+            {/* Quick Action Overlay (Copy Mermaid) */}
+            <div class="absolute top-3 right-3 flex items-center gap-1.5">
+              <button
+                type="button"
+                data-copy-mermaid={d.mermaid}
+                title="Copy Mermaid source"
+                class="copy-mermaid-btn p-1.5 rounded-md bg-surface-elevated/80 hover:bg-surface-elevated text-text-muted hover:text-text-base border border-border-default/60 backdrop-blur-sm transition-all"
+              >
+                <svg class="w-3.5 h-3.5 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  ></path>
+                </svg>
+                <svg
+                  class="w-3.5 h-3.5 check-icon hidden text-emerald-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<script>
+  import mermaid from 'mermaid';
+
+  // Initialize Mermaid with custom HelmForge dark aesthetic
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'loose',
+    theme: 'base',
+    themeVariables: {
+      darkMode: true,
+      background: 'transparent',
+      primaryColor: '#0c2340',
+      primaryTextColor: '#f8fafc',
+      primaryBorderColor: '#0ea5e9',
+      lineColor: '#38bdf8',
+      secondaryColor: '#1e293b',
+      secondaryTextColor: '#cbd5e1',
+      secondaryBorderColor: '#475569',
+      tertiaryColor: '#0f172a',
+      tertiaryTextColor: '#94a3b8',
+      tertiaryBorderColor: '#334155',
+      noteBkgColor: '#1e293b',
+      noteTextColor: '#e2e8f0',
+      noteBorderColor: '#0ea5e9',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+      fontSize: '13px',
+    },
+  });
+
+  async function renderAllDiagrams() {
+    const nodes = document.querySelectorAll('.mermaid-diagram-wrapper');
+    if (!nodes.length) return;
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i] as HTMLElement;
+      const raw = node.dataset.rawMermaid;
+      if (!raw) continue;
+
+      const id = `mermaid-svg-${i}-${Date.now()}`;
+      try {
+        const { svg } = await mermaid.render(id, raw);
+        node.innerHTML = svg;
+        const svgEl = node.querySelector('svg');
+        if (svgEl) {
+          svgEl.style.maxWidth = '100%';
+          svgEl.style.height = 'auto';
+        }
+      } catch (err) {
+        // Fallback: keep pre
+        console.warn('Mermaid rendering fallback:', err);
+      }
+    }
+  }
+
+  // Setup tabs and copy buttons
+  function setupArchitectureInteractions() {
+    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-diagram-tab]');
+    const panels = document.querySelectorAll<HTMLElement>('[data-diagram-panel]');
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const targetIdx = tab.dataset.diagramTab;
+
+        tabs.forEach((t) => {
+          const isSelected = t.dataset.diagramTab === targetIdx;
+          t.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+          if (isSelected) {
+            t.className =
+              'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-text-inverted shadow-sm transition-all';
+          } else {
+            t.className =
+              'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-base bg-surface-subtle hover:bg-surface-elevated transition-all';
+          }
+        });
+
+        panels.forEach((p) => {
+          if (p.dataset.diagramPanel === targetIdx) {
+            p.classList.remove('hidden');
+            p.classList.add('block');
+          } else {
+            p.classList.add('hidden');
+            p.classList.remove('block');
+          }
+        });
+      });
+    });
+
+    // Copy Mermaid buttons
+    document.querySelectorAll<HTMLButtonElement>('[data-copy-mermaid]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copyMermaid || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const copyIcon = btn.querySelector('.copy-icon');
+          const checkIcon = btn.querySelector('.check-icon');
+          copyIcon?.classList.add('hidden');
+          checkIcon?.classList.remove('hidden');
+          setTimeout(() => {
+            copyIcon?.classList.remove('hidden');
+            checkIcon?.classList.add('hidden');
+          }, 2000);
+        } catch (e) {
+          console.error('Failed to copy diagram source:', e);
+        }
+      });
+    });
+  }
+
+  // Execute on initial DOM and on client-side navigation
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAllDiagrams();
+      setupArchitectureInteractions();
+    });
+  } else {
+    renderAllDiagrams();
+    setupArchitectureInteractions();
+  }
+  document.addEventListener('astro:page-load', () => {
+    renderAllDiagrams();
+    setupArchitectureInteractions();
+  });
+</script>

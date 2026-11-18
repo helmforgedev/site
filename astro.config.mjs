@@ -68,6 +68,9 @@ function normalizeSitemapUrl(url) {
 export default defineConfig({
   site: SITE_URL,
   trailingSlash: 'never',
+  devToolbar: {
+    enabled: false,
+  },
 
   vite: {
     plugins: [tailwindcss()],

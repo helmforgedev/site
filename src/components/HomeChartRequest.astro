@@ -1,0 +1,347 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import {
+  MessageSquarePlus,
+  ThumbsUp,
+  Sparkles,
+  ArrowRight,
+  ExternalLink,
+  BadgeCheck,
+  CheckCircle2,
+} from 'lucide-astro';
+import Container from './Container.astro';
+
+interface GHIssue {
+  title: string;
+  html_url: string;
+  reactions: { total_count: number; '+1': number };
+  created_at: string;
+}
+
+let openRequests: GHIssue[] = [];
+
+try {
+  // Query GitHub Search API for real open community requests
+  const res = await fetch(
+    'https://api.github.com/search/issues?q=repo:helmforgedev/charts+type:issue+%5Bchart-request%5D+state:open&sort=reactions-%2B1&direction=desc&per_page=6',
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'helmforge-site-build',
+      },
+      signal: AbortSignal.timeout(4000),
+    },
+  );
+  if (res.ok) {
+    const data = await res.json();
+    openRequests = data.items || [];
+  }
+} catch {
+  // Graceful fallback for offline dev or build-time rate limits
+}
+
+// Real community requests successfully delivered into HelmForge production catalog
+const deliveredCommunityCharts = [
+  {
+    name: 'Discourse',
+    slug: 'discourse',
+    issueNumber: 1822,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1822',
+    description: 'PostgreSQL + pgvector, Redis, Ingress & Gateway API support',
+    icon: '/icons/charts/discourse.png',
+  },
+  {
+    name: 'Temporal',
+    slug: 'temporal',
+    issueNumber: 1478,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1478',
+    description: 'High-availability workflow orchestration with Gateway API routes',
+    icon: '/icons/charts/temporal.png',
+  },
+  {
+    name: 'Ghostfolio',
+    slug: 'ghostfolio',
+    issueNumber: 1419,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1419',
+    description: 'Open-source wealth tracker with S3 automated backup contracts',
+    icon: '/icons/charts/ghostfolio.png',
+  },
+  {
+    name: 'WebODM',
+    slug: 'webodm',
+    issueNumber: 1384,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1384',
+    description: 'Drone mapping processing platform with NodeODM worker scaling',
+    icon: '/icons/charts/webodm.png',
+  },
+  {
+    name: 'Bulwark Mail',
+    slug: 'bulwark-mail',
+    issueNumber: 1358,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1358',
+    description: 'Stalwart-based all-in-one mail server with JMAP & S3 backend',
+    icon: '/icons/charts/bulwark-mail.png',
+  },
+  {
+    name: 'Twenty',
+    slug: 'twenty',
+    issueNumber: 1357,
+    issueUrl: 'https://github.com/helmforgedev/charts/issues/1357',
+    description: 'Modern open-source CRM with self-hosted PostgreSQL & workers',
+    icon: '/icons/charts/twenty.png',
+  },
+];
+---
+
+<section
+  id="chart-request"
+  class="py-20 lg:py-28 bg-gradient-to-b from-bg-base via-bg-surface/50 to-bg-base border-t border-border/80 relative overflow-hidden"
+>
+  <!-- Atmospheric Glow -->
+  <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-primary/10 rounded-full blur-[140px] pointer-events-none"></div>
+
+  <Container class="relative">
+    <div class="flex flex-col lg:flex-row lg:items-end justify-between mb-14 gap-6">
+      <div class="max-w-2xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent-light text-xs font-bold uppercase tracking-wider mb-4">
+          <Sparkles class="w-3.5 h-3.5" />
+          Community Priority Engine
+        </div>
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight heading-font text-text-base">
+          Missing a chart?{' '}
+          <span class="bg-gradient-to-r from-accent-light via-primary-light to-accent bg-clip-text text-transparent">
+            We forge what you request.
+          </span>
+        </h2>
+        <p class="mt-4 text-base sm:text-lg text-text-muted leading-relaxed">
+          HelmForge is 100% community-driven. Suggest an open-source software and our team forges it into a
+          production-ready chart with automated backups, non-root security, and signed releases.
+        </p>
+      </div>
+
+      <div class="shrink-0">
+        <a
+          href="/request"
+          class="inline-flex items-center gap-2 text-sm font-semibold text-primary-light hover:text-primary transition-colors group"
+        >
+          View chart requests
+          <ArrowRight class="w-4 h-4 transition-transform group-hover:translate-x-1" />
+        </a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <!-- Submission Form Card -->
+      <div class="lg:col-span-6 rounded-3xl border border-border/90 bg-bg-surface/80 p-6 sm:p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+        <div class="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center gap-3 mb-6">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary-light">
+            <MessageSquarePlus class="w-5 h-5" />
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-text-base heading-font">Suggest a new chart</h3>
+            <p class="text-xs text-text-muted">Takes 30 seconds • Directly linked to GitHub</p>
+          </div>
+        </div>
+
+        <form id="home-chart-request-form" class="space-y-4">
+          <div>
+            <label
+              for="home-req-name"
+              class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5"
+            >
+              Software or Application Name
+            </label>
+            <input
+              type="text"
+              id="home-req-name"
+              required
+              placeholder="e.g. Grafana Tempo, NetBox, Meilisearch..."
+              class="w-full rounded-xl border border-border bg-bg-base/80 px-4 py-2.5 text-sm text-text-base placeholder-text-muted/60 focus:border-primary-light focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label
+              for="home-req-url"
+              class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5"
+            >
+              Upstream Project or Repository URL
+            </label>
+            <input
+              type="url"
+              id="home-req-url"
+              required
+              placeholder="https://github.com/org/project"
+              class="w-full rounded-xl border border-border bg-bg-base/80 px-4 py-2.5 text-sm text-text-base placeholder-text-muted/60 focus:border-primary-light focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label
+              for="home-req-reason"
+              class="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5"
+            >
+              Why should HelmForge include this? (Optional)
+            </label>
+            <textarea
+              id="home-req-reason"
+              rows="2"
+              placeholder="e.g. Popular self-hosted software, missing official non-root chart, need S3 backup support..."
+              class="w-full rounded-xl border border-border bg-bg-base/80 px-4 py-2.5 text-sm text-text-base placeholder-text-muted/60 focus:border-primary-light focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+            ></textarea>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:opacity-95 hover:shadow-primary/30 transition-all cursor-pointer"
+          >
+            <ExternalLink class="w-4 h-4" />
+            Open Pre-filled Request on GitHub
+          </button>
+
+          <p class="text-[11px] text-center text-text-muted">
+            Opens an official issue in <span class="text-text-base font-mono">helmforgedev/charts</span>. GitHub login
+            required.
+          </p>
+        </form>
+      </div>
+
+      <!-- Community Requests Column -->
+      <div class="lg:col-span-6 space-y-3">
+        {openRequests.length > 0 ? (
+          <div>
+            <div class="flex items-center justify-between px-1 mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                <ThumbsUp class="w-3.5 h-3.5 text-primary-light" />
+                Trending Community Requests
+              </span>
+              <span class="text-xs text-text-muted">Click to upvote with 👍</span>
+            </div>
+
+            <div class="space-y-2.5">
+              {openRequests.map((issue) => (
+                <a
+                  href={issue.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="group flex items-center justify-between gap-4 p-4 rounded-2xl border border-border/80 bg-bg-surface/50 hover:bg-bg-surface hover:border-primary/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg shadow-sm"
+                >
+                  <div class="min-w-0 flex-1">
+                    <h4 class="text-sm font-semibold text-text-base group-hover:text-primary-light transition-colors line-clamp-1">
+                      {issue.title.replace(/^\[chart-request\]\s*/i, '')}
+                    </h4>
+                    <p class="text-[11px] text-text-muted mt-0.5">Community proposal • Open for votes</p>
+                  </div>
+
+                  <div class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-bold text-primary-light group-hover:bg-primary group-hover:text-white transition-all">
+                    <ThumbsUp class="w-3.5 h-3.5" />
+                    <span>{issue.reactions?.['+1'] ?? issue.reactions?.total_count ?? 1}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div class="flex items-center justify-between px-1 mb-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                <BadgeCheck class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Recently Delivered Requests
+              </span>
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                100% Delivered
+              </span>
+            </div>
+
+            <div class="space-y-2.5">
+              {deliveredCommunityCharts.map((chart) => (
+                <div class="group flex items-center justify-between gap-3 p-3.5 rounded-2xl border border-border/80 bg-bg-surface/50 hover:bg-bg-surface hover:border-border transition-all duration-200">
+                  <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <img
+                      src={chart.icon}
+                      alt={chart.name}
+                      class="w-9 h-9 rounded-xl object-contain bg-bg-base/80 p-1 border border-border/60 shrink-0"
+                      loading="lazy"
+                      width="36"
+                      height="36"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <a
+                          href={`/docs/charts/${chart.slug}`}
+                          class="text-sm font-semibold text-text-base hover:text-primary-light transition-colors truncate"
+                        >
+                          {chart.name}
+                        </a>
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shrink-0">
+                          <CheckCircle2 class="w-2.5 h-2.5" />
+                          Forged
+                        </span>
+                      </div>
+                      <p class="text-[11px] text-text-muted truncate mt-0.5">{chart.description}</p>
+                    </div>
+                  </div>
+
+                  <div class="shrink-0 flex items-center gap-2">
+                    <a
+                      href={chart.issueUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-[11px] font-medium text-text-muted hover:text-text-base flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-bg-base transition-colors"
+                      title={`View original request #${chart.issueNumber} on GitHub`}
+                    >
+                      #{chart.issueNumber}
+                      <ExternalLink class="w-3 h-3 opacity-60" />
+                    </a>
+                    <a
+                      href={`/docs/charts/${chart.slug}`}
+                      class="text-xs font-semibold text-primary-light hover:text-primary transition-colors flex items-center gap-0.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20"
+                    >
+                      Docs
+                      <ArrowRight class="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div class="p-4 rounded-2xl border border-dashed border-border bg-bg-base/40 text-center">
+          <p class="text-xs text-text-muted">
+            Have a specialized architecture or enterprise requirement?{' '}
+            <a
+              href="https://github.com/helmforgedev/charts/discussions"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primary-light hover:underline font-medium"
+            >
+              Start a discussion on GitHub
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </Container>
+</section>
+
+<script>
+  const form = document.getElementById('home-chart-request-form') as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('home-req-name') as HTMLInputElement)?.value.trim() || '';
+      const url = (document.getElementById('home-req-url') as HTMLInputElement)?.value.trim() || '';
+      const reason = (document.getElementById('home-req-reason') as HTMLTextAreaElement)?.value.trim() || '';
+
+      const title = encodeURIComponent(`[chart-request] ${name}`);
+      const body = encodeURIComponent(
+        `## Chart Request\n\n**Application:** ${name}\n**Upstream URL:** ${url}\n\n**Reason:**\n${reason || 'N/A'}\n\n---\n_Submitted from HelmForge Home Page (helmforge.dev)_`,
+      );
+
+      window.open(`https://github.com/helmforgedev/charts/issues/new?title=${title}&body=${body}`, '_blank');
+    });
+  }
+</script>

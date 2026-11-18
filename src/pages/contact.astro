@@ -1,4 +1,5 @@
 ---
+// SPDX-License-Identifier: Apache-2.0
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -20,58 +21,126 @@ const contactJsonLd = {
         contactType: 'maintainer',
         email: 'berlofa@helmforge.dev',
       },
+      {
+        '@type': 'ContactPoint',
+        contactType: 'security',
+        email: 'security@helmforge.dev',
+      },
     ],
   },
 };
+
+const channels = [
+  {
+    title: 'Chart Issues & Bug Reports',
+    category: 'Engineering',
+    description:
+      'Report chart deployment errors, image drift, templating issues, or suggest chart improvements directly on GitHub.',
+    link: 'https://github.com/helmforgedev/charts/issues',
+    linkText: 'Open GitHub Issue',
+    external: true,
+  },
+  {
+    title: 'Request a New Chart',
+    category: 'Catalog',
+    description:
+      'Need an open-source application packaged as a production Helm chart? Open a chart request in our zero-backlog tracker.',
+    link: '/request',
+    linkText: 'Open Request Hub',
+    external: false,
+  },
+  {
+    title: 'Security & Vulnerabilities',
+    category: 'Security',
+    description:
+      'Privately disclose security findings, CVE exposures, or signature discrepancies under our responsible disclosure policy.',
+    link: 'mailto:security@helmforge.dev',
+    linkText: 'security@helmforge.dev',
+    external: true,
+  },
+  {
+    title: 'Maintainer & Partnerships',
+    category: 'Governance',
+    description:
+      'Reach the maintainer regarding open-source sponsorships, upstream collaborations, CNCF initiatives, or press inquiries.',
+    link: 'mailto:berlofa@helmforge.dev',
+    linkText: 'berlofa@helmforge.dev',
+    external: true,
+  },
+  {
+    title: 'Technical Corrections',
+    category: 'Editorial',
+    description:
+      'Found an outdated command, inaccurate parameter, or technical typo in our blog posts or chart documentation?',
+    link: '/corrections',
+    linkText: 'Corrections Policy',
+    external: false,
+  },
+  {
+    title: 'Community Discussions',
+    category: 'Discussions',
+    description:
+      'Ask architectural questions, share self-hosted homelab setups, or discuss Kubernetes day-two operational patterns.',
+    link: 'https://github.com/helmforgedev/charts/discussions',
+    linkText: 'Join GitHub Discussions',
+    external: true,
+  },
+];
 ---
 
 <BaseLayout
-  title="Contact HelmForge"
-  description="Contact HelmForge maintainers, report chart issues, request charts, or send editorial corrections."
+  title="Contact HelmForge — Get in Touch with Maintainers"
+  description="Contact HelmForge maintainers, report chart bugs, request new applications, report security vulnerabilities, or join community discussions."
 >
   <Header />
   <script type="application/ld+json" set:html={JSON.stringify(contactJsonLd)}></script>
-  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+  <main id="main-content" class="py-16 sm:py-24" data-pagefind-body>
     <Container>
+      <!-- Section Header -->
       <SectionHeader
-        label="Contact"
+        label="Contact & Support"
         as="h1"
         title="Reach the right channel."
-        description="Use GitHub for project work, email for maintainer contact, and the correction policy for article updates."
+        description="We respond promptly across our dedicated communication channels. Choose the path that matches your question or contribution."
       />
 
-      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <a
-          href="mailto:berlofa@helmforge.dev"
-          class="glass-panel rounded-2xl p-6 hover:border-primary/40 transition-colors"
-        >
-          <h2 class="text-lg font-bold text-text-base heading-font">Maintainer email</h2>
-          <p class="mt-2 text-sm text-text-muted">berlofa@helmforge.dev</p>
-        </a>
-        <a
-          href="https://github.com/helmforgedev/charts/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="glass-panel rounded-2xl p-6 hover:border-primary/40 transition-colors"
-        >
-          <h2 class="text-lg font-bold text-text-base heading-font">Chart issues</h2>
-          <p class="mt-2 text-sm text-text-muted">
-            Open bug reports, feature requests, and chart discussions on GitHub.
-          </p>
-        </a>
-        <a href="/request" class="glass-panel rounded-2xl p-6 hover:border-primary/40 transition-colors">
-          <h2 class="text-lg font-bold text-text-base heading-font">Chart requests</h2>
-          <p class="mt-2 text-sm text-text-muted">Request a new application chart for the HelmForge catalog.</p>
-        </a>
-        <a href="/corrections" class="glass-panel rounded-2xl p-6 hover:border-primary/40 transition-colors">
-          <h2 class="text-lg font-bold text-text-base heading-font">Corrections</h2>
-          <p class="mt-2 text-sm text-text-muted">
-            Report an article error, outdated command, or unclear technical claim.
-          </p>
-        </a>
+      <!-- Channels Grid -->
+      <div class="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {channels.map((c) => (
+          <div class="glass-panel rounded-2xl p-6 flex flex-col border border-border hover:border-primary/40 transition-all hover:-translate-y-0.5">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-primary-light bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
+                {c.category}
+              </span>
+            </div>
+            <h2 class="text-base font-bold text-text-base heading-font">{c.title}</h2>
+            <p class="mt-2 text-xs sm:text-sm text-text-muted leading-relaxed flex-1">{c.description}</p>
+            <div class="mt-5 pt-3 border-t border-border/40">
+              <a
+                href={c.link}
+                target={c.external ? '_blank' : undefined}
+                rel={c.external ? 'noopener noreferrer' : undefined}
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-primary-light hover:underline"
+              >
+                {c.linkText}
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- SLA Box -->
+      <div class="mt-16 glass-panel rounded-2xl p-6 sm:p-8 border border-border text-center max-w-2xl mx-auto">
+        <h3 class="text-base font-bold text-text-base">Transparent Response Standards</h3>
+        <p class="mt-2 text-xs sm:text-sm text-text-muted leading-relaxed">
+          Security disclosures receive an initial response within 24 hours. GitHub issues and pull requests are triaged
+          continuously with automated k3d preflight validation.
+        </p>
       </div>
     </Container>
   </main>
-
   <Footer />
 </BaseLayout>

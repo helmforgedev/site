@@ -1,0 +1,76 @@
+name: Site Health & Link Integrity
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    name: Link Integrity & Build Health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Checkout charts repo
+        uses: actions/checkout@v7
+        with:
+          repository: helmforgedev/charts
+          path: .charts-repo
+          sparse-checkout: |
+            charts
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build site with Pagefind
+        run: npm run build
+
+      - name: Verify sitemap coverage
+        run: npm run seo:verify-sitemap
+
+      - name: Verify all internal links
+        run: |
+          ERRORS=0
+          for f in $(find dist -name '*.html'); do
+            grep -oE 'href="(/[^"#]*)"' "$f" | sed 's/href="//;s/"//' | while read -r link; do
+              TARGET="dist${link}"
+              if [ "${link}" != "/" ] && [ "${link: -1}" = "/" ]; then
+                TARGET="${TARGET}index.html"
+              elif [ "${link}" = "/" ]; then
+                TARGET="dist/index.html"
+              elif [[ ! "$link" =~ \. ]]; then
+                TARGET="${TARGET}/index.html"
+              fi
+              if [ ! -f "$TARGET" ]; then
+                echo "BROKEN LINK in $f: $link -> $TARGET"
+                echo "BROKEN" >> /tmp/broken-links.txt
+              fi
+            done
+          done
+          if [ -f /tmp/broken-links.txt ]; then
+            COUNT=$(wc -l < /tmp/broken-links.txt)
+            echo "ERROR: Found $COUNT broken internal link(s)"
+            exit 1
+          fi
+          echo "All internal links are valid."
+
+      - name: Generate blog performance & discovery report
+        run: npm run blog:performance-report || true
+
+      - name: Upload site health report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: site-health-artifacts
+          path: |
+            dist/sitemap-index.xml
+            dist/blog/rss.xml
+          retention-days: 14

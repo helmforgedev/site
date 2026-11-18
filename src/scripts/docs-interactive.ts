@@ -81,7 +81,7 @@ document.querySelectorAll('.prose-docs pre').forEach((pre) => {
 // Table of Contents generation + scroll spy
 const toc = document.getElementById('docs-toc');
 if (toc) {
-  const article = document.querySelector('.prose-docs');
+  const article = document.querySelector('article') || document.querySelector('.prose-docs');
   if (article) {
     const headings = article.querySelectorAll('h2, h3');
     if (headings.length < 2) {

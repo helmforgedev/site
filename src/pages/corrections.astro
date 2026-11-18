@@ -1,4 +1,5 @@
 ---
+// SPDX-License-Identifier: Apache-2.0
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -12,58 +13,133 @@ const correctionsJsonLd = {
   url: 'https://helmforge.dev/corrections',
   about: 'Corrections and update process for HelmForge content',
 };
+
+const correctionSteps = [
+  {
+    step: '1',
+    title: 'Report',
+    description: 'Provide the article URL, specific quote or code snippet, and the proposed correction.',
+  },
+  {
+    step: '2',
+    title: 'Verify',
+    description: 'Maintainers validate the issue against the upstream release notes or live k3d cluster.',
+  },
+  {
+    step: '3',
+    title: 'Patch & Re-index',
+    description: 'The MDX source is updated with an updated timestamp and rebuilt in CI automatically.',
+  },
+  {
+    step: '4',
+    title: 'Credit',
+    description: 'Contributors are credited in the Git commit and PR for helping maintain project accuracy.',
+  },
+];
 ---
 
 <BaseLayout
-  title="Corrections Policy"
-  description="How to report corrections for HelmForge articles and how meaningful updates are handled."
+  title="Corrections Policy — Transparent Accuracy Maintenance"
+  description="How HelmForge handles technical corrections, outdated Kubernetes commands, version deprecations, and upstream drift in documentation and blog articles."
 >
   <Header />
   <script type="application/ld+json" set:html={JSON.stringify(correctionsJsonLd)}></script>
-  <main id="main-content" class="py-16 sm:py-20" data-pagefind-body>
+  <main id="main-content" class="py-16 sm:py-24" data-pagefind-body>
     <Container>
+      <!-- Section Header -->
       <SectionHeader
         label="Corrections"
         as="h1"
-        title="Help keep HelmForge content accurate."
-        description="Technical content ages quickly. Corrections are welcome when commands, versions, links, or operational guidance need attention."
+        title="Help keep HelmForge accurate."
+        description="Kubernetes APIs, container images, and security standards evolve rapidly. We welcome corrections when commands, versions, links, or architectural guidance need attention."
       />
 
-      <div class="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section class="space-y-4 text-sm leading-relaxed text-text-muted">
-          <h2 class="text-lg font-bold text-text-base heading-font">What to send</h2>
-          <p>
-            Include the article URL, the section or quote that needs attention, the corrected information, and a source
-            or reproduction step when available.
-          </p>
-          <p>
-            For chart behavior, include the chart name, version, Kubernetes version, and relevant values or logs when
-            they help confirm the issue.
-          </p>
+      <!-- 4-Step Process -->
+      <div class="mt-14 glass-panel rounded-2xl p-6 sm:p-8 border border-border">
+        <h2 class="text-lg font-bold text-text-base heading-font mb-6 text-center">Our 4-Step Correction Workflow</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {correctionSteps.map((s) => (
+            <div class="flex flex-col items-center text-center">
+              <div class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white text-sm font-extrabold shadow-md shadow-primary/20 mb-3">
+                {s.step}
+              </div>
+              <h3 class="text-sm font-bold text-text-base">{s.title}</h3>
+              <p class="mt-1.5 text-xs text-text-muted leading-relaxed">{s.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Information Requirements Grid -->
+      <div class="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-2 items-start">
+        <section class="glass-panel rounded-2xl p-6 sm:p-8 border border-border space-y-4">
+          <h2 class="text-lg font-bold text-text-base heading-font">What to include in a report</h2>
+          <ul class="space-y-3 text-xs sm:text-sm text-text-muted leading-relaxed">
+            <li class="flex items-start gap-2.5">
+              <span class="text-primary font-bold">›</span>
+              <span>
+                <strong>Article or Doc URL:</strong> Direct link to the page that needs revision.
+              </span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-primary font-bold">›</span>
+              <span>
+                <strong>The Specific Claim:</strong> Quote the exact sentence, command, or parameter.
+              </span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-primary font-bold">›</span>
+              <span>
+                <strong>Primary Source Evidence:</strong> Link to upstream documentation, CVE report, or KEP.
+              </span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-primary font-bold">›</span>
+              <span>
+                <strong>Runtime Context:</strong> If related to chart behavior, include your Kubernetes version and Helm
+                values.
+              </span>
+            </li>
+          </ul>
         </section>
 
-        <section class="glass-panel rounded-2xl p-6">
-          <h2 class="text-lg font-bold text-text-base heading-font">Where to report</h2>
-          <div class="mt-4 flex flex-wrap gap-3 text-sm">
+        <!-- Where to Report -->
+        <section class="glass-panel rounded-2xl p-6 sm:p-8 border border-border flex flex-col justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-text-base heading-font">Where to submit</h2>
+            <p class="mt-2 text-xs sm:text-sm text-text-muted leading-relaxed">
+              We prefer public GitHub issues for documentation and blog updates so other operators can track the fix in
+              the open. For sensitive security findings, please email us directly.
+            </p>
+          </div>
+
+          <div class="mt-6 flex flex-wrap gap-3">
             <a
               href="https://github.com/helmforgedev/site/issues/new"
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 font-semibold text-primary-light hover:bg-primary/20 transition-colors"
+              class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary-dark transition-all shadow-sm"
             >
-              Open a site issue
+              Open a Site Issue
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
             </a>
             <a
               href="mailto:berlofa@helmforge.dev"
-              class="inline-flex rounded-lg border border-border px-4 py-2 font-semibold text-text-base hover:border-primary/40 hover:text-primary-light transition-colors"
+              class="inline-flex items-center gap-2 rounded-xl border border-border bg-bg-surface px-4 py-2.5 text-xs font-bold text-text-base hover:border-primary/40 hover:text-primary-light transition-colors"
             >
-              Email maintainers
+              Email Maintainers
             </a>
           </div>
         </section>
       </div>
     </Container>
   </main>
-
   <Footer />
 </BaseLayout>

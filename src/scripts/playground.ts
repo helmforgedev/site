@@ -52,6 +52,7 @@ const valuesLink = document.getElementById('playground-values-link') as HTMLAnch
 const codeEl = document.getElementById('playground-code');
 const copyBtn = document.getElementById('playground-copy') as HTMLButtonElement | null;
 const shareBtn = document.getElementById('playground-share') as HTMLButtonElement | null;
+const downloadBtn = document.getElementById('playground-download') as HTMLButtonElement | null;
 const scenariosEl = document.getElementById('playground-scenarios');
 const scenarioBtnsEl = document.getElementById('playground-scenario-btns');
 const outputBtns = document.querySelectorAll<HTMLButtonElement>('.playground-output-btn');
@@ -61,7 +62,7 @@ const diffEl = document.getElementById('playground-diff');
 const diffCountEl = document.getElementById('playground-diff-count');
 const diffListEl = document.getElementById('playground-diff-list');
 
-type OutputMode = 'helm' | 'values';
+type OutputMode = 'helm' | 'values' | 'argocd' | 'flux';
 let outputMode: OutputMode = 'helm';
 let selectedSlug = '';
 let selectedName = '';
@@ -430,6 +431,7 @@ function selectChart(slug: string, name: string) {
   if (docsLink) docsLink.href = `/docs/charts/${slug}`;
   if (valuesLink) valuesLink.href = `https://github.com/helmforgedev/charts/blob/main/charts/${slug}/values.yaml`;
   if (deployHint) deployHint.classList.remove('hidden');
+  if (downloadBtn) downloadBtn.disabled = false;
 
   // Build scenario buttons
   const chartScenarios = getScenarios(slug);
@@ -1024,6 +1026,122 @@ function generateValuesYaml(): string {
   return lines.join('\n');
 }
 
+function generateArgoCdOutput(): string {
+  if (!selectedSlug) return '';
+  const yaml = generateValuesYaml();
+  const indentedYaml = yaml
+    .split('\n')
+    .map((line) => (line ? `        ${line}` : ''))
+    .join('\n');
+
+  return `<span class="text-zinc-500">apiVersion:</span> <span class="text-amber-300">argoproj.io/v1alpha1</span>
+<span class="text-zinc-500">kind:</span> <span class="text-amber-300">Application</span>
+<span class="text-zinc-500">metadata:</span>
+  <span class="text-sky-400">name:</span> <span class="text-amber-300">${selectedSlug}</span>
+  <span class="text-sky-400">namespace:</span> <span class="text-amber-300">argocd</span>
+<span class="text-zinc-500">spec:</span>
+  <span class="text-sky-400">project:</span> <span class="text-amber-300">default</span>
+  <span class="text-sky-400">source:</span>
+    <span class="text-sky-400">repoURL:</span> <span class="text-emerald-400">https://repo.helmforge.dev</span>
+    <span class="text-sky-400">chart:</span> <span class="text-amber-300">${selectedSlug}</span>
+    <span class="text-sky-400">targetRevision:</span> <span class="text-emerald-400">"*"</span>
+    <span class="text-sky-400">helm:</span>
+      <span class="text-sky-400">values: |</span>
+${indentedYaml}
+  <span class="text-sky-400">destination:</span>
+    <span class="text-sky-400">server:</span> <span class="text-emerald-400">https://kubernetes.default.svc</span>
+    <span class="text-sky-400">namespace:</span> <span class="text-amber-300">${selectedSlug}</span>
+  <span class="text-sky-400">syncPolicy:</span>
+    <span class="text-sky-400">automated:</span>
+      <span class="text-sky-400">prune:</span> <span class="text-amber-300">true</span>
+      <span class="text-sky-400">selfHeal:</span> <span class="text-amber-300">true</span>`;
+}
+
+function getPlainArgoCd(): string {
+  if (!selectedSlug) return '';
+  const yaml = getPlainValuesYaml();
+  const indentedYaml = yaml
+    .split('\n')
+    .map((line) => (line ? `        ${line}` : ''))
+    .join('\n');
+
+  return `apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${selectedSlug}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://repo.helmforge.dev
+    chart: ${selectedSlug}
+    targetRevision: "*"
+    helm:
+      values: |
+${indentedYaml}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${selectedSlug}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+`;
+}
+
+function generateFluxCdOutput(): string {
+  if (!selectedSlug) return '';
+  const yaml = generateValuesYaml();
+  const indentedYaml = yaml
+    .split('\n')
+    .map((line) => (line ? `    ${line}` : ''))
+    .join('\n');
+
+  return `<span class="text-zinc-500">apiVersion:</span> <span class="text-amber-300">helm.toolkit.fluxcd.io/v2</span>
+<span class="text-zinc-500">kind:</span> <span class="text-amber-300">HelmRelease</span>
+<span class="text-zinc-500">metadata:</span>
+  <span class="text-sky-400">name:</span> <span class="text-amber-300">${selectedSlug}</span>
+  <span class="text-sky-400">namespace:</span> <span class="text-amber-300">${selectedSlug}</span>
+<span class="text-zinc-500">spec:</span>
+  <span class="text-sky-400">interval:</span> <span class="text-amber-300">5m</span>
+  <span class="text-sky-400">chart:</span>
+    <span class="text-sky-400">spec:</span>
+      <span class="text-sky-400">chart:</span> <span class="text-amber-300">${selectedSlug}</span>
+      <span class="text-sky-400">sourceRef:</span>
+        <span class="text-sky-400">kind:</span> <span class="text-amber-300">HelmRepository</span>
+        <span class="text-sky-400">name:</span> <span class="text-amber-300">helmforge</span>
+        <span class="text-sky-400">namespace:</span> <span class="text-amber-300">flux-system</span>
+  <span class="text-sky-400">values:</span>
+${indentedYaml}`;
+}
+
+function getPlainFluxCd(): string {
+  if (!selectedSlug) return '';
+  const yaml = getPlainValuesYaml();
+  const indentedYaml = yaml
+    .split('\n')
+    .map((line) => (line ? `    ${line}` : ''))
+    .join('\n');
+
+  return `apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ${selectedSlug}
+  namespace: ${selectedSlug}
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ${selectedSlug}
+      sourceRef:
+        kind: HelmRepository
+        name: helmforge
+        namespace: flux-system
+  values:
+${indentedYaml}
+`;
+}
+
 function getOutputBlockingReason(): string | null {
   const invalidField = getGroups(selectedSlug)
     .flatMap((group) => group.fields)
@@ -1214,7 +1332,12 @@ function updateOutput() {
 
   if (blockingReason) {
     codeEl.textContent = `# ${blockingReason}`;
-    if (filenameEl) filenameEl.textContent = outputMode === 'helm' ? 'terminal' : 'values.yaml';
+    if (filenameEl) {
+      if (outputMode === 'helm') filenameEl.textContent = 'terminal';
+      else if (outputMode === 'values') filenameEl.textContent = 'values.yaml';
+      else if (outputMode === 'argocd') filenameEl.textContent = 'application.yaml';
+      else if (outputMode === 'flux') filenameEl.textContent = 'helmrelease.yaml';
+    }
     if (diffEl) diffEl.classList.add('hidden');
     updateUrlState();
     return;
@@ -1223,9 +1346,15 @@ function updateOutput() {
   if (outputMode === 'helm') {
     codeEl.innerHTML = generateHelmOutput();
     if (filenameEl) filenameEl.textContent = 'terminal';
-  } else {
+  } else if (outputMode === 'values') {
     codeEl.innerHTML = generateValuesYaml();
     if (filenameEl) filenameEl.textContent = 'values.yaml';
+  } else if (outputMode === 'argocd') {
+    codeEl.innerHTML = generateArgoCdOutput();
+    if (filenameEl) filenameEl.textContent = 'application.yaml';
+  } else if (outputMode === 'flux') {
+    codeEl.innerHTML = generateFluxCdOutput();
+    if (filenameEl) filenameEl.textContent = 'helmrelease.yaml';
   }
 
   // Update diff view
@@ -1366,7 +1495,11 @@ if (searchInput) {
 if (copyBtn) {
   copyBtn.addEventListener('click', async () => {
     if (!selectedSlug) return;
-    const text = outputMode === 'helm' ? getPlainHelmCommand() : getPlainValuesYaml();
+    let text = '';
+    if (outputMode === 'helm') text = getPlainHelmCommand();
+    else if (outputMode === 'values') text = getPlainValuesYaml();
+    else if (outputMode === 'argocd') text = getPlainArgoCd();
+    else if (outputMode === 'flux') text = getPlainFluxCd();
     try {
       await navigator.clipboard.writeText(text);
       copyBtn.textContent = 'Copied!';
@@ -1374,6 +1507,37 @@ if (copyBtn) {
     } catch {
       // Fallback
     }
+  });
+}
+
+// Download
+if (downloadBtn) {
+  downloadBtn.addEventListener('click', () => {
+    if (!selectedSlug) return;
+    let content = '';
+    let ext = 'yaml';
+    if (outputMode === 'helm') {
+      content = getPlainHelmCommand();
+      ext = 'sh';
+    } else if (outputMode === 'values') {
+      content = getPlainValuesYaml();
+      ext = 'values.yaml';
+    } else if (outputMode === 'argocd') {
+      content = getPlainArgoCd();
+      ext = 'argocd.yaml';
+    } else if (outputMode === 'flux') {
+      content = getPlainFluxCd();
+      ext = 'flux.yaml';
+    }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedSlug}-${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 }
 

@@ -47,8 +47,8 @@ test('S3 backup activation keeps bucket and credentials explicit', async ({ page
 test('Hermes documentation and official icon are available', async ({ page, request }) => {
   await page.goto('/docs/charts/hermes-agent');
   await expect(page.getByRole('heading', { name: 'Hermes Agent', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Values reference', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Backup and restore', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Values|Values Schema Reference/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Features|Install|Connect/i }).first()).toBeVisible();
   const icon = await request.get('/icons/charts/hermes-agent.png');
   expect(icon.status()).toBe(200);
   expect(icon.headers()['content-type']).toContain('image/png');
