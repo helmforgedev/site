@@ -157,126 +157,127 @@ const githubDesignUrl = `https://github.com/helmforgedev/charts/blob/main/charts
   </div>
 </section>
 
-<script>
-  import mermaid from 'mermaid';
+<script is:inline>
+  (function () {
+    async function renderAllDiagrams() {
+      const nodes = document.querySelectorAll('.mermaid-diagram-wrapper');
+      if (!nodes.length) return;
 
-  // Initialize Mermaid with custom HelmForge dark aesthetic
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'loose',
-    theme: 'base',
-    themeVariables: {
-      darkMode: true,
-      background: 'transparent',
-      primaryColor: '#0c2340',
-      primaryTextColor: '#f8fafc',
-      primaryBorderColor: '#0ea5e9',
-      lineColor: '#38bdf8',
-      secondaryColor: '#1e293b',
-      secondaryTextColor: '#cbd5e1',
-      secondaryBorderColor: '#475569',
-      tertiaryColor: '#0f172a',
-      tertiaryTextColor: '#94a3b8',
-      tertiaryBorderColor: '#334155',
-      noteBkgColor: '#1e293b',
-      noteTextColor: '#e2e8f0',
-      noteBorderColor: '#0ea5e9',
-      fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-      fontSize: '13px',
-    },
-  });
-
-  async function renderAllDiagrams() {
-    const nodes = document.querySelectorAll('.mermaid-diagram-wrapper');
-    if (!nodes.length) return;
-
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i] as HTMLElement;
-      const raw = node.dataset.rawMermaid;
-      if (!raw) continue;
-
-      const id = `mermaid-svg-${i}-${Date.now()}`;
       try {
-        const { svg } = await mermaid.render(id, raw);
-        node.innerHTML = svg;
-        const svgEl = node.querySelector('svg');
-        if (svgEl) {
-          svgEl.style.maxWidth = '100%';
-          svgEl.style.height = 'auto';
+        const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'loose',
+          theme: 'base',
+          themeVariables: {
+            darkMode: true,
+            background: 'transparent',
+            primaryColor: '#0c2340',
+            primaryTextColor: '#f8fafc',
+            primaryBorderColor: '#0ea5e9',
+            lineColor: '#38bdf8',
+            secondaryColor: '#1e293b',
+            secondaryTextColor: '#cbd5e1',
+            secondaryBorderColor: '#475569',
+            tertiaryColor: '#0f172a',
+            tertiaryTextColor: '#94a3b8',
+            tertiaryBorderColor: '#334155',
+            noteBkgColor: '#1e293b',
+            noteTextColor: '#e2e8f0',
+            noteBorderColor: '#0ea5e9',
+            fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: '13px',
+          },
+        });
+
+        for (let i = 0; i < nodes.length; i++) {
+          const node = nodes[i];
+          const raw = node.dataset.rawMermaid;
+          if (!raw) continue;
+
+          const id = 'mermaid-svg-' + i + '-' + Date.now();
+          try {
+            const { svg } = await mermaid.render(id, raw);
+            node.innerHTML = svg;
+            const svgEl = node.querySelector('svg');
+            if (svgEl) {
+              svgEl.style.maxWidth = '100%';
+              svgEl.style.height = 'auto';
+            }
+          } catch (err) {
+            console.warn('Mermaid rendering fallback:', err);
+          }
         }
       } catch (err) {
-        // Fallback: keep pre
-        console.warn('Mermaid rendering fallback:', err);
+        console.warn('Failed to load mermaid from CDN:', err);
       }
     }
-  }
 
-  // Setup tabs and copy buttons
-  function setupArchitectureInteractions() {
-    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-diagram-tab]');
-    const panels = document.querySelectorAll<HTMLElement>('[data-diagram-panel]');
+    function setupArchitectureInteractions() {
+      const tabs = document.querySelectorAll('[data-diagram-tab]');
+      const panels = document.querySelectorAll('[data-diagram-panel]');
 
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const targetIdx = tab.dataset.diagramTab;
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const targetIdx = tab.dataset.diagramTab;
 
-        tabs.forEach((t) => {
-          const isSelected = t.dataset.diagramTab === targetIdx;
-          t.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-          if (isSelected) {
-            t.className =
-              'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-text-inverted shadow-sm transition-all';
-          } else {
-            t.className =
-              'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-base bg-surface-subtle hover:bg-surface-elevated transition-all';
-          }
+          tabs.forEach((t) => {
+            const isSelected = t.dataset.diagramTab === targetIdx;
+            t.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            if (isSelected) {
+              t.className =
+                'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-text-inverted shadow-sm transition-all';
+            } else {
+              t.className =
+                'diagram-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-base bg-surface-subtle hover:bg-surface-elevated transition-all';
+            }
+          });
+
+          panels.forEach((p) => {
+            if (p.dataset.diagramPanel === targetIdx) {
+              p.classList.remove('hidden');
+              p.classList.add('block');
+            } else {
+              p.classList.add('hidden');
+              p.classList.remove('block');
+            }
+          });
         });
+      });
 
-        panels.forEach((p) => {
-          if (p.dataset.diagramPanel === targetIdx) {
-            p.classList.remove('hidden');
-            p.classList.add('block');
-          } else {
-            p.classList.add('hidden');
-            p.classList.remove('block');
+      document.querySelectorAll('[data-copy-mermaid]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const text = btn.dataset.copyMermaid || '';
+          try {
+            await navigator.clipboard.writeText(text);
+            const copyIcon = btn.querySelector('.copy-icon');
+            const checkIcon = btn.querySelector('.check-icon');
+            copyIcon?.classList.add('hidden');
+            checkIcon?.classList.remove('hidden');
+            setTimeout(() => {
+              copyIcon?.classList.remove('hidden');
+              checkIcon?.classList.add('hidden');
+            }, 2000);
+          } catch (e) {
+            console.error('Failed to copy diagram source:', e);
           }
         });
       });
-    });
+    }
 
-    // Copy Mermaid buttons
-    document.querySelectorAll<HTMLButtonElement>('[data-copy-mermaid]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const text = btn.dataset.copyMermaid || '';
-        try {
-          await navigator.clipboard.writeText(text);
-          const copyIcon = btn.querySelector('.copy-icon');
-          const checkIcon = btn.querySelector('.check-icon');
-          copyIcon?.classList.add('hidden');
-          checkIcon?.classList.remove('hidden');
-          setTimeout(() => {
-            copyIcon?.classList.remove('hidden');
-            checkIcon?.classList.add('hidden');
-          }, 2000);
-        } catch (e) {
-          console.error('Failed to copy diagram source:', e);
-        }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        renderAllDiagrams();
+        setupArchitectureInteractions();
       });
-    });
-  }
-
-  // Execute on initial DOM and on client-side navigation
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+    } else {
+      renderAllDiagrams();
+      setupArchitectureInteractions();
+    }
+    document.addEventListener('astro:page-load', () => {
       renderAllDiagrams();
       setupArchitectureInteractions();
     });
-  } else {
-    renderAllDiagrams();
-    setupArchitectureInteractions();
-  }
-  document.addEventListener('astro:page-load', () => {
-    renderAllDiagrams();
-    setupArchitectureInteractions();
-  });
+  })();
 </script>
