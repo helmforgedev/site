@@ -227,7 +227,10 @@ database:
 Use `database.external.parameters` for Prisma connection arguments without the leading `?`. PgBouncer deployments that
 require Prisma compatibility mode can set `parameters: pgbouncer=true`. For a complete URL override, store the URL in the
 existing Secret and set `database.external.existingSecretUrlKey` to its key. Keep the structured host, port, and database
-values aligned because the readiness check, optional database preparation, and backup jobs use them independently.
+values aligned because the readiness check, optional database preparation, and backup jobs use them independently. When
+backups are enabled, the Secret must also contain the key selected by
+`database.external.existingSecretPasswordKey`, or configure a backup-specific Secret with
+`backup.database.existingSecret` and `backup.database.existingSecretPasswordKey`.
 
 </div>
 
@@ -481,6 +484,7 @@ or IRSA metadata endpoint for the cluster's IPv4 or IPv6 mode. Keep bucket creat
 | `backup.s3.credentialsFromPodIdentity` | `false`                                  | Use EKS Pod Identity or IRSA.                      |
 | `backup.s3.region`                     | `""`                                     | AWS region used by workload identity.              |
 | `backup.serviceAccount.*`              | dedicated                                | Configure the backup workload identity account.    |
+| `backup.securityContext`               | no escalation, drop `ALL`                | Security context for both backup containers.       |
 | `backup.database.existingSecret`       | `""`                                     | Optional backup-specific database password Secret. |
 | `backup.database.postgresDumpArgs`     | `""`                                     | Extra `pg_dump` arguments.                         |
 
