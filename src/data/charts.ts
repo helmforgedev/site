@@ -567,7 +567,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.3.3',
-    appVersion: '6.71.0',
+    appVersion: '6.77.0',
     category: 'skip-prediction',
     keywords: ['cms', 'blog', 'publishing', 'ghost', 'headless-cms', 'newsletter', 'self-hosted'],
     hasValuesSchema: true,

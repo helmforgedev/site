@@ -7296,7 +7296,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.71.0',
+          default: '6.77.0',
           description: 'Ghost image tag',
         },
         {
