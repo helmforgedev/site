@@ -648,7 +648,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.2.1',
-    appVersion: '2.8.3',
+    appVersion: '2.8.4',
     category: 'skip-prediction',
     keywords: ['heimdall', 'dashboard', 'homepage', 'launcher', 'self-hosted'],
     hasValuesSchema: true,
