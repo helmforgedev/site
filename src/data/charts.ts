@@ -676,7 +676,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.1.0',
-    appVersion: '2.6.0',
+    appVersion: '2.13.1',
     category: 'skip-prediction',
     keywords: ['homarr', 'dashboard', 'self-hosted', 'homepage', 'kubernetes'],
     hasValuesSchema: true,
