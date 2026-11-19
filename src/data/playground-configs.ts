@@ -6194,7 +6194,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.4.32',
+          default: 'v0.4.38',
           description: 'Pinned Certimate image tag',
         },
         {
