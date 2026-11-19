@@ -500,7 +500,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.1.9',
-    appVersion: 'v1.9.2',
+    appVersion: 'v1.10.0',
     category: 'networking',
     keywords: ['envoy', 'gateway', 'gateway-api', 'ingress', 'api-gateway', 'kubernetes'],
     hasValuesSchema: true,
