@@ -217,7 +217,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.2.15',
-    appVersion: '1.15.5',
+    appVersion: '1.15.6',
     category: 'skip-prediction',
     keywords: ['podcast', 'hosting', 'castopod', 'fediverse', 'self-hosted'],
     hasValuesSchema: true,
