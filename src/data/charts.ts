@@ -1719,7 +1719,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.0.2',
-    appVersion: '2026.7.4',
+    appVersion: '2026.7.5',
     category: 'skip-prediction',
     keywords: ['discourse', 'forum', 'community', 'discussion', 'kubernetes'],
     hasValuesSchema: true,
