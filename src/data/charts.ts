@@ -297,7 +297,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.5.21',
-    appVersion: '2026.10.1',
+    appVersion: '2026.11.0',
     category: 'networking',
     keywords: ['cloudflare', 'tunnel', 'cloudflared', 'zero-trust', 'ingress', 'networking'],
     hasValuesSchema: true,
