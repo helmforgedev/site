@@ -5170,7 +5170,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.8.10',
+          default: '2.8.11',
           description: 'Pinned official BentoPDF image',
         },
         {
