@@ -1746,7 +1746,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.1.6',
-    appVersion: '3.88.0',
+    appVersion: '3.100.0',
     category: 'skip-prediction',
     keywords: ['ghostfolio', 'wealth-management', 'portfolio', 'finance', 'kubernetes'],
     hasValuesSchema: true,
