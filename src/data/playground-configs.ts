@@ -5086,7 +5086,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.5.13',
+          default: '1.6.2',
           description: 'Pinned official application image',
         },
         {
