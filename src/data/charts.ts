@@ -257,7 +257,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.20',
-    appVersion: '2.5.0',
+    appVersion: '2.5.2',
     category: 'skip-prediction',
     keywords: ['onboarding', 'hr', 'employee', 'automation', 'chiefonboarding', 'self-hosted'],
     hasValuesSchema: true,
