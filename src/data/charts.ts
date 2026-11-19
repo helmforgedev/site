@@ -345,7 +345,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.2',
-    appVersion: '1.16.0',
+    appVersion: '1.23.0',
     category: 'skip-prediction',
     keywords: ['dawarich', 'location', 'gps', 'postgis'],
     hasValuesSchema: true,
