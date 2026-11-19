@@ -581,7 +581,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.2.3',
-    appVersion: '28.2.0',
+    appVersion: '28.4.0',
     category: 'integration-delivery',
     keywords: ['gitea', 'git', 'scm', 'version-control', 'devops', 'self-hosted'],
     hasValuesSchema: true,
