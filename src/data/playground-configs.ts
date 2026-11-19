@@ -4317,7 +4317,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.14.4',
+          default: '1.23.0',
           description: 'Pinned official Dawarich release',
         },
         {
