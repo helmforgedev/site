@@ -283,7 +283,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.1.0',
-    appVersion: '26.9.21',
+    appVersion: '26.10.4',
     category: 'database',
     keywords: ['clickhouse', 'database', 'olap', 'analytics', 'kubernetes'],
     hasValuesSchema: true,
