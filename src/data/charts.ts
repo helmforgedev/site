@@ -270,7 +270,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.4.2',
-    appVersion: '2.12.0',
+    appVersion: '2.12.1',
     category: 'skip-prediction',
     keywords: ['ckan', 'data', 'portal', 'open-data', 'catalog', 'api'],
     hasValuesSchema: true,
