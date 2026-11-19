@@ -409,7 +409,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.2',
-    appVersion: '3.3.3',
+    appVersion: '3.3.7',
     category: 'integration-delivery',
     keywords: ['docuseal', 'electronic-signature', 'documents', 'pdf', 'self-hosted'],
     hasValuesSchema: true,
