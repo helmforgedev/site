@@ -554,7 +554,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '3.2.2',
-    appVersion: '1.31.7',
+    appVersion: '1.31.8',
     category: 'integration-delivery',
     keywords: ['generic'],
     hasValuesSchema: true,
