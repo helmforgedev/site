@@ -608,7 +608,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.2',
-    appVersion: '0.8.7',
+    appVersion: '0.8.8',
     category: 'skip-prediction',
     keywords: ['glance', 'dashboard', 'feeds', 'kubernetes'],
     hasValuesSchema: true,
