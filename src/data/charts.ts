@@ -799,7 +799,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.6.0',
-    appVersion: '1.29.1',
+    appVersion: '1.30.1',
     category: 'storage',
     keywords: ['komga', 'comics', 'manga', 'media-server', 'opds', 'self-hosted'],
     hasValuesSchema: true,
