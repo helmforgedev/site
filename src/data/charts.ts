@@ -1085,7 +1085,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.3',
-    appVersion: '0.81.5',
+    appVersion: '0.83.1',
     category: 'networking',
     keywords: ['wireguard', 'vpn', 'zero-trust', 'mesh', 'networking', 'postgresql', 'self-hosted', 'kubernetes'],
     hasValuesSchema: true,
