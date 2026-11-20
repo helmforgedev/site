@@ -1071,7 +1071,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.2.0',
-    appVersion: '2.44.4',
+    appVersion: '3.2.2',
     category: 'integration-delivery',
     keywords: ['n8n', 'workflow', 'automation', 'integration', 'low-code'],
     hasValuesSchema: true,

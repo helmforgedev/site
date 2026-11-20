@@ -11945,7 +11945,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.44.4',
+          default: '3.2.2',
           description: 'Pinned n8n image tag',
         },
         {
