@@ -812,7 +812,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.0',
-    appVersion: '0.0.67',
+    appVersion: '0.1.3',
     category: 'integration-delivery',
     keywords: ['kubernetes-mcp-server', 'kubernetes', 'helm'],
     hasValuesSchema: true,
