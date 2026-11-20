@@ -1005,7 +1005,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.9.0',
-    appVersion: '9.0.4',
+    appVersion: '9.0.8',
     category: 'database',
     keywords: ['mongodb', 'database', 'nosql', 'replicaset', 'sharded'],
     hasValuesSchema: true,
