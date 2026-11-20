@@ -758,7 +758,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.3.1',
-    appVersion: '0.34.1',
+    appVersion: '0.35.0',
     category: 'skip-prediction',
     keywords: ['bookmarks', 'read-later', 'archiving', 'karakeep', 'self-hosted'],
     hasValuesSchema: true,
