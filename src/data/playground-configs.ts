@@ -18270,7 +18270,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.31.0',
+          default: '26.11.1',
           description: 'Pinned official Memos image',
         },
         {
