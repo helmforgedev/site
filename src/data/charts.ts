@@ -690,7 +690,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.18',
-    appVersion: '2026.9.0',
+    appVersion: '2026.10.1',
     category: 'integration-delivery',
     keywords: ['hoppscotch', 'api', 'rest', 'graphql', 'websocket', 'developer-tools'],
     hasValuesSchema: true,
