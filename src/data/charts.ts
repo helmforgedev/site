@@ -938,7 +938,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.0.6',
-    appVersion: '0.31.0',
+    appVersion: '26.11.1',
     category: 'skip-prediction',
     keywords: ['memos', 'kubernetes', 'helm'],
     hasValuesSchema: true,
