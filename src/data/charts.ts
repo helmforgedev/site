@@ -1124,7 +1124,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.0.6',
-    appVersion: '0.32.1',
+    appVersion: '0.35.0',
     category: 'skip-prediction',
     keywords: ['notes', 'knowledge-base', 'markdown', 'mcp', 'self-hosted', 'kubernetes'],
     hasValuesSchema: true,
