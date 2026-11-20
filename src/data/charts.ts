@@ -992,7 +992,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.5.8',
-    appVersion: '2026.10.0',
+    appVersion: '2026.11.0',
     category: 'skip-prediction',
     keywords: ['minecraft', 'game-server', 'java', 'paper', 'forge', 'fabric', 'geyser', 'bedrock'],
     hasValuesSchema: true,
