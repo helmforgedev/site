@@ -851,7 +851,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.2.8',
-    appVersion: '1.8.0',
+    appVersion: '1.8.2',
     category: 'monitoring-logging',
     keywords: ['analytics', 'web-analytics', 'privacy', 'liwan', 'duckdb', 'self-hosted'],
     hasValuesSchema: true,
