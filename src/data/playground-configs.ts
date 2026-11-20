@@ -21429,7 +21429,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '3.10.14',
+          default: '3.11.3',
           description: 'Pinned official Matterbridge image tag',
         },
         {

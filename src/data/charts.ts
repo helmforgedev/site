@@ -890,7 +890,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.1.0',
-    appVersion: '3.10.14',
+    appVersion: '3.11.3',
     category: 'integration-delivery',
     keywords: ['matterbridge', 'matter', 'smart-home', 'iot', 'home-automation', 'mqtt', 'kubernetes'],
     hasValuesSchema: true,
