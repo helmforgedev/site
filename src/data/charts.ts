@@ -1150,7 +1150,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.9',
-    appVersion: '7.15.5',
+    appVersion: '7.15.6',
     category: 'security',
     keywords: ['oauth2-proxy', 'oauth2', 'oidc', 'authentication', 'reverse-proxy', 'sso'],
     hasValuesSchema: true,
