@@ -745,7 +745,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.5.3',
-    appVersion: '4.3.1',
+    appVersion: '4.4.0',
     category: 'streaming-messaging',
     keywords: ['kafka', 'streaming', 'messaging', 'kraft', 'eventing'],
     hasValuesSchema: true,
