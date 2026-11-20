@@ -1111,7 +1111,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.2.1',
-    appVersion: '35.0.2',
+    appVersion: '35.0.3',
     category: 'integration-delivery',
     keywords: ['nextcloud', 'files', 'collaboration', 'webdav', 'kubernetes'],
     hasValuesSchema: true,
