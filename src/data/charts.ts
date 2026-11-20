@@ -1137,7 +1137,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.8.0',
-    appVersion: 'v2.32.0',
+    appVersion: 'v2.38.1',
     category: 'integration-delivery',
     keywords: ['notifications', 'push-notifications', 'pub-sub', 'ntfy', 'self-hosted', 'alerting'],
     hasValuesSchema: true,
