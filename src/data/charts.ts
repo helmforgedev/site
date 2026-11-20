@@ -771,7 +771,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '3.1.0',
-    appVersion: '26.8.1',
+    appVersion: '26.8.2',
     category: 'security',
     keywords: ['keycloak', 'identity', 'oidc', 'sso'],
     hasValuesSchema: true,
