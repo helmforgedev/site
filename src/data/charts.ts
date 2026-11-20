@@ -1057,7 +1057,7 @@ export const charts: Chart[] = [
     description: 'MySQL for Kubernetes with explicit standalone and replication modes',
     maturity: 'stable',
     backup: true,
-    version: '2.4.0',
+    version: '2.4.1',
     appVersion: '26.7.0',
     category: 'database',
     keywords: ['mysql', 'database', 'replication'],
