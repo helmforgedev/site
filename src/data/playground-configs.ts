@@ -5620,7 +5620,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.72.0',
+          default: 'v0.74.0',
           description: 'Pinned official MediKeep image tag',
         },
         {

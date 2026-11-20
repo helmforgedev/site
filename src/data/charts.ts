@@ -903,7 +903,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.1.2',
-    appVersion: '0.72.0',
+    appVersion: '0.74.0',
     category: 'skip-prediction',
     keywords: [
       'medical-records',
