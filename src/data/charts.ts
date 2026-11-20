@@ -825,7 +825,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '2.1.0',
-    appVersion: '1.12.6',
+    appVersion: '1.13.2',
     category: 'ai-machine-learning',
     keywords: ['langflow', 'kubernetes', 'helm'],
     hasValuesSchema: true,
