@@ -718,7 +718,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.12',
-    appVersion: '2.580.1',
+    appVersion: '2.580.2',
     category: 'integration-delivery',
     keywords: ['jenkins', 'ci', 'cd', 'automation', 'devops', 'pipeline', 'jcasc', 'kubernetes'],
     hasValuesSchema: true,
