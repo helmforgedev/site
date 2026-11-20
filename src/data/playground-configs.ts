@@ -12255,7 +12255,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v2.32.0',
+          default: 'v2.38.1',
           description: 'Pinned ntfy image tag',
         },
         {
@@ -18412,7 +18412,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '0.32.1',
+          default: '0.35.0',
           description: 'Pinned NoteDiscovery image tag',
         },
         {
