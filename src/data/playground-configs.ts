@@ -18654,7 +18654,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.0.64',
+          default: 'v0.1.3',
           description: 'Pinned Kubernetes MCP Server image tag',
         },
         {
