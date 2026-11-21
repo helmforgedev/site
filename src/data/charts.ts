@@ -1204,7 +1204,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.2',
-    appVersion: '7.2.4',
+    appVersion: '7.2.5',
     category: 'skip-prediction',
     keywords: ['opencloud', 'files', 'collaboration', 'webdav'],
     hasValuesSchema: true,
