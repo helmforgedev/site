@@ -1363,7 +1363,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.8',
-    appVersion: '1.19.2',
+    appVersion: '1.20.2',
     category: 'database',
     keywords: ['qdrant', 'kubernetes', 'helm'],
     hasValuesSchema: true,

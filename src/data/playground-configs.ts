@@ -18163,7 +18163,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v1.18.2',
+          default: 'v1.20.2',
           description: 'Pinned Qdrant image tag',
         },
         {
