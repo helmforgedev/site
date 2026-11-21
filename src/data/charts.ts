@@ -1403,7 +1403,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '3.2.1',
-    appVersion: '8.10.2',
+    appVersion: '8.10.3',
     category: 'database',
     keywords: ['redis', 'cache', 'datastore', 'sentinel', 'cluster', 'database', 'key-value', 'in-memory', 'ha'],
     hasValuesSchema: true,
