@@ -1826,7 +1826,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.2.1',
-    appVersion: '10.0.1',
+    appVersion: '10.2.0',
     category: 'database',
     keywords: ['questdb', 'database', 'time-series', 'analytics', 'kubernetes'],
     hasValuesSchema: true,
