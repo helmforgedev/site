@@ -1376,7 +1376,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.8.0',
-    appVersion: '4.3.6',
+    appVersion: '4.4.0',
     category: 'streaming-messaging',
     keywords: ['rabbitmq', 'amqp', 'messaging', 'queue', 'cluster'],
     hasValuesSchema: true,
