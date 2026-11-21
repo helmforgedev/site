@@ -1337,7 +1337,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.2.0',
-    appVersion: '18.6',
+    appVersion: '18.7',
     category: 'database',
     keywords: ['postgresql', 'postgres', 'database', 'replication'],
     hasValuesSchema: true,
