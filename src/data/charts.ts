@@ -1163,7 +1163,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.3.0',
-    appVersion: '3000.20.0',
+    appVersion: '3000.22.0',
     category: 'integration-delivery',
     keywords: ['olivetin', 'shell', 'commands', 'automation', 'web-ui', 'self-hosted'],
     hasValuesSchema: true,
