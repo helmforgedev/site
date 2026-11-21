@@ -10557,7 +10557,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '5.2.3',
+          default: '5.2.4',
           description: 'Pinned openHAB image tag',
         },
         {

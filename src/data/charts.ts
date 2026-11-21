@@ -1230,7 +1230,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.2.4',
-    appVersion: '5.2.3',
+    appVersion: '5.2.4',
     category: 'integration-delivery',
     keywords: ['openhab', 'home-automation', 'iot', 'smarthome', 'automation', 'kubernetes'],
     hasValuesSchema: true,
