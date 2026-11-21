@@ -4926,7 +4926,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '26.6.2-rootless',
+          default: '26.7.1-rootless',
           description: 'Pinned official rootless image',
         },
         {
