@@ -1270,7 +1270,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.3',
-    appVersion: '26.7.0',
+    appVersion: '26.7.1',
     category: 'skip-prediction',
     keywords: ['papra', 'documents', 'archive', 'kubernetes'],
     hasValuesSchema: true,
