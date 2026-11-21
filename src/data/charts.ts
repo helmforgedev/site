@@ -1296,7 +1296,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.2.2',
-    appVersion: '2026.10.0',
+    appVersion: '2026.11.0',
     category: 'networking',
     keywords: ['pihole', 'dns', 'ad-blocker', 'network', 'dnsmasq', 'unbound'],
     hasValuesSchema: true,
