@@ -1813,7 +1813,7 @@ export const charts: Chart[] = [
     maturity: 'alpha',
     backup: false,
     version: '1.1.4',
-    appVersion: '3.3.2',
+    appVersion: '3.4.2',
     category: 'skip-prediction',
     keywords: ['paperless-ngx', 'paperless', 'document-management', 'dms', 'ocr', 'archive', 'postgres', 'valkey'],
     hasValuesSchema: true,
