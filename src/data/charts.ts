@@ -1564,7 +1564,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.12',
-    appVersion: '2.49.0',
+    appVersion: '2.59.1',
     category: 'skip-prediction',
     keywords: ['twenty', 'crm'],
     hasValuesSchema: true,
