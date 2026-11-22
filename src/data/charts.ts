@@ -1840,7 +1840,7 @@ export const charts: Chart[] = [
     maturity: 'alpha',
     backup: false,
     version: '1.2.0',
-    appVersion: '1.0.3',
+    appVersion: '1.0.6',
     category: 'storage',
     keywords: ['rustfs', 's3', 'storage', 'object-storage', 'cluster', 'replication'],
     hasValuesSchema: true,
