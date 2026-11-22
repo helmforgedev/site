@@ -1496,7 +1496,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.2.0',
-    appVersion: '5.6.2',
+    appVersion: '5.9.0',
     category: 'skip-prediction',
     keywords: ['strava', 'fitness', 'statistics', 'dashboard', 'cycling', 'running', 'self-hosted'],
     hasValuesSchema: true,
