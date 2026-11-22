@@ -1879,7 +1879,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.1.5',
-    appVersion: '3.3.1',
+    appVersion: '4.0.1',
     category: 'ai-machine-learning',
     keywords: ['webodm', 'photogrammetry', 'drones', 'geospatial', 'kubernetes'],
     hasValuesSchema: true,
