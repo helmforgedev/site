@@ -1680,7 +1680,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.2.1',
-    appVersion: '3.9.6',
+    appVersion: '3.9.7',
     category: 'database',
     keywords: ['zookeeper', 'coordination', 'distributed-systems', 'quorum', 'apache'],
     hasValuesSchema: true,
