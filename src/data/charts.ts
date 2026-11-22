@@ -1853,7 +1853,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.1.2',
-    appVersion: '0.16.27',
+    appVersion: '1.1.1',
     category: 'networking',
     keywords: ['stalwart', 'mail', 'smtp', 'imap', 'jmap'],
     hasValuesSchema: true,
