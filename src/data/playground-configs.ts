@@ -5135,7 +5135,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v3.8.3',
+          default: 'v3.8.10',
           description: 'Pinned official SiYuan release',
         },
         {

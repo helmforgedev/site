@@ -1443,7 +1443,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.5',
-    appVersion: '3.8.7',
+    appVersion: '3.8.10',
     category: 'skip-prediction',
     keywords: ['siyuan', 'notes', 'knowledge', 'workspace'],
     hasValuesSchema: true,
