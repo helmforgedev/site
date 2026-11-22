@@ -1667,7 +1667,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '3.3.1',
-    appVersion: '7.1.3',
+    appVersion: '7.1.4',
     category: 'integration-delivery',
     keywords: ['wordpress', 'cms', 'blog', 'php', 'mysql'],
     hasValuesSchema: true,
