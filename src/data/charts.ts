@@ -1654,7 +1654,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.3.14',
-    appVersion: '2.6.14',
+    appVersion: '2.6.17',
     category: 'skip-prediction',
     keywords: ['wallabag', 'read-it-later', 'bookmarks', 'articles', 'self-hosted'],
     hasValuesSchema: true,
