@@ -1866,7 +1866,7 @@ export const charts: Chart[] = [
     maturity: 'beta',
     backup: false,
     version: '1.2.2',
-    appVersion: '1.32.1',
+    appVersion: '1.32.2',
     category: 'integration-delivery',
     keywords: ['temporal', 'workflows', 'orchestration', 'gateway-api'],
     hasValuesSchema: true,
