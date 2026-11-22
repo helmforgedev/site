@@ -1536,7 +1536,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.0.10',
-    appVersion: '11.0.27',
+    appVersion: '11.0.29',
     category: 'integration-delivery',
     keywords: ['tomcat', 'apache', 'java', 'jakarta-ee', 'servlet', 'jsp', 'webserver', 'application-server'],
     hasValuesSchema: true,
