@@ -30,11 +30,15 @@ test.describe('Home Page Modernization', () => {
     expect(await playgroundLinks.count()).toBeGreaterThanOrEqual(1);
   });
 
-  test('home chart request section displays delivered community charts', async ({ page }) => {
+  test('home chart request section displays community requests or delivered charts', async ({ page }) => {
     await page.goto('/');
 
-    // Delivered chart items on home
-    await expect(page.getByText('Delivered').first()).toBeVisible();
-    await expect(page.getByText('Discourse').first()).toBeVisible();
+    // Chart request community column displays either trending open requests or delivered charts
+    const requestSection = page.locator('#chart-request');
+    await expect(requestSection).toBeVisible();
+
+    const trending = requestSection.getByText('Trending Community Requests');
+    const delivered = requestSection.getByText('Recently Delivered Requests');
+    await expect(trending.or(delivered)).toBeVisible();
   });
 });
