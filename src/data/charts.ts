@@ -96,7 +96,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '2.1.3',
-    appVersion: '2.7.2',
+    appVersion: '2.7.4',
     category: 'integration-delivery',
     keywords: ['appwrite', 'baas', 'backend', 'api', 'database', 'authentication', 'storage', 'functions'],
     hasValuesSchema: true,
