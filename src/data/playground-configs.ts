@@ -17278,6 +17278,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2.1.4-alpine',
+          description: 'Official eclipse-mosquitto image tag',
+        },
+        {
           label: 'Architecture',
           key: 'architecture.mode',
           type: 'select',
