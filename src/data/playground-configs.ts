@@ -6886,7 +6886,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '1.31.7',
+          default: '1.31.10',
           description: 'Container image tag',
         },
       ],
