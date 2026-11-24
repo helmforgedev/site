@@ -6620,7 +6620,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '5.14.2-apache',
+          default: '5.14.3-apache',
           description: 'Pinned official Matomo Apache image tag',
         },
         {
