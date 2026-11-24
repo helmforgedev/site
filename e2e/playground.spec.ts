@@ -211,8 +211,8 @@ test.describe('Playground', () => {
   test('minecraft uses its verified image tag', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="minecraft"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.9.0');
-    await expect(page.locator('#playground-code')).not.toContainText('2026.8.3');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.11.1');
+    await expect(page.locator('#playground-code')).not.toContainText('2026.11.0');
   });
   test('matterbridge defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
