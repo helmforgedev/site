@@ -396,7 +396,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: true,
     version: '1.4.9',
-    appVersion: '0.97.0',
+    appVersion: '0.98.0',
     category: 'skip-prediction',
     keywords: ['docmost', 'wiki', 'documentation', 'knowledge-base', 'collaboration', 'postgres', 'redis'],
     hasValuesSchema: true,
