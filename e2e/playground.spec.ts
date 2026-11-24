@@ -230,7 +230,7 @@ test.describe('Playground', () => {
   test('matomo exposes the patched image and independent HTTP ports', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="matomo"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('5.14.2-apache');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('5.14.3-apache');
     const listenerPort = page.locator('input[data-field-key="containerPorts.http"]');
     const servicePort = page.locator('input[data-field-key="service.port"]');
     await expect(listenerPort).toHaveValue('80');
