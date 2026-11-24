@@ -217,7 +217,7 @@ test.describe('Playground', () => {
   test('matterbridge defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="matterbridge"]').click();
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('3.10.14');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('3.11.4');
     await expect(page.locator('input[data-field-key="frontend.port"]')).toHaveValue('8283');
     await expect(page.locator('input[data-field-key="service.port"]')).toHaveValue('8283');
     await page.locator('input[data-field-key="frontend.port"]').fill('8383');
