@@ -436,7 +436,7 @@ export const charts: Chart[] = [
     maturity: 'stable',
     backup: false,
     version: '1.4.0',
-    appVersion: '38.0.0',
+    appVersion: '39.0.0',
     category: 'database',
     keywords: ['druid', 'analytics', 'olap', 'database', 'realtime', 'query'],
     hasValuesSchema: true,
