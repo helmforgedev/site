@@ -17181,6 +17181,13 @@ export const chartConfigs: Record<string, ChartConfig> = {
       name: 'General',
       fields: [
         {
+          label: 'Image Tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '2026.11.1',
+          description: 'itzg/minecraft-server container image tag',
+        },
+        {
           label: 'Server Type',
           key: 'server.type',
           type: 'select',
