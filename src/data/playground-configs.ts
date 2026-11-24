@@ -20258,7 +20258,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v0.64.2',
+          default: 'v0.65.6',
           description: 'Pinned Metabase image tag',
         },
         {
