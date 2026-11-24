@@ -991,7 +991,7 @@ export const charts: Chart[] = [
     description: 'A Helm chart for deploying Minecraft Java Edition servers on Kubernetes',
     maturity: 'stable',
     backup: true,
-    version: '1.5.9',
+    version: '1.5.10',
     appVersion: '2026.11.1',
     category: 'skip-prediction',
     keywords: ['minecraft', 'game-server', 'java', 'paper', 'forge', 'fabric', 'geyser', 'bedrock'],
