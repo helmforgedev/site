@@ -5277,6 +5277,18 @@ export const chartConfigs: Record<string, ChartConfig> = {
   ],
   moodle: [
     {
+      name: 'General',
+      fields: [
+        {
+          label: 'Image tag',
+          key: 'image.tag',
+          type: 'text',
+          default: '8.4-bookworm',
+          description: 'Official PHP/Apache runtime container image tag',
+        },
+      ],
+    },
+    {
       name: 'Database',
       collapsible: true,
       fields: [
