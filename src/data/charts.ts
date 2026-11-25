@@ -628,6 +628,19 @@ export const charts: Chart[] = [
     icon: '/icons/charts/gophish.png',
   },
   {
+    name: 'Grafana',
+    slug: 'grafana',
+    description: 'Grafana observability dashboards with declarative provisioning and guarded high availability.',
+    maturity: 'stable',
+    backup: false,
+    version: '1.0.0',
+    appVersion: '13.3.2',
+    category: 'monitoring-logging',
+    keywords: ['grafana', 'observability', 'dashboards', 'monitoring', 'visualization', 'kubernetes'],
+    hasValuesSchema: true,
+    icon: '/icons/charts/grafana.png',
+  },
+  {
     name: 'Guacamole',
     slug: 'guacamole',
     description:

@@ -162,6 +162,18 @@ for (const entry of entries) {
 // Ensure documented charts that are in PR/companion branches remain in catalog
 const COMPANION_DOCUMENTED_CHARTS = [
   {
+    name: 'Grafana',
+    slug: 'grafana',
+    description: 'Grafana observability dashboards with declarative provisioning and guarded high availability.',
+    maturity: 'stable',
+    backup: false,
+    version: '1.0.0',
+    appVersion: '13.3.2',
+    category: 'monitoring-logging',
+    keywords: ['grafana', 'observability', 'dashboards', 'monitoring', 'visualization', 'kubernetes'],
+    hasValuesSchema: true,
+  },
+  {
     name: 'Attic',
     slug: 'attic',
     description: 'Nix binary cache with standalone SQLite storage or distributed PostgreSQL and S3 operation.',
@@ -301,11 +313,11 @@ for (const comp of COMPANION_DOCUMENTED_CHARTS) {
   if (!existingSlugs.has(comp.slug)) {
     catalog.push({
       ...comp,
-      version: '1.0.0',
-      appVersion: 'latest',
-      category: 'general',
-      keywords: [comp.slug],
-      hasValuesSchema: false,
+      version: comp.version || '1.0.0',
+      appVersion: comp.appVersion || 'latest',
+      category: comp.category || 'general',
+      keywords: comp.keywords || [comp.slug],
+      hasValuesSchema: comp.hasValuesSchema || false,
       icon: `/icons/charts/${comp.slug}.png`,
     });
     existingSlugs.add(comp.slug);
