@@ -232,6 +232,24 @@ test.describe('Playground', () => {
     await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('2026.11.1');
     await expect(page.locator('#playground-code')).not.toContainText('2026.11.0');
   });
+  test('minecraft backup workload identity supports EKS Pod Identity and IRSA', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="minecraft"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    await expect(code).toContainText('set backup.s3.region');
+
+    await page.locator('input[data-field-key="backup.s3.region"]').fill('us-east-1');
+    await expect(code).toContainText('backup.s3.credentialsFromPodIdentity=true');
+
+    await page
+      .getByText('IRSA Role ARN', { exact: true })
+      .locator('xpath=../following-sibling::div//input')
+      .fill('arn:aws:iam::123456789012:role/minecraft-backup');
+    await expect(code).toContainText('arn:aws:iam::123456789012:role/minecraft-backup');
+  });
   test('matterbridge defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="matterbridge"]').click();
