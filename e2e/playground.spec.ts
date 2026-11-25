@@ -818,7 +818,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="wordpress"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('7.1.3-apache');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('7.1.5-apache');
     await page.locator('input[data-field-key="containerPorts.http"]').fill('8080');
     await page.locator('[data-section-toggle="Production Controls"]').click();
     await page.locator('button[data-field-key="networkPolicy.enabled"]').click();
