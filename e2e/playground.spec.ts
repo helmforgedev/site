@@ -390,7 +390,7 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="poznote"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.121.0');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('6.156.2');
     await expect(page.locator('input[data-field-key="containerPorts.http"]')).toHaveValue('80');
     await expect(page.locator('input[data-field-key="service.port"]')).toHaveValue('80');
     await expect(page.locator('input[data-field-key="persistence.data.size"]')).toHaveValue('5Gi');
