@@ -18049,7 +18049,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v1.18.4',
+          default: 'v1.19.0',
           description: 'Pinned Velero server image tag',
         },
         {
