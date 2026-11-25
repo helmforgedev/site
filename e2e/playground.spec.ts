@@ -385,6 +385,22 @@ test.describe('Playground', () => {
     await page.goto('/playground?chart=mongodb&architecture=replicaset&replicaSet.members=3&arbiter.enabled=true');
     await expect(page.locator('#playground-code')).not.toContainText('arbiter.enabled');
   });
+  test('mongodb backup workload identity supports EKS Pod Identity and IRSA', async ({ page }) => {
+    await page.goto('/playground');
+    await page.locator('.playground-chart-btn[data-slug="mongodb"]').click();
+    await page.locator('[data-section-toggle="S3 Backup"]').click();
+
+    const code = page.locator('#playground-code');
+    await page.locator('button[data-field-key="backup.s3.credentialsFromPodIdentity"]').click();
+    await expect(code).toContainText('backup.s3.credentialsFromPodIdentity=true');
+    await expect(page.locator('input[data-field-key="backup.s3.region"]')).toHaveValue('us-east-1');
+
+    await page
+      .getByText('IRSA Role ARN', { exact: true })
+      .locator('xpath=../following-sibling::div//input')
+      .fill('arn:aws:iam::123456789012:role/mongodb-backup');
+    await expect(code).toContainText('arn:aws:iam::123456789012:role/mongodb-backup');
+  });
 
   test('ntfy defaults stay aligned with the chart', async ({ page }) => {
     await page.goto('/playground');
