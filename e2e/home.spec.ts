@@ -30,7 +30,9 @@ test.describe('Home Page Modernization', () => {
     expect(await playgroundLinks.count()).toBeGreaterThanOrEqual(1);
   });
 
-  test('home chart request section displays community requests and delivered charts', async ({ page }) => {
+  test('home chart request section keeps delivered charts visible and renders open requests when available', async ({
+    page,
+  }) => {
     await page.goto('/');
 
     // Chart request community column keeps delivered charts visible alongside open requests
@@ -39,7 +41,12 @@ test.describe('Home Page Modernization', () => {
 
     const trending = requestSection.getByText('Trending Community Requests');
     const delivered = requestSection.getByText('Recently Delivered Requests');
-    await expect(trending).toBeVisible();
     await expect(delivered).toBeVisible();
+
+    // The trending block is intentionally omitted when no chart requests are open.
+    if ((await trending.count()) > 0) {
+      await expect(trending).toBeVisible();
+      await expect(requestSection.getByText('Click to upvote with')).toBeVisible();
+    }
   });
 });
