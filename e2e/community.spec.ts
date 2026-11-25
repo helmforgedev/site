@@ -9,7 +9,7 @@ test.describe('Community & Governance Hub', () => {
     await expect(page.locator('h1')).toContainText('Built in the open, shaped by operators');
 
     // Metrics grid
-    await expect(page.getByText('135+').first()).toBeVisible();
+    await expect(page.getByText('136+').first()).toBeVisible();
     await expect(page.getByText('Production Charts').first()).toBeVisible();
     await expect(page.getByText('Apache-2.0').first()).toBeVisible();
     await expect(page.getByText('Quality Gate').first()).toBeVisible();
