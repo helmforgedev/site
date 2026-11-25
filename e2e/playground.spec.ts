@@ -436,8 +436,8 @@ test.describe('Playground', () => {
     await page.goto('/playground');
     await page.locator('.playground-chart-btn[data-slug="valkey"]').click();
 
-    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('9.1.2');
-    await expect(page.locator('input[data-field-key="tests.image.tag"]')).toHaveValue('9.1.2');
+    await expect(page.locator('input[data-field-key="image.tag"]')).toHaveValue('9.2.0');
+    await expect(page.locator('input[data-field-key="tests.image.tag"]')).toHaveValue('9.2.0');
     await expect(page.locator('select[data-field-key="architecture"]')).toHaveValue('standalone');
   });
 
