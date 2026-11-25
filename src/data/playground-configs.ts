@@ -12618,7 +12618,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '7.1.3-apache',
+          default: '7.1.5-apache',
           description: 'Pinned WordPress image tag',
         },
         {
