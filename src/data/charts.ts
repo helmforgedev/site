@@ -243,7 +243,7 @@ export const charts: Chart[] = [
     description: 'changedetection.io website change detection and monitoring with optional Playwright browser',
     maturity: 'stable',
     backup: false,
-    version: '1.1.24',
+    version: '1.1.25',
     appVersion: '0.70.4',
     category: 'monitoring-logging',
     keywords: ['monitoring', 'change-detection', 'website-monitoring', 'notifications', 'self-hosted'],
