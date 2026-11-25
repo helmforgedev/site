@@ -18140,7 +18140,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '6.121.0',
+          default: '6.156.2',
           description: 'Pinned Poznote image tag',
         },
         {
