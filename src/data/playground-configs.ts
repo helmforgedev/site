@@ -8,6 +8,155 @@
 // field definitions from values.schema.json.
 
 export const chartConfigs: Record<string, ChartConfig> = {
+  grafana: [
+    {
+      name: 'Deployment topology',
+      fields: [
+        {
+          label: 'Replicas',
+          key: 'replicaCount',
+          type: 'number',
+          default: '1',
+          min: 1,
+          max: 20,
+          description: 'More than one replica requires PostgreSQL or MySQL and no shared ReadWriteOnce volume',
+        },
+        {
+          label: 'Metadata database',
+          key: 'database.type',
+          type: 'select',
+          default: 'sqlite3',
+          options: ['sqlite3', 'postgres', 'mysql'],
+          description: 'SQLite is durable for one replica; use an external database for active-active Grafana',
+        },
+        {
+          label: 'External database host',
+          key: 'database.host',
+          type: 'text',
+          default: '',
+          description: 'Required for PostgreSQL or MySQL',
+        },
+        {
+          label: 'Database credential Secret',
+          key: 'database.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Secret containing the external database password key',
+        },
+      ],
+    },
+    {
+      name: 'Storage and identity',
+      fields: [
+        {
+          label: 'Persistent data',
+          key: 'persistence.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Persist SQLite metadata, plugins, and Grafana local state',
+        },
+        {
+          label: 'Storage size',
+          key: 'persistence.size',
+          type: 'text',
+          default: '10Gi',
+          description: 'Requested capacity for the Grafana data claim',
+        },
+        {
+          label: 'Storage class',
+          key: 'persistence.storageClass',
+          type: 'text',
+          default: '',
+          description: 'Leave empty to use the cluster default StorageClass',
+        },
+        {
+          label: 'Administrator Secret',
+          key: 'admin.existingSecret',
+          type: 'text',
+          default: '',
+          description: 'Existing Secret with admin-user and admin-password keys',
+        },
+      ],
+    },
+    {
+      name: 'HTTP and exposure',
+      fields: [
+        {
+          label: 'Grafana listener',
+          key: 'grafana.port',
+          type: 'number',
+          default: '3000',
+          min: 1024,
+          max: 65535,
+          description: 'Real process listener port',
+        },
+        {
+          label: 'Service port',
+          key: 'service.port',
+          type: 'number',
+          default: '80',
+          min: 1,
+          max: 65535,
+          description: 'Client-facing Service port independent from the listener',
+        },
+        {
+          label: 'Public root URL',
+          key: 'grafana.rootUrl',
+          type: 'text',
+          default: '',
+          description: 'Exact browser-visible URL used for redirects and OAuth callbacks',
+        },
+        {
+          label: 'Ingress',
+          key: 'ingress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create a Kubernetes Ingress',
+        },
+        {
+          label: 'Gateway API',
+          key: 'gatewayAPI.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Create canonical HTTPRoutes from gatewayAPI.httpRoutes',
+        },
+      ],
+    },
+    {
+      name: 'Operations',
+      fields: [
+        {
+          label: 'NetworkPolicy',
+          key: 'networkPolicy.enabled',
+          type: 'toggle',
+          default: 'true',
+          description: 'Restrict Grafana ingress to declared peers',
+        },
+        {
+          label: 'Egress isolation',
+          key: 'networkPolicy.egress.enabled',
+          type: 'toggle',
+          default: 'false',
+          description:
+            'Enable only after database, datasource, SMTP, auth, webhook, and plugin destinations are modeled',
+        },
+        {
+          label: 'ServiceMonitor',
+          key: 'metrics.serviceMonitor.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Scrape Grafana native metrics through Prometheus Operator',
+        },
+        {
+          label: 'PodDisruptionBudget',
+          key: 'pdb.enabled',
+          type: 'toggle',
+          default: 'false',
+          description: 'Enable only for an external-database deployment with multiple replicas',
+        },
+      ],
+    },
+  ],
   rustfs: [
     {
       name: 'Storage topology',

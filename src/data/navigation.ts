@@ -136,6 +136,7 @@ export const chartCategories: ChartCategory[] = [
   {
     label: 'Monitoring & Ops',
     charts: [
+      { label: 'Grafana', href: '/docs/charts/grafana', maturity: 'stable' },
       { label: 'OpenReplay', href: '/docs/charts/openreplay', maturity: 'beta' },
       { label: 'Uptime Kuma', href: '/docs/charts/uptime-kuma', maturity: 'stable' },
       { label: 'Velero', href: '/docs/charts/velero', maturity: 'stable' },
