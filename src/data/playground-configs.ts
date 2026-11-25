@@ -13691,7 +13691,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '2.5.6',
+          default: '2.5.12',
           description: 'Uptime Kuma image tag',
         },
         {
