@@ -3779,7 +3779,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: 'v2.49.0@sha256:80e1b33b0b4b9dc292e776c64c320be2ae9467677ce639ba9bde1cffca68a3b0',
+          default: 'v2.62.2',
           description: 'Official image pinned by immutable digest',
         },
         {
