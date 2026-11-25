@@ -4612,7 +4612,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image tag',
           key: 'image.tag',
           type: 'text',
-          default: '7.2.4',
+          default: '9.1.1',
           description: 'Pinned official OpenCloud release',
         },
         {
