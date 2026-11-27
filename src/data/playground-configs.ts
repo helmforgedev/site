@@ -11597,7 +11597,7 @@ export const chartConfigs: Record<string, ChartConfig> = {
           label: 'Image Tag',
           key: 'image.tag',
           type: 'text',
-          default: '8.3.8',
+          default: '9.0.8',
           description: 'Pinned MongoDB image tag',
         },
         {
