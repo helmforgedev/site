@@ -17305,6 +17305,38 @@ export const chartConfigs: Record<string, ChartConfig> = {
       ],
     },
     {
+      name: 'Replica Bootstrap',
+      collapsible: true,
+      fields: [
+        {
+          label: 'Bootstrap Method',
+          key: 'replication.readReplicas.bootstrap.method',
+          type: 'select',
+          default: 'logical',
+          options: ['logical', 'volumeSnapshot'],
+          description: 'Use a portable logical dump or an application-consistent CSI VolumeSnapshot',
+        },
+        {
+          label: 'VolumeSnapshot Name',
+          key: 'replication.readReplicas.bootstrap.volumeSnapshot.name',
+          type: 'text',
+          default: '',
+          visibleWhen: { 'replication.readReplicas.bootstrap.method': 'volumeSnapshot' },
+          requiredWhen: { 'replication.readReplicas.bootstrap.method': 'volumeSnapshot' },
+          description: 'Ready VolumeSnapshot of the writable source PVC in the release namespace',
+        },
+        {
+          label: 'Snapshot GTID',
+          key: 'replication.readReplicas.bootstrap.volumeSnapshot.gtid',
+          type: 'text',
+          default: '',
+          visibleWhen: { 'replication.readReplicas.bootstrap.method': 'volumeSnapshot' },
+          requiredWhen: { 'replication.readReplicas.bootstrap.method': 'volumeSnapshot' },
+          description: 'MariaDB GTID captured at the exact application-consistent snapshot point',
+        },
+      ],
+    },
+    {
       name: 'Resources',
       collapsible: true,
       fields: [
