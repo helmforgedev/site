@@ -16,8 +16,10 @@ test.describe('Changelog Page', () => {
     const items = page.locator('#changelog-list .changelog-item');
     expect(await items.count()).toBeGreaterThan(5);
 
-    // Filter by specific chart name
-    await searchInput.fill('redis');
+    // Filter by a chart that is present in the rendered release feed
+    const firstChart = await items.first().getAttribute('data-chart');
+    expect(firstChart).toBeTruthy();
+    await searchInput.fill(firstChart!);
     await page.waitForTimeout(200);
 
     // Visible items should be filtered
